@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[2764]:
+# In[1087]:
 
 
 from lxml import etree
@@ -18,12 +18,12 @@ from datetime import datetime
 import html2text
 
 
-# In[2765]:
+# In[1088]:
 
 
 # parsing xml file
 
-file='eCARE_ped_diagnostic.drawio'
+file='eCARE_ped_diagnostic-newskin.drawio'
 output_file='msfecare_ped.xlsx'
 form_id='msfecare_ped'
 treatment_flow=False
@@ -49,7 +49,7 @@ objects_elements.extend(list(objects.findall('UserObject')))
 objects_elements.extend(list(objects.findall('object')))
 
 
-# In[2766]:
+# In[1089]:
 
 
 # putting content of xml into dataframe df
@@ -86,7 +86,7 @@ df=pd.DataFrame(rows,columns=
 df.loc[df.tag=='UserObject','value']=df.label_userObject
 
 
-# In[2767]:
+# In[1090]:
 
 
 # make a constraint column
@@ -96,7 +96,7 @@ df.loc[df['max'].notna(),'constraint']=df['constraint'] + ' and .<=' + df['max']
 df.drop(columns=['min','max'],inplace=True)
 
 
-# In[2768]:
+# In[1091]:
 
 
 # unescape converts codings like &lt into <. 
@@ -118,7 +118,7 @@ df.loc[df['odk_type'].str.contains('select_',na=False),'value'] = df.loc[df['odk
 # remove also in decimal and integer
 df.loc[df['odk_type']=='decimal','value'] = df.loc[df['odk_type']=='decimal','value'].apply(lambda x: remove_html(x) if x!=None else None)
 df.loc[df['odk_type']=='integer','value'] = df.loc[df['odk_type']=='integer','value'].apply(lambda x: remove_html(x) if x!=None else None)
-
+df.loc[df['odk_type']=='calculate','value'] = df.loc[df['odk_type']=='calculate','value'].apply(lambda x: remove_html(x) if x!=None else None)
 
 
 # remove all html from 'value column' when dealing with the high flow of treatments
@@ -127,7 +127,7 @@ if treatment_flow == True:
     df['label_userObject'] = df['label_userObject'].apply(lambda x: remove_html(x) if x!=None else None)
 
 
-# In[2769]:
+# In[1092]:
 
 
 df['name']=df['tooltip']
@@ -159,7 +159,7 @@ df.value.fillna('',inplace=True)
 # df.tail()
 
 
-# In[2770]:
+# In[1093]:
 
 
 # make a dataframe with connectors only
@@ -171,7 +171,7 @@ df.drop(df_arrows.index,inplace=True)
 df_arrows.head()
 
 
-# In[2771]:
+# In[1094]:
 
 
 # creating a folder for images and other media
@@ -181,7 +181,7 @@ if not(os.path.isdir('media')): # check if it exists, because if it does, error 
     os.mkdir('media')
 
 
-# In[2772]:
+# In[1095]:
 
 
 # finding png images that belong to container-hint-media (not included are those that belong to select_options)
@@ -221,7 +221,48 @@ df.drop(index_delete,inplace=True)
 df.loc[df['media::image::English (en)'].notna()].head()
 
 
-# In[2773]:
+# In[1096]:
+
+
+# finding jpeg images that belong to container-hint-media (not included are those that belong to select_options)
+df.loc[df['style'].str.contains("image/jpeg",na=False),'odk_type']='jpeg-image'+df.name+'.jpeg'
+
+# getting a dataframe with png-images only (better for joining with df later)
+# images:rows where 'xml-parent' is inside the index of rows that have the entry 'container_hint_media' in odk_type column, 
+# of those rows we extract those where the 'type' column contains the substring 'png-image'
+# and of the result we just take the columns 'xml-parent', 'odk_type' and 'style'
+# 'xml-parent' is the container it belongs to and the line that will contain the info about the image
+# 'odk_type' contains also the file name .png
+# 'style' contains the actual image data
+
+df_png=df.loc[df['xml-parent'].isin(df.loc[df['odk_type']=='container_hint_media'].index) 
+              & df['odk_type'].str.contains('jpeg-image',na=False),
+              ['xml-parent','odk_type','style']] # images that are in 'containers_hint_media'
+
+# getting image data from 'style' column for all images (from containers AND select_options) and storing it to disk
+df_pngAll=df.loc[df['odk_type'].str.contains('jpeg-image',na=False),['xml-parent','odk_type','style']]
+for index, row in df_pngAll.iterrows():
+    string = row['style'] 
+    img_data=re.search('image/jpeg,(.+?);',string).group(1) # extract image data from 'style' column using regex
+    with open('media/'+row['odk_type'], "wb") as fh:
+        fh.write(base64.decodebytes(img_data.encode('ascii'))) # encode image into ascii (binary) and save
+
+df_png.rename({'xml-parent':'container_id','odk_type':'media::image::English (en)'},axis=1,inplace=True)
+index_delete=df_png.index
+df_png.set_index('container_id',inplace=True)
+df_png.drop('style',axis=1,inplace=True)
+
+# joinging df and df_png (this adds the media-image column to df)
+#df=df.join(df_png)
+df.update(df_png)
+
+# remove the rows with those 'png messages' in df as they are no longer needed
+df.drop(index_delete,inplace=True)
+
+df.loc[df['media::image::English (en)'].notna()].head()
+
+
+# In[1097]:
 
 
 # getting an dataframe with HINT-images only (better for joining later)
@@ -243,7 +284,7 @@ df.drop(index_delete,inplace=True)
 df.loc[df['hint::English (en)'].notna()].head()
 
 
-# In[2774]:
+# In[1098]:
 
 
 # getting an dataframe with Help-images only (better for joining later)
@@ -265,7 +306,7 @@ df.drop(index_delete,inplace=True)
 df.loc[df['help::English (en)'].notna()].head()
 
 
-# In[2775]:
+# In[1099]:
 
 
 # make a dataframe that will be needed later to replace sources in df_arrows which are inside a container, by the container itself
@@ -278,7 +319,7 @@ df_new_arrow_sources.rename({'xml-parent':'container_id','odk_type':'odk_type_of
 df_new_arrow_sources = df_new_arrow_sources.merge(df[['odk_type']],how='left',left_on='container_id',right_index=True)
 
 
-# In[2776]:
+# In[1100]:
 
 
 # getting an dataframe with text cells inside the containers only (better for joining later)
@@ -320,10 +361,10 @@ df.drop('value_label',axis=1,inplace=True)
 # remove the rows with 'labels messages from containers' in df as they are no longer needed
 df.drop(index_delete,inplace=True)
 
-df.loc[df['hint::English (en)'].notna() | df['media::image::English (en)'].notna() | df['help::English (en)'].notna()].head()
+# df.loc[df['hint::English (en)'].notna() | df['media::image::English (en)'].notna() | df['help::English (en)'].notna()].head()
 
 
-# In[2777]:
+# In[1101]:
 
 
 # for connectors where the source is inside a container-hint-media, replace the source with the container itself
@@ -337,7 +378,7 @@ df_arrows.drop(columns=['container_id','odk_type_of_content','container_type'],i
 df_arrows.fillna('',inplace=True)
 
 
-# In[2778]:
+# In[1102]:
 
 
 # giving rhombus a 'odk_type'
@@ -357,7 +398,7 @@ df_choices.rename({'name_y':'list_name','name_x':'name','value':'label::English 
 df.drop(df_choices.index,inplace=True)
 
 # make a dataframe that contains only remaining image objects (those that belong to options)
-df_png = df.loc[df['odk_type'].str.contains('png-image',na=False),'odk_type'].to_frame()
+df_png = df.loc[df['odk_type'].str.contains('-image',na=False),'odk_type'].to_frame()
 # drop the select_option images from df
 df.drop(df_png.index)
 # merge with df_arrows to add the 
@@ -378,7 +419,7 @@ df_choices.loc['zzz_yes']=yes
 df_choices.loc['zzz_no']=no
 
 
-# In[2779]:
+# In[1103]:
 
 
 # preparing df_arrows for logic part:
@@ -417,7 +458,7 @@ df_arrows.drop(['name_x','list_name','odk_type'],axis=1,inplace=True)
 df_arrows.rename(columns={'name_y':'select_option'},inplace=True)
 
 
-# In[2780]:
+# In[1104]:
 
 
 df_arrows['expression']=''
@@ -440,7 +481,7 @@ df_arrows.loc[df_arrows['source_type']=='select_multiple','expression'] = 'selec
 df_arrows.loc[df_arrows['source_type']=='calculate','expression'] = '${'+df_arrows['source_name'] + '}=1'
 
 
-# In[2781]:
+# In[1105]:
 
 
 # expression for target being a count---> in this case the expression depends not on the source but on the target!
@@ -452,7 +493,7 @@ df_arrows.loc[m,'expression'] = 'number(' + df_arrows.loc[m,'expression'] + ')'
 # from there on, a rhombus, referring to a counter can lookup the entire expression
 
 
-# In[2782]:
+# In[1106]:
 
 
 # expression for rhombus
@@ -474,25 +515,30 @@ df_arrows.rename(columns={'value_x':'value','value_y':'value_of_rhombus'},inplac
 # set all 'NaN' to empty strings
 df_arrows=df_arrows.fillna('')
 
-# when rhombus refers to a select_one yesno
-m = (df_arrows['source_type']=='rhombus') & (df_arrows['rhombus_refer_to_odk_type']=='select_one yesno')
-df_arrows.loc[m,'expression'] = '${'+df_arrows['source_name'] + '}=' + '\'' + df_arrows.value + '\''
+
+# In[1107]:
+
 
 # when rhombus refers to a an integer or decimal
 m = (df_arrows['source_type']=='rhombus') & (df_arrows['rhombus_refer_to_odk_type'].isin(['integer','decimal']))
 df_arrows.loc[m,'value_of_rhombus'] = df_arrows.loc[m,'value_of_rhombus'].str.replace(r'^[^<=>]+','',regex=True) # only keep what comes after <,= or >
 df_arrows.loc[m,'value_of_rhombus'] = df_arrows.loc[m,'value_of_rhombus'].str.replace('?','',regex=False) # remove the '?' at the end
 df_arrows.loc[m,'expression'] = '${'+df_arrows['source_name'] + '}' + df_arrows['value_of_rhombus']
-df_arrows.loc[m & (df_arrows['value']=='No')] = df_arrows.loc[m & (df_arrows['value']=='No')].replace({'<':'>','>':'<'},regex=True)
+df_arrows.loc[m & (df_arrows['value']=='No')] = df_arrows.loc[m & (df_arrows['value']=='No')].replace({'<=':'>','>=':'<','<':'>=','>':'<='},regex=True)
+
+# when rhombus refers to a select_one yesno
+m = (df_arrows['source_type']=='rhombus') & (df_arrows['rhombus_refer_to_odk_type']=='select_one yesno')
+df_arrows.loc[m,'expression'] = '${'+df_arrows['source_name'] + '}=' + '\'' + df_arrows.value + '\''
 
 # this is very specific for MSFeCARE where the age is a select_one, but then there are rhombus refering to it as if it was 
-# an integer!!! Must do this like that in the short run, but a better fix is needed in the future. 
-m = (df_arrows['source_type']=='rhombus') & (df_arrows['rhombus_refer_to_odk_type']=='select_one') & (df_arrows['source_name']=='p_age')
-df_arrows.loc[m,'value_of_rhombus'] = df_arrows.loc[m,'value_of_rhombus'].str.replace(r'^[^<=>]+','',regex=True) # only keep what comes after <,= or >
-df_arrows.loc[m,'expression'] = '${'+df_arrows['source_name'] + '}' + df_arrows['value_of_rhombus']
+# an integer!!! Must do this like that in the short run, but a better fix is needed in the future. ----> MAKE THIS WORK AT SOME POINT!!! disabled for now, the TRICC drawing is adapted accordingly
+#m = (df_arrows['source_type']=='rhombus') & (df_arrows['rhombus_refer_to_odk_type']=='select_one') & (df_arrows['source_name']=='p_age')
+#df_arrows.loc[m,'value_of_rhombus'] = df_arrows.loc[m,'value_of_rhombus'].str.replace(r'^[^<=>]+','',regex=True) # only keep what comes after <,= or >
+#df_arrows.loc[m,'expression'] = '${'+df_arrows['source_name'] + '}' + df_arrows['value_of_rhombus']
 
 # now the real select_ones:
-m = (df_arrows['source_type']=='rhombus') & df_arrows['rhombus_refer_to_odk_type'].str.contains('select_',na=False) & (df_arrows['source_name']!='p_age')
+# m = (df_arrows['source_type']=='rhombus') & df_arrows['rhombus_refer_to_odk_type'].str.contains('select_',na=False) & (df_arrows['source_name']!='p_age')
+m = (df_arrows['source_type']=='rhombus') & df_arrows['rhombus_refer_to_odk_type'].str.contains('select_',na=False) & (df_arrows['rhombus_refer_to_odk_type']!='select_one yesno')
 df_arrows.loc[m,'value_of_rhombus'] = df_arrows.loc[m,'value_of_rhombus'].str.extract(r'\[(.*?)\]',expand=False)
 # merge again with df_choices to get the 'name' of the selected option (also needed for select_multiple!)
 df_arrows = df_arrows.merge(df_choices[['list_name','name','label::English (en)']],                 how='left',left_on=['source_name','value_of_rhombus'],right_on=['list_name','label::English (en)'])
@@ -509,6 +555,10 @@ df_arrows.loc[m & (df_arrows['value']=='Yes'),'expression'] = 'selected(${'+df_a
 # when the outgoing arrow is NO (means that what is in RHOMBUS is FALSE)
 df_arrows.loc[m & (df_arrows['value']=='No'),'expression'] = 'not(selected(${'+df_arrows['source_name'] + '},\'' + df_arrows['name'] + '\'))'
 
+
+# In[1108]:
+
+
 # when rhombus refers to calculate
 m = (df_arrows['source_type']=='rhombus') & (df_arrows['rhombus_refer_to_odk_type']=='calculate')
 # when the outgoing arrow is YES (means that what is in RHOMBUS is TRUE)
@@ -517,7 +567,7 @@ df_arrows.loc[m & (df_arrows['value']=='Yes'),'expression'] = '${'+df_arrows['so
 df_arrows.loc[m & (df_arrows['value']=='No'),'expression'] = '${'+df_arrows['source_name'] + '}=0'
 
 
-# In[2783]:
+# In[1109]:
 
 
 # when rhombus refers to a count (in this case we must combine all 'expressions' of the incoming arrows into the count object 
@@ -533,6 +583,8 @@ gk = df_arrows.loc[m1].groupby('target') # group them by counters
 for elem, group in gk:
     # for each counter (elem), combine the expressions of all incoming arrows into a single one, concatenated with +
     full_expression=' + '.join(filter(None,group['expression']))
+    # put result into brackets, because comparison is executed BEFORE +
+    full_expression = '(' + full_expression + ')'
     
     # lookup the 'name' of the counter in df, based on the id = target
     counter_name = df.loc[elem,'name']
@@ -541,29 +593,23 @@ for elem, group in gk:
     df_arrows.loc[m & (df_arrows['source_name']==counter_name),'expression'] = full_expression + df_arrows['value_of_rhombus']
     
     # for the 'No' arrow we invert > and <
-    df_arrows.loc[m & (df_arrows['source_name']==counter_name) & (df_arrows['value']=='No'),'expression'] = df_arrows.loc[m & (df_arrows['source_name']==counter_name) & (df_arrows['value']=='No'),'expression'].replace({'<':'>','>':'<'},regex=True)
+    df_arrows.loc[m & (df_arrows['source_name']==counter_name) & (df_arrows['value']=='No'),'expression'] = df_arrows.loc[m & (df_arrows['source_name']==counter_name) & (df_arrows['value']=='No'),'expression'].replace({'<=':'>','>=':'<','<':'>=','>':'<='},regex=True)
 
 
-# In[2784]:
+# In[1110]:
 
-
-# also drop count objects from df, they are no longer needed
-df.drop(df[df['odk_type']=='count'].index,inplace=True)
 
 # also drop the arrows that point to counters
-df_arrows.drop(df_arrows[m1].index,inplace=True)
+df_arrows = df_arrows[df_arrows['target'].isin(df.loc[df['odk_type']!='count'].index)]
 
 # drop no longer necessary columns
 df_arrows.drop(columns=['value','value_of_rhombus','source_name','rhombus_refer_to_odk_type','list_name','label::English (en)','name'],inplace=True)
 
-
-# In[2785]:
-
-
-df_arrows.drop(df_arrows[m1].index,inplace=True)
+# also drop count objects from df, they are no longer needed
+df.drop(df[df['odk_type']=='count'].index,inplace=True)
 
 
-# In[2786]:
+# In[1111]:
 
 
 '''A rhombus can refer to a field that is not in the drawing. For instance, in the TT flow, where values like fever are used
@@ -572,7 +618,7 @@ For this, the symbols are drawn in the beginning of the flow, pointing to the no
 Once this is done, it is handled correctly by the script and they get included. '''
 
 
-# In[2787]:
+# In[1112]:
 
 
 # modifying the sources of select_options:
@@ -594,7 +640,7 @@ df_arrows.loc[m_select,'source']=df_arrows.loc[m_select,'id']
 df_arrows.drop(columns=['list_name','id','name'],inplace=True)
 
 
-# In[2788]:
+# In[1113]:
 
 
 # for connectors where the source is inside a container-hint-media, replace the source with the container itself
@@ -606,7 +652,7 @@ df_arrows.loc[m,'source']=df_arrows.loc[m,'container_id']
 df_arrows.loc[m,'source_type']=df_arrows.loc[m,'odk_type_of_content']
 
 
-# In[2789]:
+# In[1114]:
 
 
 # get container_ids of pages
@@ -617,6 +663,11 @@ page_objects = df.loc[df['xml-parent'].isin(container_ids)].index
 
 # get those page_objects which are the starting point of the flow INSIDE the page
 page_starts = page_objects[~page_objects.isin(df_arrows['target'])]
+
+# get the page_starts that are a rhombus (needed for later)
+page_starts_rhombus = df.loc[page_starts].loc[df['odk_type']=='rhombus'].index
+
+# get the page_objects where all objects in a single page are notes (needed for later)
 
 # get page_start - container_id pairs
 dfnew_connectors = df.loc[page_starts,['xml-parent']].reset_index().rename(columns={'id':'target','xml-parent':'source'})
@@ -634,7 +685,7 @@ df_arrows = df_arrows.merge(df['odk_type'],how='left',left_on='target',right_ind
 df_arrows.rename(columns={'odk_type':'target_type'},inplace=True)
 
 
-# In[2790]:
+# In[1115]:
 
 
 # all connectors are present, we build the graph with networkx
@@ -649,55 +700,198 @@ order = list(nx.lexicographical_topological_sort(dg))
 df=df.reindex(order)
 
 
-# In[2791]:
+# In[1116]:
+
+
+# This is necessary because there are pure note pages. In this case notes that point ouf of the page, have no 'expression'
+# and this interrupts the flow. The solution is to give those 'notes' as expression the 'relevant' of the page, while 
+# building the logic
+
+df_pageObjects = df.loc[df['xml-parent'].isin(df.loc[df['odk_type']=='container_page'].index)]
+
+# get ids of pages that ONLY contain 'notes'
+pure_note_pages=[]
+gk = df_pageObjects.groupby('xml-parent')
+for elem,frame in gk: 
+    if len(frame.index) == len(frame.loc[frame['odk_type']=='note']):
+        pure_note_pages.append(elem)
+
+# get all the 'notes' that point out pages:
+df_notes_out_pages = df_arrows.loc[df_arrows['source'].isin(df_pageObjects.index) &                                     ~df_arrows['target'].isin(df_pageObjects.index) & (df_arrows['source_type']=='note')]
+
+# among those get those notes that belong to 'pure_note_pages' - these are the notes you are looking for
+df_notes_outof_pure_notes_pages = df_notes_out_pages.loc[df_notes_out_pages['container_id'].isin(pure_note_pages)]
+df_notes_outof_pure_notes_pages = df_notes_outof_pure_notes_pages[['source','container_id']]
+df_notes_outof_pure_notes_pages.set_index('source',inplace=True)
+
+
+# In[1117]:
 
 
 '''
 Building the logic: 
 1. It must be done for each object independently, not for all at once, so there is a for loop
 2. Start on the very top and go down the tree. This is the reason why we have topologically sorted df in the previous step
-3. For each object lookup all sources in df_arrows (get all rows from df_arrows where the object is a target). 
+3. For each object lookup all sources in df_arrows (get all rows from df_arrows where the object is the target). 
 4. Each source -> target arrow has a logic expression and the entire 'relevant' of the target is just the logic expressions of 
     all incoming arrows, combined with a OR. 
-5. A particular attention must be paid when a source is a 'note' or a 'calculate'. For those sources the 'expression' is empty. 
-    That is because there is no decision taken for those objects. A note is just an info to the user and forward to the next 
-    field. There is also only one arrow coming out from a note. 'calculate' objects are just for calculation are not shown to 
-    the user at all. Here as well, there can only be one arrow coming out (or zero)
-    In this case we must use the relevant of the 'note' and 'calculate' source itself 
-    as an expression of note/calculate -> target 
+5. A particular attention must be paid when a source is a 'note'. For those sources the 'expression' is 
+    empty. 
+    That is because there is no decision taken for those objects. A note is just an info to the user and forward to the 
+    next field. There is also only one arrow coming out from a note. In this case we must use the relevant of 
+    the 'note' and 'calculate' source itself as the expression of note -> target
+    This would also be the case for 'calculate' objects, but their 'expression' has been populated already.  
     If we do not do that, then the target would pop up independently of the 'note/calculate' condition. That would be wrong. 
     Therefore, in df_source, the 'expression' for 'note' and 'calculate' is the 'relevant' of those sources. 
     To get those into df_sources, we merge it with df accordingly. 
     Therefore it is also important to do the logic from top to bottom, to assure that the relevant of the previous objects 
     has already been done. 
-6. Another particular interest is for rhombus (previously entered data). Here we also need the relevant of the rhombus itself, 
-    because it must be combined with the expresion by an AND. The rhombus itself is not seen to the user, so the logic depends
-    on his relevant. For the terms to be executed in the right order, the 'relevant' must be put into brackets first. 
+6. Another particular interest is for rhombus (previously entered data). Here we also need the relevant of the rhombus 
+    itself, because it must be combined with the expresion by an AND. The rhombus itself is not seen to the user, 
+    so the logic depends on his relevant. For the terms to be executed in the right order, the 'relevant' must be put 
+    into brackets first. 
 7. After those steps we have a df_sources dataframe where the 'expression' is correct for each of the arrows (each row). 
     As said in (4) they are combined with OR and written into the 'relevant' of the object we are looking at. 
+8. Another major problem are pages that contain ONLY notes. As objects inside a page automatically inherit the relevant 
+    of the page itself, their expression is entirely empty. The exit not then points to a target outside the page and 
+    has no expression at all. The following object would then always be displayed 
+    (or never, if there are other arrows pointing to)
+    To deal with this we identify all those objects (groups that contain only notes and )
+9. Another problem is when the first object in a page is a rhombus. It also gets no relevant generated. As a consequence, 
+    we would get just the expression with 'and ()'
 '''
 
 df['relevant']=''
 
-for elem in df.index:
+for elem in df.index:     
+    # df_sources: dataframe that contains all connections pointing to the object 'elem'
     df_sources = df_arrows.loc[df_arrows['target']==elem,['source','source_type','expression']]
-    df_sources = df_sources.merge(df['relevant'],how='left',left_on='source',right_index=True)
+    # pulling the relevant of the sources into df_sources. This corresponds to the logic to each elem. 
+    # 'xml-parent' is needed for rhombus at beginning of a page
+    df_sources = df_sources.merge(df[['relevant','xml-parent']],how='left',left_on='source',right_index=True) 
+
+    # when the source is a rhombus and it's relevant IS empty and the rhombus is on a page
+    # you have to combine the expression with the relevant of the page
+    # first merge with df again to the the relevant of the page
+    df_sources = df_sources.merge(df[['relevant']],how='left',left_on='xml-parent',right_index=True,suffixes=('', '_page'))
+    m=df_sources['source_type'].isin(['rhombus']) & (df_sources['relevant']=='') & df_sources['xml-parent'].isin(container_ids)
+    df_sources.loc[m,'expression'] = df_sources.loc[m,'expression'] + ' and (' + df_sources.loc[m,'relevant_page'] + ')'    
     
+    # when the source is a rhombus and it's relevant is NOT empty, you have to combine both with AND
     m=df_sources['source_type'].isin(['rhombus']) & (df_sources['relevant']!='')
     df_sources.loc[m,'expression'] = df_sources.loc[m,'expression'] + ' and (' + df_sources.loc[m,'relevant'] + ')'
     
+    # when the source is a note, just take its relevant and put it into expression
     m=df_sources['source_type'].isin(['note'])
     df_sources.loc[m,'expression'] = df_sources.loc[m,'relevant']    
+
+    # when the source is a note that is pointing out of a page that only contains 'notes' use the page relevant as 
+    # its expression 
+    m=df_sources['source'].isin(df_notes_outof_pure_notes_pages.index) # Mask to get pure note elements
+    df_sources.loc[m,'expression'] = df_sources.loc[m,'relevant_page']
+    #page_id = df.loc[df_sources.loc[m,'source'],'xml-parent'] # # get the page_ids of the pages the elments are in
+    # df_sources.loc[m,'expression'] = df.loc[page_id,'relevant'].to_list()
     
- #   m=df_sources['source_type'].isin(['calculate'])
- #   df_sources.loc[m,'expression'] = df_sources.loc[m,'relevant']  
     if df.loc[elem,'odk_type']!='count':
         df.loc[elem,'relevant'] = ' or '.join(filter(None,df_sources['expression']))
     else:
-        df.loc[elem,'relevant'] = ' + '.join(filter(None,df_sources['expression'])) # for counters the joining is number + number ...
+        # for counters the joining is number + number
+        df.loc[elem,'relevant'] = ' + '.join(filter(None,df_sources['expression'])) 
 
 
-# In[2792]:
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[1118]:
+
+
+# making summary
+def make_summary(df):
+    diagnose_colors=['f8cecc','ffe6cc','fff2cc','d5e8d4'] #red, orange, yellow, green
+    df_diagnose=df.loc[(df['odk_type']=='calculate') & df['style'].str.contains('|'.join(diagnose_colors)),['value','name','relevant']]
+    diagnose_index=df_diagnose.index
+    df_diagnose['relevance']=df_diagnose['relevant']
+    df_diagnose.loc[diagnose_index,'appearance']='center'
+    df_diagnose['help::English (en)']=''
+    df_diagnose['hint::English (en)']=''
+    df_diagnose['constraint']=''
+    df_diagnose['constraint message::English (en)']=''
+    df_diagnose['required']=''
+    df_diagnose['required message::English (en)']=''
+    df_diagnose['calculation']=''
+    df_diagnose['repeat_count']=''
+    df_diagnose['media::image::English (en)']=''
+    df_diagnose['type']='note'
+    df_diagnose['value']='<p>' + df_diagnose['value'] + '</p>'
+    df_diagnose['name']=df_diagnose['name'].replace({'d_':'label_'},regex=True)
+    df_diagnose = df_diagnose[['type','name','value','help::English (en)','hint::English (en)','appearance','relevance','constraint','constraint message::English (en)','required','required message::English (en)','calculation','repeat_count','media::image::English (en)']]
+    df_diagnose.rename(columns={'value':'label::English (en)'},inplace=True)
+    
+    intro = pd.read_excel('summary.xlsx').iloc[:4]
+    
+    extro = pd.read_excel('summary.xlsx').iloc[-2:]
+    
+    danger_signs = df_choices.loc[df_choices['list_name'].str.contains('select_signs') & ~df_choices['name'].str.contains('none')].copy()
+    danger_signs['relevance']='selected(${' + danger_signs['list_name'] + '},\'' + danger_signs['name'] + '\')'
+    danger_signs['appearance']='li'
+    danger_signs['help::English (en)']=''
+    danger_signs['hint::English (en)']=''
+    danger_signs['constraint']=''
+    danger_signs['constraint message::English (en)']=''
+    danger_signs['required']=''
+    danger_signs['required message::English (en)']=''
+    danger_signs['calculation']=''
+    danger_signs['repeat_count']=''
+    danger_signs['media::image::English (en)']=''
+    danger_signs['type']='note'
+    danger_signs['name']='label_' + danger_signs['name']
+    danger_signs = danger_signs[['type','name','label::English (en)','help::English (en)','hint::English (en)','appearance','relevance','constraint','constraint message::English (en)','required','required message::English (en)','calculation','repeat_count','media::image::English (en)']]
+    
+    df_new = pd.concat([intro,df_diagnose,pd.read_excel('summary.xlsx').iloc[4:6],danger_signs,extro])
+    
+    return df_new
+
+
+# In[1119]:
+
+
+df_summary = make_summary(df)
+
+
+# In[ ]:
+
+
+
+
+
+# In[1120]:
+
+
+# resort the graph so that pages are grouped together
+
+# ids of objects are page_headers pages
+page_ids = df.loc[df['odk_type']=='container_page'].index
+
+# new dataframe that contains only objects that are INSIDE pages (all pages combined)
+df_pageObjects = df.loc[df['xml-parent'].isin(page_ids)]
+
+
+# In[1121]:
 
 
 '''
@@ -743,7 +937,7 @@ df_arrows.drop(columns=['index'],inplace=True)
 df_arrows.drop(df_arrows.loc[df_arrows['source_type']=='page'].index,inplace=True)
 
 
-# In[2793]:
+# In[1122]:
 
 
 # make a new topological sort in the df without objects INSIDE pages, but page heads (begin_group) only: 
@@ -756,31 +950,7 @@ order = list(nx.lexicographical_topological_sort(dg))
 df=df.reindex(order)
 
 
-# In[ ]:
-
-
-
-
-
-# In[2794]:
-
-
-df_pageObjects.head()
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
-
-
-# In[2795]:
+# In[1123]:
 
 
 # topologically sort each page and insert back into main dataframe df
@@ -789,8 +959,7 @@ df_pageObjects.head()
 gk = df_pageObjects.groupby('xml-parent')
 
 # sort each page and put it into main dataframe df
-for page in gk.groups.keys():
-    df_page = gk.get_group(page)
+for page, df_page in gk:
     df_arrows_in_page = df_arrows_in_pages.loc[df_arrows_in_pages['source'].isin(df_page.index)]
     
     # make a dag for the page
@@ -818,7 +987,7 @@ for page in gk.groups.keys():
     df = pd.concat([df_top,df_page,df_bottom])
 
 
-# In[2796]:
+# In[1124]:
 
 
 # taking out rhombus objects of the graph
@@ -856,7 +1025,7 @@ for node in rhombus_id:
 dg = nx.from_edgelist(new_edges, create_using=nx.DiGraph)
 
 
-# In[2797]:
+# In[1125]:
 
 
 # short term workaround for select_xxx + NAME to add the same name as list_name
@@ -879,17 +1048,20 @@ df.drop(df.loc[df['type']=='rhombus'].index,inplace=True)
 
 # in 'calculate' fields move 'relevance' to calculate
 df.loc[df['type']=='calculate','calculation'] = df.loc[df['type']=='calculate','relevance']
+# add 'number() to fit with odk '
+df.loc[df['type']=='calculate','calculation'] = 'number(' + df.loc[df['type']=='calculate','calculation'] + ')'
+# delete entry in relevance column of 'calcuate' rows
 df.loc[df['type']=='calculate','relevance'] = ''
 
 
-# In[2798]:
+# In[1126]:
 
 
 # making df_choices look like the 'choices' tab in an xls form
 df_choices.drop(columns=['odk_type'],inplace=True)
 
 
-# In[2799]:
+# In[1127]:
 
 
 # make a 'settings' tab
@@ -904,7 +1076,7 @@ df_settings.head()
 
 # ## make standalone (for diagnostic AND treatment)
 
-# In[2800]:
+# In[1128]:
 
 
 # adding top questions and populating the 'calculate' column of the calculate fields in order to make the treatment flow 
@@ -936,11 +1108,11 @@ else:
 data_load = pd.DataFrame([data_load],columns=df.columns)
 df = pd.concat([data_load,df])
 
-# populate the calculate fields
-df.loc[df['type']=='calculate','calculation']='number(selected(${data_load}, \''+ df.loc[df['type']=='calculate','name'] + '\'))'
+# populate the load_ calculate fields
+df.loc[(df['type']=='calculate') & df['name'].str.contains('load_',na=False),'calculation']='number(selected(${data_load}, \''+ df.loc[df['type']=='calculate','name'] + '\'))'
 
 
-# In[2801]:
+# In[1129]:
 
 
 # populate constraint message to all select_multiple
@@ -948,27 +1120,51 @@ df.loc[df['type'].str.contains('select_multiple',na=False),'constraint']='.=\'op
 df.loc[df['type'].str.contains('select_multiple',na=False),'constraint message::English (en)']='**None** cannot be selected together with symptoms.'
 
 
-# In[2802]:
+# In[1130]:
 
 
 # load z-score into the df
 
 # first drop the row containing calculate - load_zscore
 df.drop(df.loc[df['name']=='load_z_score'].index,inplace=True)
+df.drop(df.loc[df['name']=='load_z_score_wa'].index,inplace=True)
 df_choices.drop(df_choices.loc[df_choices['name']=='load_z_score'].index,inplace=True) # remove the option 'zscore' from the data_loader
+df_choices.drop(df_choices.loc[df_choices['name']=='load_z_score_wa'].index,inplace=True) # remove the option 'zscore_wa' from the data_loader
 dfz=pd.read_excel('z_score_xlsForm.xlsx')
 dfz.fillna('',inplace=True)
 df=pd.concat([dfz,df])
 
 
-# In[2803]:
+# In[1131]:
+
+
+# concat summary to df
+df = pd.concat([df,df_summary])
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[1132]:
 
 
 # add the 'quick' appearance to all select_one
 df.loc[df['type'].str.contains('select_one',na=False),'appearance']='quick'
 
+# drop the load field
+df.drop({df.loc[df['label::English (en)']=='Load Data'].index[0]},inplace=True)
 
-# In[2804]:
+
+# In[1133]:
 
 
 '''
@@ -984,25 +1180,7 @@ Currently not implemented in TRICC, but hard coded here
 df.loc[df['label::English (en)'].str.contains('START',na=False),'appearance']='countdown-timer'
 
 
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
-
-
-# In[2805]:
+# In[1134]:
 
 
 # make the xlsx file! 
@@ -1023,7 +1201,7 @@ writer.close()
 writer.handles = None
 
 
-# In[2806]:
+# In[1135]:
 
 
 # converting into xls-form
@@ -1052,5 +1230,5 @@ get_ipython().run_line_magic('run', '-i c:\\users\\kluera\\anaconda3\\lib\\site-
 # In[ ]:
 
 
-
+df.to_csv('output.csv')
 
