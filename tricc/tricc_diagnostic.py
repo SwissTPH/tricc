@@ -54,13 +54,13 @@ objects_elements.extend(list(objects.findall('object')))
 
 # putting content of xml into dataframe df
 
-#df = pd.DataFrame(columns=['tag','id', 'value', 'style', 'xml-parent','source','target','tooltip','media'])
+#df = pd.DataFrame(columns=['tag','id', 'value', 'style', 'xml-parent','source','target','name','media'])
 rows=[]
 
 for item in objects_elements:
     if item.tag=='mxCell':
         row = list([item.tag,item.attrib.get('id'),item.attrib.get('value'),item.attrib.get('label'),item.attrib.get('style'),
-                    item.attrib.get('parent'),item.attrib.get('source'),item.attrib.get('target'),item.attrib.get('tooltip'),
+                    item.attrib.get('parent'),item.attrib.get('source'),item.attrib.get('target'),item.attrib.get('name'),
                     item.attrib.get('odk_type'),item.attrib.get('min'),item.attrib.get('max'),
                     item.attrib.get('required'),item.attrib.get('constraint_message'),''])
     if item.tag=='UserObject':
@@ -68,19 +68,19 @@ for item in objects_elements:
         row = list([item.tag,item.attrib.get('id'),nested_mxCell.attrib.get('value'),item.attrib.get('label'),
                     nested_mxCell.attrib.get('style'),nested_mxCell.attrib.get('parent'),
                     item.attrib.get('source'),item.attrib.get('target'),
-                    item.attrib.get('tooltip'),item.attrib.get('odk_type'),item.attrib.get('min'),item.attrib.get('max'),
+                    item.attrib.get('name'),item.attrib.get('odk_type'),item.attrib.get('min'),item.attrib.get('max'),
                     item.attrib.get('required'),item.attrib.get('constraint_message'),''])
     if item.tag=='object':
         nested_mxCell=item.find('.//mxCell')
         row = list([item.tag,item.attrib.get('id'),item.attrib.get('label'),item.attrib.get('label'),
                     nested_mxCell.attrib.get('style'),nested_mxCell.attrib.get('parent'),
                     item.attrib.get('source'),item.attrib.get('target'),
-                    item.attrib.get('tooltip'),item.attrib.get('odk_type'),item.attrib.get('min'),item.attrib.get('max'),
+                    item.attrib.get('name'),item.attrib.get('odk_type'),item.attrib.get('min'),item.attrib.get('max'),
                     item.attrib.get('required'),item.attrib.get('constraint_message'),''])
     rows.append(row)
 
 df=pd.DataFrame(rows,columns=
-                ['tag','id','value','label_userObject', 'style', 'xml-parent','source','target','tooltip','odk_type',\
+                ['tag','id','value','label_userObject', 'style', 'xml-parent','source','target','name','odk_type',\
                  'min','max','required','constraint_message','media'])
 
 df.loc[df.tag=='UserObject','value']=df.label_userObject
@@ -130,13 +130,13 @@ if treatment_flow == True:
 # In[1092]:
 
 
-df['name']=df['tooltip']
-# where 'tooltip' empty, use generic hash ID
-#df.loc[df['tooltip'].isna(),'name']=df['id'].apply(lambda x: hashlib.sha1(x.encode()).hexdigest())
-df.loc[df['tooltip'].isna(),'name']=df['id']
+
+# where 'name' empty, use generic hash ID
+#df.loc[df['name'].isna(),'name']=df['id'].apply(lambda x: hashlib.sha1(x.encode()).hexdigest())
+df.loc[df['name'].isna(),'name']=df['id']
 # where duplicates (for instance default name for a text message is 'label_'; if user does not change it remains the same)
 # ATTENTION: if you select duplicates first and in second step it does not base on the duplicates but on the entire dataframe
-# this took time to solve, also filtering with 'tooltip' did not work, had to use the same column in both conditions: 'name'
+# this took time to solve, also filtering with 'name' did not work, had to use the same column in both conditions: 'name'
 # this should not be applied to select_options and to rhombus, because those can have duplicates.
 df.loc[df.duplicated(subset=['name'],keep=False) & ~df['name'].str.contains('opt_',na=False)        & ~df['name'].str.contains('stored_',na=False),'name']=df['name']+df['id']
 
@@ -340,10 +340,10 @@ df.loc[df.index.isin(df_label.index),'value']=''
 
 # replacing 'odk_type' value of the container row in df with the one from df_label (because this is where the info is stored) 
 df['odk_type'].update(df_label['odk_type'])
-# replacing 'tooltip' value of the container row in df with the one from df_label (because this is where the info is stored) 
+# replacing 'name' value of the container row in df with the one from df_label (because this is where the info is stored) 
 df['name'].update(df_label['name'])
 
-#deleting the columns 'odk_type' and 'tooltip' from df_label because it would raise error in join in the next step
+#deleting the columns 'odk_type' and 'name' from df_label because it would raise error in join in the next step
 df_label.drop(['odk_type','name'],axis=1,inplace=True)
 
 # joining df and df_label (this adds the column 'value_label' to df)
@@ -1085,9 +1085,9 @@ df_settings.head()
 # making the top questions 
 
 if treatment_flow == False:
-    # for the diagnostic flow as a shortterm we extract all the 'calculates' where the tooltip starts with 'load_'
+    # for the diagnostic flow as a shortterm we extract all the 'calculates' where the name starts with 'load_'
     # this is because, at this stage we no longer can distinguish the data-load-calculates from the normal calcualtes
-    # drawback is that now all data-loaders must have a tooltip starting with 'load_'. In the future this will be fixed, probably 
+    # drawback is that now all data-loaders must have a name starting with 'load_'. In the future this will be fixed, probably 
     # by adding a new data_attribute 'load_data' and make a special data_loader object
     tt_input_options = df.loc[(df['type']=='calculate') & df['name'].str.contains('load_',na=False),['type','name','label::English (en)']]
 else:        
