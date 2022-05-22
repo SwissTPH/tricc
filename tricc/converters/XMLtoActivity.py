@@ -25,7 +25,7 @@ def create_activity(diagram_key, diagram):
             activity.nodes = nodes
         if edges and len(edges)>0:
             activity.edges = edges
-            activity.edges_tmp = edges.copy()
+            activity.edges_copy = edges.copy()
     else:
         logger.debug("root not found for page {0}".format(name))
             

@@ -100,10 +100,18 @@ class TriccNodeEnd(TriccBaseModel):
 
 class TriccNodeActivity(TriccNodeBaseModel):
     odk_type = TriccExtendedNodeType.activity
+    # starting point of the activity
     root: TriccNodeBaseModel
+    # edge list
     edges: List[TriccEdge]= []
-    edges_tmp: List[TriccEdge]= []
+    # copy of the edge for later restauration
+    edges_copy: List[TriccEdge]= []
+    # nodes part of that actvity
     nodes: Dict[str, TriccNodeBaseModel] = {}
+    # node that lead to the end of the interogation
+    end_prev_nodes:  List[TriccBaseModel] = []
+    # node that leads to the end of the activity
+    activity_end_prev_nodes:  List[TriccBaseModel] = []
 
 
     

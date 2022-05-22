@@ -36,7 +36,7 @@ def process_diagram(in_filepath, out_filepath, formid):
             if page.edges is not None and len(page.edges)>0:
                 logger.warning(
                     "Page {0} has still {1}/{2} edges that were not used: {3}"\
-                    .format(page.label, len(page.edges) ,len(page.edges_tmp),page.edges ))
+                    .format(page.label, len(page.edges) ,len(page.edges_copy),page.edges ))
          # refresh the edges (were remove by previous code)
         # TODO save link from
         
@@ -87,9 +87,10 @@ def walktrhough_node(node, page, pages, processed_nodes = [], path = []):
             #get target node
             if edge.target in page.nodes:
                 target_node = page.nodes[edge.target]
-                node.next_nodes.append(target_node)
+                # link perv / next nodes
+                set_prev_next_node(page, node, target_node)
+                # walk only if the target node was not processed already
                 if edge.target not in processed_nodes:
-                    #add the id to avoid loop: 
                     processed_nodes.append(edge.target)
                     walktrhough_node(target_node, page, pages, processed_nodes, current_path)
                 elif edge.target in current_path:
@@ -98,13 +99,22 @@ def walktrhough_node(node, page, pages, processed_nodes = [], path = []):
                 logger.warning("target not found {0}".format(edge.target))
             page.edges.remove(edge)
 
-
+def set_prev_next_node(page, source_node, target_node):
+    # if it is end node, attached it to the activity/page
+    if target_node.odk_type == TriccExtendedNodeType.end:
+        page.end_prev_nodes.append(source_node)
+    elif target_node.odk_type == TriccExtendedNodeType.activity_end:
+        page.activity_end_prev_nodes.append(source_node)
+    else:
+        target_node.prev_nodes.append(source_node)
+    source_node.next_nodes.append(target_node)
+        
 def walkthrough_goto_node(node, page, pages, processed_nodes, current_path):
      # find the page
     if node.link in pages:
         next_page = pages[node.link]
         # attach the page
-        node.next_nodes.append(next_page)
+        set_prev_next_node(page, node, next_page)
         # walk thought the next page
         if node.link not in processed_nodes:
         # will be added in process nod later
@@ -131,11 +141,11 @@ def walkthrough_link_out_node(node, page, pages, processed_nodes, current_path):
             logger.warning("more than one link in {0} found for link out {1} in page {2}"\
                 .format(node.reference, node.name,page.label))
         else:
+            # all good, only one target node found
             linked_target_node=link_in_list[0]
-            node.next_nodes.append(linked_target_node)
+            # link perv / next nodes
+            set_prev_next_node(page, node, linked_target_node)
             walktrhough_node(linked_target_node, link_in_page, pages, processed_nodes, current_path)
     else:
             logger.warning("link out {0} in page {2} : reference not found"\
                 .format(node.name,page.label))
-            
-
