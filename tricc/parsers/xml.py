@@ -37,12 +37,32 @@ def get_odk_type(diagram, node_type, odk_type):
     return diagram.find('.//{0}[@odk_type="{1}"]'.format(node_type, odk_type))
 
 
-def get_odk_type_list(diagram, node_type, odk_type):
-    return list(diagram.findall('.//{0}[@odk_type="{1}"]'.format(node_type, odk_type)))
-
-def get_mxcell_parent_list(diagram, select_id, odk_type):
+def get_odk_type_list(diagram, node_type, odk_type=None, parent_id = None):
+   
+    parent_suffix = "[@parent='{}']".format(parent_id)  if parent_id is not None else ''
+    if odk_type is None:
+        return list(diagram.findall('.//{0}[@odk_type]{1}'.format(node_type, parent_suffix)))
+    elif isinstance(odk_type, list):
+        result = []
+        for type in odk_type:
+            result +=  get_odk_type_list(diagram, node_type, type)
+        return list(set(result))
+    if isinstance(node_type, list):
+        result = []
+        for type in node_type:
+            result +=  get_odk_type_list(diagram, type, odk_type)
+        return list(set(result))
+    else:
+        return list(diagram.findall('.//{0}[@odk_type="{1}"]{2}'.format(node_type, odk_type, parent_suffix)))
+    
+def get_mxcell_parent_list(diagram, select_id, odk_type =None, attrib = None):
     #get the mxcels
-    if isinstance(odk_type, List):
+    if odk_type is None:
+        if attrib is not None:
+            return diagram.findall(".//mxCell[@parent='{0}']/..[@{1}]".format(select_id, attrib))
+        else:
+            return diagram.findall(".//mxCell[@parent='{0}']".format(select_id))
+    elif isinstance(odk_type, List):
         result = []
         for type in odk_type:
             result +=  get_mxcell_parent_list(diagram, select_id, type)

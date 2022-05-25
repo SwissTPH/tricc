@@ -1,41 +1,59 @@
 # TRICC
 
-# OR
+## properties
 
-if 2+ arrows arrive in the same box then the logic will be consider as an OR BUT is the box is a diamand
+### odk_type
 
-# AND
+    rhombus: fetch data
+    goto: start the linked activity within the target activity
+    start: main start of the algo
+    activity_start: start of an activity (link in)
+    link_in
+    link_out
+    count: count the number of valid input
+    add: add counts
+    container_hint_media:
+    activity:
+    #select_yesno:
+    select_option:
+    hint:
+    help:
+    exclusive:
+    end:
+    activity_end:
+    edge:
+    page:
+    note:
+    calculate:
+    select_multiple:
+    select_one:
+    decimal:
+    integer:
+    text:
 
-Same as OR but for the diamant (odk_type : rhombus)
 
-Questions:
-- Can I assign the same calculate multiple time
-- can I link a calculate to another calculate
-- 
+### expression
+replace the calcualte deducted by inputs
+### expression_inputs
+adds a calcualte to the one deducted by inputs
 
+### default
+not supported yet
 
-# format params
-## odk_type : define the XFORM question type
-### base type
-- select_multiple
-- select_one
-- note
-
-### tricc type
-- rhombus: use an existing value/calcualte
-- loose_link: add a constraint: start_before the linked activity
-- hard_link: start the linked activity within the target activity
-- main_start: main start of the algo
-- activity_start: start of an activity (link in)
-- count: count the number of valid input
-
-## save: define is the value will be used 
+### save
+will create a calculate with the same name
 - obs: observation: save the option as a calcualte obs_[name of the option]
-  - can be written obs.[othername](snomeCode)
+  - can be written obs.[othername].[snomedCode]
 - diag: diagnostic/classification save the option as a calcualte diag_[name of the option]
 - flag: calculate save the option as a calcualte is_[name of the option]
 
-READ Xressource
+### name
+Mandatory
+
+### label
+Not a real property to add, it is simply the text display in the boxes
+
+# READ Xressource
 https://jgraph.github.io/drawio-tools/tools/convert.html
 
 

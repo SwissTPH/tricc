@@ -4,7 +4,7 @@ from typing import Dict, List, Optional,  Union
 from pandas import DataFrame
 from pydantic import BaseModel, constr
 
-Expression= constr(regex="^[^\\/]$")
+Expression= constr(regex="^[^\\/]+$")
 
 triccId = constr(regex="^.+$")
 
@@ -43,6 +43,7 @@ class TriccExtendedNodeType(str, Enum):
     end='end'
     activity_end='activity_end'
     edge='edge'
+    page='page'
 
 class TriccOperation(str, Enum):
     _and='and'
@@ -61,24 +62,42 @@ media_nodes = [
 
 class TriccBaseModel(BaseModel):
     odk_type: Union[TriccNodeType,TriccExtendedNodeType]
-    id:Optional[triccId]
+    id:triccId
     parent:Optional[triccId]
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            return self.id == other.id
+        else:
+            return False
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
     class Config:  
         use_enum_values = True  # <--
     
 class TriccNodeBaseModel(TriccBaseModel):
     name: Optional[str]
     label: Optional[str]
-    next_nodes : List[TriccBaseModel] = []
-    prev_nodes : List[TriccBaseModel] = []
+    next_nodes: List[TriccBaseModel] = []
+    prev_nodes: List[TriccBaseModel] = []
+    # to be updated while processing because final expression will be possible to build$
+    # #only the last time the script will go through the node (all prev node expression would be created
+    expression_inputs: List[Expression] = []
+    activity: Optional[TriccBaseModel]
     
+
+class TriccGroup(TriccBaseModel):
+    odk_type = TriccExtendedNodeType.page
+
 class TriccNodeDiplayModel(TriccNodeBaseModel):
     name: str
     image: Optional[base64]
     hint: Optional[str]
     help: Optional[str]
-    
+    group:Optional[TriccGroup]
     relevance: Optional[Expression]
+
     # to use the enum value of the TriccNodeType
 
 
@@ -93,9 +112,11 @@ class TriccEdge(TriccBaseModel):
 
 
 class TriccNodeActivityEnd(TriccBaseModel):
+    activity: Optional[TriccBaseModel]
     odk_type = TriccExtendedNodeType.activity_end
 
 class TriccNodeEnd(TriccBaseModel):
+    activity:Optional[TriccBaseModel]
     odk_type = TriccExtendedNodeType.end
 
 class TriccNodeActivity(TriccNodeBaseModel):
@@ -108,10 +129,13 @@ class TriccNodeActivity(TriccNodeBaseModel):
     edges_copy: List[TriccEdge]= []
     # nodes part of that actvity
     nodes: Dict[str, TriccNodeBaseModel] = {}
+    #groups
+    groups : Dict[str, TriccGroup] = {}
     # node that lead to the end of the interogation
     end_prev_nodes:  List[TriccBaseModel] = []
     # node that leads to the end of the activity
     activity_end_prev_nodes:  List[TriccBaseModel] = []
+    relevance: Optional[Expression]
 
 
     
@@ -124,14 +148,7 @@ class TriccNodeInputModel(TriccNodeDiplayModel):
 class TriccNodeExclusive(TriccNodeBaseModel):
     odk_type = TriccExtendedNodeType.exclusive
         
-class TriccNodeCalculate(TriccNodeBaseModel):
-    odk_type = TriccNodeType.calculate
-    input: Dict[TriccOperation, TriccNodeBaseModel] = {}
-    expression : Optional[Expression] # will be generated based on the input
-    save: Optional[str] # contribute to another calculate
-        # to use the enum value of the TriccNodeType
-    class Config:  
-        use_enum_values = True  # <--
+
     
 class TriccNodeMainStart(TriccNodeBaseModel):
     odk_type = TriccExtendedNodeType.start
@@ -156,12 +173,13 @@ class TriccNodeSelectOption(TriccNodeDiplayModel):
     odk_type = TriccExtendedNodeType.select_option
     label:str
     save:Optional[str]
+    select:TriccNodeInputModel
     
     
 
 class TriccNodeSelect(TriccNodeInputModel):
     filter: Optional[str]
-    options : Dict[int, TriccNodeSelectOption]
+    options : Dict[int, TriccNodeSelectOption] = {}
 
 class TriccNodeSelectOne(TriccNodeSelect):
     odk_type = TriccNodeType.select_one
@@ -174,24 +192,42 @@ class TriccNodeSelectOne(TriccNodeSelect):
 class TriccNodeSelectMultiple(TriccNodeSelect):
     odk_type = TriccNodeType.select_multiple
 
-class TriccNodeDecimal(TriccNodeInputModel):
-    odk_type = TriccNodeType.decimal
+class TriccNodeNumber(TriccNodeInputModel):
     min:Optional[float]
     max:Optional[float]
+    
+    
+    
+class TriccNodeDecimal(TriccNodeNumber):
+    odk_type = TriccNodeType.decimal
+    
 
-class TriccNodeInteger(TriccNodeInputModel):
+class TriccNodeInteger(TriccNodeNumber):
     odk_type = TriccNodeType.integer
-    min:Optional[int]
-    max:Optional[int]
+
     
 class TriccNodeText(TriccNodeInputModel):
     odk_type = TriccNodeType.text
     
-class TriccNodeAdd(TriccNodeCalculate):
+class TriccNodeCalculateBase(TriccNodeBaseModel):
+    odk_type = TriccNodeType.calculate
+    input: Dict[TriccOperation, TriccNodeBaseModel] = {}
+    expression : Optional[Expression] # will be generated based on the input
+    
+    save: Optional[str] # contribute to another calculate
+    version: int = 0
+        # to use the enum value of the TriccNodeType
+    class Config:  
+        use_enum_values = True  # <--
+
+
+class TriccNodeCalculate(TriccNodeCalculateBase):
+    odk_type = TriccNodeType.calculate
+class TriccNodeAdd(TriccNodeCalculateBase):
     odk_type:TriccExtendedNodeType = TriccExtendedNodeType.add
     
-class TriccNodeCount(TriccNodeCalculate):
+class TriccNodeCount(TriccNodeCalculateBase):
     odk_type:TriccExtendedNodeType = TriccExtendedNodeType.count
     
-class TriccNodeRhombus(TriccNodeCalculate):
+class TriccNodeRhombus(TriccNodeCalculateBase):
     odk_type:TriccExtendedNodeType = TriccExtendedNodeType.rhombus
