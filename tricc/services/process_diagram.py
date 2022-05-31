@@ -1,17 +1,17 @@
 from tricc.converters.utils import clean_name
-from tricc.converters.xml_to_tricc import add_save_calculate, create_activity, get_edges
+from tricc.converters.xml_to_tricc import add_save_calculate, create_activity
 from tricc.models import *
-from tricc.serializers.planuml import print_plantuml
+
 from tricc.parsers.xml import read_drawio
 
 import logging
 from tricc.services.utils import walktrhough_tricc_node, set_prev_next_node
 
-from tricc.strategies.xls_form import XLSFormStrategy
+
 
 logger = logging.getLogger('default')
 
-def build_tricc_graph(in_filepath, out_filepath, formid):
+def build_tricc_graph(in_filepath):
     pages = {}
     start_page=None
     # read all pages
@@ -44,7 +44,7 @@ def build_tricc_graph(in_filepath, out_filepath, formid):
         walktrhough_tricc_node(start_page.root, add_save_calculate, calculates=calculates,
                                used_calculates=used_calculates, processed_nodes=processed_nodes)
         logger.info("# check if all edges (arrow where used)")
-        for id, page in pages.items():
+        for key, page in pages.items():
             if page.edges is not None and len(page.edges)>0:
                 logger.warning(
                     "Page {0} has still {1}/{2} edges that were not used: {3}"\
@@ -74,6 +74,9 @@ def walktrhough_node(node, page, pages, processed_nodes = [], path = []):
     # don't stop the walkthroug by default
     message_name=node.name if hasattr(node,'name') else node.id
     logger.debug("linking node {0}".format(message_name))
+    # clean name
+    if hasattr(node, 'name') and node.name is not None and len(node.name) > 1 and node.name[-1:] == '_':
+        node.name = clean_name(node.name) + clean_name(node.id)
     if len(node_edge) == 0:
         logger.debug("node {0} without edges out found in page {1}, full path {2}"\
             .format(message_name, page.label, current_path))
@@ -90,9 +93,6 @@ def walktrhough_node(node, page, pages, processed_nodes = [], path = []):
             #get target node
             if edge.target in page.nodes:
                 target_node = page.nodes[edge.target]
-                # clean name
-                if hasattr(node, 'name') and node.name is not None and len(node.name) > 1 and node.name[-1:] == '_':
-                    node.name = clean_name(node.name) + clean_name(node.id)
                 # link perv / next nodes
                 set_prev_next_node( node, target_node)
                 # walk only if the target node was not processed already
@@ -100,7 +100,7 @@ def walktrhough_node(node, page, pages, processed_nodes = [], path = []):
                     processed_nodes.append(edge.target)
                     walktrhough_node(target_node, page, pages, processed_nodes, current_path)
                 elif edge.target in current_path:
-                    logger.warning("possible loop detected for node {0} in page {1}; path: {3} ".format(message_name, page.label, current_path))
+                    logger.warning("possible loop detected for node {0} in page {1}; path: {2} ".format(message_name, page.label, current_path))
             else:
                 logger.warning("target not found {0}".format(edge.target))
             page.edges.remove(edge)
@@ -143,7 +143,7 @@ def walkthrough_link_out_node(node, page, pages, processed_nodes, current_path):
             set_prev_next_node(node, linked_target_node)
             walktrhough_node(linked_target_node, link_in_page, pages, processed_nodes, current_path)
     else:
-            logger.warning("link out {0} in page {2} : reference not found"\
+            logger.warning("link out {0} in page {1} : reference not found"\
                 .format(node.name,page.label))
 
 

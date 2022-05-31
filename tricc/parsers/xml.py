@@ -1,18 +1,11 @@
-#from lxml import etree
-import itertools
 from typing import List
 import lxml.etree as etree
-import html2text
-import pandas as pd
+
  
 
 
 def read_drawio(filepath):
-    # dict of pages
-    diagrams={}
-    xml_element_tree = None
-    # full list of object
-    objects = None
+
     root = etree.parse(filepath)
     # import xml.etree.cElementTree as ET
     #with open(filepath) as f:
@@ -44,13 +37,13 @@ def get_odk_type_list(diagram, node_type, odk_type=None, parent_id = None):
         return list(diagram.findall('.//{0}[@odk_type]{1}'.format(node_type, parent_suffix)))
     elif isinstance(odk_type, list):
         result = []
-        for type in odk_type:
-            result +=  get_odk_type_list(diagram, node_type, type)
+        for type_ in odk_type:
+            result +=  get_odk_type_list(diagram, node_type, type_)
         return list(set(result))
     if isinstance(node_type, list):
         result = []
-        for type in node_type:
-            result +=  get_odk_type_list(diagram, type, odk_type)
+        for type_ in node_type:
+            result +=  get_odk_type_list(diagram, type_, odk_type)
         return list(set(result))
     else:
         return list(diagram.findall('.//{0}[@odk_type="{1}"]{2}'.format(node_type, odk_type, parent_suffix)))

@@ -1,28 +1,26 @@
 import sys, getopt, os
-from tricc.serializers.planuml import print_plantuml
 
 from tricc.services.process_diagram import build_tricc_graph
 import logging
-import sys
-sys.setrecursionlimit(100)
-
 from tricc.strategies.xls_form import XLSFormStrategy
 # set up logging to file
-def setup_logger(logger_name, 
+
+
+def setup_logger(logger_name,
                  log_file, 
                  level=logging.INFO, 
-                 format  ='[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s'):
+                 formatting  ='[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s'):
      
     l = logging.getLogger(logger_name)
-    formatter = logging.Formatter(format)
-    fileHandler = logging.FileHandler(log_file, mode='w')
-    fileHandler.setFormatter(formatter)
-    streamHandler = logging.StreamHandler()
-    streamHandler.setFormatter(formatter)
+    formatter = logging.Formatter(formatting)
+    file_handler = logging.FileHandler(log_file, mode='w')
+    file_handler.setFormatter(formatter)
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(formatter)
 
     l.setLevel(level)
-    l.addHandler(fileHandler)
-    l.addHandler(streamHandler)
+    l.addHandler(file_handler)
+    l.addHandler(stream_handler)
 
 
 
@@ -77,22 +75,24 @@ if __name__ == "__main__":
     pre, ext = os.path.splitext(in_filepath)
     if out_filepath is None:
         # if output file path not specified, just chagne the extension
-        out_filepath= pre + 'xlsx'
+        out_filepath= pre + '.xlsx'
     if out_filepath is None:
         # if output file path not specified, jsut take the name without extension
         formid= pre
 
-    start_page = build_tricc_graph(in_filepath, out_filepath, formid)
+    start_page = build_tricc_graph(in_filepath)
     
-    stategy = XLSFormStrategy()
+    strategy = XLSFormStrategy()
     # create constaints, clean name
-    stategy.process_base(start_page)
+    strategy.process_base(start_page)
     # create relevance Expression
-    stategy.process_relevance(start_page)
+    strategy.process_relevance(start_page)
     # create calculate Expression
-    stategy.process_calculate(start_page)
+    strategy.process_calculate(start_page)
     
-    stategy.process_export(start_page)
+    strategy.process_export(start_page)
+    
+    strategy.do_export(out_filepath, formid)
 
 
      

@@ -7,7 +7,6 @@ Collect easy.
 __version__ = "0.0.0"
 
 from .models import *
-#from .converters import *
 from .serializers import *
 from .services import *
 

@@ -1,7 +1,7 @@
-from importlib.metadata import entry_points
+
 from enum import Enum
 from typing import Dict, List, Optional,  Union
-from pandas import DataFrame
+
 from pydantic import BaseModel, constr
 
 Expression= constr(regex="^[^\\/]+$")
@@ -20,6 +20,7 @@ class TriccNodeType(str, Enum):
     decimal='decimal'
     integer='integer'
     text='text'
+
 
     
     
@@ -213,10 +214,9 @@ class TriccNodeCalculateBase(TriccNodeBaseModel):
     odk_type = TriccNodeType.calculate
     input: Dict[TriccOperation, TriccNodeBaseModel] = {}
     expression : Optional[Expression] # will be generated based on the input
-    
     save: Optional[str] # contribute to another calculate
     version: int = 0
-        # to use the enum value of the TriccNodeType
+    # to use the enum value of the TriccNodeType
     class Config:  
         use_enum_values = True  # <--
 
@@ -231,3 +231,4 @@ class TriccNodeCount(TriccNodeCalculateBase):
     
 class TriccNodeRhombus(TriccNodeCalculateBase):
     odk_type:TriccExtendedNodeType = TriccExtendedNodeType.rhombus
+    reference: Optional[Union[TriccNodeBaseModel, triccId]]

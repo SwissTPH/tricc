@@ -1,4 +1,4 @@
-from tricc.converters.utils import clean_name
+
 from tricc.models import *
 
 
@@ -33,15 +33,15 @@ def generate_xls_form_relevance(node):
 
 def generate_xls_form_calculate(node):
     expressions= []
-    if hasattr(node, 'expression') and ((node.expression is None or len(node.expression_inputs)>1 )):
-        if isinstance(node.__class__, TriccNodeCalculate):
-            input_expression = get_node_expression(node)
+    if hasattr(node, 'expression') and (node.expression is None or len(node.expression_inputs)>1 ):
+        if node.odk_type == TriccNodeType.calculate:
+            input_expression = get_node_expressions(node)
             if input_expression is not None:
                 add_sub_expression(expressions, "({})".format(input_expression))
         elif issubclass(node.__class__, TriccNodeCalculateBase):
             add_sub_expression(expressions, get_calculation_terms(node))
         if len(expressions)>0:
-            node.expression = "number({1})".format( ' and '.join(expressions) )
+            node.expression = "number({0})".format( ' and '.join(expressions) )
 
     
 def get_required_node_expression(node):
@@ -82,7 +82,7 @@ def get_node_expression(node):
             return node.relevance
         else:
             # get the expression form the parent (will be useful for the links)
-            if node.odk_type not in (TriccExtendedNodeType.start, TriccExtendedNodeType):
+            if node.odk_type not in (TriccExtendedNodeType.start, TriccExtendedNodeType.activity_start):
                 return get_node_expressions(node)
 
 
@@ -91,20 +91,22 @@ def add_sub_expression(array, sub):
         array.append(sub)
 
 def get_calculation_terms(node):
-    if isinstance(node.__class__, TriccNodeAdd):
+    if isinstance(node, TriccNodeAdd):
         return get_add_terms(node)
-    elif isinstance(node.__class__, TriccNodeCount):
+    elif isinstance(node, TriccNodeCount):
         return get_count_terms(node)
-    elif isinstance(node.__class__, TriccNodeRhombus):
+    elif isinstance(node, TriccNodeRhombus):
         return get_rhumbus_terms(node)
     
     
 def process_rhumbus_expression(label, operation):
     if operation in label:
-        terms = label.split('=')
+        terms = label.split(operation)
         if len(terms) == 2:
-            operation = operation[1] if operation == '==' else operation
-            return  operation + "'" + terms[1].replace('?','')
+            if operation == '==':
+                operation = operation[1]
+            #TODO check if number
+            return  operation + terms[1].replace('?','').strip()
         
 def get_rhumbus_terms(node):
     
@@ -113,13 +115,13 @@ def get_rhumbus_terms(node):
             left_term =  process_rhumbus_expression(node.label, operation)
             if left_term is not None:
                 return "number(${{{0}}}{1})=1".format(node.reference,left_term)
-    return "number(${{{}}})=1".format(node.reference)
+    return "number(${{{}}})=1".format(node.reference.strip())
          
         
 def get_add_terms(node): 
     terms = []
     for prev_node in node.prev_nodes:
-        if issubclass(prev_node.__class__, TriccNodeNumber) or isinstance(node.__class__, TriccNodeCount):
+        if issubclass(prev_node, TriccNodeNumber) or isinstance(node, TriccNodeCount):
             terms.append("coalesce(${{{0}}},0)".format(prev_node.name))
         else:
             terms.append("number({0})".format(get_node_expression(prev_node)))

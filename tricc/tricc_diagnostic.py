@@ -103,8 +103,8 @@ df.drop(columns=['min','max'],inplace=True)
 # in the xml file html needs to be encoded like that, otherwise it would interfere with the coding of the xml file
 
 # the soup.text strips off the html formatting also
-def remove_html(string):
-    text = html2text.html2text(string) # retrive pure text from html
+def remove_html(str):
+    text = html2text.html2text(str) # retrive pure text from html
     text = text.strip('\n') # get rid of empty lines at the end (and beginning)
     text = text.split('\n') # split string into a list at new lines
     text = '\n'.join([i.strip(' ') for i in text if i]) # in each element in that list strip empty space (at the end of line) 
@@ -122,7 +122,7 @@ df.loc[df['odk_type']=='calculate','value'] = df.loc[df['odk_type']=='calculate'
 
 
 # remove all html from 'value column' when dealing with the high flow of treatments
-if treatment_flow == True:
+if treatment_flow:
     df['value'] = df['value'].apply(lambda x: remove_html(x) if x!=None else None)
     df['label_userObject'] = df['label_userObject'].apply(lambda x: remove_html(x) if x!=None else None)
 

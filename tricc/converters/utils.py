@@ -1,5 +1,5 @@
-def replace_all(text, list, replacement):
-    for i in list:
+def replace_all(text, list_char, replacement):
+    for i in list_char:
         text = text.replace(i, replacement)
     return text
 def clean_name( name):

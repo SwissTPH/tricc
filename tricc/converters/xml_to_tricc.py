@@ -129,7 +129,7 @@ def add_calculate_nodes(nodes, diagram):
     list = get_odk_type_list(diagram, 'object', TriccExtendedNodeType.count)
     add_tricc_nodes(nodes, TriccNodeCount, list, ['save','expression'])
     list = get_odk_type_list(diagram, 'UserObject', TriccExtendedNodeType.rhombus)
-    add_tricc_nodes(nodes, TriccNodeRhombus, list, ['save','expression'])
+    add_tricc_nodes(nodes, TriccNodeRhombus, list, ['save','expression'],['reference'])
     list = get_odk_type_list(diagram, 'object', TriccExtendedNodeType.exclusive)
     add_tricc_base_node(nodes, TriccNodeExclusive, list)
     
@@ -193,6 +193,8 @@ def add_save_calculate(node, calculates, used_calculates,processed_nodes ):
                 # check if the calculate is used, if not merge it with the previous versions
                 from_version = get_max_used_version(used_calculates, node.name)
                 merge_calculate(node, calculates[node.name], from_version)
+                if from_version > 0:
+                    update_last_calculate_name(calculates[node.name], from_version-1 )
             else:
                 calculates[node.name]= {}
             calculates[node.name][node.id]=node
@@ -206,7 +208,12 @@ def get_max_used_version(used_calculates,name):
                 max = node.version
     return max
 
-
+def update_last_calculate_name(calculates, version ):
+    for id, node in calculates.items():
+        if node.version == version:
+            node.name += VERSION_SEPARATOR + str(version)
+    
+    
 
 
 def generate_save_calculate(node, calculates, used_calculates,processed_nodes):
@@ -250,21 +257,26 @@ def is_ready_to_process(node, processed_nodes):
     else:
         return False
         
-            
+VERSION_SEPARATOR = '_v_'       
 def process_calculate_version_requirement(node, calculates,used_calculates,processed_nodes):
     prev_nodes_processed = True
     for prev_node in node.prev_nodes:
         if prev_node.id in processed_nodes:
-            # reference the used calculate
+            
             if issubclass(prev_node.__class__, TriccNodeCalculateBase):
-                if prev_node.name not in calculates:
+                # if not a verison, index will equal -1
+                index = prev_node.name.rfind(VERSION_SEPARATOR)
+                node_clean_name = prev_node.name[:index] if index > 0 else prev_node.name
+                if node_clean_name not in used_calculates:
+                    node_clean_name =prev_node.name
+                if node_clean_name not in calculates :
                     logger.warning("node {} refered before being processed".format(node.label if node.label is not None else node.name))
-                max_version = get_max_version(calculates[prev_node.name])
-                if prev_node.name not in used_calculates:
-                    used_calculates[prev_node.name] = {}
+                max_version = get_max_version(calculates[node_clean_name])
+                if node_clean_name not in used_calculates:
+                    used_calculates[node_clean_name] = {}
                 #save the max version only once
-                if max_version.id not in used_calculates[prev_node.name]:
-                    used_calculates[prev_node.name][max_version.id] = max_version
+                if max_version.id not in used_calculates[node_clean_name]:
+                    used_calculates[node_clean_name][max_version.id] = max_version
     # update the used_calculates         
     return prev_nodes_processed
 
@@ -348,6 +360,14 @@ def set_mandatory_attribute(elm, mandatory_attributes):
     param = {}
     for attributes in mandatory_attributes:
         attribute_value = elm.attrib.get(attributes)
+        if attribute_value is None:
+            if elm.attrib.get('label')is not None:
+                display_name = elm.attrib.get('label')
+            elif elm.attrib.get('name')is not None:
+                display_name = elm.attrib.get('name')
+            else:
+                display_name = elm.attrib.get('id')
+            logger.error("the attibute {} is mandatory but not found in {}".format(attributes, display_name))
         if attributes == 'link':
             param[attributes] = clean_link(attribute_value)
         elif attributes in ('parent','id', 'source', 'target'):
@@ -366,7 +386,7 @@ def get_groups(diagram, nodes):
     groups = {}
     list=get_odk_type_list(diagram, 'object', TriccExtendedNodeType.page )
     for elm in list:
-        group = add_group(elm, diagram, nodes, groups)
+        add_group(elm, diagram, nodes, groups)
     return groups
 
         
