@@ -65,6 +65,7 @@ class TriccBaseModel(BaseModel):
     odk_type: Union[TriccNodeType,TriccExtendedNodeType]
     id:triccId
     parent:Optional[triccId]
+    group : Optional[BaseModel]
     def __eq__(self, other):
         if isinstance(other, self.__class__):
             return self.id == other.id
@@ -73,6 +74,10 @@ class TriccBaseModel(BaseModel):
 
     def __ne__(self, other):
         return not self.__eq__(other)
+    
+    def __hash__(self):
+        hash_value = hash(self.id)
+        return hash_value
 
     class Config:  
         use_enum_values = True  # <--
@@ -91,35 +96,10 @@ class TriccNodeBaseModel(TriccBaseModel):
 class TriccGroup(TriccBaseModel):
     odk_type = TriccExtendedNodeType.page
 
-class TriccNodeDiplayModel(TriccNodeBaseModel):
-    name: str
-    image: Optional[base64]
-    hint: Optional[str]
-    help: Optional[str]
-    group:Optional[TriccGroup]
-    relevance: Optional[Expression]
-
-    # to use the enum value of the TriccNodeType
-
-
-
-class TriccNodeNote(TriccNodeDiplayModel):
-    odk_type = TriccNodeType.note
-        
 class TriccEdge(TriccBaseModel):
     odk_type = TriccExtendedNodeType.edge
-    source: Union[triccId, TriccNodeDiplayModel]
-    target: Union[triccId, TriccNodeDiplayModel]
-
-
-class TriccNodeActivityEnd(TriccBaseModel):
-    activity: Optional[TriccBaseModel]
-    odk_type = TriccExtendedNodeType.activity_end
-
-class TriccNodeEnd(TriccBaseModel):
-    activity:Optional[TriccBaseModel]
-    odk_type = TriccExtendedNodeType.end
-
+    source: Union[triccId, TriccNodeBaseModel]
+    target: Union[triccId, TriccNodeBaseModel]
 class TriccNodeActivity(TriccNodeBaseModel):
     odk_type = TriccExtendedNodeType.activity
     # starting point of the activity
@@ -137,6 +117,33 @@ class TriccNodeActivity(TriccNodeBaseModel):
     # node that leads to the end of the activity
     activity_end_prev_nodes:  List[TriccBaseModel] = []
     relevance: Optional[Expression]
+class TriccNodeDiplayModel(TriccNodeBaseModel):
+    name: str
+    image: Optional[base64]
+    hint: Optional[str]
+    help: Optional[str]
+    group:Optional[Union[TriccGroup,TriccNodeActivity]]
+    relevance: Optional[Expression]
+
+    # to use the enum value of the TriccNodeType
+
+
+
+class TriccNodeNote(TriccNodeDiplayModel):
+    odk_type = TriccNodeType.note
+        
+
+
+
+class TriccNodeActivityEnd(TriccBaseModel):
+    activity: Optional[TriccBaseModel]
+    odk_type = TriccExtendedNodeType.activity_end
+
+class TriccNodeEnd(TriccBaseModel):
+    activity:Optional[TriccBaseModel]
+    odk_type = TriccExtendedNodeType.end
+
+
 
 
     
@@ -146,9 +153,7 @@ class TriccNodeInputModel(TriccNodeDiplayModel):
     constraint:Optional[Expression]
     save: Optional[str] # contribute to another calculate
 
-class TriccNodeExclusive(TriccNodeBaseModel):
-    odk_type = TriccExtendedNodeType.exclusive
-        
+
 
     
 class TriccNodeMainStart(TriccNodeBaseModel):
@@ -232,3 +237,7 @@ class TriccNodeCount(TriccNodeCalculateBase):
 class TriccNodeRhombus(TriccNodeCalculateBase):
     odk_type:TriccExtendedNodeType = TriccExtendedNodeType.rhombus
     reference: Optional[Union[TriccNodeBaseModel, triccId]]
+    
+class TriccNodeExclusive(TriccNodeCalculateBase):
+    odk_type = TriccExtendedNodeType.exclusive
+        

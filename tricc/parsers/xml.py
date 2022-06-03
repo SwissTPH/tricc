@@ -33,18 +33,18 @@ def get_odk_type(diagram, node_type, odk_type):
 def get_odk_type_list(diagram, node_type, odk_type=None, parent_id = None):
    
     parent_suffix = "[@parent='{}']".format(parent_id)  if parent_id is not None else ''
-    if odk_type is None:
-        return list(diagram.findall('.//{0}[@odk_type]{1}'.format(node_type, parent_suffix)))
-    elif isinstance(odk_type, list):
+    if isinstance(odk_type, list):
         result = []
         for type_ in odk_type:
-            result +=  get_odk_type_list(diagram, node_type, type_)
+            result +=  get_odk_type_list(diagram, node_type, type_, parent_id)
         return list(set(result))
     if isinstance(node_type, list):
         result = []
         for type_ in node_type:
-            result +=  get_odk_type_list(diagram, type_, odk_type)
+            result +=  get_odk_type_list(diagram, type_, odk_type, parent_id)
         return list(set(result))
+    elif  odk_type is None:
+        return list(diagram.findall('.//{0}[@odk_type]{1}'.format(node_type, parent_suffix)))
     else:
         return list(diagram.findall('.//{0}[@odk_type="{1}"]{2}'.format(node_type, odk_type, parent_suffix)))
     

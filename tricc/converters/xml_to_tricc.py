@@ -1,8 +1,11 @@
-
+#FIXME, romhbus should not be a next node of the previous but a next node of the ref
+# and then nodes before the rombus should be "linked" node after the rombhus but in a way that 
+# won't impact the relevance/calcualteg
 
 import os
 from uuid import uuid4
 import html2text
+from tricc.converters.utils import clean_name
 from tricc.models import *
 from tricc.parsers.xml import  get_edges_list, get_mxcell_parent_list, get_odk_type,  get_odk_type_list
 import logging
@@ -12,7 +15,7 @@ from tricc.services.utils import set_prev_node
 
 
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("default")
 
 def create_activity(diagram):
     
@@ -20,16 +23,18 @@ def create_activity(diagram):
     name = diagram.attrib.get('name')
     id = diagram.attrib.get('id')
     if root is not None:
-        edges = get_edges(diagram)
-        nodes = get_nodes(diagram)
-        groups  = get_groups(diagram, nodes)
-
         activity = TriccNodeActivity(
             root=root,
             name=id,
             id=id,       
             label=name,
         )
+        # add the group on the root node
+        root.group = activity
+        activity.group = activity
+        edges = get_edges(diagram)
+        nodes = get_nodes(diagram, activity)
+        groups  = get_groups(diagram, nodes, activity)
         if groups and len(groups)>0:
             activity.groups = groups        
         if nodes and len(nodes)>0:
@@ -55,13 +60,13 @@ def remove_html(string):
     # and delete empty lines
     return text
 
-def get_nodes(diagram):
+def get_nodes(diagram, group):
     nodes = {}
-    add_note_nodes(nodes, diagram)  
-    add_calculate_nodes(nodes, diagram)
-    add_select_nodes(nodes, diagram)
-    add_input_nodes(nodes, diagram)
-    add_link_nodes(nodes, diagram)
+    add_note_nodes(nodes, diagram, group)  
+    add_calculate_nodes(nodes, diagram, group)
+    add_select_nodes(nodes, diagram, group)
+    add_input_nodes(nodes, diagram, group)
+    add_link_nodes(nodes, diagram, group)
     add_contained_resources(diagram, nodes)
     return nodes
 
@@ -100,52 +105,52 @@ def set_additional_attributes(attribute_names, elm, node):
             attribute = [attribute] if attributename == 'expression_inputs' else attribute
             setattr(node, attributename, attribute)        
 
-def add_note_nodes(nodes, diagram):
+def add_note_nodes(nodes, diagram, group):
     list = get_odk_type_list(diagram, ['UserObject','object'], TriccNodeType.note)
-    add_tricc_nodes(nodes, TriccNodeNote, list, ['relevance'])
+    add_tricc_nodes(nodes, TriccNodeNote, list, group, ['relevance'])
     
 
-def add_select_nodes(nodes, diagram):
+def add_select_nodes(nodes, diagram, group=None):
     list = get_odk_type_list(diagram, 'UserObject', TriccNodeType.select_one)
-    add_tricc_select_nodes(diagram, nodes, TriccNodeSelectOne, list, ['required','save','filter','constraint','constraint_message'])
+    add_tricc_select_nodes(diagram, nodes, TriccNodeSelectOne, list, group, ['required','save','filter','constraint','constraint_message'])
     #list = get_odk_type_list(diagram, 'UserObject', TriccExtendedNodeType.select_yesno)
     #add_tricc_nodes(nodes, TriccNodeSelectYesNo, list, ['constraint','save','constraint_message','required'])
     list = get_odk_type_list(diagram, 'UserObject', TriccNodeType.select_multiple)
-    add_tricc_select_nodes(diagram, nodes, TriccNodeSelectMultiple, list, ['required','save','filter','constraint','constraint_message'])
+    add_tricc_select_nodes(diagram, nodes, TriccNodeSelectMultiple, list, group, ['required','save','filter','constraint','constraint_message'])
 
-def add_input_nodes(nodes, diagram):
+def add_input_nodes(nodes, diagram, group= None):
     list = get_odk_type_list(diagram, 'object', TriccNodeType.decimal)
-    add_tricc_nodes(nodes, TriccNodeDecimal, list, ['min','max', 'constraint','save','constraint_message','required'])
+    add_tricc_nodes(nodes, TriccNodeDecimal, list, group, ['min','max', 'constraint','save','constraint_message','required'])
     list = get_odk_type_list(diagram, 'object', TriccNodeType.integer)
-    add_tricc_nodes(nodes, TriccNodeInteger, list, ['min','max', 'constraint','save','constraint_message','required'])
+    add_tricc_nodes(nodes, TriccNodeInteger, list, group, ['min','max', 'constraint','save','constraint_message','required'])
     list = get_odk_type_list(diagram, 'object', TriccNodeType.text)
-    add_tricc_nodes(nodes, TriccNodeText, list, ['constraint','save','constraint_message','required'])
+    add_tricc_nodes(nodes, TriccNodeText, list, group, ['constraint','save','constraint_message','required'])
 
-def add_calculate_nodes(nodes, diagram):
+def add_calculate_nodes(nodes, diagram, group=None):
     list = get_odk_type_list(diagram, 'object', TriccNodeType.calculate)
-    add_tricc_nodes(nodes, TriccNodeCalculate, list, ['save','expression'])
+    add_tricc_nodes(nodes, TriccNodeCalculate, list, group, ['save','expression'])
     list = get_odk_type_list(diagram, 'object', TriccExtendedNodeType.add)
-    add_tricc_nodes(nodes, TriccNodeAdd, list, ['save','expression'])
+    add_tricc_nodes(nodes, TriccNodeAdd, list, group, ['save','expression'])
     list = get_odk_type_list(diagram, 'object', TriccExtendedNodeType.count)
-    add_tricc_nodes(nodes, TriccNodeCount, list, ['save','expression'])
+    add_tricc_nodes(nodes, TriccNodeCount, list, group, ['save','expression'])
     list = get_odk_type_list(diagram, 'UserObject', TriccExtendedNodeType.rhombus)
-    add_tricc_nodes(nodes, TriccNodeRhombus, list, ['save','expression'],['reference'])
+    add_tricc_nodes(nodes, TriccNodeRhombus, list, group, ['save','expression'],['reference'])
     list = get_odk_type_list(diagram, 'object', TriccExtendedNodeType.exclusive)
-    add_tricc_base_node(nodes, TriccNodeExclusive, list)
+    add_tricc_base_node(nodes, TriccNodeExclusive, list, group)
     
 
     
-def add_link_nodes(nodes, diagram):
+def add_link_nodes(nodes, diagram, group=None):
     list = get_odk_type_list(diagram, 'object', TriccExtendedNodeType.link_out)
-    add_tricc_nodes(nodes, TriccNodeLinkOut, list, [], ['reference'])
+    add_tricc_nodes(nodes, TriccNodeLinkOut, list, group, [], ['reference'])
     list = get_odk_type_list(diagram, 'object', TriccExtendedNodeType.link_in)
-    add_tricc_nodes(nodes, TriccNodeLinkIn, list)
+    add_tricc_nodes(nodes, TriccNodeLinkIn, list, group)
     list = get_odk_type_list(diagram, 'object', TriccExtendedNodeType.goto)
-    add_tricc_nodes(nodes, TriccNodeGoTo, list,[],['link'])
+    add_tricc_nodes(nodes, TriccNodeGoTo, list, group,[],['link'])
     list = get_odk_type_list(diagram, 'object', TriccExtendedNodeType.activity_end)
-    add_tricc_base_node(nodes, TriccNodeActivityEnd, list)
+    add_tricc_base_node(nodes, TriccNodeActivityEnd, list, group)
     list = get_odk_type_list(diagram, 'object', TriccExtendedNodeType.end)
-    add_tricc_base_node(nodes, TriccNodeEnd, list)
+    add_tricc_base_node(nodes, TriccNodeEnd, list, group)
     
     
 def get_select_options(diagram, select_node):
@@ -164,7 +169,8 @@ def get_select_options(diagram, select_node):
             id = elm.attrib.get('id'),
             label = elm.attrib.get('label'),
             name = name,
-            select = select_node
+            select = select_node,
+            group = select_node.group
         )
         get_select_option_image(option)
         set_additional_attributes(['save'], elm, option)
@@ -177,28 +183,39 @@ def get_select_options(diagram, select_node):
 
 
 
-def add_save_calculate(node, calculates, used_calculates,processed_nodes ):
+def add_save_calculate(node, calculates, used_calculates,processed_nodes, stashed_nodes ):
      # used_calculates dict[name, Dict[id, node]]
      # processed_nodes Dict[id, node]
      # calculates  dict[name, Dict[id, node]]
-    logger.debug("{}:save the calculate".format(node.label if hasattr(node,'label') else node.id))
-    if is_ready_to_process(node, processed_nodes):
-        process_calculate_version_requirement(node, calculates, used_calculates,processed_nodes)
+    if hasattr(node,'prev_nodes') and is_ready_to_process(node, processed_nodes) and node.id not in processed_nodes:
+        logger.debug("add_save_calculate:{}".format(node.name if hasattr(node,'name') else node.id))
+        if not process_calculate_version_requirement(node, calculates, used_calculates,processed_nodes):
+            # missing save stashed it for later
+            logger.warning("add_save_calculate:stashed:{}".format(node.name if hasattr(node,'name') else node.id))
+            stashed_nodes[node.id] = node
+            return False
         generate_save_calculate(node, calculates, used_calculates,processed_nodes)
-        if issubclass(node.__class__, TriccNodeCalculateBase) and node.name is not None:
+        if isinstance(node, (TriccNodeCount, TriccNodeAdd, TriccNodeCalculate )) and node.name is not None:
             # generate the calc node version by looking in the processed calculate
             if node.name in calculates:
                 if node.id in calculates[node.name]:
                     node.version = get_max_used_version(calculates,node.name) + 1
                 # check if the calculate is used, if not merge it with the previous versions
                 from_version = get_max_used_version(used_calculates, node.name)
-                merge_calculate(node, calculates[node.name], from_version)
+                if len(calculates[node.name])>1:
+                    merge_calculate(node, calculates[node.name], from_version)
+
                 if from_version > 0:
                     update_last_calculate_name(calculates[node.name], from_version-1 )
             else:
                 calculates[node.name]= {}
             calculates[node.name][node.id]=node
         processed_nodes[node.id] = node
+        group_next_nodes(node)
+        return True
+    else:
+        return False
+
 
 def get_max_used_version(used_calculates,name):
     max = 0
@@ -217,7 +234,9 @@ def update_last_calculate_name(calculates, version ):
 
 
 def generate_save_calculate(node, calculates, used_calculates,processed_nodes):
+    
     if hasattr(node, 'save') and node.save is not None:
+        logger.debug("generate_save_calculate:{}".format(node.name if hasattr(node,'name') else node.id))
         # get fragments type.name.icdcode
         save_fragments=node.save.split('.')
         if len(save_fragments)>1:
@@ -226,14 +245,15 @@ def generate_save_calculate(node, calculates, used_calculates,processed_nodes):
             calculate_name = "{0}_{1}".format(save_fragments[0], node.name)
         calc_node = TriccNodeCalculate(
             name=calculate_name,
-            id = generate_id()
+            id = generate_id(),
+            group = node.group
         )
         calc_node.prev_nodes.append(node)
         node.next_nodes.append(calc_node)
         if calculate_name not in calculates:
             calculates[calculate_name] = {}
         calculates[calculate_name][calc_node.id]=calc_node
-        add_save_calculate(calc_node, calculates, used_calculates,processed_nodes)
+        #add_save_calculate(calc_node, calculates, used_calculates,processed_nodes)
         
 def generate_id():
     return str(uuid4())
@@ -248,24 +268,54 @@ def get_max_version(dict):
 
 # check if the all the prev nodes are processed
 def is_ready_to_process(node, processed_nodes):
+    if isinstance(node, TriccNodeSelectOption):
+            node = node.select
     if hasattr(node, 'prev_nodes'):
-        prev_nodes_processed = True
+        # ensure the the previous node of the select are processed, not the option prev nodes
         for prev_node in node.prev_nodes:
-            if prev_node.id not in processed_nodes:
-                prev_nodes_processed = False
-        return prev_nodes_processed
+            if isinstance(prev_node,TriccNodeActivity):
+                if len(prev_node.end_prev_nodes)==0 and len(prev_node.activity_end_prev_nodes)==0:
+                    return False
+                for end_node in prev_node.end_prev_nodes:
+                    if end_node.id not in processed_nodes:
+                        return False
+                for activity_end_node in prev_node.activity_end_prev_nodes:
+                    if activity_end_node.id not in processed_nodes:
+                        return False
+            elif prev_node.id not in processed_nodes:
+                return False
+        return True
     else:
-        return False
+        return True
         
 VERSION_SEPARATOR = '_v_'       
 def process_calculate_version_requirement(node, calculates,used_calculates,processed_nodes):
-    prev_nodes_processed = True
+    if isinstance(node, TriccNodeRhombus):
+        logger.debug("process_calculate_version_requirement:{} ".format(node.name if hasattr(node,'name') else node.id))
+        last_found = None
+        for key, p_node in processed_nodes.items():
+            if hasattr(p_node,'name') and p_node.name == node.reference:
+                # issue is that it can be further in another path
+                last_found = p_node
+        if node.reference in calculates and len(calculates[node.reference])>0 :
+                # issue is that it can be further in another path
+                last_found = get_max_version(calculates[node.reference])
+        if last_found is not None:
+            if node is not last_found.next_nodes:
+                last_found.next_nodes.append(node)
+            if last_found is not node.prev_nodes:
+                node.prev_nodes.append(last_found)
+        else:
+            return False
+        return True
+            
     for prev_node in node.prev_nodes:
         if prev_node.id in processed_nodes:
-            
-            if issubclass(prev_node.__class__, TriccNodeCalculateBase):
+            if isinstance(prev_node, (TriccNodeCount, TriccNodeAdd, TriccNodeCalculate )):
+                logger.debug("process_calculate_version_requirement:{}".format(node.name if hasattr(node,'name') else node.id))
                 # if not a verison, index will equal -1
                 index = prev_node.name.rfind(VERSION_SEPARATOR)
+                #remove the leading part with version 
                 node_clean_name = prev_node.name[:index] if index > 0 else prev_node.name
                 if node_clean_name not in used_calculates:
                     node_clean_name =prev_node.name
@@ -278,7 +328,7 @@ def process_calculate_version_requirement(node, calculates,used_calculates,proce
                 if max_version.id not in used_calculates[node_clean_name]:
                     used_calculates[node_clean_name][max_version.id] = max_version
     # update the used_calculates         
-    return prev_nodes_processed
+    return True
 
 
 
@@ -287,11 +337,11 @@ def merge_calculate(node, calculates, from_version):
     version = node.version
     node_to_delete = []
     for id, calc_node in calculates.items():
-        cur_version = calc_node.version
-        
-        # merge only if same name, version >= fromm version but < node version
-        if cur_version >= from_version and  cur_version<version :
-            if node.odk_type == calc_node.odk_type and (not hasattr(node, 'reference') or node.reference == calc_node.reference):
+        # merge only if same name, version >= fromm version but < node version    
+        if  node.odk_type == calc_node.odk_type :
+            cur_version = calc_node.version
+            if cur_version >= from_version and  cur_version<version:
+                logger.debug("merge_calculate:{} ".format(node.name if hasattr(node,'name') else node.id))
                 node.next_nodes += calc_node.next_nodes
                 node.prev_nodes += calc_node.prev_nodes
                 node.expression_inputs += calc_node.expression_inputs
@@ -309,8 +359,8 @@ def merge_calculate(node, calculates, from_version):
                             prev_node.next_nodes.remove(calc_node)
                         prev_node.next_nodes.append(node)
                 node_to_delete.append(id)
-            else:
-                logger.error("two different type of calculate node share the same name {}".format(node.name))
+        else:
+            logger.error("two different type of calculate node share the same name {}".format(node.name))
     for node_id in node_to_delete:
         del calculates[node_id]
 
@@ -322,7 +372,7 @@ def get_select_option_image(option):
     # save image and add the link to the option.image
     pass
     
-def add_tricc_select_nodes(diagram, nodes, type, list, attributes):
+def add_tricc_select_nodes(diagram, nodes, type, list, group, attributes):
     for elm in list:
         id = elm.attrib.get('id')
         parent= elm.attrib.get('parent')
@@ -332,6 +382,7 @@ def add_tricc_select_nodes(diagram, nodes, type, list, attributes):
             label = elm.attrib.get('label'),
             name = elm.attrib.get('name'),
             required=True,
+            group =  group
         )
         node.options = get_select_options(diagram, node)
         set_additional_attributes(attributes, elm, node)
@@ -339,18 +390,19 @@ def add_tricc_select_nodes(diagram, nodes, type, list, attributes):
         
 
 
-def add_tricc_nodes(nodes, type, list, attributes = [], mandatory_attributes = []):
+def add_tricc_nodes(nodes, type, list, group, attributes = [], mandatory_attributes = []):
         mandatory_attributes +=  ['label','name']
-        add_tricc_base_node(nodes, type, list, attributes, mandatory_attributes)
+        add_tricc_base_node(nodes, type, list, group, attributes, mandatory_attributes)
             
             
-def add_tricc_base_node(nodes, type, list, attributes = [], mandatory_attributes = []):   
+def add_tricc_base_node(nodes, type, list, group, attributes = [], mandatory_attributes = []):   
     for elm in list:
         id = elm.attrib.get('id')
         parent= elm.attrib.get('parent')
         node = type(
             id = id,
             parent= parent,
+            group = group,
             **set_mandatory_attribute(elm, mandatory_attributes)
         )
         set_additional_attributes(attributes, elm, node)
@@ -382,46 +434,46 @@ def clean_link(link):
     if link_parts[0] == 'data:page/id' and len(link_parts)==2:
         return link_parts[1]
     
-def get_groups(diagram, nodes):
+def get_groups(diagram, nodes, parent_group):
     groups = {}
     list=get_odk_type_list(diagram, 'object', TriccExtendedNodeType.page )
     for elm in list:
-        add_group(elm, diagram, nodes, groups)
+        add_group(elm, diagram, nodes, groups,parent_group)
     return groups
 
         
-def add_group(elm, diagram, nodes, groups):
+def add_group(elm, diagram, nodes, groups, parent_group):
     id = elm.attrib.get('id')
     if id not in groups:
         group = TriccGroup(
-            name = elm.attrib.get('name'),
+            name = clean_name(elm.attrib.get('name')),
             label = elm.attrib.get('label'),
-            id = id
+            id = id,
+            group = parent_group
         )
         # get elememt witn parent = id and odk_type defiend
         list_child = get_odk_type_list(diagram, ['object','UserObject'], odk_type=None, parent_id = id)
-        add_group_to_child(group, diagram,list_child, nodes, groups)
+        add_group_to_child(group, diagram,list_child, nodes, groups, parent_group)
         if group is not None:
             groups[group.id] = group
         return group
         
-def add_group_to_child(group, diagram,list_child, nodes, groups):
+def add_group_to_child(group, diagram,list_child, nodes, groups, parent_group):
     for child_elm in list_child:
         if child_elm.attrib.get('odk_type') == TriccExtendedNodeType.container_hint_media:
-            list_sub_child = get_odk_type_list(diagram, ['object','UserObject'], odk_type=None, parent_id = id )
-            add_group_to_child(group, diagram,list_sub_child, nodes, groups)
+            list_sub_child = get_odk_type_list(diagram, ['object','UserObject'], odk_type=None, parent_id =child_elm.attrib.get('id') )
+            add_group_to_child(group, diagram,list_sub_child, nodes, groups, parent_group )
         elif child_elm.attrib.get('odk_type') == TriccExtendedNodeType.page:
             child_group_id = child_elm.attrib.get('id')
             if not child_group_id  in groups:
-                child_group = add_group(child_elm, diagram, nodes, groups)
+                child_group = add_group(child_elm, diagram, nodes, groups, group)
             else:
                 child_group = groups[child_group_id]
             child_group.group = group
         else:
             child_id=child_elm.attrib.get('id')
             if child_id is not None and child_id in nodes:
-                if issubclass(nodes[child_id].__class__, TriccNodeDiplayModel):
-                    nodes[child_id].group = group
+                nodes[child_id].group = group
                 
                 
         
@@ -503,3 +555,28 @@ def get_edges( diagram):
         edges.append(edge)
     return edges
         
+def group_next_nodes(node):
+    if hasattr(node, 'next_nodes') and len(node.next_nodes)>1:
+        new_order = [ len(node.next_nodes) for i in node.next_nodes]
+        curent_place = 0
+        # fist the one from the same group
+        order_group_hierachy_nodes(node, new_order, curent_place, node.group)
+        if curent_place > 0:
+            node.next_nodes =  [node.next_nodes[i] for i in new_order]
+           
+        # then loop over the parent group
+def order_group_hierachy_nodes(node, new_order, curent_place, group):
+    if group is not None:
+        order_group_nodes(node.next_nodes, new_order, curent_place, node.group)
+        if group is not group.group:
+            order_group_hierachy_nodes(node, new_order, curent_place, group.group)
+    
+
+    
+def order_group_nodes(nodes, new_order, curent_place, group):
+    for i in range(len(nodes)):
+        next_node = nodes[i]
+        #if same group give the first place available
+        if next_node.group == group:
+            new_order[i] = curent_place
+            curent_place += 1

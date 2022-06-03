@@ -20,7 +20,7 @@ def setup_logger(logger_name,
 
     l.setLevel(level)
     l.addHandler(file_handler)
-    l.addHandler(stream_handler)
+
 
 
 
@@ -79,20 +79,26 @@ if __name__ == "__main__":
     if out_filepath is None:
         # if output file path not specified, jsut take the name without extension
         formid= pre
-
+    logger.info("build the graph from XML")
     start_page = build_tricc_graph(in_filepath)
     
     strategy = XLSFormStrategy()
+    logger.info("Using strategy {}".format(strategy.__class__))
+    logger.info("update the node with basic information")
     # create constaints, clean name
     strategy.process_base(start_page)
+    logger.info("generate the relevance based on edges")
     # create relevance Expression
     strategy.process_relevance(start_page)
+    logger.info("generate the calculate based on edges")
+    
     # create calculate Expression
     strategy.process_calculate(start_page)
+    logger.info("generate the export fromat")
     
     strategy.process_export(start_page)
-    
-    strategy.do_export(out_filepath, formid)
+    logger.info("print the export")
+    strategy.do_export(start_page.root.label,out_filepath, formid)
 
 
      

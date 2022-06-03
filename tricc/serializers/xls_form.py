@@ -1,30 +1,50 @@
 
 
+from tricc.converters.utils import clean_name
+from tricc.converters.xml_to_tricc import is_ready_to_process
 from tricc.models import *
+from tricc.services.utils import walktrhough_tricc_node
+import logging
+logger = logging.getLogger('default')
 
+def start_group( cur_group, groups, df_survey, relevance = False, **kargs):
+    values = []
+    for column in SURVEY_MAP:
+        if column == 'type':
+            values.append('begin group')
+        elif column == 'name':
+            value = clean_name(get_attr_if_exists(cur_group,column,SURVEY_MAP))
+            if cur_group.id in groups:
+                value = value + "_" + str(groups[cur_group.id])
+                groups[cur_group.id] += 1
+            else:
+                groups[cur_group.id] = 0
+            values.append(value)
+        elif column == 'label':
+            values.append(get_attr_if_exists(cur_group,column,SURVEY_MAP))        
+        elif  column == 'appearance':
+            values.append('field-list')
+        elif relevance and column == 'relevance':
+            values.append(get_attr_if_exists(cur_group,column,SURVEY_MAP))
+        else:
+            values.append('')
+    df_survey.loc[len(df_survey)] = values
+    
 
+def end_group( cur_group, groups, df_survey, **kargs):
+    values = []
+    for column in SURVEY_MAP:
+        if column == 'type':
+            values.append('end group')
+        elif column in ('name','label'):
+            value = get_attr_if_exists(cur_group,column,SURVEY_MAP)
+            if cur_group.id in groups:
+                value = value + "_" + str(groups[cur_group.id])
+            values.append(value)
+        else:
+            values.append('')
+    df_survey.loc[len(df_survey)] = values
 
-def generate_xls_form_export(node, nodes, df_survey, df_choice, **kargs):
-    # check that all prev nodes were processed
-
-    if hasattr(node, 'prev_nodes' ):
-        for prev_node in node.prev_nodes:
-            if prev_node.id not in nodes:
-                return None
-    if node.id not in nodes:
-        if issubclass(node.__class__, TriccNodeCalculateBase) or issubclass(node.__class__, TriccNodeDiplayModel):
-            if isinstance(node, TriccNodeSelectOption):
-                values = []
-                for column in CHOICE_MAP:
-                    values.append(get_attr_if_exists(node,column,CHOICE_MAP))
-                df_choice.loc[len(df_choice)] = values
-                pass
-            elif node.odk_type in ODK_TRICC_TYPE_MAP and ODK_TRICC_TYPE_MAP[node.odk_type] is not None:
-                values = []
-                for column in SURVEY_MAP:
-                    values.append(get_attr_if_exists(node,column,SURVEY_MAP))
-                df_survey.loc[len(df_survey)] = values
-        nodes[node.id] = node
 
     # waltk thought the node,
     # if node has group, open the group (and parent group)
@@ -49,8 +69,8 @@ ODK_TRICC_TYPE_MAP = { 'note':'note'
     ,'text':'text'
     ,'rhombus':'calculate'
     ,'goto':''#: start the linked activity within the target activity
-    ,'start':''
-    ,'activity_start':''
+    ,'start':'begin group'
+    ,'activity_start':'begin group'
     ,'link_in':''
     ,'link_out':''
     ,'count':'calculate'
@@ -64,7 +84,7 @@ ODK_TRICC_TYPE_MAP = { 'note':'note'
     ,'end':'calculate'
     ,'activity_end':''
     ,'edge':''
-    ,'page':''
+    ,'page':'begin group'
     }
 
 GROUP_ODK_TYPE = [TriccExtendedNodeType.page,TriccExtendedNodeType.activity]
@@ -106,3 +126,31 @@ def get_attr_if_exists(node,column, map_array):
     else:
         return ''
     
+
+def generate_xls_form_export(node, nodes, stashed_nodes, df_survey, df_choice, cur_group, **kargs):
+    # check that all prev nodes were processed
+    if hasattr(node, 'prev_nodes' ) and not is_ready_to_process(node,nodes):
+        return False
+    if isinstance(node,(TriccNodeRhombus, TriccNodeExclusive)):
+        # Rhombus are only used for relevance, no need to print them
+        nodes[node.id] = node
+        return True
+    elif node.id not in nodes :
+        if node.group != cur_group :
+            stashed_nodes[node.id]=node
+            return False
+        if issubclass(node.__class__, (TriccNodeCalculateBase,TriccNodeDiplayModel)):
+            if isinstance(node, TriccNodeSelectOption):
+                values = []
+                for column in CHOICE_MAP:
+                    values.append(get_attr_if_exists(node,column,CHOICE_MAP))
+                df_choice.loc[len(df_choice)] = values
+            elif node.odk_type in ODK_TRICC_TYPE_MAP and ODK_TRICC_TYPE_MAP[node.odk_type] is not None:
+                values = []
+                for column in SURVEY_MAP:
+                    values.append(get_attr_if_exists(node,column,SURVEY_MAP))
+                df_survey.loc[len(df_survey)] = values
+        nodes[node.id] = node
+        #continue walk 
+        return True
+    return False
