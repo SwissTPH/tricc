@@ -22,7 +22,7 @@ def set_prev_node( source_node, target_node):
 def walktrhough_tricc_node( node, callback, **kwargs):
         if ( callback(node, **kwargs)):
             # if has next, walkthrough them (support options)
-            if node.odk_type == TriccExtendedNodeType.activity:
+            if isinstance(node, TriccNodeActivity):
                 if node.root is not None:
                     walktrhough_tricc_node(node.root, callback, **kwargs)
             elif issubclass(node.__class__, TriccNodeSelect):

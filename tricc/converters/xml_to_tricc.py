@@ -194,7 +194,7 @@ def add_save_calculate(node, calculates, used_calculates,processed_nodes, stashe
             logger.warning("add_save_calculate:stashed:{}".format(node.name if hasattr(node,'name') else node.id))
             stashed_nodes[node.id] = node
             return False
-        generate_save_calculate(node, calculates, used_calculates,processed_nodes)
+        generate_save_calculate(node, calculates)
         if isinstance(node, (TriccNodeCount, TriccNodeAdd, TriccNodeCalculate )) and node.name is not None:
             # generate the calc node version by looking in the processed calculate
             if node.name in calculates:
@@ -233,7 +233,7 @@ def update_last_calculate_name(calculates, version ):
     
 
 
-def generate_save_calculate(node, calculates, used_calculates,processed_nodes):
+def generate_save_calculate(node, calculates):
     
     if hasattr(node, 'save') and node.save is not None:
         logger.debug("generate_save_calculate:{}".format(node.name if hasattr(node,'name') else node.id))

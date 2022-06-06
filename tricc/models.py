@@ -216,28 +216,30 @@ class TriccNodeText(TriccNodeInputModel):
     odk_type = TriccNodeType.text
     
 class TriccNodeCalculateBase(TriccNodeBaseModel):
-    odk_type = TriccNodeType.calculate
     input: Dict[TriccOperation, TriccNodeBaseModel] = {}
     expression : Optional[Expression] # will be generated based on the input
-    save: Optional[str] # contribute to another calculate
     version: int = 0
     # to use the enum value of the TriccNodeType
     class Config:  
         use_enum_values = True  # <--
 
+class TriccNodeDisplayCalculateBase(TriccNodeCalculateBase):
+    save: Optional[str] # contribute to another calculate
 
-class TriccNodeCalculate(TriccNodeCalculateBase):
+class TriccNodeCalculate(TriccNodeDisplayCalculateBase):
     odk_type = TriccNodeType.calculate
-class TriccNodeAdd(TriccNodeCalculateBase):
-    odk_type:TriccExtendedNodeType = TriccExtendedNodeType.add
+class TriccNodeAdd(TriccNodeDisplayCalculateBase):
+    odk_type = TriccExtendedNodeType.add
     
-class TriccNodeCount(TriccNodeCalculateBase):
-    odk_type:TriccExtendedNodeType = TriccExtendedNodeType.count
+class TriccNodeCount(TriccNodeDisplayCalculateBase):
+    odk_type = TriccExtendedNodeType.count
     
-class TriccNodeRhombus(TriccNodeCalculateBase):
-    odk_type:TriccExtendedNodeType = TriccExtendedNodeType.rhombus
+class TriccNodeFakeCalculateBase(TriccNodeCalculateBase):
+    pass
+class TriccNodeRhombus(TriccNodeFakeCalculateBase):
+    odk_type = TriccExtendedNodeType.rhombus
     reference: Optional[Union[TriccNodeBaseModel, triccId]]
     
-class TriccNodeExclusive(TriccNodeCalculateBase):
+class TriccNodeExclusive(TriccNodeFakeCalculateBase):
     odk_type = TriccExtendedNodeType.exclusive
         

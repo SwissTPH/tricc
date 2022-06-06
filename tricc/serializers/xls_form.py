@@ -131,15 +131,11 @@ def generate_xls_form_export(node, nodes, stashed_nodes, df_survey, df_choice, c
     # check that all prev nodes were processed
     if hasattr(node, 'prev_nodes' ) and not is_ready_to_process(node,nodes):
         return False
-    if isinstance(node,(TriccNodeRhombus, TriccNodeExclusive)):
-        # Rhombus are only used for relevance, no need to print them
-        nodes[node.id] = node
-        return True
-    elif node.id not in nodes :
+    if node.id not in nodes :
         if node.group != cur_group :
             stashed_nodes[node.id]=node
             return False
-        if issubclass(node.__class__, (TriccNodeCalculateBase,TriccNodeDiplayModel)):
+        if issubclass(node.__class__, (TriccNodeDisplayCalculateBase,TriccNodeDiplayModel)):
             if isinstance(node, TriccNodeSelectOption):
                 values = []
                 for column in CHOICE_MAP:

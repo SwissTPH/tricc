@@ -53,6 +53,8 @@ def generate_xls_form_calculate(node, nodes, **kwargs):
     if hasattr(node, 'prev_nodes') and is_ready_to_process(node, nodes) and node.id not in nodes :
         # calcualte expression
         expressions= []
+        if hasattr(node, 'prev_nodes' ) and not issubclass(node.__class__,TriccNodeFakeCalculateBase):
+            bypass_calculate(node,node)
         if hasattr(node, 'expression') and (node.expression is None or len(node.expression_inputs)>1 ):
             if node.odk_type == TriccNodeType.calculate:
                 input_expression = get_node_expressions(node, nodes)
@@ -62,10 +64,8 @@ def generate_xls_form_calculate(node, nodes, **kwargs):
                 add_sub_expression(expressions, get_calculation_terms(node))
             if len(expressions)>0:
                 node.expression = "number({0})".format( ' and '.join(expressions) )
-        if hasattr(node, 'prev_nodes' ) and not issubclass(node.__class__,TriccNodeCalculateBase):
-            bypass_calculate(node,node)
-
         #continue walk 
+
         nodes[node.id]=node
         return True
     else:
@@ -77,17 +77,17 @@ def bypass_calculate(node,walked_node):
     for prev_node in walked_node.prev_nodes:
         if prev_node == walked_node or prev_node == node:
             continue
-        if issubclass(prev_node.__class__,TriccNodeCalculateBase):
+        if issubclass(prev_node.__class__,TriccNodeFakeCalculateBase):
             # link prev node of the calculate to node (as next_node)
             # do it recursivly if a calulate is founded
             bypass_calculate(node,prev_node)
             # remove only the last link, because the calulate migh be used elsewhere
-            if node == walked_node:
+            #if node == walked_node:
                 #remove from edge
-                node.prev_nodes.remove(prev_node)
+                #node.prev_nodes.remove(prev_node)
                 # remove to edge
-                if node  in prev_node.next_nodes: 
-                    prev_node.next_nodes.remove(node)
+                #if node  in prev_node.next_nodes: 
+                #    prev_node.next_nodes.remove(node)
         #bypass calc node of recurvise call (node != walked_node)
         elif  issubclass(prev_node.__class__, (TriccNodeDiplayModel)) or isinstance(prev_node, TriccNodeActivity) and node != walked_node :
             #add new to edge
@@ -113,7 +113,7 @@ def get_selected_option_expression(option_node):
 def get_calculate_expressions(node):
     logger.debug("get_calculate_expressions:{}".format(node.id) )
     # Rhombus are not display, they are only used for calculation
-    if isinstance(node, (TriccNodeRhombus,TriccNodeExclusive)):
+    if issubclass(node.__class__, TriccNodeFakeCalculateBase):
         return get_calculation_terms(node)
     else:
         return '${{{0}}} = 1'.format(node.name)
