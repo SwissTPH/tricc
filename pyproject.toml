@@ -4,6 +4,6 @@ requires = [
     "abc",
     "html2text",
     "pydantic",
-    
+    "babel",
 ]
 build-backend = "setuptools.build_meta"

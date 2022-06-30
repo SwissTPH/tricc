@@ -4,6 +4,13 @@ from tricc.services.process_diagram import build_tricc_graph
 import logging
 from tricc.strategies.xls_form import XLSFormStrategy
 # set up logging to file
+from babel import Locale
+import gettext
+#gettext.bindtextdomain('tricc', './locale/')
+#gettext.textdomain('tricc')
+langage =   Locale('Fr')
+fr =  gettext.translation('tricc', './locales' , languages=['fr'])
+fr.install()
 
 
 def setup_logger(logger_name,
@@ -21,14 +28,9 @@ def setup_logger(logger_name,
     l.setLevel(level)
     l.addHandler(file_handler)
 
-
-
-
 setup_logger('default', "debug.log", logging.DEBUG)
 
 logger = logging.getLogger('default')
-
-
 
 # set up logging to console
 console = logging.StreamHandler()
@@ -94,7 +96,7 @@ if __name__ == "__main__":
     
     # create calculate Expression
     strategy.process_calculate(start_page)
-    logger.info("generate the export fromat")
+    logger.info("generate the export format")
     
     strategy.process_export(start_page)
     logger.info("print the export")
