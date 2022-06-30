@@ -1,4 +1,5 @@
 
+
 from tricc.converters.xml_to_tricc import add_save_calculate, create_activity
 from tricc.models import *
 
@@ -79,14 +80,13 @@ def walktrhough_node(node, page, pages, processed_nodes = [], path = []):
     #build current path
     current_path = path + [node.id]
     # don't stop the walkthroug by default
-    message_name=node.name if hasattr(node,'name') else node.id
-    logger.debug("linking node {0}".format(message_name))
+    logger.debug("linking node {0}".format(node.get_name()))
     # clean name
-    if hasattr(node, 'name') and node.name is not None and len(node.name) > 1 and node.name[-1:] == '_':
+    if hasattr(node, 'name') and node.name is not None and node.name.endswith('_'):
         node.name = node.name + node.id
     if len(node_edge) == 0:
         logger.debug("node {0} without edges out found in page {1}, full path {2}"\
-            .format(message_name, page.label, current_path))
+            .format(node.get_name(), page.label, current_path))
     for edge in node_edge:
         #get target node
         if edge.target in page.nodes:
@@ -106,16 +106,22 @@ def walktrhough_node(node, page, pages, processed_nodes = [], path = []):
                 elif issubclass(target_node.__class__, TriccNodeSelect):
                     for key, option in target_node.options.items():
                         walktrhough_node(option, page, pages, processed_nodes, current_path)
+
                 # don't save the link out because the real node is the page
                 processed_nodes.append(target_node.id)
                 walktrhough_node(target_node, page, pages, processed_nodes, current_path)
             elif edge.target in current_path:
                 logger.warning("possible loop detected for node {0} in page {1}; path: {2} ".format(message_name, page.label, current_path))
-            set_prev_next_node( node, target_node)
+            if isinstance(node, TriccNodeSelectNotAvailable):
+                set_prev_next_node( node.options[0], target_node)
+            else:  
+                set_prev_next_node( node, target_node)
         else:
             logger.warning("target not found {0}".format(edge.target))
         page.edges.remove(edge)
-        
+  
+
+      
 def walkthrough_goto_node(node, page, pages, processed_nodes, current_path):
      # find the page
     if node.link in pages:

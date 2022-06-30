@@ -7,13 +7,13 @@ from uuid import uuid4
 import html2text
 from tricc.converters.utils import clean_name
 from tricc.models import *
-from tricc.parsers.xml import  get_edges_list, get_mxcell_parent_list, get_odk_type,  get_odk_type_list
+from tricc.parsers.xml import  get_edges_list, get_mxcell, get_mxcell_parent_list, get_odk_type,  get_odk_type_list
 import logging
 import base64
 
 from tricc.services.utils import set_prev_node
 
-
+NO_LABEL = "NO_LABEL"
 
 logger = logging.getLogger("default")
 
@@ -27,7 +27,7 @@ def create_activity(diagram):
             root=root,
             name=id,
             id=id,       
-            label=name,
+            label=name
         )
         # add the group on the root node
         root.group = activity
@@ -42,6 +42,12 @@ def create_activity(diagram):
         if edges and len(edges)>0:
             activity.edges = edges
             activity.edges_copy = edges.copy()
+        for edge in edges:
+            if edge.source not in nodes and edge.target in nodes:
+                node_used = enrich_node(diagram, edge, nodes[edge.target])
+                if node_used is not None:
+                    edges.remove(edge)
+
         # link back the activity
         activity.root.activity = activity
         return activity
@@ -67,7 +73,7 @@ def get_nodes(diagram, group):
     add_select_nodes(nodes, diagram, group)
     add_input_nodes(nodes, diagram, group)
     add_link_nodes(nodes, diagram, group)
-    add_contained_resources(diagram, nodes)
+    get_hybride_node(nodes, diagram, group)
     return nodes
 
 
@@ -111,49 +117,55 @@ def add_note_nodes(nodes, diagram, group):
     
 
 def add_select_nodes(nodes, diagram, group=None):
-    list = get_odk_type_list(diagram, 'UserObject', TriccNodeType.select_one)
+    list = get_odk_type_list(diagram, ['UserObject','object'], TriccNodeType.select_one)
     add_tricc_select_nodes(diagram, nodes, TriccNodeSelectOne, list, group, ['required','save','filter','constraint','constraint_message'])
     #list = get_odk_type_list(diagram, 'UserObject', TriccExtendedNodeType.select_yesno)
     #add_tricc_nodes(nodes, TriccNodeSelectYesNo, list, ['constraint','save','constraint_message','required'])
-    list = get_odk_type_list(diagram, 'UserObject', TriccNodeType.select_multiple)
+    list = get_odk_type_list(diagram, ['UserObject','object'], TriccNodeType.select_multiple)
     add_tricc_select_nodes(diagram, nodes, TriccNodeSelectMultiple, list, group, ['required','save','filter','constraint','constraint_message'])
 
 def add_input_nodes(nodes, diagram, group= None):
-    list = get_odk_type_list(diagram, 'object', TriccNodeType.decimal)
+    list = get_odk_type_list(diagram, ['object','UserObject'], TriccNodeType.decimal)
     add_tricc_nodes(nodes, TriccNodeDecimal, list, group, ['min','max', 'constraint','save','constraint_message','required'])
-    list = get_odk_type_list(diagram, 'object', TriccNodeType.integer)
+    list = get_odk_type_list(diagram, ['object','UserObject'], TriccNodeType.integer)
     add_tricc_nodes(nodes, TriccNodeInteger, list, group, ['min','max', 'constraint','save','constraint_message','required'])
-    list = get_odk_type_list(diagram, 'object', TriccNodeType.text)
+    list = get_odk_type_list(diagram, ['object','UserObject'], TriccNodeType.text)
     add_tricc_nodes(nodes, TriccNodeText, list, group, ['constraint','save','constraint_message','required'])
 
 def add_calculate_nodes(nodes, diagram, group=None):
-    list = get_odk_type_list(diagram, 'object', TriccNodeType.calculate)
+    list = get_odk_type_list(diagram, ['UserObject','object'], TriccNodeType.calculate)
     add_tricc_nodes(nodes, TriccNodeCalculate, list, group, ['save','expression'])
-    list = get_odk_type_list(diagram, 'object', TriccExtendedNodeType.add)
+    list = get_odk_type_list(diagram, ['UserObject','object'], TriccExtendedNodeType.add)
     add_tricc_nodes(nodes, TriccNodeAdd, list, group, ['save','expression'])
-    list = get_odk_type_list(diagram, 'object', TriccExtendedNodeType.count)
+    list = get_odk_type_list(diagram, ['UserObject','object'], TriccExtendedNodeType.count)
     add_tricc_nodes(nodes, TriccNodeCount, list, group, ['save','expression'])
-    list = get_odk_type_list(diagram, 'UserObject', TriccExtendedNodeType.rhombus)
+    list = get_odk_type_list(diagram, ['UserObject','object'], TriccExtendedNodeType.rhombus)
     add_tricc_nodes(nodes, TriccNodeRhombus, list, group, ['save','expression'],['reference'])
-    list = get_odk_type_list(diagram, 'object', TriccExtendedNodeType.exclusive)
+    list = get_odk_type_list(diagram, ['UserObject','object'], TriccExtendedNodeType.exclusive)
     add_tricc_base_node(nodes, TriccNodeExclusive, list, group)
     
-
-    
+def get_hybride_node(nodes, diagram, group=None):
+    list = get_odk_type_list(diagram, ['UserObject','object'], TriccExtendedNodeType.not_available)
+    add_tricc_hybrid_select_nodes(nodes, TriccNodeSelectNotAvailable, list, group, [])
+    list = get_odk_type_list(diagram, ['UserObject','object'], TriccExtendedNodeType.select_yesno)
+    add_tricc_hybrid_select_nodes(nodes, TriccNodeSelectYesNo, list, group, ['required','save','filter','constraint','constraint_message'])
+    #to do generate option
+   
 def add_link_nodes(nodes, diagram, group=None):
-    list = get_odk_type_list(diagram, 'object', TriccExtendedNodeType.link_out)
+    list = get_odk_type_list(diagram, ['UserObject','object'], TriccExtendedNodeType.link_out)
     add_tricc_nodes(nodes, TriccNodeLinkOut, list, group, [], ['reference'])
-    list = get_odk_type_list(diagram, 'object', TriccExtendedNodeType.link_in)
+    list = get_odk_type_list(diagram, ['UserObject','object'], TriccExtendedNodeType.link_in)
     add_tricc_nodes(nodes, TriccNodeLinkIn, list, group)
-    list = get_odk_type_list(diagram, 'object', TriccExtendedNodeType.goto)
+    list = get_odk_type_list(diagram, ['UserObject','object'], TriccExtendedNodeType.goto)
     add_tricc_nodes(nodes, TriccNodeGoTo, list, group,[],['link'])
-    list = get_odk_type_list(diagram, 'object', TriccExtendedNodeType.activity_end)
+    list = get_odk_type_list(diagram, ['UserObject','object'], TriccExtendedNodeType.activity_end)
     add_tricc_base_node(nodes, TriccNodeActivityEnd, list, group)
-    list = get_odk_type_list(diagram, 'object', TriccExtendedNodeType.end)
+    list = get_odk_type_list(diagram, ['UserObject','object'], TriccExtendedNodeType.end)
     add_tricc_base_node(nodes, TriccNodeEnd, list, group)
+
+ 
     
-    
-def get_select_options(diagram, select_node):
+def get_select_options(diagram, select_node, nodes):
     options = {}
     i = 0
     list = get_mxcell_parent_list(diagram, select_node.id, TriccExtendedNodeType.select_option)
@@ -161,20 +173,21 @@ def get_select_options(diagram, select_node):
     for elm in list:
         name = elm.attrib.get('name')
         if name in options_name_list:
-            logger.error("Select quesiton {0} have twice the option name {1}"\
-                .format(select_node.label ,name))
+            logger.error("Select question {0} have twice the option name {1}"\
+                .format(select_node.get_name() ,name))
         else:
             options_name_list.append(name)
+        id=elm.attrib.get('id')
         option = TriccNodeSelectOption(
-            id = elm.attrib.get('id'),
+            id = id,
             label = elm.attrib.get('label'),
             name = name,
             select = select_node,
             group = select_node.group
         )
-        get_select_option_image(option)
         set_additional_attributes(['save'], elm, option)
         options[i]=option
+        nodes[id]=option
         i += 1
     if len(list)== 0:
         logger.error("select {} does not have any option".format(select_node.label))
@@ -188,10 +201,9 @@ def add_save_calculate(node, calculates, used_calculates,processed_nodes, stashe
      # processed_nodes Dict[id, node]
      # calculates  dict[name, Dict[id, node]]
     if hasattr(node,'prev_nodes') and is_ready_to_process(node, processed_nodes) and node.id not in processed_nodes:
-        logger.debug("add_save_calculate:{}".format(node.name if hasattr(node,'name') else node.id))
         if not process_calculate_version_requirement(node, calculates, used_calculates,processed_nodes):
             # missing save stashed it for later
-            logger.warning("add_save_calculate:stashed:{}".format(node.name if hasattr(node,'name') else node.id))
+            logger.warning("add_save_calculate:stashed:{}".format(node.get_name()))
             stashed_nodes[node.id] = node
             return False
         generate_save_calculate(node, calculates)
@@ -230,19 +242,15 @@ def update_last_calculate_name(calculates, version ):
         if node.version == version:
             node.name += VERSION_SEPARATOR + str(version)
     
-    
-
-
 def generate_save_calculate(node, calculates):
-    
     if hasattr(node, 'save') and node.save is not None:
         logger.debug("generate_save_calculate:{}".format(node.name if hasattr(node,'name') else node.id))
         # get fragments type.name.icdcode
         save_fragments=node.save.split('.')
         if len(save_fragments)>1:
-            calculate_name = "{0}_{1}".format(save_fragments[0], save_fragments[1])
+            calculate_name = "{0}.{1}".format(save_fragments[0], save_fragments[1])
         else:
-            calculate_name = "{0}_{1}".format(save_fragments[0], node.name)
+            calculate_name = "{0}.{1}".format(save_fragments[0], node.name)
         calc_node = TriccNodeCalculate(
             name=calculate_name,
             id = generate_id(),
@@ -330,8 +338,6 @@ def process_calculate_version_requirement(node, calculates,used_calculates,proce
     # update the used_calculates         
     return True
 
-
-
 def merge_calculate(node, calculates, from_version):
     #calcualtes list[ node] 
     version = node.version
@@ -344,7 +350,7 @@ def merge_calculate(node, calculates, from_version):
                 logger.debug("merge_calculate:{} ".format(node.name if hasattr(node,'name') else node.id))
                 node.next_nodes += calc_node.next_nodes
                 node.prev_nodes += calc_node.prev_nodes
-                node.expression_inputs += calc_node.expression_inputs
+                
                 # unlink the merged node in its next nodes
 
                 for next_node in calc_node.next_nodes:
@@ -364,27 +370,75 @@ def merge_calculate(node, calculates, from_version):
     for node_id in node_to_delete:
         del calculates[node_id]
 
+def enrich_node(diagram, edge, node):
+    if edge.target == node.id:
+        # get node and process type
+        type, message = get_message(diagram, edge.source)
+        if type is not None and type not in (TriccExtendedNodeType.start, TriccExtendedNodeType.activity_start):   
+            if hasattr(node, type):
+                if message is not None:
+                    setattr(node,type,message)
+                    return True
+            else:
+                logger.warning("A attribute box of type {0} and value {1} is attached to an object not compatible {2}".format(type, message, node.get_name()))
+        else:
+            image = get_image(diagram, edge.source )
+            if image:
+                node.image=image 
+                return True
 
-
-def get_select_option_image(option):
-    # TODO , get edge that has a target to the option (mxcelL ?)
-    # get the image from source
-    # save image and add the link to the option.image
-    pass
+def add_tricc_hybrid_select_nodes(nodes, type, list, group, attributes):
+    for elm in list:
+        id = elm.attrib.get('id')
+        label = elm.attrib.get('label')
+        name = elm.attrib.get('name')
+        if name is None:
+            name = elm.attrib.get('id')
+        node = type(
+            id=id,
+            parent=  elm.attrib.get('parent'),
+            label = label if type != TriccNodeSelectNotAvailable else NO_LABEL,
+            name = name,
+            required=True,
+            group =  group
+        )
+        if type == TriccNodeSelectNotAvailable:
+            node.options =   {0:TriccNodeSelectOption(
+                id = generate_id(),
+                name="1",
+                label=label,
+                select = node,
+                group = group
+            )}
+        elif type == TriccNodeSelectYesNo:
+            node.options =   {0:TriccNodeSelectOption(
+                id = generate_id(),
+                name="1",
+                label=_("Yes"),
+                select = None,
+                group = group
+            ), 1:TriccNodeSelectOption(
+                id = generate_id(),
+                name="-1",
+                label=_("No"),
+                select = None,
+                group = group
+            )}
+        set_additional_attributes(attributes, elm, node)
+        nodes[id]=node
     
 def add_tricc_select_nodes(diagram, nodes, type, list, group, attributes):
     for elm in list:
         id = elm.attrib.get('id')
-        parent= elm.attrib.get('parent')
         node = type(
             id = id,
-            parent= parent,
+            parent= elm.attrib.get('parent'),
             label = elm.attrib.get('label'),
             name = elm.attrib.get('name'),
             required=True,
             group =  group
         )
-        node.options = get_select_options(diagram, node)
+        node.options = get_select_options(diagram, node, nodes)
         set_additional_attributes(attributes, elm, node)
         nodes[id]=node
         
@@ -474,37 +528,15 @@ def add_group_to_child(group, diagram,list_child, nodes, groups, parent_group):
             child_id=child_elm.attrib.get('id')
             if child_id is not None and child_id in nodes:
                 nodes[child_id].group = group
-                
-                
         
 
-        
-def add_contained_resources(diagram, nodes):
-    list=get_odk_type_list(diagram, 'object', TriccExtendedNodeType.container_hint_media)
-    for elm in list:
-        id = elm.attrib.get('id')
-        main_node = get_contained_main_node(diagram, id)
-        if main_node is not None:
-            main_id = main_node.attrib.get('id')
-            if main_id in nodes:
-                hint_message = get_contained_message(diagram, id,TriccExtendedNodeType.hint)
-                help_message = get_contained_message(diagram, id,TriccExtendedNodeType.help)
-                image = get_contained_image(diagram, id )
-                if hint_message:
-                    nodes[main_id].hint=hint_message
-                if help_message:
-                    nodes[main_id].help=help_message
-                if image:
-                    nodes[main_id].image=image                        
-        
-        
-
-def get_contained_image(diagram, container_id ):
-
-    list = get_mxcell_parent_list(diagram, container_id, None)
-    for elm in list:
+def get_image(diagram, id, image_name = None ):
+    elm = get_mxcell(diagram, id)
+    if elm is not None:
         style=elm.attrib.get('style')
-        file_name = add_image_from_style(style, container_id)
+        if image_name is None:
+            image_name = id
+        file_name = add_image_from_style(style, image_name)
         if file_name is not None:
             return file_name
 
@@ -524,10 +556,6 @@ def add_image_from_style(style,image_name):
             with open(file_name , "wb") as fh:
                 fh.write(base64.decodebytes(payload.encode('ascii'))) 
                 return file_name
-        
-    
-
-
 
 def get_contained_main_node(diagram, id):
     list = get_mxcell_parent_list(diagram, id, media_nodes)
@@ -535,12 +563,16 @@ def get_contained_main_node(diagram, id):
         #use only the first one
         return list[0]
         
-def get_contained_message(diagram, id,type):
-    list = get_mxcell_parent_list(diagram, id, type)
-    if isinstance(list, List) and len(list)>0:
+def get_message(diagram, id):
+    elm = get_mxcell(diagram, id)
+    if elm is not None:
+        type = elm.attrib.get('odk_type')
+        if type is not None:
+            if type.endswith("-message"):
+                type = type[:-8]
+            return type, elm.attrib.get('label')
         #use only the first one
-        return remove_html(list[0].attrib.get('label'))
-
+    return None, None
 
 def get_edges( diagram):
     edges = []

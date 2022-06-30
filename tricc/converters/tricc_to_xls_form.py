@@ -1,72 +1,98 @@
 
 import logging
-from tricc.converters.utils import  clean_str
+from tricc.converters.utils import   clean_str
 from tricc.converters.xml_to_tricc import is_ready_to_process
 from tricc.models import *
 from tricc.serializers.xls_form import CHOICE_MAP, ODK_TRICC_TYPE_MAP
+from gettext import gettext as _ # plurals: , ngettext as __
+#from babel import _
+
+TRICC_SELECT_MULTIPLE_CALC_EXPRESSION = "count-selected(${{{0}}}) - number(selected(${{{0}}},'opt_none'))"
+TRICC_SELECT_MULTIPLE_CALC_NONE_EXPRESSION = "selected(${{{0}}},'opt_none')"
+TRICC_CALC_EXPRESSION = "${{{0}}}='1'"
+TRICC_EMPTY_EXPRESSION = "coalesce(${{{0}}},'') != ''"
+TRICC_SELECTED_EXPRESSION = 'selected(${{{0}}}, "{1}")'
+TRICC_REF_EXPRESSION = "${{{0}}}"
+TRICC_NEGATE = "not({})"
+TRICC_NUMBER = "number({})"
 
 logger = logging.getLogger('default')
 
-def generate_xls_form_condition(node, nodes, **kwargs):
-    if is_ready_to_process(node, nodes):
+def generate_xls_form_condition(node, processed_nodes, **kwargs):
+    if is_ready_to_process(node, processed_nodes) and node.id not in processed_nodes:
+        logger.debug('Processing condition for node {0}'.format(node.get_name()))
         # generate condition
         if hasattr(node, 'name') and node.name is not None:
             node.name = clean_str(node.name)
+        if hasattr(node, 'reference') and node.reference is not None:
+            node.reference = clean_str(node.reference)
         if issubclass( node.__class__, TriccNodeInputModel):
             # we don't overright if define in the diagram
             if node.constraint is None:
                 if isinstance(node, TriccNodeSelectMultiple):
                     node.constraint = '.=\'opt_none\' or not(selected(.,\'opt_none\'))'
-                    # TODO gettext
-                    node.constraint_message = '**None** cannot be selected together with choice.'
+                    node.constraint_message = _('**None** cannot be selected together with choice.')
             elif node.odk_type in (TriccNodeType.integer, TriccNodeType.decimal):
                 constraints = []
                 constraints_message = []
                 if node.min is not None:
                         constraints.append('.>=' + node.min)
-                        constraints_message = "the minimun value is {0}.".format(node.min)
+                        constraints_message.append( _("The minimun value is {0}.").format(node.min))
                 if node.max is not None:
                         constraints.append('.>=' + node.max)
-                        constraints_message = "the minimun value is {0}.".format(node.min)
+                        constraints_message.append( _("The maximum value is {0}.").format(node.max))
                 if len(constraints)>0:
                     node.constraint = ' and '.join(constraints)
                     node.constraint_message = ' '.join(constraints_message)
         #continue walk 
-        nodes[node.id]=node
+        processed_nodes[node.id]=node
         return True
     else:
         return False
 
-def generate_xls_form_relevance(node, nodes, **kwargs):
-    if is_ready_to_process(node, nodes):
+def generate_xls_form_relevance(node, processed_nodes, **kwargs):
+    if is_ready_to_process(node, processed_nodes) and node.id not in processed_nodes:
+        logger.debug('Processing relevance for node {0}'.format(node.get_name()))
         # if has prev, create condition
-        if hasattr(node, 'relevance') and (node.relevance is None or len(node.expression_inputs)>1 ):
-            node.relevance = get_node_expressions(node, nodes)
-        #continue walk 
-        nodes[node.id]=node
+        if hasattr(node, 'relevance') and node.relevance is None  :
+            node.relevance = get_node_expressions(node, processed_nodes)
+            # manage not Available
+            if isinstance(node, TriccNodeSelectNotAvailable):
+                #update the checkbox
+                if len(node.prev_nodes)==1:
+                    parent_node = node.prev_nodes[0]
+                    parent_empty = "${{{0}}}=''".format(parent_node.name)
+                    if node.relevance is not None: 
+                        node.relevance += " and " + parent_empty
+                    else:
+                        node.relevance =  parent_empty
+                    node.required = parent_empty
+                    node.constraint = parent_empty
+                    node.constraint_message = _("Cannot be selected with a value entered above")
+                    #update the check box parent : create loop error
+                    parent_node.required = None #"${{{0}}}=''".format(node.name)
+                else:
+                    logger.warning("not available node {} does't have a single parent".format(node.get_name()))
+                
+                
+        processed_nodes[node.id]=node
+        #continue walk
         return True
     else:
         return False
 
 
-def generate_xls_form_calculate(node, nodes, **kwargs):
-    if hasattr(node, 'prev_nodes') and is_ready_to_process(node, nodes) and node.id not in nodes :
+def generate_xls_form_calculate(node, processed_nodes, **kwargs):
+    if is_ready_to_process(node, processed_nodes) and node.id not in processed_nodes :
+        logger.debug("generation of calculate for node {}".format(node.get_name()))
         # calcualte expression
-        expressions= []
-        if hasattr(node, 'prev_nodes' ) and not issubclass(node.__class__,TriccNodeFakeCalculateBase):
-            bypass_calculate(node,node)
-        if hasattr(node, 'expression') and (node.expression is None or len(node.expression_inputs)>1 ):
-            if node.odk_type == TriccNodeType.calculate:
-                input_expression = get_node_expressions(node, nodes)
-                if input_expression is not None:
-                    add_sub_expression(expressions, "({})".format(input_expression))
-            elif issubclass(node.__class__, TriccNodeCalculateBase):
-                add_sub_expression(expressions, get_calculation_terms(node))
-            if len(expressions)>0:
-                node.expression = "number({0})".format( ' and '.join(expressions) )
-        #continue walk 
-
-        nodes[node.id]=node
+        #if hasattr(node, 'prev_nodes' ) and not issubclass(node.__class__,TriccNodeFakeCalculateBase):
+        #    bypass_calculate(node,node)
+        if hasattr(node, 'expression') and (node.expression is None ):
+            if issubclass(node.__class__, TriccNodeCalculateBase):
+                node.expression = get_node_expressions(node, processed_nodes, is_calculate = True)
+               #continue walk 
+        processed_nodes[node.id]=node
         return True
     else:
         return False
@@ -81,13 +107,6 @@ def bypass_calculate(node,walked_node):
             # link prev node of the calculate to node (as next_node)
             # do it recursivly if a calulate is founded
             bypass_calculate(node,prev_node)
-            # remove only the last link, because the calulate migh be used elsewhere
-            #if node == walked_node:
-                #remove from edge
-                #node.prev_nodes.remove(prev_node)
-                # remove to edge
-                #if node  in prev_node.next_nodes: 
-                #    prev_node.next_nodes.remove(node)
         #bypass calc node of recurvise call (node != walked_node)
         elif  issubclass(prev_node.__class__, (TriccNodeDiplayModel)) or isinstance(prev_node, TriccNodeActivity) and node != walked_node :
             #add new to edge
@@ -96,77 +115,126 @@ def bypass_calculate(node,walked_node):
             #add from dege
             if prev_node not in node.prev_nodes: 
                 node.prev_nodes.append(prev_node)
-            
 
- 
-
-
-    
-
-
+#if the node is "required" then we can take the fact that it has value for the next elements
 def get_required_node_expression(node):
-    return "coalesce(${{{0}}},'') != ''".format(node.name)
+    return TRICC_EMPTY_EXPRESSION.format(node.name)
 
+# Get a selected option
 def get_selected_option_expression(option_node):
-    return 'selected(${{{0}}}, "{1}")'.format(option_node.select.name,option_node.name )
+    return TRICC_SELECTED_EXPRESSION.format(option_node.select.name,option_node.name )
 
-def get_calculate_expressions(node):
-    logger.debug("get_calculate_expressions:{}".format(node.id) )
-    # Rhombus are not display, they are only used for calculation
-    if issubclass(node.__class__, TriccNodeFakeCalculateBase):
-        return get_calculation_terms(node)
-    else:
-        return '${{{0}}} = 1'.format(node.name)
 
-def get_node_expressions(node, nodes):
+# Function that add element to array is not None or ''
+def add_sub_expression(array, sub):
+    if sub is not None and sub not in array and sub != '':
+        not_sub = 'not({})'.format(sub)
+        if not_sub in array:
+            # avoid having 2 conditions that are complete opposites
+            array.remove(not_sub)
+        else:
+            array.append(sub)
+
+
+# main function to retrieve the expression from the tree
+# node is the node to calculate
+# processed_nodes are the list of processed nodes
+
+def get_node_expressions(node, processed_nodes, is_calculate = False):
     expression = None
-    if hasattr(node,'prev_nodes') and is_ready_to_process(node, nodes)\
-        and hasattr(node, 'expression_inputs'):
-        # generate only if relevance is not set in the diagramm 
-        for prev_node in node.prev_nodes:
-        #   - IF OPTION, then use selected()
-        #   - if calculate : ${name} == 1
-        #   - for the rest, if required, check for empty value if not required, copy relevance
-            add_sub_expression(node.expression_inputs,get_node_expression(prev_node, nodes))
-        if len(node.expression_inputs)>0:
-            expression =  ' or '.join(node.expression_inputs)
-            if node.odk_type ==  TriccExtendedNodeType.exclusive:
-                expression =  'not(' + expression  + ')'
+    # in case of recursive call processed_nodes will be None
+    if hasattr(node,'prev_nodes') and (processed_nodes is None or is_ready_to_process(node, processed_nodes)):
+        # for the calculate we 
+        expression = get_node_expression(node, is_calculate)
+        #fall back on required or on relevance if nothin found
+        if expression is None:
+                expression = get_prev_node_expression(node)
+    if is_calculate:
+        if expression is not None and expression != '':
+            expression = TRICC_NUMBER.format(expression)
+        else:
+            expression = ''
+    return expression
+
+
+
+
+def get_prev_node_expression(node, excluded_name = None):
+    expression = None
+    #when getting the prev node, we calculate the  
+    
+    if hasattr(node, 'expression_inputs') and len(node.expression_inputs)>0:
+        expression_inputs = node.expression_inputs
+    else:
+        expression_inputs = []
+    for  prev_node in node.prev_nodes:
+        if excluded_name is None or  hasattr(prev_node,'name') and prev_node.name != excluded_name:
+            #we have to calculate all but the real calculate
+            is_calculate = issubclass(node.__class__, TriccNodeCalculate) 
+            add_sub_expression(expression_inputs, get_node_expression(prev_node, is_calculate, True))
+        # avoid void is there is not conditions to avoid looping too much itme
+    if len(expression_inputs)>0:
+        expression =  ' or '.join(expression_inputs)
+        expression_inputs = None
+        if isinstance(node,  TriccNodeExclusive):
+            expression =  TRICC_NEGATE.format(expression)
+    return expression
+
+def get_node_expression(node, is_calculate = False, is_prev = False, negate = False):
+    # in case of calculate we only use the select multiple if none is not selected
+    expression = None
+    negate_expression = None
+    if is_calculate and isinstance(node, (TriccNodeSelectMultiple, TriccNodeSelectOne )):
+        expression = TRICC_SELECT_MULTIPLE_CALC_EXPRESSION.format(node.name)
+    elif is_calculate and isinstance(node, (TriccNodeSelectYesNo,TriccNodeSelectNotAvailable)):
+        expression = TRICC_CALC_EXPRESSION.format(node.name)
+    elif is_calculate  and  isinstance(node, TriccNodeActivityStart):
+            expression = node.activity.relevance
+    elif is_prev  and issubclass(node.__class__, TriccNodeDisplayCalculateBase):
+        expression = '${{{0}}} = 1'.format(node.name)
+    elif issubclass(node.__class__, TriccNodeCalculateBase):
+        if negate:
+            negate_expression =  get_calculation_terms(node, negate = True)
+        else:
+            expression =  get_calculation_terms(node)
+    elif is_prev  and hasattr(node,'required') and node.required == True:
+        expression = get_required_node_expression(node) 
+    elif is_prev  and   hasattr(node, 'relevance') and node.relevance is not None:
+            expression = node.relevance
+
+    elif isinstance(node, TriccNodeSelectOption):
+       expression = get_selected_option_expression(node)
+    if negate:
+        if negate_expression is not None:
+            return negate_expression
+        else:
+            return TRICC_NEGATE.format(expression)
+    else:
         return expression
 
-def get_node_expression(node, nodes):
-    if node.odk_type == TriccExtendedNodeType.select_option:
-       return get_selected_option_expression(node)
-    elif issubclass(node.__class__, TriccNodeCalculateBase):
-        return get_calculate_expressions(node)
-    else:
-        if hasattr(node,'required') and node.required == True:
-            return get_required_node_expression(node)
-        elif hasattr(node, 'relevance') and node.relevance is not None  :
-            return node.relevance
-        else:
-            # get the expression form the parent (will be useful for the links)
-            if node.odk_type not in (TriccExtendedNodeType.start, TriccExtendedNodeType.activity_start):
-                return get_node_expressions(node, nodes)
 
 
-def add_sub_expression(array, sub):
-    if sub is not None and sub not in array:
-        array.append(sub)
-
-def get_calculation_terms(node):
+def get_calculation_terms(node, is_calculate = False, negate = False):
     if isinstance(node, TriccNodeAdd):
-        return get_add_terms(node)
+        return get_add_terms(node, is_calculate, negate)
     elif isinstance(node, TriccNodeCount):
-        return get_count_terms(node)
+        return get_count_terms(node, is_calculate, negate)
     elif isinstance(node, TriccNodeRhombus):
-        return get_rhumbus_terms(node)
+        return get_rhumbus_terms(node, is_calculate, negate)
     elif isinstance(node, TriccNodeExclusive):
-        if len(node.prev_nodes) == 1 and issubclass(node.prev_nodes[0].__class__, TriccNodeCalculateBase):
-            return 'not('  + get_calculate_expressions(node.prev_nodes[0]) + ')'
+        if len(node.prev_nodes) == 1:
+            if issubclass(node.prev_nodes[0].__class__, TriccNodeDisplayCalculateBase):
+                return get_node_expression(node.prev_nodes[0], negate=True) 
+            elif issubclass(node.prev_nodes[0].__class__, TriccNodeFakeCalculateBase):
+                return  get_node_expression(node.prev_nodes[0], is_calculate = True, negate=True)
+            else:
+                logger.error("exclusive node {} does not depend of a calculate".format(node.get_name()))
         else:
-            logger.error("exclusive node {} has no ou too much parent".format(node.id))
-
+            logger.error("exclusive node {} has no ou too much parent".format(node.get_name()))
+    elif negate:
+        return TRICC_NEGATE.format(get_prev_node_expression(node))
+    else:
+        return get_prev_node_expression(node )
     
     
 def process_rhumbus_expression(label, operation):
@@ -178,30 +246,68 @@ def process_rhumbus_expression(label, operation):
             #TODO check if number
             return  operation + terms[1].replace('?','').strip()
         
-def get_rhumbus_terms(node):
-    
+def get_rhumbus_terms(node, is_calculate= False, negate = False):
+    expression = None
+    left_term = None
     if node.label is not None:
         for operation in [ '>=', '<=', '==','=','>','<']:
             left_term =  process_rhumbus_expression(node.label, operation)
             if left_term is not None:
-                return "number(${{{0}}}{1})=1".format(node.reference,left_term)
-    return "number(${{{}}})=1".format(node.reference.strip())
-         
+                break
+    if left_term is None:
+        left_term = '>0'
+    reference_node = get_prev_node_by_name(node.prev_nodes, node.reference)
+    # calcualte the expression only for select muzltiple and fake calculate
+    if reference_node is not None:
+        if issubclass(reference_node.__class__, TriccNodeFakeCalculateBase) or isinstance(reference_node, TriccNodeSelectMultiple):
+            expression = get_node_expression(reference_node, is_calculate = True, is_prev = True)
+        else:
+            expression = TRICC_REF_EXPRESSION.format(node.reference)
+    else: 
+        expression = TRICC_REF_EXPRESSION.format(node.reference)
+        #expression = "${{{}}}".format(node.reference)
+        logger.warning('reference {0} was not found in the previous nodes of node {1}'.format(node.reference, node.get_name()))
+    expression_prev = get_prev_node_expression(node, node.reference )
+    if expression is not None:
+        expression =  "({0}){1}".format(expression,left_term)
+    else:
+        expression =  "({0}){1}".format(node.reference,left_term)
+    if negate:
+        expression = TRICC_NEGATE.format(expression)
+    if expression_prev is not None:
+        expression = "({} and ({}))".format(expression, expression_prev)
+    return expression
+
+def get_prev_node_by_name(nodes, name):
+    for node in nodes:
+        if hasattr(node, 'name') and node.name == name:
+            return node
         
-def get_add_terms(node): 
+def get_add_terms(node, is_calculate = False, negate = False): 
+    if negate:
+        logger.warning("negate not supported for Add node {}".format(node.get_name()))
     terms = []
     for prev_node in node.prev_nodes:
         if issubclass(prev_node, TriccNodeNumber) or isinstance(node, TriccNodeCount):
             terms.append("coalesce(${{{0}}},0)".format(prev_node.name))
         else:
-            terms.append("number({0})".format(get_node_expression(prev_node)))
+            terms.append("number({0})".format(get_node_expression(prev_node, is_calculate, True)))
     if len(terms)>0:
         return  ' + '.join(terms)
             
-def get_count_terms(node): 
+def get_count_terms(node, is_calculate, negate = False): 
     terms = []
     for prev_node in node.prev_nodes:
-        terms.append("number({0})".format(get_node_expression(prev_node)))
+        if isinstance(prev_node, TriccNodeSelectMultiple):
+            if negate:
+                terms.append(TRICC_SELECT_MULTIPLE_CALC_NONE_EXPRESSION.format(prev_node.name))
+            else:
+                terms.append(TRICC_SELECT_MULTIPLE_CALC_EXPRESSION.format(prev_node.name))
+        else:
+            if negate:
+                terms.append("number(number({0})=0)".format(get_node_expression(prev_node, is_calculate, True)))
+            else:
+                terms.append("number({0})".format(get_node_expression(prev_node, is_calculate, True)))
     if len(terms)>0:
         return  ' + '.join(terms)
 

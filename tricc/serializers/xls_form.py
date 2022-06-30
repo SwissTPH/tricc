@@ -127,26 +127,32 @@ def get_attr_if_exists(node,column, map_array):
         return ''
     
 
-def generate_xls_form_export(node, nodes, stashed_nodes, df_survey, df_choice, cur_group, **kargs):
+def generate_xls_form_export(node, processed_nodes, stashed_nodes, df_survey, df_choice, cur_group, **kargs):
     # check that all prev nodes were processed
-    if hasattr(node, 'prev_nodes' ) and not is_ready_to_process(node,nodes):
-        return False
-    if node.id not in nodes :
-        if node.group != cur_group :
-            stashed_nodes[node.id]=node
-            return False
-        if issubclass(node.__class__, (TriccNodeDisplayCalculateBase,TriccNodeDiplayModel)):
-            if isinstance(node, TriccNodeSelectOption):
-                values = []
-                for column in CHOICE_MAP:
-                    values.append(get_attr_if_exists(node,column,CHOICE_MAP))
-                df_choice.loc[len(df_choice)] = values
-            elif node.odk_type in ODK_TRICC_TYPE_MAP and ODK_TRICC_TYPE_MAP[node.odk_type] is not None:
-                values = []
-                for column in SURVEY_MAP:
-                    values.append(get_attr_if_exists(node,column,SURVEY_MAP))
-                df_survey.loc[len(df_survey)] = values
-        nodes[node.id] = node
-        #continue walk 
-        return True
+
+    if is_ready_to_process(node,processed_nodes):
+        if node.id not in processed_nodes :
+            if node.group != cur_group :
+                logger.debug("stashing node {}".format(node.get_name()))
+                stashed_nodes[node.id]=node
+                return False
+            logger.debug("printing node {}".format(node.get_name()))
+            if issubclass(node.__class__, (TriccNodeDisplayCalculateBase,TriccNodeDiplayModel)):
+                if isinstance(node, TriccNodeSelectOption):
+                    values = []
+                    for column in CHOICE_MAP:
+                        values.append(get_attr_if_exists(node,column,CHOICE_MAP))
+                    df_choice.loc[len(df_choice)] = values
+                elif node.odk_type in ODK_TRICC_TYPE_MAP and ODK_TRICC_TYPE_MAP[node.odk_type] is not None:
+                    values = []
+                    for column in SURVEY_MAP:
+                        values.append(get_attr_if_exists(node,column,SURVEY_MAP))
+                    df_survey.loc[len(df_survey)] = values
+                else:
+                    logger.warning("node {} have an unsupported type {}".format(node.get_name(),node.odk_type))
+            processed_nodes[node.id] = node
+            #continue walk °
+            return True
+    else:
+        stashed_nodes[node.id]=node
     return False

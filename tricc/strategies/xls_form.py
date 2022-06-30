@@ -13,9 +13,13 @@ from tricc.models import TriccNodeActivity
 from tricc.serializers.xls_form import CHOICE_MAP, SURVEY_MAP, end_group, generate_xls_form_export, start_group
 from tricc.services.utils import walktrhough_tricc_node
 from tricc.strategies.base_strategy import BaseStrategy
+import logging
+logger = logging.getLogger('default')
+
+
 class XLSFormStrategy(BaseStrategy):
     calculates= {}
-    nodes = {}
+    processed_nodes = {}
     df_survey = pd.DataFrame(columns=SURVEY_MAP.keys())
     df_choice = pd.DataFrame(columns=CHOICE_MAP.keys())
     
@@ -31,10 +35,10 @@ class XLSFormStrategy(BaseStrategy):
 
     def do_clean(self, **kwargs):
         self.calculates= {}
-        self.nodes = {}
+        self.processed_nodes = {}
     
     def get_kwargs(self):  
-        return {'calculates':self.calculates, 'nodes':self.nodes, 'df_survey':self.df_survey, 'df_choice':self.df_choice }  
+        return {'calculates':self.calculates, 'processed_nodes':self.processed_nodes, 'df_survey':self.df_survey, 'df_choice':self.df_choice }  
 
     def generate_export(self, node, **kwargs):
         return generate_xls_form_export(node, **kwargs)
@@ -90,7 +94,7 @@ class XLSFormStrategy(BaseStrategy):
                 # add end group if new node where added OR if the previous end group was removed
                 if delta_len == 1 and previous_len == (len(self.df_survey) - 1):
                     # remove start for empty group
-                    print("group {} without content".format(s_node.group.label))
+                    logger.warning("group {} without content".format(s_node.group.label))
                     self.df_survey.drop(index=self.df_survey.index[-1], axis=0, inplace=True)
                 else:
                     end_group( cur_group =s_node.group, groups=groups, **self.get_kwargs())

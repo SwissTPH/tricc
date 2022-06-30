@@ -1,7 +1,6 @@
 
 from enum import Enum
 from typing import Dict, List, Optional,  Union
-
 from pydantic import BaseModel, constr
 
 Expression= constr(regex="^[^\\/]+$")
@@ -11,6 +10,8 @@ triccId = constr(regex="^.+$")
 base64 = constr(regex="[^-A-Za-z0-9+/=]|=[^=]|={3,}$")
 
 #data:page/id,UkO_xCL5ZjyshJO9Bexg
+
+
 
 class TriccNodeType(str, Enum):
     note='note'
@@ -34,9 +35,9 @@ class TriccExtendedNodeType(str, Enum):
     link_out='link_out'
     count='count'#: count the number of valid input
     add='add' # add counts
-    container_hint_media='container_hint_media'
+    container_hint_media='container_hint_media'#DEPRECATED
     activity='activity'
-    #select_yesno='select_one yesno'
+    select_yesno='select_one yesno'
     select_option='select_option'
     hint='hint-message'
     help='help-message'
@@ -45,6 +46,7 @@ class TriccExtendedNodeType(str, Enum):
     activity_end='activity_end'
     edge='edge'
     page='page'
+    not_available='not_available'
 
 class TriccOperation(str, Enum):
     _and='and'
@@ -78,6 +80,8 @@ class TriccBaseModel(BaseModel):
     def __hash__(self):
         hash_value = hash(self.id)
         return hash_value
+    def get_name(self):
+        return id
 
     class Config:  
         use_enum_values = True  # <--
@@ -91,7 +95,18 @@ class TriccNodeBaseModel(TriccBaseModel):
     # #only the last time the script will go through the node (all prev node expression would be created
     expression_inputs: List[Expression] = []
     activity: Optional[TriccBaseModel]
-    
+    def get_name(self):
+        #if self.label is not None:
+        #    if len(self.label)<128:
+        #        return self.label
+        #    else:
+        #        return self.label[:127]
+        #el
+        if self.name is not None:
+            return self.name
+        else:
+            # TODO call parent.get_name instead
+            return self.id
 
 class TriccGroup(TriccBaseModel):
     odk_type = TriccExtendedNodeType.page
@@ -127,14 +142,9 @@ class TriccNodeDiplayModel(TriccNodeBaseModel):
 
     # to use the enum value of the TriccNodeType
 
-
-
 class TriccNodeNote(TriccNodeDiplayModel):
     odk_type = TriccNodeType.note
         
-
-
-
 class TriccNodeActivityEnd(TriccBaseModel):
     activity: Optional[TriccBaseModel]
     odk_type = TriccExtendedNodeType.activity_end
@@ -142,18 +152,12 @@ class TriccNodeActivityEnd(TriccBaseModel):
 class TriccNodeEnd(TriccBaseModel):
     activity:Optional[TriccBaseModel]
     odk_type = TriccExtendedNodeType.end
-
-
-
-
     
 class TriccNodeInputModel(TriccNodeDiplayModel):
-    required:Optional[bool]
+    required:Optional[Expression]
     constraint_message:Optional[str]
     constraint:Optional[Expression]
     save: Optional[str] # contribute to another calculate
-
-
 
     
 class TriccNodeMainStart(TriccNodeBaseModel):
@@ -190,11 +194,12 @@ class TriccNodeSelect(TriccNodeInputModel):
 class TriccNodeSelectOne(TriccNodeSelect):
     odk_type = TriccNodeType.select_one
 
-#class TriccNodeSelectYesNo(TriccNodeSelect):
-#    odk_type = TriccNodeType.select_one
+class TriccNodeSelectYesNo(TriccNodeSelectOne):
+    pass
 #    options: List[TriccNodeSelectOption] = [TriccNodeSelectOption(label='Yes', name='yes'),
 #                 TriccNodeSelectOption(label='No', name='no')]
-
+class TriccNodeSelectNotAvailable(TriccNodeSelectOne):
+    pass
 class TriccNodeSelectMultiple(TriccNodeSelect):
     odk_type = TriccNodeType.select_multiple
 

@@ -63,6 +63,8 @@ def get_mxcell_parent_list(diagram, select_id, odk_type =None, attrib = None):
     else:
         return diagram.findall(".//mxCell[@parent='{0}']/..[@odk_type='{1}']".format(select_id, odk_type))
 
+def get_mxcell(diagram, id):
+    return diagram.find(".//*[@id='{0}']".format(id))
 
 def get_edges_list(diagram):
     #return list(diagram.findall('.//mxCell[@edge][@source][@target]'))
