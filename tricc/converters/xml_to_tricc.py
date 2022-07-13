@@ -203,8 +203,6 @@ def add_save_calculate(node, calculates, used_calculates,processed_nodes, stashe
      # calculates  dict[name, Dict[id, node]]
     calc_node = None
     if is_ready_to_process(node, processed_nodes) and node.id not in processed_nodes:
-        if node.id in ('oIgg9j4Nw0w7UEB7tNBO-4'):
-            pass
         if process_calculate_version_requirement(node, calculates, used_calculates,processed_nodes):
             calc_node = generate_save_calculate(node)
 
@@ -226,7 +224,7 @@ def add_save_calculate(node, calculates, used_calculates,processed_nodes, stashe
             processed_nodes[node.id] = node
             if node.id  in stashed_nodes:
                 del stashed_nodes[node.id]
-                logger.info("add_save_calculate:unstashing processed node{} ".format(node.get_name()))
+                logger.debug("add_save_calculate:unstashing processed node{} ".format(node.get_name()))
             group_next_nodes(node)
             # it seems that the "next nodes" don't take newly created node
             #if calc_node is not None:
@@ -236,11 +234,11 @@ def add_save_calculate(node, calculates, used_calculates,processed_nodes, stashe
             #    calculates[calc_node.name][calc_node.id]=calc_node
             return True
         else:
-            logger.warning("add_save_calculate:stashed {}".format(node.get_name()))
+            logger.debug("add_save_calculate:stashed {}".format(node.get_name()))
             stashed_nodes[node.id] = node
     elif node.id not in stashed_nodes and node.id not in processed_nodes:
                     # missing save stashed it for later
-        logger.warning("add_save_calculate:stashed {}".format(node.get_name()))
+        logger.debug("add_save_calculate:stashed {}".format(node.get_name()))
         stashed_nodes[node.id] = node
         # once processed clean the stashed node
         #if node.id in stashed_nodes:

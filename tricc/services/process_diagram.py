@@ -49,7 +49,7 @@ def build_tricc_graph(in_filepath):
 
         while len(stashed_nodes)>0:
             s_node = stashed_nodes.pop(list(stashed_nodes.keys())[0])
-            logger.info("add_save_calculate:unstashed:{}".format(s_node.get_name()))
+            logger.debug("add_save_calculate:unstashed:{}".format(s_node.get_name()))
             walktrhough_tricc_node(s_node, add_save_calculate, calculates=calculates,
                                used_calculates=used_calculates, processed_nodes=processed_nodes, stashed_nodes=stashed_nodes)
         logger.info("# check if all edges (arrow where used)")

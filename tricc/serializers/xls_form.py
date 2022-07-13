@@ -139,7 +139,7 @@ def generate_xls_form_export(node, processed_nodes, stashed_nodes, df_survey, df
             # clean stashed node when processed
             if node.id in stashed_nodes:
                 del stashed_nodes[node.id]
-                logger.info("generate_xls_form_export: unstashing processed node{} ".format(node.get_name()))
+                logger.debug("generate_xls_form_export: unstashing processed node{} ".format(node.get_name()))
             if issubclass(node.__class__, (TriccNodeDisplayCalculateBase,TriccNodeDiplayModel)):
                 if isinstance(node, TriccNodeSelectOption):
                     values = []

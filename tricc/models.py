@@ -75,6 +75,7 @@ class TriccBaseModel(BaseModel):
     parent:Optional[triccId]
     group : Optional[BaseModel]
     instance: int = 1
+    base_instance : Optional[BaseModel]
     def __eq__(self, other):
         if isinstance(other, self.__class__):
             return self.id == other.id
@@ -95,6 +96,7 @@ class TriccBaseModel(BaseModel):
         # change the id to avoid colision of name
         instance.id = generate_id()
         instance.instance=nb_instance
+        instance.base_instance = self
         return instance
  
         
@@ -146,7 +148,13 @@ class TriccEdge(TriccBaseModel):
     odk_type = TriccExtendedNodeType.edge
     source: Union[triccId, TriccNodeBaseModel]
     target: Union[triccId, TriccNodeBaseModel]
-
+    def  make_instance(self, instance_nb, activity = None):
+        instance = super().make_instance(instance_nb, activity = activity)
+        if issubclass(self.source.__class__, TriccNodeBaseModel):
+            instance.source = self.source.copy()
+        if issubclass(self.target.__class__, TriccNodeBaseModel):
+            instance.target = self.target.copy()
+        return instance
 class TriccNodeActivity(TriccNodeBaseModel):
     odk_type = TriccExtendedNodeType.activity
     # starting point of the activity
@@ -244,6 +252,10 @@ class TriccNodeDiplayModel(TriccNodeBaseModel):
     help: Optional[str]
     group:Optional[Union[TriccGroup,TriccNodeActivity]]
     relevance: Optional[Expression]
+    def  make_instance(self, instance_nb, activity = None):
+        instance = super().make_instance(instance_nb, activity = activity)
+        instance.relevance = None
+        return instance
 
     # to use the enum value of the TriccNodeType
 
@@ -253,10 +265,20 @@ class TriccNodeNote(TriccNodeDiplayModel):
 class TriccNodeActivityEnd(TriccBaseModel):
     activity: Optional[TriccBaseModel]
     odk_type = TriccExtendedNodeType.activity_end
+    def make_instance(self,instance_nb,activity,   **kwargs):
+        #shallow copy
+        instance = super().make_instance(instance_nb, activity = activity)
+        instance.activity = activity
+        return instance   
 
 class TriccNodeEnd(TriccBaseModel):
     activity:Optional[TriccBaseModel]
     odk_type = TriccExtendedNodeType.end
+    def make_instance(self,instance_nb,activity,  **kwargs):
+        #shallow copy
+        instance = super().make_instance(instance_nb, activity = activity)
+        instance.activity = activity
+        return instance   
     
 class TriccNodeInputModel(TriccNodeDiplayModel):
     required:Optional[Expression]
@@ -277,10 +299,12 @@ class TriccNodeLinkIn(TriccNodeBaseModel):
 class TriccNodeLinkOut(TriccNodeBaseModel):
     odk_type = TriccExtendedNodeType.link_out
     reference: Optional[Union[TriccNodeLinkIn, triccId]]
+    # no need to copy
 
 class TriccNodeGoTo(TriccNodeBaseModel):
     odk_type = TriccExtendedNodeType.goto 
     link: Union[TriccNodeActivity , triccId]
+    # no need ot copy
 
 
     
@@ -303,7 +327,7 @@ class TriccNodeSelect(TriccNodeInputModel):
     options : Dict[int, TriccNodeSelectOption] = {}
     list_name: str
     def make_instance(self,instance_nb,activity, **kwargs):
-        #shallow copy
+        #shallow copy, no copy of filter and list_name
         instance = super().make_instance(instance_nb, activity = activity)
         instance.options = {}
         for key, option in self.options.items():
@@ -326,6 +350,7 @@ class TriccNodeSelectMultiple(TriccNodeSelect):
 class TriccNodeNumber(TriccNodeInputModel):
     min:Optional[float]
     max:Optional[float]
+    # no need to copy min max in make isntance
     
     
     
@@ -347,9 +372,21 @@ class TriccNodeCalculateBase(TriccNodeBaseModel):
     # to use the enum value of the TriccNodeType
     class Config:  
         use_enum_values = True  # <--
+    def make_instance(self,instance_nb,activity,  **kwargs):
+        #shallow copy
+        instance = super().make_instance(instance_nb, activity = activity)
+        input = {}
+        instance.input = input
+        instance.expression = None
+        version = 0 
+        instance.version = version
+        return instance
+    
 
 class TriccNodeDisplayCalculateBase(TriccNodeCalculateBase):
     save: Optional[str] # contribute to another calculate
+    # no need to copy save
+    
 
 class TriccNodeCalculate(TriccNodeDisplayCalculateBase):
     odk_type = TriccNodeType.calculate
@@ -364,6 +401,11 @@ class TriccNodeFakeCalculateBase(TriccNodeCalculateBase):
 class TriccNodeRhombus(TriccNodeFakeCalculateBase):
     odk_type = TriccExtendedNodeType.rhombus
     reference: Optional[Union[TriccNodeBaseModel, triccId]]
+    def make_instance(self,instance_nb,activity,   **kwargs):
+        #shallow copy
+        instance = super().make_instance(instance_nb, activity = activity)
+        instance.reference = None
+        return instance
     
 class TriccNodeExclusive(TriccNodeFakeCalculateBase):
     odk_type = TriccExtendedNodeType.exclusive
