@@ -3,17 +3,17 @@
 # won't impact the relevance/calcualteg
 
 import os
-from uuid import uuid4
 import html2text
-from tricc.converters.utils import clean_name
+from tricc.converters.utils import clean_name, generate_id
 from tricc.models import *
 from tricc.parsers.xml import  get_edges_list, get_mxcell, get_mxcell_parent_list, get_odk_type,  get_odk_type_list
 import logging
 import base64
 
-from tricc.services.utils import set_prev_node
+
 
 NO_LABEL = "NO_LABEL"
+TRICC_LIST_NAME = 'list_{0}'
 
 logger = logging.getLogger("default")
 
@@ -66,14 +66,14 @@ def remove_html(string):
     # and delete empty lines
     return text
 
-def get_nodes(diagram, group):
+def get_nodes(diagram, activity):
     nodes = {}
-    add_note_nodes(nodes, diagram, group)  
-    add_calculate_nodes(nodes, diagram, group)
-    add_select_nodes(nodes, diagram, group)
-    add_input_nodes(nodes, diagram, group)
-    add_link_nodes(nodes, diagram, group)
-    get_hybride_node(nodes, diagram, group)
+    add_note_nodes(nodes, diagram, activity)  
+    add_calculate_nodes(nodes, diagram, activity)
+    add_select_nodes(nodes, diagram, activity)
+    add_input_nodes(nodes, diagram, activity)
+    add_link_nodes(nodes, diagram, activity)
+    get_hybride_node(nodes, diagram, activity)
     return nodes
 
 
@@ -157,7 +157,7 @@ def add_link_nodes(nodes, diagram, group=None):
     list = get_odk_type_list(diagram, ['UserObject','object'], TriccExtendedNodeType.link_in)
     add_tricc_nodes(nodes, TriccNodeLinkIn, list, group)
     list = get_odk_type_list(diagram, ['UserObject','object'], TriccExtendedNodeType.goto)
-    add_tricc_nodes(nodes, TriccNodeGoTo, list, group,[],['link'])
+    add_tricc_nodes(nodes, TriccNodeGoTo, list, group,['instance'],['link'])
     list = get_odk_type_list(diagram, ['UserObject','object'], TriccExtendedNodeType.activity_end)
     add_tricc_base_node(nodes, TriccNodeActivityEnd, list, group)
     list = get_odk_type_list(diagram, ['UserObject','object'], TriccExtendedNodeType.end)
@@ -183,6 +183,7 @@ def get_select_options(diagram, select_node, nodes):
             label = elm.attrib.get('label'),
             name = name,
             select = select_node,
+            list_name = select_node.list_name,
             group = select_node.group
         )
         set_additional_attributes(['save'], elm, option)
@@ -196,43 +197,61 @@ def get_select_options(diagram, select_node, nodes):
 
 
 
-def add_save_calculate(node, calculates, used_calculates,processed_nodes, stashed_nodes ):
+def add_save_calculate(node, calculates, used_calculates,processed_nodes, stashed_nodes,  **kwargs ):
      # used_calculates dict[name, Dict[id, node]]
      # processed_nodes Dict[id, node]
      # calculates  dict[name, Dict[id, node]]
-    if hasattr(node,'prev_nodes') and is_ready_to_process(node, processed_nodes) and node.id not in processed_nodes:
-        if not process_calculate_version_requirement(node, calculates, used_calculates,processed_nodes):
-            # missing save stashed it for later
-            logger.warning("add_save_calculate:stashed:{}".format(node.get_name()))
+    calc_node = None
+    if is_ready_to_process(node, processed_nodes) and node.id not in processed_nodes:
+        if node.id in ('oIgg9j4Nw0w7UEB7tNBO-4'):
+            pass
+        if process_calculate_version_requirement(node, calculates, used_calculates,processed_nodes):
+            calc_node = generate_save_calculate(node)
+
+            if isinstance(node, (TriccNodeCount, TriccNodeAdd, TriccNodeCalculate )) and node.name is not None:
+                # generate the calc node version by looking in the processed calculate
+                if node.name in calculates:
+                    #if node.id in calculates[node.name]:
+                    node.version = get_max_named_version(calculates,node.name) + 1
+                    # check if the calculate is used, if not merge it with the previous versions
+                    from_version = get_max_named_version(used_calculates, node.name)
+                    # current node not yet in the list so 1 item is enough
+                    if len(calculates[node.name])>0:
+                        merge_calculate(node, calculates[node.name], from_version)
+                    if from_version > 0:
+                        update_last_calculate_name(calculates[node.name], from_version-1 )
+                else:
+                    calculates[node.name]= {}
+                calculates[node.name][node.id]=node
+            processed_nodes[node.id] = node
+            if node.id  in stashed_nodes:
+                del stashed_nodes[node.id]
+                logger.info("add_save_calculate:unstashing processed node{} ".format(node.get_name()))
+            group_next_nodes(node)
+            # it seems that the "next nodes" don't take newly created node
+            #if calc_node is not None:
+            #    processed_nodes[calc_node.id]=calc_node
+            #    if calc_node.name not in calculates:
+            #        calculates[calc_node.name]= {}
+            #    calculates[calc_node.name][calc_node.id]=calc_node
+            return True
+        else:
+            logger.warning("add_save_calculate:stashed {}".format(node.get_name()))
             stashed_nodes[node.id] = node
-            return False
-        generate_save_calculate(node, calculates)
-        if isinstance(node, (TriccNodeCount, TriccNodeAdd, TriccNodeCalculate )) and node.name is not None:
-            # generate the calc node version by looking in the processed calculate
-            if node.name in calculates:
-                if node.id in calculates[node.name]:
-                    node.version = get_max_used_version(calculates,node.name) + 1
-                # check if the calculate is used, if not merge it with the previous versions
-                from_version = get_max_used_version(used_calculates, node.name)
-                if len(calculates[node.name])>1:
-                    merge_calculate(node, calculates[node.name], from_version)
-
-                if from_version > 0:
-                    update_last_calculate_name(calculates[node.name], from_version-1 )
-            else:
-                calculates[node.name]= {}
-            calculates[node.name][node.id]=node
-        processed_nodes[node.id] = node
-        group_next_nodes(node)
-        return True
-    else:
-        return False
+    elif node.id not in stashed_nodes and node.id not in processed_nodes:
+                    # missing save stashed it for later
+        logger.warning("add_save_calculate:stashed {}".format(node.get_name()))
+        stashed_nodes[node.id] = node
+        # once processed clean the stashed node
+        #if node.id in stashed_nodes:
+        #    del stashed_nodes[node.id]
+    return False
 
 
-def get_max_used_version(used_calculates,name):
+def get_max_named_version(calculates,name):
     max = 0
-    if name  in used_calculates:
-        for id, node in used_calculates[name].items():
+    if name  in calculates:
+        for id, node in calculates[name].items():
             if node.version > max:
                 max = node.version
     return max
@@ -242,7 +261,7 @@ def update_last_calculate_name(calculates, version ):
         if node.version == version:
             node.name += VERSION_SEPARATOR + str(version)
     
-def generate_save_calculate(node, calculates):
+def generate_save_calculate(node):
     if hasattr(node, 'save') and node.save is not None:
         logger.debug("generate_save_calculate:{}".format(node.name if hasattr(node,'name') else node.id))
         # get fragments type.name.icdcode
@@ -254,17 +273,16 @@ def generate_save_calculate(node, calculates):
         calc_node = TriccNodeCalculate(
             name=calculate_name,
             id = generate_id(),
-            group = node.group
+            group = node.group,
+            activity = node.activity,
         )
         calc_node.prev_nodes.append(node)
         node.next_nodes.append(calc_node)
-        if calculate_name not in calculates:
-            calculates[calculate_name] = {}
-        calculates[calculate_name][calc_node.id]=calc_node
+        
+        return calc_node
         #add_save_calculate(calc_node, calculates, used_calculates,processed_nodes)
         
-def generate_id():
-    return str(uuid4())
+
 
 
 def get_max_version(dict):
@@ -274,67 +292,43 @@ def get_max_version(dict):
             max_version = sim_node
     return max_version
 
-# check if the all the prev nodes are processed
-def is_ready_to_process(node, processed_nodes):
-    if isinstance(node, TriccNodeSelectOption):
-            node = node.select
-    if hasattr(node, 'prev_nodes'):
-        # ensure the the previous node of the select are processed, not the option prev nodes
-        for prev_node in node.prev_nodes:
-            if isinstance(prev_node,TriccNodeActivity):
-                if len(prev_node.end_prev_nodes)==0 and len(prev_node.activity_end_prev_nodes)==0:
-                    return False
-                for end_node in prev_node.end_prev_nodes:
-                    if end_node.id not in processed_nodes:
-                        return False
-                for activity_end_node in prev_node.activity_end_prev_nodes:
-                    if activity_end_node.id not in processed_nodes:
-                        return False
-            elif prev_node.id not in processed_nodes:
-                return False
-        return True
-    else:
-        return True
+
         
 VERSION_SEPARATOR = '_v_'       
 def process_calculate_version_requirement(node, calculates,used_calculates,processed_nodes):
-    if isinstance(node, TriccNodeRhombus):
+    if isinstance(node, (TriccNodeRhombus)):
         logger.debug("process_calculate_version_requirement:{} ".format(node.name if hasattr(node,'name') else node.id))
-        last_found = None
-        for key, p_node in processed_nodes.items():
-            if hasattr(p_node,'name') and p_node.name == node.reference:
-                # issue is that it can be further in another path
-                last_found = p_node
+        last_found = get_prev_node_by_name(processed_nodes, node.reference, node.instance)
         if node.reference in calculates and len(calculates[node.reference])>0 :
                 # issue is that it can be further in another path
                 last_found = get_max_version(calculates[node.reference])
         if last_found is not None:
-            if node is not last_found.next_nodes:
+            if node.id is not last_found.next_nodes:
                 last_found.next_nodes.append(node)
-            if last_found is not node.prev_nodes:
+            if last_found.id is not node.prev_nodes:
                 node.prev_nodes.append(last_found)
         else:
             return False
-        return True
-            
-    for prev_node in node.prev_nodes:
-        if prev_node.id in processed_nodes:
+    if hasattr(node, 'prev_nodes'):
+        for prev_node in node.prev_nodes:
             if isinstance(prev_node, (TriccNodeCount, TriccNodeAdd, TriccNodeCalculate )):
-                logger.debug("process_calculate_version_requirement:{}".format(node.name if hasattr(node,'name') else node.id))
-                # if not a verison, index will equal -1
-                index = prev_node.name.rfind(VERSION_SEPARATOR)
-                #remove the leading part with version 
-                node_clean_name = prev_node.name[:index] if index > 0 else prev_node.name
-                if node_clean_name not in used_calculates:
-                    node_clean_name =prev_node.name
-                if node_clean_name not in calculates :
-                    logger.warning("node {} refered before being processed".format(node.label if node.label is not None else node.name))
-                max_version = get_max_version(calculates[node_clean_name])
-                if node_clean_name not in used_calculates:
-                    used_calculates[node_clean_name] = {}
-                #save the max version only once
-                if max_version.id not in used_calculates[node_clean_name]:
-                    used_calculates[node_clean_name][max_version.id] = max_version
+                logger.debug("process_calculate_version_requirement:{} , prev Node ".format(node.get_name(), prev_node.get_name()))
+                if prev_node.id in processed_nodes:
+                    # if not a verison, index will equal -1
+                    index = prev_node.name.rfind(VERSION_SEPARATOR)
+                    #remove the leading part with version 
+                    node_clean_name = prev_node.name[:index] if index > 0 else prev_node.name
+                    if node_clean_name not in used_calculates:
+                        node_clean_name =prev_node.name
+                    if node_clean_name not in calculates :
+                        logger.warning("node {} refered before being processed".format(node.get_name()))
+                        return False
+                    max_version = get_max_version(calculates[node_clean_name])
+                    if node_clean_name not in used_calculates:
+                        used_calculates[node_clean_name] = {}
+                    #save the max version only once
+                    if max_version.id not in used_calculates[node_clean_name]:
+                        used_calculates[node_clean_name][max_version.id] = max_version
     # update the used_calculates         
     return True
 
@@ -369,6 +363,7 @@ def merge_calculate(node, calculates, from_version):
             logger.error("two different type of calculate node share the same name {}".format(node.name))
     for node_id in node_to_delete:
         del calculates[node_id]
+    
 
 def enrich_node(diagram, edge, node):
     if edge.target == node.id:
@@ -400,7 +395,8 @@ def add_tricc_hybrid_select_nodes(nodes, type, list, group, attributes):
             label = label if type != TriccNodeSelectNotAvailable else NO_LABEL,
             name = name,
             required=True,
-            group =  group
+            group =  group,
+            list_name = 'yes_no' if type == TriccNodeSelectYesNo else TRICC_LIST_NAME.format(id)
         )
         if type == TriccNodeSelectNotAvailable:
             node.options =   {0:TriccNodeSelectOption(
@@ -408,7 +404,8 @@ def add_tricc_hybrid_select_nodes(nodes, type, list, group, attributes):
                 name="1",
                 label=label,
                 select = node,
-                group = group
+                group = group,
+                list_name = node.list_name
             )}
         elif type == TriccNodeSelectYesNo:
             node.options =   {0:TriccNodeSelectOption(
@@ -416,13 +413,15 @@ def add_tricc_hybrid_select_nodes(nodes, type, list, group, attributes):
                 name="1",
                 label=_("Yes"),
                 select = None,
-                group = group
+                group = group,
+                list_name =  node.list_name
             ), 1:TriccNodeSelectOption(
                 id = generate_id(),
                 name="-1",
                 label=_("No"),
                 select = None,
-                group = group
+                group = group,
+                list_name =  node.list_name
             )}
         set_additional_attributes(attributes, elm, node)
         nodes[id]=node
@@ -436,10 +435,12 @@ def add_tricc_select_nodes(diagram, nodes, type, list, group, attributes):
             label = elm.attrib.get('label'),
             name = elm.attrib.get('name'),
             required=True,
-            group =  group
+            group =  group,
+            list_name = TRICC_LIST_NAME.format(id)
         )
         node.options = get_select_options(diagram, node, nodes)
         set_additional_attributes(attributes, elm, node)
+        
         nodes[id]=node
         
 
@@ -457,6 +458,7 @@ def add_tricc_base_node(nodes, type, list, group, attributes = [], mandatory_att
             id = id,
             parent= parent,
             group = group,
+            activity = group,
             **set_mandatory_attribute(elm, mandatory_attributes)
         )
         set_additional_attributes(attributes, elm, node)

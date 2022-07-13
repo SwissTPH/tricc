@@ -1,6 +1,6 @@
 import abc
 
-from tricc.services.utils import walktrhough_tricc_node
+from tricc.models import walktrhough_tricc_node
 
 
 class BaseStrategy:

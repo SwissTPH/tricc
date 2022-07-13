@@ -1,6 +1,9 @@
 #TODO move those in Strategy/tricc to ODK
 # then use the strategy to call it 
 
+from uuid import uuid4
+
+
 def replace_all(text, list_char, replacement):
     for i in list_char:
         text = text.replace(i, replacement)
@@ -15,3 +18,5 @@ def clean_name( name, prefix='' ):
         name = 'id_' + name
     return name
 
+def generate_id():
+    return str(uuid4())

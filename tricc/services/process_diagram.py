@@ -6,7 +6,6 @@ from tricc.models import *
 from tricc.parsers.xml import read_drawio
 
 import logging
-from tricc.services.utils import walktrhough_tricc_node, set_prev_next_node
 
 
 
@@ -34,7 +33,7 @@ def build_tricc_graph(in_filepath):
     logger.info("# Create the graph from the start node")
     if start_page is not None:
         # create the graph
-        walktrhough_node(start_page.root, start_page, pages )
+        linking_nodes(start_page.root, start_page, pages )
         # Save the calculate list [node]
         calculates = {}
         # save when a calcualte is used dict[name, Dict[id, node]]
@@ -47,8 +46,10 @@ def build_tricc_graph(in_filepath):
         logger.info("# add save calculate")
         walktrhough_tricc_node(start_page.root, add_save_calculate, calculates=calculates,
                                used_calculates=used_calculates, processed_nodes=processed_nodes, stashed_nodes=stashed_nodes)
+
         while len(stashed_nodes)>0:
             s_node = stashed_nodes.pop(list(stashed_nodes.keys())[0])
+            logger.info("add_save_calculate:unstashed:{}".format(s_node.get_name()))
             walktrhough_tricc_node(s_node, add_save_calculate, calculates=calculates,
                                used_calculates=used_calculates, processed_nodes=processed_nodes, stashed_nodes=stashed_nodes)
         logger.info("# check if all edges (arrow where used)")
@@ -73,7 +74,7 @@ def build_tricc_graph(in_filepath):
 
     
     
-def walktrhough_node(node, page, pages, processed_nodes = [], path = []):
+def linking_nodes(node, page, pages, processed_nodes = [], path = []):
     # get the edges that have that node as source
     node_edge = list(filter(lambda x: (x.source == node.id) , page.edges))
     node.activity = page
@@ -105,13 +106,13 @@ def walktrhough_node(node, page, pages, processed_nodes = [], path = []):
                         target_node = link_out
                 elif issubclass(target_node.__class__, TriccNodeSelect):
                     for key, option in target_node.options.items():
-                        walktrhough_node(option, page, pages, processed_nodes, current_path)
+                        linking_nodes(option, page, pages, processed_nodes, current_path)
 
                 # don't save the link out because the real node is the page
                 processed_nodes.append(target_node.id)
-                walktrhough_node(target_node, page, pages, processed_nodes, current_path)
+                linking_nodes(target_node, page, pages, processed_nodes, current_path)
             elif edge.target in current_path:
-                logger.warning("possible loop detected for node {0} in page {1}; path: {2} ".format(message_name, page.label, current_path))
+                logger.warning("possible loop detected for node {0} in page {1}; path: {2} ".format(node.get_name(), page.label, current_path))
             if isinstance(node, TriccNodeSelectNotAvailable):
                 set_prev_next_node( node.options[0], target_node)
             else:  
@@ -126,18 +127,22 @@ def walkthrough_goto_node(node, page, pages, processed_nodes, current_path):
      # find the page
     if node.link in pages:
         next_page = pages[node.link]
+        # walk thought the next page
+        if next_page.id not in processed_nodes:
+        # will be added in process nod later
+        # add the id to avoid loop: 
+            logger.debug("jumping to page {0}".format(next_page.label))
+        if next_page.instance != node.instance:
+            #FIXME find if there is other instance (list in activity ?)
+            next_page = next_page.make_instance(node.instance)
+        linking_nodes(next_page.root, next_page, pages, processed_nodes, current_path)
         # attach the page
         for got_to_prev_nodes in node.prev_nodes:
             set_prev_next_node(got_to_prev_nodes, next_page)
             # remove the got_to
             if node in got_to_prev_nodes.next_nodes:
                 got_to_prev_nodes.next_nodes.remove(node)
-        # walk thought the next page
-        if next_page.id not in processed_nodes:
-        # will be added in process nod later
-        # add the id to avoid loop: 
-            logger.debug("jumping to page {0}".format(next_page.label))
-            walktrhough_node(next_page.root, next_page, pages, processed_nodes, current_path)
+
                     # steal the edges
         replace_node(node, next_page, page)
                 
@@ -146,24 +151,7 @@ def walkthrough_goto_node(node, page, pages, processed_nodes, current_path):
     else:
         logger.warning("node {0} from page {1} doesnot have a valid link".format(node.label, page.label))
 
-def replace_node(old, new, page):
-    for prev_node in old.prev_nodes:
-        set_prev_next_node(prev_node, new)
-        if old in prev_node.next_nodes:
-            prev_node.next_nodes.remove(old)
-    old.prev_nodes = []
-    for next_node in old.next_nodes:
-        set_prev_next_node( new, next_node)
-        if old in next_node.prev_nodes:
-            next_node.prev_nodes.remove(old)
-    old.next_nodes = []
-    page.nodes[new.id]=new
-    del page.nodes[old.id]
-    for edge in page.edges:
-        if edge.source == old.id:
-           edge.source = new.id
-        if edge.target == old.id:
-           edge.target = new.id 
+
 
 def walkthrough_link_out_node(node, page, pages, processed_nodes, current_path):
     if node.reference is not None:
@@ -187,7 +175,7 @@ def walkthrough_link_out_node(node, page, pages, processed_nodes, current_path):
             replace_node(node, linked_target_node, page)
             
             if linked_target_node.id not in processed_nodes:
-                walktrhough_node(linked_target_node, link_in_page, pages, processed_nodes, current_path)
+                linking_nodes(linked_target_node, link_in_page, pages, processed_nodes, current_path)
     else:
             logger.warning("link out {0} in page {1} : reference not found"\
                 .format(node.name,page.label))

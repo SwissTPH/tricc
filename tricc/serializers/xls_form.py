@@ -3,7 +3,6 @@
 from tricc.converters.utils import clean_name
 from tricc.converters.xml_to_tricc import is_ready_to_process
 from tricc.models import *
-from tricc.services.utils import walktrhough_tricc_node
 import logging
 logger = logging.getLogger('default')
 
@@ -99,7 +98,7 @@ SURVEY_MAP = {
     'required message':'required message', 'read only':'read only', 
     'calculation':'expression','repeat_count':'repeat_count','image':'image'
 }
-CHOICE_MAP = {'list_name':'select', 'value':'name', 'label':'label' }
+CHOICE_MAP = {'list_name':'list_name', 'value':'name', 'label':'label' }
        
 
 def get_attr_if_exists(node,column, map_array):
@@ -108,7 +107,7 @@ def get_attr_if_exists(node,column, map_array):
         if isinstance(mapping, Dict) and node.odk_type in map_array[column]:
             odk_type =  map_array[column][node.odk_type]
             if odk_type[:6] == "select":
-                return odk_type + " " + node.name
+                return odk_type + " " + node.list_name
             else:
                 return odk_type
         elif hasattr(node, map_array[column]):
@@ -133,20 +132,28 @@ def generate_xls_form_export(node, processed_nodes, stashed_nodes, df_survey, df
     if is_ready_to_process(node,processed_nodes):
         if node.id not in processed_nodes :
             if node.group != cur_group :
-                logger.debug("stashing node {}".format(node.get_name()))
+                logger.debug("generate_xls_form_export:stashing node {}".format(node.get_name()))
                 stashed_nodes[node.id]=node
                 return False
             logger.debug("printing node {}".format(node.get_name()))
+            # clean stashed node when processed
+            if node.id in stashed_nodes:
+                del stashed_nodes[node.id]
+                logger.info("generate_xls_form_export: unstashing processed node{} ".format(node.get_name()))
             if issubclass(node.__class__, (TriccNodeDisplayCalculateBase,TriccNodeDiplayModel)):
                 if isinstance(node, TriccNodeSelectOption):
                     values = []
                     for column in CHOICE_MAP:
                         values.append(get_attr_if_exists(node,column,CHOICE_MAP))
-                    df_choice.loc[len(df_choice)] = values
+                    # add only if not existing
+                    if len(df_choice[(df_choice['list_name'] == node.list_name) & (df_choice['value'] == node.name)])  == 0:
+                        df_choice.loc[len(df_choice)] = values
                 elif node.odk_type in ODK_TRICC_TYPE_MAP and ODK_TRICC_TYPE_MAP[node.odk_type] is not None:
                     values = []
                     for column in SURVEY_MAP:
                         values.append(get_attr_if_exists(node,column,SURVEY_MAP))
+                    
+                        
                     df_survey.loc[len(df_survey)] = values
                 else:
                     logger.warning("node {} have an unsupported type {}".format(node.get_name(),node.odk_type))
