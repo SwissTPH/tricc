@@ -134,16 +134,14 @@ def walkthrough_goto_node(node, page, pages, processed_nodes, current_path):
             logger.debug("jumping to page {0}".format(next_page.label))
         if next_page.instance != node.instance:
             #FIXME find if there is other instance (list in activity ?)
+            # must look in pages thans to base_instance
             next_page = next_page.make_instance(node.instance)
+            pages[next_page.id]=next_page
         linking_nodes(next_page.root, next_page, pages, processed_nodes, current_path)
         # attach the page
-        for got_to_prev_nodes in node.prev_nodes:
-            set_prev_next_node(got_to_prev_nodes, next_page)
-            # remove the got_to
-            if node in got_to_prev_nodes.next_nodes:
-                got_to_prev_nodes.next_nodes.remove(node)
-
-                    # steal the edges
+        #for got_to_prev_nodes in node.prev_nodes:
+        #    set_prev_next_node(got_to_prev_nodes, next_page, node )
+        # steal the edges
         replace_node(node, next_page, page)
                 
         # continue on the initial page

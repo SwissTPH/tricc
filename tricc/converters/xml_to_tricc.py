@@ -201,23 +201,32 @@ def add_save_calculate(node, calculates, used_calculates,processed_nodes, stashe
      # used_calculates dict[name, Dict[id, node]]
      # processed_nodes Dict[id, node]
      # calculates  dict[name, Dict[id, node]]
-    calc_node = None
     if is_ready_to_process(node, processed_nodes) and node.id not in processed_nodes:
         if process_calculate_version_requirement(node, calculates, used_calculates,processed_nodes):
-            calc_node = generate_save_calculate(node)
-
+            generate_save_calculate(node)
             if isinstance(node, (TriccNodeCount, TriccNodeAdd, TriccNodeCalculate )) and node.name is not None:
                 # generate the calc node version by looking in the processed calculate
                 if node.name in calculates:
-                    #if node.id in calculates[node.name]:
-                    node.version = get_max_named_version(calculates,node.name) + 1
-                    # check if the calculate is used, if not merge it with the previous versions
-                    from_version = get_max_named_version(used_calculates, node.name)
+                    # get max version existing
+                    last_version = get_max_named_version(calculates,node.name)
+                    # get max version used 
+                    last_used_version = get_max_named_version(used_calculates, node.name)
+                    # merge is there is unsued version -> 
                     # current node not yet in the list so 1 item is enough
-                    if len(calculates[node.name])>0:
-                        merge_calculate(node, calculates[node.name], from_version)
-                    if from_version > 0:
-                        update_last_calculate_name(calculates[node.name], from_version-1 )
+                    if  last_version>last_used_version:
+                        node.version = last_version +1
+                        merge_calculate(node, calculates[node.name], last_used_version)
+                    if last_used_version > 0:
+                        # chaining the calculate, only one way FIXME it can create issue
+                        last_used_calc = get_max_version(used_calculates[node.name])
+                        if last_used_calc is not None:
+                            set_prev_next_node(last_used_calc,node)
+                            last_used_calc.name += VERSION_SEPARATOR + str(last_used_calc.version)
+                        else:
+                            logger.error("add_save_calculate: last used calc not found for {}".format(node.get_name()))
+                            exit(-2)
+                    else:
+                        node.version = 0
                 else:
                     calculates[node.name]= {}
                 calculates[node.name][node.id]=node
@@ -253,14 +262,10 @@ def get_max_named_version(calculates,name):
             if node.version > max:
                 max = node.version
     return max
-
-def update_last_calculate_name(calculates, version ):
-    for id, node in calculates.items():
-        if node.version == version:
-            node.name += VERSION_SEPARATOR + str(version)
+        
     
 def generate_save_calculate(node):
-    if hasattr(node, 'save') and node.save is not None:
+    if hasattr(node, 'save') and node.save is not None and node.save != '':
         logger.debug("generate_save_calculate:{}".format(node.name if hasattr(node,'name') else node.id))
         # get fragments type.name.icdcode
         save_fragments=node.save.split('.')
@@ -274,8 +279,8 @@ def generate_save_calculate(node):
             group = node.group,
             activity = node.activity,
         )
-        calc_node.prev_nodes.append(node)
-        node.next_nodes.append(calc_node)
+        set_prev_next_node(node,calc_node)
+
         
         return calc_node
         #add_save_calculate(calc_node, calculates, used_calculates,processed_nodes)

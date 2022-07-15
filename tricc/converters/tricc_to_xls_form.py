@@ -54,7 +54,7 @@ def generate_xls_form_relevance(node, processed_nodes, **kwargs):
     if is_ready_to_process(node, processed_nodes) and node.id not in processed_nodes:
         logger.debug('Processing relevance for node {0}'.format(node.get_name()))
         # if has prev, create condition
-        if hasattr(node, 'relevance') and node.relevance is None  :
+        if hasattr(node, 'relevance') and node.relevance is None:  
             node.relevance = get_node_expressions(node, processed_nodes)
             # manage not Available
             if isinstance(node, TriccNodeSelectNotAvailable):
@@ -149,6 +149,7 @@ def get_node_expressions(node, processed_nodes, is_calculate = False):
             expression = get_node_expression(node, processed_nodes, is_calculate, processed_nodes)
         #fall back on required or on relevance if nothin found
         if expression is None:
+                is_calculate = issubclass(node.__class__, TriccNodeCalculate)
                 expression = get_prev_node_expression(node,processed_nodes)
     if is_calculate:
         if expression is not None and expression != '':

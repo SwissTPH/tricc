@@ -13,11 +13,11 @@ def start_group( cur_group, groups, df_survey, relevance = False, **kargs):
             values.append('begin group')
         elif column == 'name':
             value = clean_name(get_attr_if_exists(cur_group,column,SURVEY_MAP))
-            if cur_group.id in groups:
-                value = value + "_" + str(groups[cur_group.id])
-                groups[cur_group.id] += 1
+            if cur_group.name in groups:
+                groups[cur_group.name] += 1
+                value = value + "_" + str(groups[cur_group.name])
             else:
-                groups[cur_group.id] = 0
+                groups[cur_group.name] = 0
             values.append(value)
         elif column == 'label':
             values.append(get_attr_if_exists(cur_group,column,SURVEY_MAP))        
@@ -37,8 +37,8 @@ def end_group( cur_group, groups, df_survey, **kargs):
             values.append('end group')
         elif column in ('name','label'):
             value = get_attr_if_exists(cur_group,column,SURVEY_MAP)
-            if cur_group.id in groups:
-                value = value + "_" + str(groups[cur_group.id])
+            if cur_group.name in groups:
+                value = value + "_" + str(groups[cur_group.name])
             values.append(value)
         else:
             values.append('')

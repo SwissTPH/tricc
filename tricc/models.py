@@ -97,6 +97,10 @@ class TriccBaseModel(BaseModel):
         instance.id = generate_id()
         instance.instance=nb_instance
         instance.base_instance = self
+        instance.group = activity
+        # assign the defualt group
+        #if activity is not None and self.group == activity.base_instance:
+        #    instance.group = instance
         return instance
  
         
@@ -127,7 +131,10 @@ class TriccNodeBaseModel(TriccBaseModel):
             return self.id
     def  make_instance(self, instance_nb, activity = None):
         instance = super().make_instance(instance_nb, activity = activity)
-        if hasattr(self, 'name'):
+        if hasattr(self, 'name') \
+            and not isinstance(self, TriccNodeSelectOption)\
+            and not issubclass(self.__class__, TriccNodeDisplayCalculateBase):
+                
             instance.name = TRICC_INSTANCE.format(instance_nb, self.name)
         if hasattr(self, 'activity') and activity is not None:
             instance.activity = activity
@@ -136,7 +143,7 @@ class TriccNodeBaseModel(TriccBaseModel):
         prev_nodes = []
         instance.prev_nodes = prev_nodes
         expression_inputs = []
-        instance. expression_inputs =expression_inputs
+        instance.expression_inputs =expression_inputs
         
         return instance
             
@@ -176,6 +183,7 @@ class TriccNodeActivity(TriccNodeBaseModel):
     def make_instance(self,instance_nb, **kwargs):
         #shallow copy
         instance = super().make_instance(instance_nb, activity = None)
+        #instance.base_instance = self
         # we duplicate all the related nodes (not the calculate, duplication is manage in calculate version code)
         nodes = {}
         instance.nodes = nodes
@@ -185,9 +193,11 @@ class TriccNodeActivity(TriccNodeBaseModel):
         instance.end_prev_nodes = end_prev_nodes
         activity_end_prev_nodes = []
         instance.activity_end_prev_nodes = activity_end_prev_nodes
-        instance.relevance= None
+        relevance= None
+        instance.relevance= relevance
         groups = {}
         instance.groups = groups
+        instance.group = instance
         for edge in self.edges:
             instance.edges.append(edge.make_instance(instance_nb, activity = instance))
         instance.edges_copy = instance.edges.copy() 
@@ -196,10 +206,10 @@ class TriccNodeActivity(TriccNodeBaseModel):
         for node in list(self.nodes.values()):
             update_nodes( instance, node)
         for group in self.groups:
-            update_groups(self, instance, group)         
+            instance.update_groups(group)         
         # update parent group
         for group in self.groups:
-            update_groups_group(self, instance, group)
+            instance.update_groups_group(group)
                  
         #processed_nodes = {}
         
@@ -208,21 +218,21 @@ class TriccNodeActivity(TriccNodeBaseModel):
         return instance
     
     
-def update_groups_group(old, instance, group):   
-    for instance_group in instance.groups:
-        if instance_group.group == group:
-            instance_group.group == instance_group
-        elif instance_group.group == old:
-            instance_group.group == instance    
-     
-def update_groups(old, instance, group):
-    instance_group = group.make_instance(instance.instance, activity = instance)
-    for node in list(instance.nodes.values()):
-        if node.group == group:
-            node.group == instance_group
-        elif node.group == old:
-            node.group == instance
-    instance.groups[instance_group.id] = instance_group
+    def update_groups_group(self, group):   
+        for instance_group in self.groups:
+            if instance_group.group == group:
+                instance_group.group == instance_group
+            elif instance_group.group == self.base_instance:
+                instance_group.group == self    
+        
+    def update_groups(self,  group):
+        # create new group 
+        instance_group = group.make_instance(self.instance, activity = self)
+        #update the group in all activity
+        for node in list(self.nodes.values()):
+            if node.group == group:
+                node.group == instance_group
+        self.groups[instance_group.id] = instance_group
 
 
 def update_nodes(instance, node):
@@ -368,7 +378,7 @@ class TriccNodeText(TriccNodeInputModel):
 class TriccNodeCalculateBase(TriccNodeBaseModel):
     input: Dict[TriccOperation, TriccNodeBaseModel] = {}
     expression : Optional[Expression] # will be generated based on the input
-    version: int = 0
+    version: int = 1
     # to use the enum value of the TriccNodeType
     class Config:  
         use_enum_values = True  # <--
@@ -377,7 +387,8 @@ class TriccNodeCalculateBase(TriccNodeBaseModel):
         instance = super().make_instance(instance_nb, activity = activity)
         input = {}
         instance.input = input
-        instance.expression = None
+        expression = None
+        instance.expression = expression
         version = 0 
         instance.version = version
         return instance
@@ -404,7 +415,8 @@ class TriccNodeRhombus(TriccNodeFakeCalculateBase):
     def make_instance(self,instance_nb,activity,   **kwargs):
         #shallow copy
         instance = super().make_instance(instance_nb, activity = activity)
-        instance.reference = None
+        reference = None
+        instance.reference = reference
         return instance
     
 class TriccNodeExclusive(TriccNodeFakeCalculateBase):
@@ -450,7 +462,7 @@ def replace_node(old, new, page):
         set_prev_next_node(prev_node, new, old)
     old.prev_nodes = []
     for next_node in old.next_nodes:
-        set_prev_next_node( new, next_node)
+        set_prev_next_node( new, next_node,old)
     old.next_nodes = []
     page.nodes[new.id]=new
     del page.nodes[old.id]
