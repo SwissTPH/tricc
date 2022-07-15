@@ -174,6 +174,8 @@ class TriccNodeActivity(TriccNodeBaseModel):
     nodes: Dict[str, TriccNodeBaseModel] = {}
     #groups
     groups : Dict[str, TriccGroup] = {}
+    # save the instance on the base activity     
+    instances : Dict[int,TriccNodeBaseModel] = {}
     # node that lead to the end of the interogation
     end_prev_nodes:  List[TriccBaseModel] = []
     # node that leads to the end of the activity
@@ -182,42 +184,47 @@ class TriccNodeActivity(TriccNodeBaseModel):
     # redefine 
     def make_instance(self,instance_nb, **kwargs):
         #shallow copy
-        instance = super().make_instance(instance_nb, activity = None)
-        #instance.base_instance = self
-        # we duplicate all the related nodes (not the calculate, duplication is manage in calculate version code)
-        nodes = {}
-        instance.nodes = nodes
-        edges = []
-        instance.edges = edges
-        end_prev_nodes = []
-        instance.end_prev_nodes = end_prev_nodes
-        activity_end_prev_nodes = []
-        instance.activity_end_prev_nodes = activity_end_prev_nodes
-        relevance= None
-        instance.relevance= relevance
-        groups = {}
-        instance.groups = groups
-        instance.group = instance
-        for edge in self.edges:
-            instance.edges.append(edge.make_instance(instance_nb, activity = instance))
-        instance.edges_copy = instance.edges.copy() 
-        update_nodes(instance, self.root) 
-        # we walk throught the nodes and replace them when ready
-        for node in list(self.nodes.values()):
-            update_nodes( instance, node)
-        for group in self.groups:
-            instance.update_groups(group)         
-        # update parent group
-        for group in self.groups:
-            instance.update_groups_group(group)
-                 
-        #processed_nodes = {}
-        
-        ##walktrhough_tricc_node( instance.root, make_node_instance, page = instance , processed_nodes= processed_nodes, instance_nb=instance_nb)
-        
-        return instance
+        if instance_nb in self.instances:
+            return  self.instances[instance_nb]
+        else:
+            instance = super().make_instance(instance_nb, activity = None)
+            self.instances[instance_nb] = instance
+            #instance.base_instance = self
+            # we duplicate all the related nodes (not the calculate, duplication is manage in calculate version code)
+            nodes = {}
+            instance.nodes = nodes
+            edges = []
+            instance.edges = edges
+            end_prev_nodes = []
+            instance.end_prev_nodes = end_prev_nodes
+            activity_end_prev_nodes = []
+            instance.activity_end_prev_nodes = activity_end_prev_nodes
+            relevance= None
+            instance.relevance= relevance
+            groups = {}
+            instance.groups = groups
+            instance.group = instance
+            for edge in self.edges:
+                instance.edges.append(edge.make_instance(instance_nb, activity = instance))
+            instance.edges_copy = instance.edges.copy() 
+            update_nodes(instance, self.root) 
+            # we walk throught the nodes and replace them when ready
+            for node in list(self.nodes.values()):
+                update_nodes( instance, node)
+            for group in self.groups:
+                instance.update_groups(group)         
+            # update parent group
+            for group in self.groups:
+                instance.update_groups_group(group)
+            #processed_nodes = {}
+            
+            ##walktrhough_tricc_node( instance.root, make_node_instance, page = instance , processed_nodes= processed_nodes, instance_nb=instance_nb)
+            
+            return instance
     
-    
+
+        
+        
     def update_groups_group(self, group):   
         for instance_group in self.groups:
             if instance_group.group == group:

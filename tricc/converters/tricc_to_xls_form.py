@@ -15,6 +15,7 @@ TRICC_SELECTED_EXPRESSION = 'selected(${{{0}}}, "{1}")'
 TRICC_REF_EXPRESSION = "${{{0}}}"
 TRICC_NEGATE = "not({})"
 TRICC_NUMBER = "number({})"
+TRICC_NAND_EXPRESSION = '({0}) and not({1})'
 
 logger = logging.getLogger('default')
 
@@ -169,6 +170,7 @@ def get_prev_node_expression(node, processed_nodes, excluded_name = None):
         expression_inputs = node.expression_inputs
     else:
         expression_inputs = []
+
     for  prev_node in node.prev_nodes:
         if excluded_name is None or  hasattr(prev_node,'name') and prev_node.name != excluded_name:
             #we have to calculate all but the real calculate
@@ -180,6 +182,15 @@ def get_prev_node_expression(node, processed_nodes, excluded_name = None):
         expression_inputs = None
         if isinstance(node,  TriccNodeExclusive):
             expression =  TRICC_NEGATE.format(expression)
+    if isinstance(node, TriccNodeActivity) and node.base_instance is not None:
+        activity = node
+        expression_inputs = []
+        add_sub_expression(expression_inputs, get_node_expression(activity.base_instance, processed_nodes, is_calculate, True))
+        for instance_nb, past_instance in activity.base_instance.instances.items():
+            if instance_nb < activity.instance:
+                add_sub_expression(expression_inputs, get_node_expression(past_instance, processed_nodes, is_calculate, True))
+        expression_activity =  ' or '.join(expression_inputs)
+        expression = TRICC_NAND_EXPRESSION.format(expression,expression_activity)         
     return expression
 
 def get_node_expression(node,processed_nodes, is_calculate = False, is_prev = False, negate = False ):
@@ -203,17 +214,44 @@ def get_node_expression(node,processed_nodes, is_calculate = False, is_prev = Fa
         expression = get_required_node_expression(node) 
     elif is_prev  and   hasattr(node, 'relevance') and node.relevance is not None:
             expression = node.relevance
-
     elif isinstance(node, TriccNodeSelectOption):
        expression = get_selected_option_expression(node)
+
+
     if negate:
         if negate_expression is not None:
             return negate_expression
-        else:
+        elif expression is not None:
             return TRICC_NEGATE.format(expression)
+        else:
+            logger.error("exclusive can not negate None from {}".format(node.get_name()))
     else:
         return expression
 
+    def get_activity_expression(activity):
+        # for each activity before
+        for instance_nb, past_instance in activity.base_instance.instances.items():
+            if instance_nb < activity.instance:
+                
+        # create an exclusive node
+                exclusif = TriccNodeExclusive(
+                    id = generate_id(),
+                    group= activity,
+                    name = 'exclude_activity_'   
+                )
+            # link excluisive node between activity before
+                set_prev_next_node(past_instance, exclusif)
+                set_prev_next_node(exclusif, activity)
+    #same for main
+        exclusif = TriccNodeExclusive(
+                    id = generate_id(),
+                    group= activity.base_instance,
+                    name = 'exclude_activity_'   
+            )
+        activity.base_instance.nodes[exclusif.id]=exclusif
+            # link excluisive node between activity before
+        set_prev_next_node(activity.base_instance, exclusif)
+        set_prev_next_node(exclusif, activity)
 
 
 def get_calculation_terms(node, processed_nodes, is_calculate = False, negate = False):
@@ -227,8 +265,10 @@ def get_calculation_terms(node, processed_nodes, is_calculate = False, negate = 
         if len(node.prev_nodes) == 1:
             if issubclass(node.prev_nodes[0].__class__, TriccNodeDisplayCalculateBase):
                 return get_node_expression(node.prev_nodes[0], processed_nodes, negate=True) 
-            elif issubclass(node.prev_nodes[0].__class__, TriccNodeFakeCalculateBase):
+            elif issubclass(node.prev_nodes[0].__class__, (TriccNodeFakeCalculateBase, TriccNodeSelect)):
                 return  get_node_expression(node.prev_nodes[0], processed_nodes, is_calculate = True, negate=True)
+            elif isinstance(node.prev_nodes[0],TriccNodeActivity):
+                return get_node_expression(node.prev_nodes[0], processed_nodes, negate=True, is_prev=True)
             else:
                 logger.error("exclusive node {} does not depend of a calculate".format(node.get_name()))
         else:
