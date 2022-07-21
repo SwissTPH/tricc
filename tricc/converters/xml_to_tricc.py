@@ -7,14 +7,14 @@ import html2text
 from tricc.converters.utils import clean_name, generate_id
 from tricc.models import *
 from tricc.parsers.xml import  get_edges_list, get_mxcell, get_mxcell_parent_list, get_odk_type,  get_odk_type_list
-import logging
+
 import base64
 
 
 
 NO_LABEL = "NO_LABEL"
 TRICC_LIST_NAME = 'list_{0}'
-
+import logging
 logger = logging.getLogger("default")
 
 def create_activity(diagram):
@@ -203,8 +203,8 @@ def add_save_calculate(node, calculates, used_calculates,processed_nodes, stashe
      # calculates  dict[name, Dict[id, node]]
     if is_ready_to_process(node, processed_nodes) and node.id not in processed_nodes:
         if process_calculate_version_requirement(node, calculates, used_calculates,processed_nodes):
-            generate_save_calculate(node)
-            if isinstance(node, (TriccNodeCount, TriccNodeAdd, TriccNodeCalculate )) and node.name is not None:
+            calc_node = generate_save_calculate(node)
+            if isinstance(node, (TriccNodeCount, TriccNodeAdd, TriccNodeCalculate )) and node.name is not None:            
                 # generate the calc node version by looking in the processed calculate
                 if node.name in calculates:
                     # get max version existing
@@ -213,23 +213,35 @@ def add_save_calculate(node, calculates, used_calculates,processed_nodes, stashe
                     last_used_version = get_max_named_version(used_calculates, node.name)
                     # merge is there is unsued version -> 
                     # current node not yet in the list so 1 item is enough
-                    if  last_version>last_used_version:
-                        node.version = last_version +1
-                        merge_calculate(node, calculates[node.name], last_used_version)
-                    if last_used_version > 0:
-                        # chaining the calculate, only one way FIXME it can create issue
-                        last_used_calc = get_max_version(used_calculates[node.name])
-                        if last_used_calc is not None:
-                            set_prev_next_node(last_used_calc,node)
-                            last_used_calc.name += VERSION_SEPARATOR + str(last_used_calc.version)
-                        else:
-                            logger.error("add_save_calculate: last used calc not found for {}".format(node.get_name()))
-                            exit(-2)
+                    #if  last_version>last_used_version:
+                    node.version = last_version +1
+                    if node.version > 1:
+                        node_to_delete = merge_calculate(node, calculates[node.name], last_used_version)
+                        if node_to_delete is not None:
+                            for node_id in node_to_delete:
+                                del calculates[node.name][node_id]
+                                del processed_nodes[node_id]
+                                if node_id in stashed_nodes:
+                                    del stashed_nodes[node_id]
+                        if last_used_version > 0 :
+                            # chaining the calculate, only one way FIXME it can create issue
+                            last_used_calc = get_max_version(used_calculates[node.name])
+                            if last_used_calc is not None:
+                                set_prev_next_node(last_used_calc,node)
+                                last_used_calc.name += VERSION_SEPARATOR + str(last_used_calc.version)
+                            else:
+                                logger.error("add_save_calculate: last used calc not found for {}".format(node.get_name()))
+                                exit(-2)
                     else:
                         node.version = 0
                 else:
                     calculates[node.name]= {}
                 calculates[node.name][node.id]=node
+                # add the node as used calculate if created a save
+                if calc_node is not None:
+                    if node.name not in used_calculates:
+                        used_calculates[node.name] = {}
+                    used_calculates[node.name][node.id]=node
             processed_nodes[node.id] = node
             if node.id  in stashed_nodes:
                 del stashed_nodes[node.id]
@@ -297,43 +309,64 @@ def get_max_version(dict):
 
 
         
-VERSION_SEPARATOR = '_v_'       
+VERSION_SEPARATOR = '_v_'
+#this function adds the reference if any 
 def process_calculate_version_requirement(node, calculates,used_calculates,processed_nodes):
     if isinstance(node, (TriccNodeRhombus)):
-        logger.debug("process_calculate_version_requirement:{} ".format(node.name if hasattr(node,'name') else node.id))
-        last_found = get_prev_node_by_name(processed_nodes, node.reference, node.instance)
-        if node.reference in calculates and len(calculates[node.reference])>0 :
-                # issue is that it can be further in another path
-                last_found = get_max_version(calculates[node.reference])
-        if last_found is not None:
-            if node.id is not last_found.next_nodes:
-                last_found.next_nodes.append(node)
-            if last_found.id is not node.prev_nodes:
-                node.prev_nodes.append(last_found)
-        else:
-            return False
+        if isinstance(node.reference, str) :
+            logger.debug("process_calculate_version_requirement:{} ".format(node.name if hasattr(node,'name') else node.id))
+            last_found = get_prev_node_by_name(processed_nodes, node.reference, node.instance)
+            # ref is still a string here
+            if last_found is None  or issubclass(last_found.__class__, TriccNodeCalculateBase):
+                if node.reference in calculates and len(calculates[node.reference])>0 :
+                    # issue is that it can be further in another path
+                    last_found = get_max_version(calculates[node.reference])
+            if last_found is not None:
+                node.reference = last_found    
+                set_prev_next_node(last_found, node)
+                # just to be safe even if it should be covered after
+            if issubclass(last_found.__class__, TriccNodeDisplayCalculateBase):
+                if last_found.name not in used_calculates:
+                    used_calculates[last_found.name] = {}
+                used_calculates[last_found.name][last_found.id] = last_found
+            else:
+                return False
+        elif node.reference is None:
+            logger.error("process_calculate_version_requirement:reference is None for {0} ".format(node.get_name()))
+            exit()
     if hasattr(node, 'prev_nodes'):
         for prev_node in node.prev_nodes:
-            if isinstance(prev_node, (TriccNodeCount, TriccNodeAdd, TriccNodeCalculate )):
-                logger.debug("process_calculate_version_requirement:{} , prev Node ".format(node.get_name(), prev_node.get_name()))
-                if prev_node.id in processed_nodes:
-                    # if not a verison, index will equal -1
-                    index = prev_node.name.rfind(VERSION_SEPARATOR)
-                    #remove the leading part with version 
-                    node_clean_name = prev_node.name[:index] if index > 0 else prev_node.name
-                    if node_clean_name not in used_calculates:
-                        node_clean_name =prev_node.name
-                    if node_clean_name not in calculates :
-                        logger.warning("node {} refered before being processed".format(node.get_name()))
-                        return False
-                    max_version = get_max_version(calculates[node_clean_name])
-                    if node_clean_name not in used_calculates:
-                        used_calculates[node_clean_name] = {}
-                    #save the max version only once
-                    if max_version.id not in used_calculates[node_clean_name]:
-                        used_calculates[node_clean_name][max_version.id] = max_version
+            add_used_calculate(node, prev_node, calculates, used_calculates, processed_nodes)
+
+        
     # update the used_calculates         
     return True
+
+def add_used_calculate(node, prev_node, calculates, used_calculates, processed_nodes):
+    if issubclass(prev_node.__class__, TriccNodeDisplayCalculateBase):
+        logger.debug("process_calculate_version_requirement:{0} , prev Node {1} ".format(node.get_name(), prev_node.get_name()))
+        if prev_node.id in processed_nodes:
+            # if not a verison, index will equal -1
+            index = prev_node.name.rfind(VERSION_SEPARATOR)
+            #remove the leading part with version 
+            node_clean_name = prev_node.name[:index] if index > 0 else prev_node.name
+            if node_clean_name not in used_calculates:
+                node_clean_name =prev_node.name
+            if node_clean_name not in calculates :
+                logger.warning("node {} refered before being processed".format(node.get_name()))
+                return False
+            max_version = get_max_version(calculates[node_clean_name])
+            if node_clean_name not in used_calculates:
+                used_calculates[node_clean_name] = {}
+            #save the max version only once
+            if max_version.id not in used_calculates[node_clean_name]:
+                used_calculates[node_clean_name][max_version.id] = max_version
+    elif isinstance(prev_node, TriccNodeActivity):
+        for prev_end_node in prev_node.activity_end_prev_nodes:
+            add_used_calculate(node, prev_end_node, calculates, used_calculates, processed_nodes)
+        for prev_end_node in prev_node.end_prev_nodes:
+            add_used_calculate(node, prev_end_node, calculates, used_calculates, processed_nodes)
+
 
 def merge_calculate(node, calculates, from_version):
     #calcualtes list[ node] 
@@ -343,29 +376,20 @@ def merge_calculate(node, calculates, from_version):
         # merge only if same name, version >= fromm version but < node version    
         if  node.odk_type == calc_node.odk_type :
             cur_version = calc_node.version
-            if cur_version >= from_version and  cur_version<version:
+            if cur_version > from_version and  cur_version<version:
                 logger.debug("merge_calculate:{} ".format(node.name if hasattr(node,'name') else node.id))
-                node.next_nodes += calc_node.next_nodes
-                node.prev_nodes += calc_node.prev_nodes
-                
+               
                 # unlink the merged node in its next nodes
 
                 for next_node in calc_node.next_nodes:
-                    if hasattr(next_node,'prev_nodes'):
-                        if calc_node in next_node.prev_nodes:
-                            next_node.prev_nodes.remove(calc_node)
-                        set_prev_node(node, next_node)
+                    set_prev_next_node(node, next_node, calc_node )
                 # unlink the merged node in its prev nodes
                 for prev_node in calc_node.prev_nodes:
-                    if hasattr(prev_node, 'next_nodes'):
-                        if calc_node in prev_node.next_nodes:
-                            prev_node.next_nodes.remove(calc_node)
-                        prev_node.next_nodes.append(node)
-                node_to_delete.append(id)
+                    set_prev_next_node(prev_node, node, calc_node )
+                node_to_delete.append(calc_node.id)
         else:
             logger.error("two different type of calculate node share the same name {}".format(node.name))
-    for node_id in node_to_delete:
-        del calculates[node_id]
+    return node_to_delete
     
 
 def enrich_node(diagram, edge, node):

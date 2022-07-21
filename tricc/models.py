@@ -95,7 +95,7 @@ class TriccBaseModel(BaseModel):
         instance = self.copy()
         # change the id to avoid colision of name
         instance.id = generate_id()
-        instance.instance=nb_instance
+        instance.instance=int(nb_instance)
         instance.base_instance = self
         instance.group = activity
         # assign the defualt group
@@ -396,7 +396,7 @@ class TriccNodeCalculateBase(TriccNodeBaseModel):
         instance.input = input
         expression = None
         instance.expression = expression
-        version = 0 
+        version = 1 
         instance.version = version
         return instance
     
@@ -422,7 +422,7 @@ class TriccNodeRhombus(TriccNodeFakeCalculateBase):
     def make_instance(self,instance_nb,activity,   **kwargs):
         #shallow copy
         instance = super().make_instance(instance_nb, activity = activity)
-        reference = None
+        reference = self.reference
         instance.reference = reference
         return instance
     
@@ -434,9 +434,9 @@ class TriccNodeExclusive(TriccNodeFakeCalculateBase):
 def set_prev_next_node( source_node, target_node, replaced_node = None):
     # if it is end node, attached it to the activity/page
     set_prev_node( source_node, target_node, replaced_node )
-    if replaced_node is not None and replaced_node in source_node.next_nodes:
+    if replaced_node is not None and hasattr(source_node,'next_nodes') and replaced_node in source_node.next_nodes:
         source_node.next_nodes.remove(replaced_node)
-    if replaced_node is not None and replaced_node in target_node.next_nodes:
+    if replaced_node is not None and hasattr(target_node,'next_nodes') and replaced_node in target_node.next_nodes:
         target_node.next_nodes.remove(replaced_node)
     source_node.next_nodes.append(target_node)
 
@@ -445,23 +445,23 @@ def set_prev_next_node( source_node, target_node, replaced_node = None):
 def set_prev_node( source_node, target_node, replaced_node = None):
     #update the prev node of the target not if not an end node
     if target_node.odk_type == TriccExtendedNodeType.end:
-        if replaced_node is not None and replaced_node in source_node.activity.end_prev_nodes:
-            source_node.activity.end_prev_nodes.remove(replaced_node)
-        if replaced_node is not None and replaced_node in source_node.activity.end_prev_nodes:
+        if replaced_node is not None and hasattr(target_node,'next_nodes') and replaced_node in source_node.activity.end_prev_nodes:
+            target_node.activity.end_prev_nodes.remove(replaced_node)
+        if replaced_node is not None and hasattr(source_node,'next_nodes') and replaced_node in source_node.activity.end_prev_nodes:
             source_node.activity.end_prev_nodes.remove(replaced_node)
         source_node.activity.end_prev_nodes.append(source_node)
     elif target_node.odk_type == TriccExtendedNodeType.activity_end:
-        if replaced_node is not None and replaced_node in source_node.activity.activity_end_prev_nodes:
+        if replaced_node is not None and hasattr(target_node,'next_nodes') and replaced_node in source_node.activity.activity_end_prev_nodes:
             source_node.activity.activity_end_prev_nodes.remove(replaced_node)
-        if replaced_node is not None and replaced_node in source_node.activity.activity_end_prev_nodes:
+        if target_node is not None and hasattr(source_node,'next_nodes') and replaced_node in source_node.activity.activity_end_prev_nodes:
             source_node.activity.activity_end_prev_nodes.remove(replaced_node)
         source_node.activity.activity_end_prev_nodes.append(source_node)
     else:
         # update directly the prev node of the target
         target_node.prev_nodes.append(source_node)
-        if replaced_node is not None and replaced_node in target_node.prev_nodes:
+        if replaced_node is not None and hasattr(target_node,'next_nodes') and replaced_node in target_node.prev_nodes:
             target_node.prev_nodes.remove(replaced_node)
-        if replaced_node is not None and replaced_node in source_node.prev_nodes:
+        if replaced_node is not None and hasattr(source_node,'next_nodes') and replaced_node in source_node.prev_nodes:
             source_node.prev_nodes.remove(replaced_node)
         
 def replace_node(old, new, page):
@@ -517,9 +517,11 @@ def make_node_instance(node, processed_nodes, page, instance_nb):
 
 
 # check if the all the prev nodes are processed
-def is_ready_to_process(in_node, processed_nodes):
+def is_ready_to_process(in_node, processed_nodes, recursive = False):
     if isinstance(in_node, TriccNodeSelectOption):
         node = in_node.select
+    elif isinstance(in_node, TriccNodeActivityStart):
+        node = in_node.activity
     else:
         node = in_node
     if hasattr(node, 'prev_nodes'):
@@ -527,30 +529,65 @@ def is_ready_to_process(in_node, processed_nodes):
         for prev_node in node.prev_nodes:
             if isinstance(prev_node,TriccNodeActivity):
                 if len(prev_node.end_prev_nodes)==0 and len(prev_node.activity_end_prev_nodes)==0:
+                    logger.error("is_ready_to_process:failed: {2} -act-> {0} NO end nodes".format(prev_node.get_name(),end_node.get_name(), node.get_name() ))
                     return False
                 for end_node in prev_node.end_prev_nodes:
                     if end_node.id not in processed_nodes:
-                        logger.debug("At least activity {0} interrogation end node {1} not yet processed".format(prev_node.get_name(),end_node.get_name() ))
+                        logger.debug("is_ready_to_process:failed: {2} -act-> {0} -end-> {1}".format(prev_node.get_name(),end_node.get_name(), node.get_name() ))
+                        if recursive :
+                            is_ready_to_process(end_node, processed_nodes, recursive )
                         return False
                 for activity_end_node in prev_node.activity_end_prev_nodes:
                     if activity_end_node.id not in processed_nodes:
-                        logger.debug("At least activity {0} end node {1} not yet processed".format(prev_node.get_name(),activity_end_node.get_name() ))
+                        logger.debug("is_ready_to_process:failed: {2} -act-> {0} -end-> {1}".format(prev_node.get_name(),activity_end_node.get_name(), node.get_name() ))
+                        if recursive :
+                            is_ready_to_process(activity_end_node, processed_nodes, recursive )
                         return False
             elif prev_node.id not in processed_nodes:
                 if isinstance(prev_node, TriccNodeExclusive):
-    
-                    logger.debug("Prev node {0} (via exclusive) {1} not yet processed".format(prev_node.prev_nodes[0].get_name(), prev_node.get_name() ))
+                    logger.debug("is_ready_to_process:failed: {0} -excl-> {2} --> {1}".format(node.get_name(),prev_node.prev_nodes[0].get_name(), prev_node.get_name() ))
+                    if recursive :
+                        is_ready_to_process(prev_node.prev_nodes[0], processed_nodes, recursive )
                 else :
-                    logger.debug("Prev node {0} not yet processed".format(prev_node.get_name() ))
+                    logger.debug("is_ready_to_process:failed: {0}  --> {1}".format(node.get_name(),prev_node.get_name(), prev_node.get_name() ))
+                    if recursive :
+                        is_ready_to_process(prev_node, processed_nodes, recursive )
                 return False
         return True
     else:
         return True
     
-def get_prev_node_by_name(nodes, name, instance_nb = 1): 
+def get_prev_node_by_name(nodes, name, instance_nb = 1):
+    # we first look for the reference in the same instance
     for node in list(nodes.values()) if isinstance(nodes, Dict)  else nodes:
         if hasattr(node, 'name'):
-            if int(instance_nb) > 1 and node.name == TRICC_INSTANCE.format(instance_nb, name):
+            if   node.instance == instance_nb and node.name == name or node.name == TRICC_INSTANCE.format(instance_nb, name):
                 return node
-            elif node.name == name:
+    for node in list(nodes.values()) if isinstance(nodes, Dict)  else nodes:
+        if hasattr(node, 'name'):
+            if node.name == name:
                 return node
+            
+def  check_stashed_loop(stashed_nodes,prev_stashed_nodes,processed_nodes,loop_count):
+    loop_out = {}
+    if len(stashed_nodes)  == len(prev_stashed_nodes):
+        
+        # copy to sort
+        cur_stashed_nodes = stashed_nodes.copy()
+        cur_stashed_nodes_ordered_id = list(cur_stashed_nodes.keys())
+        cur_stashed_nodes_ordered_id.sort()
+        prev_stashed_nodes_ordered_id = list(prev_stashed_nodes.keys())
+        prev_stashed_nodes_ordered_id.sort()        
+        if cur_stashed_nodes_ordered_id == prev_stashed_nodes_ordered_id:
+            loop_count += 1
+            if loop_count > 3*len(prev_stashed_nodes)+1:
+                logger.error("Stashed node list was unchanged: loop likely or a cyclique redundancy")
+                for es_node in list(cur_stashed_nodes.values()):
+                    loop_out[es_node.id] = is_ready_to_process(es_node, processed_nodes, True)
+                    logger.error("Stashed node {}:{}:{}:{}".format(es_node.__class__,es_node.activity.get_name(),es_node.instance,es_node.get_name()))
+                exit()
+        else:
+            loop_count = 0
+    else:
+        loop_count = 0
+    return loop_count

@@ -25,8 +25,10 @@ def generate_xls_form_condition(node, processed_nodes, **kwargs):
         # generate condition
         if hasattr(node, 'name') and node.name is not None:
             node.name = clean_str(node.name)
-        if hasattr(node, 'reference') and node.reference is not None:
-            node.reference = clean_str(node.reference)
+        if hasattr(node, 'reference'):
+            if isinstance(node.reference,str):
+                node.reference = clean_str(node.reference)
+                logger.warning("node  {} still usign the reference string".format(node.get_name()))
         if issubclass( node.__class__, TriccNodeInputModel):
             # we don't overright if define in the diagram
             if node.constraint is None:
@@ -86,9 +88,6 @@ def generate_xls_form_relevance(node, processed_nodes, **kwargs):
 def generate_xls_form_calculate(node, processed_nodes, **kwargs):
     if is_ready_to_process(node, processed_nodes) and node.id not in processed_nodes :
         logger.debug("generation of calculate for node {}".format(node.get_name()))
-        # calcualte expression
-        #if hasattr(node, 'prev_nodes' ) and not issubclass(node.__class__,TriccNodeFakeCalculateBase):
-        #    bypass_calculate(node,node)
         if hasattr(node, 'expression') and (node.expression is None ):
             if issubclass(node.__class__, TriccNodeCalculateBase):
                 node.expression = get_node_expressions(node, processed_nodes, is_calculate = True)
@@ -98,24 +97,6 @@ def generate_xls_form_calculate(node, processed_nodes, **kwargs):
     else:
         return False
 
-
-# bypass only the calc nodes in the prev nodes
-def bypass_calculate(node,walked_node):
-    for prev_node in walked_node.prev_nodes:
-        if prev_node == walked_node or prev_node == node:
-            continue
-        if issubclass(prev_node.__class__,TriccNodeFakeCalculateBase):
-            # link prev node of the calculate to node (as next_node)
-            # do it recursivly if a calulate is founded
-            bypass_calculate(node,prev_node)
-        #bypass calc node of recurvise call (node != walked_node)
-        elif  issubclass(prev_node.__class__, (TriccNodeDiplayModel)) or isinstance(prev_node, TriccNodeActivity) and node != walked_node :
-            #add new to edge
-            if node not in prev_node.next_nodes:
-                prev_node.next_nodes.append(node)
-            #add from dege
-            if prev_node not in node.prev_nodes: 
-                node.prev_nodes.append(prev_node)
 
 #if the node is "required" then we can take the fact that it has value for the next elements
 def get_required_node_expression(node):
@@ -187,7 +168,7 @@ def get_prev_node_expression(node, processed_nodes, excluded_name = None):
         expression_inputs = []
         add_sub_expression(expression_inputs, get_node_expression(activity.base_instance, processed_nodes, is_calculate, True))
         for instance_nb, past_instance in activity.base_instance.instances.items():
-            if instance_nb < activity.instance:
+            if int(instance_nb) < int(activity.instance):
                 add_sub_expression(expression_inputs, get_node_expression(past_instance, processed_nodes, is_calculate, True))
         expression_activity =  ' or '.join(expression_inputs)
         expression = TRICC_NAND_EXPRESSION.format(expression,expression_activity)         
@@ -212,6 +193,8 @@ def get_node_expression(node,processed_nodes, is_calculate = False, is_prev = Fa
             expression =  get_calculation_terms(node, processed_nodes )
     elif is_prev  and hasattr(node,'required') and node.required == True:
         expression = get_required_node_expression(node) 
+    elif is_prev and isinstance(node, TriccNodeActivity) and node.base_instance is not None:
+        expression = get_prev_node_expression(node, processed_nodes, excluded_name = "instances")
     elif is_prev  and   hasattr(node, 'relevance') and node.relevance is not None:
             expression = node.relevance
     elif isinstance(node, TriccNodeSelectOption):
@@ -231,7 +214,7 @@ def get_node_expression(node,processed_nodes, is_calculate = False, is_prev = Fa
     def get_activity_expression(activity):
         # for each activity before
         for instance_nb, past_instance in activity.base_instance.instances.items():
-            if instance_nb < activity.instance:
+            if int(instance_nb) < int(activity.instance):
                 
         # create an exclusive node
                 exclusif = TriccNodeExclusive(
@@ -298,17 +281,17 @@ def get_rhumbus_terms(node, processed_nodes, is_calculate= False, negate = False
                 break
     if left_term is None:
         left_term = '>0'
-    reference_node = get_prev_node_by_name(processed_nodes, node.reference, node.instance)
     # calcualte the expression only for select muzltiple and fake calculate
-    if reference_node is not None:
-        if issubclass(reference_node.__class__, TriccNodeFakeCalculateBase) or isinstance(reference_node, TriccNodeSelectMultiple):
-            expression = get_node_expression(reference_node, processed_nodes, is_calculate = True, is_prev = True)
+    if  node.reference is not None and issubclass(node.reference.__class__, TriccBaseModel):
+        if issubclass(node.reference.__class__, TriccNodeFakeCalculateBase) or isinstance(node.reference, TriccNodeSelectMultiple):
+            expression = get_node_expression(node.reference, processed_nodes, is_calculate = True, is_prev = True)
         else:
-            expression = TRICC_REF_EXPRESSION.format(node.reference)
+            expression = TRICC_REF_EXPRESSION.format(node.reference.name)
     else: 
-        expression = TRICC_REF_EXPRESSION.format(node.reference)
+        #expression = TRICC_REF_EXPRESSION.format(node.reference)
         #expression = "${{{}}}".format(node.reference)
-        logger.warning('reference {0} was not found in the previous nodes of node {1}'.format(node.reference, node.get_name()))
+        logger.error('reference {0} was not found in the previous nodes of node {1}'.format(node.reference, node.get_name()))
+        exit()
     expression_prev = get_prev_node_expression(node,processed_nodes, node.reference )
     if expression is not None:
         expression =  "({0}){1}".format(expression,left_term)

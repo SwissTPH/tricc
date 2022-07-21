@@ -8,7 +8,7 @@ from typing import Dict
 
 import pandas as pd
 from tricc.converters.tricc_to_xls_form import generate_xls_form_calculate, generate_xls_form_condition,  generate_xls_form_relevance
-from tricc.models import TriccNodeActivity,walktrhough_tricc_node
+from tricc.models import TriccNodeActivity,check_stashed_loop ,walktrhough_tricc_node
 
 
 from tricc.serializers.xls_form import CHOICE_MAP, SURVEY_MAP, end_group, generate_xls_form_export, start_group
@@ -97,8 +97,11 @@ class XLSFormStrategy(BaseStrategy):
         self.df_survey = pd.DataFrame(columns=SURVEY_MAP.keys())
         
         ## MANAGE STASHED NODES
-        
+        prev_stashed_nodes = self.stashed_nodes.copy()
+        loop_count = 0
         while len(self.stashed_nodes)>0:
+            loop_count = check_stashed_loop(self.stashed_nodes,prev_stashed_nodes, self.processed_nodes,loop_count)
+            prev_stashed_nodes = self.stashed_nodes.copy()    
             if len(self.stashed_nodes)>0:
                 s_node = self.stashed_nodes.pop(list(self.stashed_nodes.keys())[0])
                 start_group( cur_group =s_node.group, groups=groups, relevance= isinstance(s_node, TriccNodeActivity),  **self.get_kwargs())          
@@ -119,29 +122,10 @@ class XLSFormStrategy(BaseStrategy):
                     else:
                         df_survey_final =pd.concat([df_survey_final, self.df_survey])
                     cur_group = s_node.group
-                else:
-                    find_dependants(s_node, self.stashed_nodes)
+                #else:
+                #    find_dependants(s_node, self.stashed_nodes,self.processed_nodes, [])
                     
                 self.df_survey = pd.DataFrame(columns=SURVEY_MAP.keys())
         self.df_survey = df_survey_final    
                 
-def find_dependants(node, stashed_nodes, loop_control = []):
-    if node in loop_control:
-        logger.error("loop involving node {0}".format(node.get_name()))
-        exit(-1)
-    loop_control_prev = loop_control.copy()
-    loop_control_prev.append(node)
-    if hasattr(node, 'prev_nodes'):
-        for prev_node in list(stashed_nodes.values()) if isinstance(stashed_nodes, Dict) else stashed_nodes:
-            if prev_node.id in stashed_nodes:
-                logger.debug("node {0} depends on a stached node {1}".format(node.get_name(),stashed_nodes[prev_node.id].get_name() ))
-                return None
-            else:
-                for prev_stashed_node in list(stashed_nodes.values()) if isinstance(stashed_nodes, Dict) else stashed_nodes:
-                    if hasattr(prev_stashed_node, 'prev_nodes'):
-                        find_dependants(prev_node, prev_stashed_node.prev_nodes, loop_control_prev)
-                find_dependants(prev_node, stashed_nodes, loop_control_prev)
-    if loop_control == []:
-        logger.warning("group {} without content".format(node.group.label))
-            
-    
+

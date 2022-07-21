@@ -2,7 +2,11 @@
 # then use the strategy to call it 
 
 from uuid import uuid4
+import logging
 
+
+
+logger = logging.getLogger("default")
 
 def replace_all(text, list_char, replacement):
     for i in list_char:
@@ -20,3 +24,9 @@ def clean_name( name, prefix='' ):
 
 def generate_id():
     return str(uuid4())
+
+
+
+
+
+            

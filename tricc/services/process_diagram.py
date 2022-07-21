@@ -132,7 +132,7 @@ def walkthrough_goto_node(node, page, pages, processed_nodes, current_path):
         # will be added in process nod later
         # add the id to avoid loop: 
             logger.debug("jumping to page {0}".format(next_page.label))
-        if next_page.instance != node.instance:
+        if int(next_page.instance) != int(node.instance):
             #FIXME find if there is other instance (list in activity ?)
             # must look in pages thans to base_instance
             next_page = next_page.make_instance(node.instance)
@@ -158,7 +158,7 @@ def walkthrough_link_out_node(node, page, pages, processed_nodes, current_path):
         for page in pages:
             link_in_list += list(filter(lambda x: (x.name == node.reference) , page.nodes))
             #save the first page wheere a link is found to continue the walktrhough
-            if link_in_page is None:
+            if len(link_in_list)>0 and link_in_page is None:
                 link_in_page = page
         if len(link_in_list) == 0:
             logger.warning("link in {0} not found for link out {1} in page {2}"\
