@@ -43,7 +43,7 @@ class TriccExtendedNodeType(str, Enum):
     add='add' # add counts
     container_hint_media='container_hint_media'#DEPRECATED
     activity='activity'
-    select_yesno='select_one yesno'
+    select_yesno='select_one yesno'#NOT YET SUPPORTED
     select_option='select_option'
     hint='hint-message'
     help='help-message'

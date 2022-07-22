@@ -137,6 +137,23 @@ Mandatory
 ### label
 Not a real property to add, it is simply the text display in the boxes
 
+
+# notes
+
+advanced interpretation of the edges:
+
+Activity instances: if there is more that 1 instance of a single actity then the 1+ activity will be displayed only if the previous one were not
+
+the node folowing an 1+ activity will be display after the activy OR instead of the activity
+
+Select multiple: if followed by a calculate (rhombus included) the calculate will be equal to the number of selected option BUT opt_none
+if not a calculate then relevance will be used unless it is "required" then condition will be at least 1 selection
+
+the Rhombus act as an AND between its imputs and its reference BUT it is an OR beween the inputs
+(input1 OR input2 OR input3) AND reference
+
+
+
 # READ Xressource
 https://jgraph.github.io/drawio-tools/tools/convert.html
 

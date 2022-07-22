@@ -166,6 +166,7 @@ def get_prev_node_expression(node, processed_nodes, excluded_name = None):
     if isinstance(node, TriccNodeActivity) and node.base_instance is not None:
         activity = node
         expression_inputs = []
+        # relevance of the previous instance must be false to display this activity
         add_sub_expression(expression_inputs, get_node_expression(activity.base_instance, processed_nodes, is_calculate, True))
         for instance_nb, past_instance in activity.base_instance.instances.items():
             if int(instance_nb) < int(activity.instance):
@@ -185,7 +186,7 @@ def get_node_expression(node,processed_nodes, is_calculate = False, is_prev = Fa
     elif is_calculate  and  isinstance(node, TriccNodeActivityStart):
             expression = node.activity.relevance
     elif is_prev  and issubclass(node.__class__, TriccNodeDisplayCalculateBase):
-        expression = '${{{0}}} = 1'.format(node.name)
+        expression = '${{{0}}} > 0'.format(node.name)
     elif issubclass(node.__class__, TriccNodeCalculateBase):
         if negate:
             negate_expression =  get_calculation_terms(node, processed_nodes, negate = True )
@@ -208,33 +209,10 @@ def get_node_expression(node,processed_nodes, is_calculate = False, is_prev = Fa
             return TRICC_NEGATE.format(expression)
         else:
             logger.error("exclusive can not negate None from {}".format(node.get_name()))
+            #exit()
     else:
         return expression
 
-    def get_activity_expression(activity):
-        # for each activity before
-        for instance_nb, past_instance in activity.base_instance.instances.items():
-            if int(instance_nb) < int(activity.instance):
-                
-        # create an exclusive node
-                exclusif = TriccNodeExclusive(
-                    id = generate_id(),
-                    group= activity,
-                    name = 'exclude_activity_'   
-                )
-            # link excluisive node between activity before
-                set_prev_next_node(past_instance, exclusif)
-                set_prev_next_node(exclusif, activity)
-    #same for main
-        exclusif = TriccNodeExclusive(
-                    id = generate_id(),
-                    group= activity.base_instance,
-                    name = 'exclude_activity_'   
-            )
-        activity.base_instance.nodes[exclusif.id]=exclusif
-            # link excluisive node between activity before
-        set_prev_next_node(activity.base_instance, exclusif)
-        set_prev_next_node(exclusif, activity)
 
 
 def get_calculation_terms(node, processed_nodes, is_calculate = False, negate = False):
