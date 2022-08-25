@@ -1,15 +1,13 @@
 
-import logging
-from tricc.converters.utils import   clean_str
+from tricc.converters.utils import   OPERATION_LIST, clean_str
 from tricc.converters.xml_to_tricc import is_ready_to_process
 from tricc.models import *
-from tricc.serializers.xls_form import CHOICE_MAP, ODK_TRICC_TYPE_MAP
 from gettext import gettext as _ # plurals: , ngettext as __
 #from babel import _
 
 TRICC_SELECT_MULTIPLE_CALC_EXPRESSION = "count-selected(${{{0}}}) - number(selected(${{{0}}},'opt_none'))"
 TRICC_SELECT_MULTIPLE_CALC_NONE_EXPRESSION = "selected(${{{0}}},'opt_none')"
-TRICC_CALC_EXPRESSION = "${{{0}}}='1'"
+TRICC_CALC_EXPRESSION = "${{{0}}}>0"
 TRICC_EMPTY_EXPRESSION = "coalesce(${{{0}}},'') != ''"
 TRICC_SELECTED_EXPRESSION = 'selected(${{{0}}}, "{1}")'
 TRICC_REF_EXPRESSION = "${{{0}}}"
@@ -17,86 +15,103 @@ TRICC_NEGATE = "not({})"
 TRICC_NUMBER = "number({})"
 TRICC_NAND_EXPRESSION = '({0}) and not({1})'
 
-logger = logging.getLogger('default')
+import logging
+logger = logging.getLogger("default")
 
-def generate_xls_form_condition(node, processed_nodes, **kwargs):
-    if is_ready_to_process(node, processed_nodes) and node.id not in processed_nodes:
-        logger.debug('Processing condition for node {0}'.format(node.get_name()))
-        # generate condition
-        if hasattr(node, 'name') and node.name is not None:
-            node.name = clean_str(node.name)
-        if hasattr(node, 'reference'):
-            if isinstance(node.reference,str):
-                node.reference = clean_str(node.reference)
-                logger.warning("node  {} still usign the reference string".format(node.get_name()))
-        if issubclass( node.__class__, TriccNodeInputModel):
-            # we don't overright if define in the diagram
-            if node.constraint is None:
-                if isinstance(node, TriccNodeSelectMultiple):
-                    node.constraint = '.=\'opt_none\' or not(selected(.,\'opt_none\'))'
-                    node.constraint_message = _('**None** cannot be selected together with choice.')
-            elif node.odk_type in (TriccNodeType.integer, TriccNodeType.decimal):
-                constraints = []
-                constraints_message = []
-                if node.min is not None:
-                        constraints.append('.>=' + node.min)
-                        constraints_message.append( _("The minimun value is {0}.").format(node.min))
-                if node.max is not None:
-                        constraints.append('.>=' + node.max)
-                        constraints_message.append( _("The maximum value is {0}.").format(node.max))
-                if len(constraints)>0:
-                    node.constraint = ' and '.join(constraints)
-                    node.constraint_message = ' '.join(constraints_message)
-        #continue walk 
-        processed_nodes[node.id]=node
-        return True
-    else:
-        return False
+def generate_xls_form_condition(node, processed_nodes, stashed_nodes, **kwargs):
+    if is_ready_to_process(node, processed_nodes):
+        if node.id not in processed_nodes:
+            if node.id in stashed_nodes:
+                del stashed_nodes[node.id]
+                logger.debug("generate_xls_form_condition: unstashing processed node{} ".format(node.get_name()))
+            # generate condition
+            if hasattr(node, 'name') and node.name is not None:
+                node.name = clean_str(node.name)
+            if hasattr(node, 'reference'):
+                if isinstance(node.reference,str):
+                    node.reference = clean_str(node.reference)
+                    logger.warning("node  {} still usign the reference string".format(node.get_name()))
+            if issubclass( node.__class__, TriccNodeInputModel):
+                # we don't overright if define in the diagram
+                if node.constraint is None:
+                    if isinstance(node, TriccNodeSelectMultiple):
+                        node.constraint = '.=\'opt_none\' or not(selected(.,\'opt_none\'))'
+                        node.constraint_message = _('**None** cannot be selected together with choice.')
+                elif node.odk_type in (TriccNodeType.integer, TriccNodeType.decimal):
+                    constraints = []
+                    constraints_message = []
+                    if node.min is not None:
+                            constraints.append('.>=' + node.min)
+                            constraints_message.append( _("The minimun value is {0}.").format(node.min))
+                    if node.max is not None:
+                            constraints.append('.>=' + node.max)
+                            constraints_message.append( _("The maximum value is {0}.").format(node.max))
+                    if len(constraints)>0:
+                        node.constraint = ' and '.join(constraints)
+                        node.constraint_message = ' '.join(constraints_message)
+            #continue walk 
+            processed_nodes[node.id]=node
+            return True
+    elif node.id not in stashed_nodes and node.id not in processed_nodes:
+        logger.debug("generate_xls_form_condition: stashing processed node{} ".format(node.get_name()))
+        stashed_nodes[node.id]=node
+    return False
 
-def generate_xls_form_relevance(node, processed_nodes, **kwargs):
-    if is_ready_to_process(node, processed_nodes) and node.id not in processed_nodes:
-        logger.debug('Processing relevance for node {0}'.format(node.get_name()))
-        # if has prev, create condition
-        if hasattr(node, 'relevance') and node.relevance is None:  
-            node.relevance = get_node_expressions(node, processed_nodes)
-            # manage not Available
-            if isinstance(node, TriccNodeSelectNotAvailable):
-                #update the checkbox
-                if len(node.prev_nodes)==1:
-                    parent_node = node.prev_nodes[0]
-                    parent_empty = "${{{0}}}=''".format(parent_node.name)
-                    if node.relevance is not None: 
-                        node.relevance += " and " + parent_empty
+def generate_xls_form_relevance(node, processed_nodes, stashed_nodes, **kwargs):
+    if is_ready_to_process(node, processed_nodes):
+        if node.id not in processed_nodes:
+            if node.id in stashed_nodes:
+                del stashed_nodes[node.id]
+                logger.debug("generate_xls_form_relevance: unstashing processed node{} ".format(node.get_name()))
+            logger.debug('Processing relevance for node {0}'.format(node.get_name()))
+            # if has prev, create condition
+            if hasattr(node, 'relevance') and node.relevance is None:  
+                node.relevance = get_node_expressions(node, processed_nodes)
+                # manage not Available
+                if isinstance(node, TriccNodeSelectNotAvailable):
+                    #update the checkbox
+                    if len(node.prev_nodes)==1:
+                        parent_node = node.prev_nodes[0]
+                        parent_empty = "${{{0}}}=''".format(parent_node.name)
+                        if node.relevance is not None: 
+                            node.relevance += " and " + parent_empty
+                        else:
+                            node.relevance =  parent_empty
+                        node.required = parent_empty
+                        node.constraint = parent_empty
+                        node.constraint_message = _("Cannot be selected with a value entered above")
+                        #update the check box parent : create loop error
+                        parent_node.required = None #"${{{0}}}=''".format(node.name)
                     else:
-                        node.relevance =  parent_empty
-                    node.required = parent_empty
-                    node.constraint = parent_empty
-                    node.constraint_message = _("Cannot be selected with a value entered above")
-                    #update the check box parent : create loop error
-                    parent_node.required = None #"${{{0}}}=''".format(node.name)
-                else:
-                    logger.warning("not available node {} does't have a single parent".format(node.get_name()))
+                        logger.warning("not available node {} does't have a single parent".format(node.get_name()))
                 
                 
-        processed_nodes[node.id]=node
-        #continue walk
-        return True
-    else:
-        return False
+            processed_nodes[node.id]=node
+            #continue walk
+            return True
+    elif node.id not in stashed_nodes and node.id not in processed_nodes:
+        logger.debug("generate_xls_form_relevance: stashing processed node{} ".format(node.get_name()))
+        stashed_nodes[node.id]=node
+    return False
 
 
-def generate_xls_form_calculate(node, processed_nodes, **kwargs):
-    if is_ready_to_process(node, processed_nodes) and node.id not in processed_nodes :
-        logger.debug("generation of calculate for node {}".format(node.get_name()))
-        if hasattr(node, 'expression') and (node.expression is None ):
-            if issubclass(node.__class__, TriccNodeCalculateBase):
-                node.expression = get_node_expressions(node, processed_nodes, is_calculate = True)
-               #continue walk 
-        processed_nodes[node.id]=node
-        return True
-    else:
-        return False
-
+def generate_xls_form_calculate(node, processed_nodes, stashed_nodes, **kwargs):
+    if is_ready_to_process(node, processed_nodes):
+        if node.id not in processed_nodes :
+            if node.id in stashed_nodes:
+                del stashed_nodes[node.id]
+                logger.debug("generate_xls_form_calculate: unstashing processed node{} ".format(node.get_name()))
+            logger.debug("generation of calculate for node {}".format(node.get_name()))
+            if hasattr(node, 'expression') and (node.expression is None ):
+                if issubclass(node.__class__, TriccNodeCalculateBase):
+                    node.expression = get_node_expressions(node, processed_nodes, is_calculate = True)
+                #continue walk 
+            processed_nodes[node.id]=node
+            return True
+    elif node.id not in stashed_nodes and node.id not in processed_nodes:
+        logger.debug("generate_xls_form_calculate: stashing processed node{} ".format(node.get_name()))
+        stashed_nodes[node.id]=node
+    return False
 
 #if the node is "required" then we can take the fact that it has value for the next elements
 def get_required_node_expression(node):
@@ -138,6 +153,8 @@ def get_node_expressions(node, processed_nodes, is_calculate = False):
             expression = TRICC_NUMBER.format(expression)
         else:
             expression = ''
+    if issubclass(node.__class__, TriccNodeCalculateBase) and expression == '':
+        logger.error("Calculate {0} returning no calcualtions".format(node.get_name()))
     return expression
 
 
@@ -186,7 +203,7 @@ def get_node_expression(node,processed_nodes, is_calculate = False, is_prev = Fa
     elif is_calculate  and  isinstance(node, TriccNodeActivityStart):
             expression = node.activity.relevance
     elif is_prev  and issubclass(node.__class__, TriccNodeDisplayCalculateBase):
-        expression = '${{{0}}} > 0'.format(node.name)
+        expression = TRICC_CALC_EXPRESSION.format(node.name)
     elif issubclass(node.__class__, TriccNodeCalculateBase):
         if negate:
             negate_expression =  get_calculation_terms(node, processed_nodes, negate = True )
@@ -253,8 +270,8 @@ def get_rhumbus_terms(node, processed_nodes, is_calculate= False, negate = False
     expression = None
     left_term = None
     if node.label is not None:
-        for operation in [ '>=', '<=', '==','=','>','<']:
-            left_term =  process_rhumbus_expression(node.label, operation)
+        for operation in OPERATION_LIST:
+            left_term =  process_rhumbus_expression( node.label, operation)
             if left_term is not None:
                 break
     if left_term is None:
@@ -275,6 +292,10 @@ def get_rhumbus_terms(node, processed_nodes, is_calculate= False, negate = False
         expression =  "({0}){1}".format(expression,left_term)
     else:
         expression =  "({0}){1}".format(node.reference,left_term)
+        logger.warning("Rhombus reference was not found for node {}, reference {}".format(
+            node.get_name(),
+            node.reference
+        ))
     if negate:
         expression = TRICC_NEGATE.format(expression)
     if expression_prev is not None:

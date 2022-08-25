@@ -4,14 +4,14 @@ Strategy to build the skyp logic following the XLSForm way
 '''
 
 import datetime
-from typing import Dict
 
 import pandas as pd
 from tricc.converters.tricc_to_xls_form import generate_xls_form_calculate, generate_xls_form_condition,  generate_xls_form_relevance
+from tricc.converters.xml_to_tricc import VERSION_SEPARATOR
 from tricc.models import TriccNodeActivity,check_stashed_loop ,walktrhough_tricc_node
 
 
-from tricc.serializers.xls_form import CHOICE_MAP, SURVEY_MAP, end_group, generate_xls_form_export, start_group
+from tricc.serializers.xls_form import CHOICE_MAP, SURVEY_MAP, end_group, generate_xls_form_export, get_diagnostic_line, get_diagnostic_none_line, get_diagnostic_start_group_line, get_diagnostic_stop_group_line,  start_group
 from tricc.strategies.base_strategy import BaseStrategy
 import logging
 logger = logging.getLogger('default')
@@ -36,6 +36,9 @@ class XLSFormStrategy(BaseStrategy):
 
     def generate_calculate(self, node, **kwargs):
         return generate_xls_form_calculate( node, **kwargs)
+
+
+
     
 
     def do_clean(self, **kwargs):
@@ -99,9 +102,11 @@ class XLSFormStrategy(BaseStrategy):
         ## MANAGE STASHED NODES
         prev_stashed_nodes = self.stashed_nodes.copy()
         loop_count = 0
+        len_prev_processed_nodes = 0
         while len(self.stashed_nodes)>0:
-            loop_count = check_stashed_loop(self.stashed_nodes,prev_stashed_nodes, self.processed_nodes,loop_count)
-            prev_stashed_nodes = self.stashed_nodes.copy()    
+            loop_count = check_stashed_loop(self.stashed_nodes,prev_stashed_nodes, self.processed_nodes,len_prev_processed_nodes, loop_count)
+            prev_stashed_nodes = self.stashed_nodes.copy()
+            len_prev_processed_nodes = len(self.processed_nodes)   
             if len(self.stashed_nodes)>0:
                 s_node = self.stashed_nodes.pop(list(self.stashed_nodes.keys())[0])
                 start_group( cur_group =s_node.group, groups=groups, relevance= isinstance(s_node, TriccNodeActivity),  **self.get_kwargs())          
@@ -126,6 +131,26 @@ class XLSFormStrategy(BaseStrategy):
                 #    find_dependants(s_node, self.stashed_nodes,self.processed_nodes, [])
                     
                 self.df_survey = pd.DataFrame(columns=SURVEY_MAP.keys())
-        self.df_survey = df_survey_final    
+        self.df_survey = df_survey_final
+        self.df_survey.loc[len(self.df_survey)] = get_diagnostic_start_group_line()
+        # TODO inject flow driven diag list, the folowing fonction will fill the missing ones
+        diags = self.export_diag( activity,  **kwargs)
+        self.df_survey.loc[len(self.df_survey)] = get_diagnostic_none_line(diags)
+        self.df_survey.loc[len(self.df_survey)] = get_diagnostic_stop_group_line()
+        #TODO inject the TT flow
+        
+        
                 
 
+    def export_diag(self, activity,  **kwargs):
+        diags = []
+        for node in activity.nodes.values():
+            if isinstance(node, TriccNodeActivity):
+                diags += self.export_diag(node,  **kwargs)
+            if hasattr(node, 'name') and node.name is not None:
+                if node.name.startswith('diag_'):
+                    nb_found = len(self.df_survey[self.df_survey.name == "label_"+node.name])
+                    if VERSION_SEPARATOR not in node.name and nb_found == 0:
+                        self.df_survey.loc[len(self.df_survey)] = get_diagnostic_line(node)
+                        diags.append(node)
+        return diags

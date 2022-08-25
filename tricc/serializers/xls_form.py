@@ -2,6 +2,7 @@
 
 from tricc.converters.utils import clean_name
 from tricc.converters.xml_to_tricc import is_ready_to_process
+from tricc.converters.tricc_to_xls_form import TRICC_CALC_EXPRESSION, TRICC_NEGATE
 from tricc.models import *
 import logging
 logger = logging.getLogger('default')
@@ -160,6 +161,98 @@ def generate_xls_form_export(node, processed_nodes, stashed_nodes, df_survey, df
             processed_nodes[node.id] = node
             #continue walk °
             return True
-    else:
+    elif node.id not in stashed_nodes and node.id not in processed_nodes:
+        logger.debug("generate_xls_form_condition: stashing processed node{} ".format(node.get_name()))
         stashed_nodes[node.id]=node
     return False
+
+
+def get_diagnostic_line(node):
+    return [
+        'note',
+        "label_"+node.name,
+        node.get_name(),
+        '',#hint
+        '',#help
+        '',#default
+        '',#'appearance', 
+        '',#'constraint', 
+        '',#'constraint_message'
+        TRICC_CALC_EXPRESSION.format(node.name),#'relevance'
+        '',#'disabled'
+        '',#'required'
+        '',#'required message'
+        '',#'read only'
+        '',#'expression'
+        '',#'repeat_count'
+        ''#'image'  
+    ]
+
+def get_diagnostic_start_group_line():
+    return [
+        'begin group',
+        "l_diag_list25",
+        _('List des diagnostic'),
+        '',#hint
+        '',#help
+        '',#default
+        'field-list',#'appearance', 
+        '',#'constraint', 
+        '',#'constraint_message'
+        '',#'relevance'
+        '',#'disabled'
+        '',#'required'
+        '',#'required message'
+        '',#'read only'
+        '',#'expression'
+        '',#'repeat_count'
+        ''#'image'  
+    ]
+    
+def get_diagnostic_none_line(diags):
+    relevance = ''
+    for diag in diags:
+        relevance += TRICC_CALC_EXPRESSION.format(diag.name) + " or "
+    
+        
+    
+    return [
+        'note',
+        "l_diag_none25",
+        _('Aucun diagnostic trouvé par l\'outil mais cela ne veut pas dire que le patient est en bonne santé'),
+        '',#hint
+        '',#help
+        '',#default
+        '',#'appearance', 
+        '',#'constraint', 
+        '',#'constraint_message'
+        TRICC_NEGATE.format(relevance[:-4]),#'relevance'
+        '',#'disabled'
+        '',#'required'
+        '',#'required message'
+        '',#'read only'
+        '',#'expression'
+        '',#'repeat_count'
+        ''#'image'  
+    ]
+    
+def  get_diagnostic_stop_group_line():
+        return [
+        'end group',
+        "l_diag_list25",
+        '',
+        '',#hint
+        '',#help
+        '',#default
+        '',#'appearance', 
+        '',#'constraint', 
+        '',#'constraint_message'
+        '',#'relevance'
+        '',#'disabled'
+        '',#'required'
+        '',#'required message'
+        '',#'read only'
+        '',#'expression'
+        '',#'repeat_count'
+        ''#'image'  
+    ]

@@ -1,11 +1,11 @@
-
+from __future__ import annotations 
 from enum import Enum
-import logging
+
 from typing import Dict, List, Optional,  Union
 from pydantic import BaseModel, constr
 
 from tricc.converters.utils import generate_id
-
+import logging
 logger = logging.getLogger("default")
 
 
@@ -73,9 +73,9 @@ class TriccBaseModel(BaseModel):
     odk_type: Union[TriccNodeType,TriccExtendedNodeType]
     id:triccId
     parent:Optional[triccId]
-    group : Optional[BaseModel]
+    group : Optional[TriccBaseModel]
     instance: int = 1
-    base_instance : Optional[BaseModel]
+    base_instance : Optional[TriccBaseModel]
     def __eq__(self, other):
         if isinstance(other, self.__class__):
             return self.id == other.id
@@ -111,8 +111,8 @@ class TriccBaseModel(BaseModel):
 class TriccNodeBaseModel(TriccBaseModel):
     name: Optional[str]
     label: Optional[str]
-    next_nodes: List[TriccBaseModel] = []
-    prev_nodes: List[TriccBaseModel] = []
+    next_nodes: List[TriccNodeBaseModel] = []
+    prev_nodes: List[TriccNodeBaseModel] = []
     # to be updated while processing because final expression will be possible to build$
     # #only the last time the script will go through the node (all prev node expression would be created
 
@@ -121,9 +121,9 @@ class TriccNodeBaseModel(TriccBaseModel):
     def get_name(self):
         if self.label is not None:
             if len(self.label)<50:
-                return self.label.encode("utf-8")
+                return self.label
             else:
-                return self.label[:50].encode("utf-8")
+                return self.label[:50]
         elif self.name is not None:
             return self.name
         else:
@@ -155,6 +155,7 @@ class TriccEdge(TriccBaseModel):
     odk_type = TriccExtendedNodeType.edge
     source: Union[triccId, TriccNodeBaseModel]
     target: Union[triccId, TriccNodeBaseModel]
+    value:Optional[str]
     def  make_instance(self, instance_nb, activity = None):
         instance = super().make_instance(instance_nb, activity = activity)
         if issubclass(self.source.__class__, TriccNodeBaseModel):
@@ -169,7 +170,7 @@ class TriccNodeActivity(TriccNodeBaseModel):
     # edge list
     edges: List[TriccEdge]= []
     # copy of the edge for later restauration
-    edges_copy: List[TriccEdge]= []
+    unused_edges: List[TriccEdge]= []
     # nodes part of that actvity
     nodes: Dict[str, TriccNodeBaseModel] = {}
     #groups
@@ -195,6 +196,8 @@ class TriccNodeActivity(TriccNodeBaseModel):
             instance.nodes = nodes
             edges = []
             instance.edges = edges
+            unused_edges = []
+            instance.edges = unused_edges
             end_prev_nodes = []
             instance.end_prev_nodes = end_prev_nodes
             activity_end_prev_nodes = []
@@ -204,13 +207,13 @@ class TriccNodeActivity(TriccNodeBaseModel):
             groups = {}
             instance.groups = groups
             instance.group = instance
+            instance.activity = instance
             for edge in self.edges:
                 instance.edges.append(edge.make_instance(instance_nb, activity = instance))
-            instance.edges_copy = instance.edges.copy() 
-            update_nodes(instance, self.root) 
+            instance.update_nodes(self.root) 
             # we walk throught the nodes and replace them when ready
             for node in list(self.nodes.values()):
-                update_nodes( instance, node)
+                instance.update_nodes(node)
             for group in self.groups:
                 instance.update_groups(group)         
             # update parent group
@@ -242,24 +245,39 @@ class TriccNodeActivity(TriccNodeBaseModel):
         self.groups[instance_group.id] = instance_group
 
 
-def update_nodes(instance, node):
-    if not isinstance(node, TriccNodeSelectOption):
-        node_instance = node.make_instance(instance.instance, activity = instance)
-        instance.nodes[node_instance.id] = node_instance
-        if isinstance(node, TriccNodeActivityStart):
-            instance.root = node_instance
-        elif issubclass(node_instance.__class__, TriccNodeSelect):
-            for key,  option_instance in node_instance.options.items():
-                update_edges(instance, node.options[key], option_instance)
-        update_edges(instance, node, node_instance)
+    def update_nodes(self, node_origin):
+        updated_edges = 0
+        if not isinstance(node_origin, TriccNodeSelectOption):
+            node_instance = node_origin.make_instance(self.instance, activity = self)
+            self.nodes[node_instance.id] = node_instance
+            # update root
+            if isinstance(node_origin, TriccNodeActivityStart) and node_origin == node_origin.activity.root:
+                self.root = node_instance
+            # generate options
+            elif issubclass(node_instance.__class__, TriccNodeSelect):
+                for key,  option_instance in node_instance.options.items():
+                    updated_edges += self.update_edges( node_origin.options[key], option_instance)
+            # update activity end nodes
+            if node_origin in node_origin.activity.activity_end_prev_nodes:
+                self.activity_end_prev_nodes.append(node_instance)
+            # update end nodes
+            if node_origin in node_origin.activity.end_prev_nodes:
+                self.end_prev_nodes.append(node_instance)
+            updated_edges += self.update_edges( node_origin, node_instance)
+            if updated_edges == 0:
+                logger.error("no edge was updated for node {}".format(node_instance.get_name()))
 
 
-def update_edges(instance, node, node_instance):
-    for edge in instance.edges:
-        if edge.source == node.id or edge.source == node:
-            edge.source = node_instance.id
-        if edge.target == node.id or edge.target == node:
-            edge.target = node_instance.id
+    def update_edges(self, node_origin, node_instance):
+        updates = 0
+        for edge in self.edges:
+            if edge.source == node_origin.id or edge.source == node_origin:
+                edge.source = node_instance.id
+                updates +=1
+            if edge.target == node_origin.id or edge.target == node_origin:
+                edge.target = node_instance.id
+                updates +=1
+        return updates
         
         
 class TriccNodeDiplayModel(TriccNodeBaseModel):
@@ -482,6 +500,7 @@ def replace_node(old, new, page):
 # therefore to avoid double processing the nodes variable saves the node already processed
 # there 2 strategies : process it the first time or the last time (wait that all the previuous node are processed)
 def walktrhough_tricc_node( node, callback, **kwargs):
+        logger.debug("walkthrough::{}::{}".format(callback.__name__, node.get_name()))
         if ( callback(node, **kwargs)):
             # if has next, walkthrough them (support options)
             if isinstance(node, TriccNodeActivity):
@@ -498,22 +517,25 @@ def walktrhough_tricc_node( node, callback, **kwargs):
                             walktrhough_tricc_node(next_node, callback, **kwargs)
             if hasattr(node,'next_nodes') and len(node.next_nodes)>0:
                 for next_node in node.next_nodes:
-                    walktrhough_tricc_node(next_node, callback, **kwargs)
-                
-def make_node_instance(node, processed_nodes, page, instance_nb):
-    if is_ready_to_process(node, processed_nodes) and node.id not in processed_nodes:
-        for next_node in node.next_nodes:
-            next_instance = next_node.make_instance(instance_nb , page )
-            set_prev_next_node(node,next_instance, next_node)
-            for edge in page.edges:
-                if edge.source == next_node.id:
-                    edge.source  = next_instance.id
-                if edge.target == next_node.id:
-                    edge.target  = next_instance.id
-        processed_nodes[node.id]=node     
-        return True
-    else:
-        return False
+                    if not isinstance(node, (TriccNodeActivityEnd, TriccNodeEnd)):
+                        walktrhough_tricc_node(next_node, callback, **kwargs)
+                    else:
+                        logger.error("end node of {} has a next node".format(node.activity.get_name()))
+                        exit()                
+#def make_node_instance(node, processed_nodes, page, instance_nb):
+#    if is_ready_to_process(node, processed_nodes) and node.id not in processed_nodes:
+#        for next_node in node.next_nodes:
+#            next_instance = next_node.make_instance(instance_nb , page )
+#            set_prev_next_node(node,next_instance, next_node)
+#            for edge in page.edges:
+#                if edge.source == next_node.id:
+#                    edge.source  = next_instance.id
+#                if edge.target == next_node.id:
+#                    edge.target  = next_instance.id
+#        processed_nodes[node.id]=node     
+#        return True
+#    else:
+#        return False
 
 
 # check if the all the prev nodes are processed
@@ -529,7 +551,7 @@ def is_ready_to_process(in_node, processed_nodes, recursive = False):
         for prev_node in node.prev_nodes:
             if isinstance(prev_node,TriccNodeActivity):
                 if len(prev_node.end_prev_nodes)==0 and len(prev_node.activity_end_prev_nodes)==0:
-                    logger.error("is_ready_to_process:failed: {2} -act-> {0} NO end nodes".format(prev_node.get_name(),end_node.get_name(), node.get_name() ))
+                    logger.error("is_ready_to_process:failed: {1} -act-> {0} NO end nodes".format(prev_node.get_name(), node.get_name() ))
                     return False
                 for end_node in prev_node.end_prev_nodes:
                     if end_node.id not in processed_nodes:
@@ -539,7 +561,7 @@ def is_ready_to_process(in_node, processed_nodes, recursive = False):
                         return False
                 for activity_end_node in prev_node.activity_end_prev_nodes:
                     if activity_end_node.id not in processed_nodes:
-                        logger.debug("is_ready_to_process:failed: {2} -act-> {0} -end-> {1}".format(prev_node.get_name(),activity_end_node.get_name(), node.get_name() ))
+                        logger.debug("is_ready_to_process:failed: {2} -act-> {0}({3}) -end-> {1}".format(prev_node.get_name(),activity_end_node.get_name(), node.get_name(), activity_end_node.instance ))
                         if recursive :
                             is_ready_to_process(activity_end_node, processed_nodes, recursive )
                         return False
@@ -568,7 +590,7 @@ def get_prev_node_by_name(nodes, name, instance_nb = 1):
             if node.name == name:
                 return node
             
-def  check_stashed_loop(stashed_nodes,prev_stashed_nodes,processed_nodes,loop_count):
+def  check_stashed_loop(stashed_nodes,prev_stashed_nodes,processed_nodes, len_prev_processed_nodes,loop_count):
     loop_out = {}
     if len(stashed_nodes)  == len(prev_stashed_nodes):
         
@@ -578,10 +600,10 @@ def  check_stashed_loop(stashed_nodes,prev_stashed_nodes,processed_nodes,loop_co
         cur_stashed_nodes_ordered_id.sort()
         prev_stashed_nodes_ordered_id = list(prev_stashed_nodes.keys())
         prev_stashed_nodes_ordered_id.sort()        
-        if cur_stashed_nodes_ordered_id == prev_stashed_nodes_ordered_id:
+        if cur_stashed_nodes_ordered_id == prev_stashed_nodes_ordered_id and len(processed_nodes) ==len_prev_processed_nodes:
             loop_count += 1
-            if loop_count > 3*len(prev_stashed_nodes)+1:
-                logger.error("Stashed node list was unchanged: loop likely or a cyclique redundancy")
+            if loop_count > 100*len(prev_stashed_nodes)+1:
+                logger.error("Stashed node list was unchanged: loop likely or a cyclic redundancy")
                 for es_node in list(cur_stashed_nodes.values()):
                     loop_out[es_node.id] = is_ready_to_process(es_node, processed_nodes, True)
                     logger.error("Stashed node {}:{}:{}:{}".format(es_node.__class__,es_node.activity.get_name(),es_node.instance,es_node.get_name()))

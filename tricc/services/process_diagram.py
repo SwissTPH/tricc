@@ -40,24 +40,29 @@ def build_tricc_graph(in_filepath):
         used_calculates = {}
         # save the node that are processed dict[id, node]
         processed_nodes = {}
-        
         stashed_nodes = {}
         # add save nodes and merge nodes
         logger.info("# add save calculate")
         walktrhough_tricc_node(start_page.root, add_save_calculate, calculates=calculates,
                                used_calculates=used_calculates, processed_nodes=processed_nodes, stashed_nodes=stashed_nodes)
-
+        prev_stashed_nodes = {}
+        len_prev_processed_nodes = 0
+        loop_count = 0
         while len(stashed_nodes)>0:
+            loop_count = check_stashed_loop(stashed_nodes,prev_stashed_nodes,processed_nodes,len_prev_processed_nodes,loop_count)
+            prev_stashed_nodes = stashed_nodes.copy()
+            len_prev_processed_nodes = len(processed_nodes) 
             s_node = stashed_nodes.pop(list(stashed_nodes.keys())[0])
             logger.debug("add_save_calculate:unstashed:{}".format(s_node.get_name()))
             walktrhough_tricc_node(s_node, add_save_calculate, calculates=calculates,
                                used_calculates=used_calculates, processed_nodes=processed_nodes, stashed_nodes=stashed_nodes)
+            
         logger.info("# check if all edges (arrow where used)")
         for key, page in pages.items():
-            if page.edges is not None and len(page.edges)>0:
+            if page.unused_edges is not None and len(page.unused_edges)>0:
                 logger.warning(
-                    "Page {0} has still {1}/{2} edges that were not used: {3}"\
-                    .format(page.label, len(page.edges) ,len(page.edges_copy),page.edges ))
+                    "Page {0} has still {1}/{2} edges that were not used:"\
+                    .format(page.label, len(page.unused_edges) ,len(page.edges)))
          # refresh the edges (were remove by previous code)
         return start_page
         
@@ -82,9 +87,6 @@ def linking_nodes(node, page, pages, processed_nodes = [], path = []):
     current_path = path + [node.id]
     # don't stop the walkthroug by default
     logger.debug("linking node {0}".format(node.get_name()))
-    # clean name
-    if hasattr(node, 'name') and node.name is not None and node.name.endswith('_'):
-        node.name = node.name + node.id
     if len(node_edge) == 0:
         logger.debug("node {0} without edges out found in page {1}, full path {2}"\
             .format(node.get_name(), page.label, current_path))
@@ -119,7 +121,7 @@ def linking_nodes(node, page, pages, processed_nodes = [], path = []):
                 set_prev_next_node( node, target_node)
         else:
             logger.warning("target not found {0}".format(edge.target))
-        page.edges.remove(edge)
+        #page.edges.remove(edge)
   
 
       

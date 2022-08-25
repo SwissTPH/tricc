@@ -1,9 +1,7 @@
-#TODO move those in Strategy/tricc to ODK
-# then use the strategy to call it 
-
 from uuid import uuid4
 import logging
 
+OPERATION_LIST = [ '>=', '<=', '==','=','>','<']
 
 
 logger = logging.getLogger("default")
