@@ -597,6 +597,7 @@ def set_mandatory_attribute(elm, mandatory_attributes):
             else:
                 display_name = elm.attrib.get('id')
             logger.error("the attibute {} is mandatory but not found in {}".format(attributes, display_name))
+            exit()
         if attributes == 'link':
             param[attributes] = clean_link(attribute_value)
         elif attributes in ('parent','id', 'source', 'target'):
