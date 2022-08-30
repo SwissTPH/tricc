@@ -421,6 +421,8 @@ class TriccNodeCalculateBase(TriccNodeBaseModel):
 
 class TriccNodeDisplayCalculateBase(TriccNodeCalculateBase):
     save: Optional[str] # contribute to another calculate
+    hint: Optional[str] # for diagnostic display
+    help: Optional[str] # for diagnostic display
     # no need to copy save
     
 

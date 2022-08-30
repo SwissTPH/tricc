@@ -254,7 +254,7 @@ def get_select_options(diagram, select_node, nodes):
     options_name_list = []
     for elm in list:
         name = elm.attrib.get('name')
-        if name in options_name_list:
+        if name in options_name_list and not name.endswith('_'):
             logger.error("Select question {0} have twice the option name {1}"\
                 .format(select_node.get_name() ,name))
         else:
