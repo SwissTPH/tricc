@@ -1,4 +1,5 @@
 
+import re
 from tricc.converters.utils import   OPERATION_LIST, clean_str
 from tricc.converters.xml_to_tricc import is_ready_to_process
 from tricc.models import *
@@ -46,7 +47,7 @@ def generate_xls_form_condition(node, processed_nodes, stashed_nodes, **kwargs):
                     if node.max is not None:
                             constraints.append('.>=' + node.max)
                             constraints_message.append( _("The maximum value is {0}.").format(node.max))
-                    if len(constraints)>0:
+                    if len(constraints)>0:   
                         node.constraint = ' and '.join(constraints)
                         node.constraint_message = ' '.join(constraints_message)
             #continue walk 
@@ -103,8 +104,7 @@ def generate_xls_form_calculate(node, processed_nodes, stashed_nodes, **kwargs):
                 logger.debug("generate_xls_form_calculate: unstashing processed node{} ".format(node.get_name()))
             logger.debug("generation of calculate for node {}".format(node.get_name()))
             if hasattr(node, 'expression') and (node.expression is None ):
-                if issubclass(node.__class__, TriccNodeCalculateBase):
-                    node.expression = get_node_expressions(node, processed_nodes, is_calculate = True)
+                node.expression = get_node_expressions(node, processed_nodes)
                 #continue walk 
             processed_nodes[node.id]=node
             return True
@@ -125,7 +125,7 @@ def get_selected_option_expression(option_node):
 # Function that add element to array is not None or ''
 def add_sub_expression(array, sub):
     if sub is not None and sub not in array and sub != '':
-        not_sub = 'not({})'.format(sub)
+        not_sub = TRICC_NEGATE.format(sub)
         if not_sub in array:
             # avoid having 2 conditions that are complete opposites
             array.remove(not_sub)
@@ -137,45 +137,47 @@ def add_sub_expression(array, sub):
 # node is the node to calculate
 # processed_nodes are the list of processed nodes
 
-def get_node_expressions(node, processed_nodes, is_calculate = False):
+def get_node_expressions(node, processed_nodes):
+    is_calculate =issubclass(node.__class__, TriccNodeCalculateBase)
     expression = None
     # in case of recursive call processed_nodes will be None
-    if hasattr(node,'prev_nodes') and (processed_nodes is None or is_ready_to_process(node, processed_nodes)):
-        # for the calculate we 
-        if not issubclass(node.__class__, TriccNodeCalculate):
-            expression = get_node_expression(node, processed_nodes, is_calculate, processed_nodes)
-        #fall back on required or on relevance if nothin found
-        if expression is None:
-                is_calculate = issubclass(node.__class__, TriccNodeCalculate)
-                expression = get_prev_node_expression(node,processed_nodes)
+    if processed_nodes is None or is_ready_to_process(node, processed_nodes):
+        expression = get_node_expression(node, processed_nodes, is_calculate)
     if is_calculate:
         if expression is not None and expression != '':
             expression = TRICC_NUMBER.format(expression)
         else:
             expression = ''
     if issubclass(node.__class__, TriccNodeCalculateBase) and expression == '':
-        logger.error("Calculate {0} returning no calcualtions".format(node.get_name()))
+        logger.warning("Calculate {0} returning no calcualtions".format(node.get_name()))
+        expression = 'true()'
     return expression
 
 
 
 
-def get_prev_node_expression(node, processed_nodes, excluded_name = None):
+def get_prev_node_expression(node, processed_nodes, is_calculate = False, excluded_name = None):
     expression = None
-    #when getting the prev node, we calculate the  
     
+    if isinstance(node, TriccNodeActivityStart):
+        node = node.activity
+    #when getting the prev node, we calculate the  
     if hasattr(node, 'expression_inputs') and len(node.expression_inputs)>0:
         expression_inputs = node.expression_inputs
+        if 'false()' in expression_inputs:
+            expression_inputs.remove('false()')
     else:
         expression_inputs = []
-
     for  prev_node in node.prev_nodes:
         if excluded_name is None or  hasattr(prev_node,'name') and prev_node.name != excluded_name:
-            #we have to calculate all but the real calculate
-            is_calculate = issubclass(node.__class__, TriccNodeCalculate) 
+            # the rumbus should calcualte only reference
+            if isinstance(node, TriccNodeRhombus):
+                is_calculate = False
             add_sub_expression(expression_inputs, get_node_expression(prev_node, processed_nodes, is_calculate, True))
         # avoid void is there is not conditions to avoid looping too much itme
     if len(expression_inputs)>0:
+        if 'false()' in expression_inputs:
+            expression_inputs.remove('false()')
         expression =  ' or '.join(expression_inputs)
         expression_inputs = None
         if isinstance(node,  TriccNodeExclusive):
@@ -184,10 +186,12 @@ def get_prev_node_expression(node, processed_nodes, excluded_name = None):
         activity = node
         expression_inputs = []
         # relevance of the previous instance must be false to display this activity
-        add_sub_expression(expression_inputs, get_node_expression(activity.base_instance, processed_nodes, is_calculate, True))
+        add_sub_expression(expression_inputs, get_node_expression(activity.base_instance, processed_nodes, False, True))
         for instance_nb, past_instance in activity.base_instance.instances.items():
             if int(instance_nb) < int(activity.instance):
-                add_sub_expression(expression_inputs, get_node_expression(past_instance, processed_nodes, is_calculate, True))
+                add_sub_expression(expression_inputs, get_node_expression(past_instance, processed_nodes, False, True))
+        if 'false()' in expression_inputs:
+            expression_inputs.remove('false()')
         expression_activity =  ' or '.join(expression_inputs)
         expression = TRICC_NAND_EXPRESSION.format(expression,expression_activity)         
     return expression
@@ -200,24 +204,29 @@ def get_node_expression(node,processed_nodes, is_calculate = False, is_prev = Fa
         expression = TRICC_SELECT_MULTIPLE_CALC_EXPRESSION.format(node.name)
     elif is_calculate and isinstance(node, (TriccNodeSelectYesNo,TriccNodeSelectNotAvailable)):
         expression = TRICC_CALC_EXPRESSION.format(node.name)
-    elif is_calculate  and  isinstance(node, TriccNodeActivityStart):
-            expression = node.activity.relevance
-    elif is_prev  and issubclass(node.__class__, TriccNodeDisplayCalculateBase):
+    elif is_prev  and issubclass(node.__class__, TriccNodeDisplayCalculateBase) and not ( negate and isinstance(node, TriccNodeRhombus)):
+            
         expression = TRICC_CALC_EXPRESSION.format(node.name)
     elif issubclass(node.__class__, TriccNodeCalculateBase):
         if negate:
-            negate_expression =  get_calculation_terms(node, processed_nodes, negate = True )
+            negate_expression =  get_calculation_terms(node, processed_nodes, is_calculate, negate = True )
         else:
-            expression =  get_calculation_terms(node, processed_nodes )
+            expression =  get_calculation_terms(node, processed_nodes , is_calculate)
     elif is_prev  and hasattr(node,'required') and node.required == True:
         expression = get_required_node_expression(node) 
     elif is_prev and isinstance(node, TriccNodeActivity) and node.base_instance is not None:
-        expression = get_prev_node_expression(node, processed_nodes, excluded_name = "instances")
+        end_nodes = node.get_end_nodes()
+        expression_inputs = []
+        for end_node in end_nodes:
+            add_sub_expression(expression_inputs, get_node_expression(end_node,processed_nodes, is_calculate = False, is_prev = True))
+        expression = ' or '.join(expression_inputs)
     elif is_prev  and   hasattr(node, 'relevance') and node.relevance is not None:
             expression = node.relevance
     elif isinstance(node, TriccNodeSelectOption):
        expression = get_selected_option_expression(node)
 
+    if expression is None:
+        expression= get_prev_node_expression(node,processed_nodes,is_calculate)
 
     if negate:
         if negate_expression is not None:
@@ -234,27 +243,27 @@ def get_node_expression(node,processed_nodes, is_calculate = False, is_prev = Fa
 
 def get_calculation_terms(node, processed_nodes, is_calculate = False, negate = False):
     if isinstance(node, TriccNodeAdd):
-        return get_add_terms(node, is_calculate, negate)
+        return get_add_terms(node,  False, negate)
     elif isinstance(node, TriccNodeCount):
-        return get_count_terms(node, is_calculate, negate)
+        return get_count_terms(node, False, negate)
     elif isinstance(node, TriccNodeRhombus):
-        return get_rhumbus_terms(node, processed_nodes, is_calculate, negate)
+        return get_rhumbus_terms(node, processed_nodes, False, negate)
     elif isinstance(node, TriccNodeExclusive):
         if len(node.prev_nodes) == 1:
             if issubclass(node.prev_nodes[0].__class__, TriccNodeDisplayCalculateBase):
-                return get_node_expression(node.prev_nodes[0], processed_nodes, negate=True) 
+                return get_node_expression(node.prev_nodes[0], processed_nodes, is_prev = True, negate=True) 
             elif issubclass(node.prev_nodes[0].__class__, (TriccNodeFakeCalculateBase, TriccNodeSelect)):
-                return  get_node_expression(node.prev_nodes[0], processed_nodes, is_calculate = True, negate=True)
+                return  get_node_expression(node.prev_nodes[0], processed_nodes, is_calculate = False, is_prev = True, negate=True)
             elif isinstance(node.prev_nodes[0],TriccNodeActivity):
-                return get_node_expression(node.prev_nodes[0], processed_nodes, negate=True, is_prev=True)
+                return get_node_expression(node.prev_nodes[0], processed_nodes, is_calculate = False, is_prev=True, negate=True)
             else:
                 logger.error("exclusive node {} does not depend of a calculate".format(node.get_name()))
         else:
             logger.error("exclusive node {} has no ou too much parent".format(node.get_name()))
     elif negate:
-        return TRICC_NEGATE.format(get_prev_node_expression(node,processed_nodes))
+        return TRICC_NEGATE.format(get_prev_node_expression(node,processed_nodes,is_calculate))
     else:
-        return get_prev_node_expression(node )
+        return get_prev_node_expression(node, processed_nodes, is_calculate )
     
     
 def process_rhumbus_expression(label, operation):
@@ -278,7 +287,7 @@ def get_rhumbus_terms(node, processed_nodes, is_calculate= False, negate = False
         left_term = '>0'
     # calcualte the expression only for select muzltiple and fake calculate
     if  node.reference is not None and issubclass(node.reference.__class__, TriccBaseModel):
-        if issubclass(node.reference.__class__, TriccNodeFakeCalculateBase) or isinstance(node.reference, TriccNodeSelectMultiple):
+        if issubclass(node.reference.__class__, TriccNodeFakeCalculateBase) or isinstance(node.reference, (TriccNodeSelectMultiple, TriccNodeSelectOne, TriccNodeSelectYesNo,TriccNodeSelectNotAvailable )):
             expression = get_node_expression(node.reference, processed_nodes, is_calculate = True, is_prev = True)
         else:
             expression = TRICC_REF_EXPRESSION.format(node.reference.name)
@@ -287,11 +296,14 @@ def get_rhumbus_terms(node, processed_nodes, is_calculate= False, negate = False
         #expression = "${{{}}}".format(node.reference)
         logger.error('reference {0} was not found in the previous nodes of node {1}'.format(node.reference, node.get_name()))
         exit()
-    expression_prev = get_prev_node_expression(node,processed_nodes, node.reference )
+    expression_prev = get_prev_node_expression(node,processed_nodes, excluded_name =node.reference )
     if expression is not None:
-        expression =  "({0}){1}".format(expression,left_term)
+        if re.search(" (or)|(and) ", expression):
+            expression =  "({0}){1}".format(expression,left_term)
+        else:
+            expression =  "{0}{1}".format(expression,left_term)
     else:
-        expression =  "({0}){1}".format(node.reference,left_term)
+        expression =  "{0}{1}".format(node.reference,left_term)
         logger.warning("Rhombus reference was not found for node {}, reference {}".format(
             node.get_name(),
             node.reference
@@ -299,7 +311,28 @@ def get_rhumbus_terms(node, processed_nodes, is_calculate= False, negate = False
     if negate:
         expression = TRICC_NEGATE.format(expression)
     if expression_prev is not None:
-        expression = "({} and ({}))".format(expression, expression_prev)
+        if expression_prev != expression:
+            # to avoid useless code
+            if expression == 'false()' or  expression_prev == 'false()' or expression_prev == TRICC_NEGATE.format(expression) or TRICC_NEGATE.format(expression_prev) == expression:
+                expression = 'false()'
+            else:
+                list_or = expression_prev.split(' or ')
+                if TRICC_NEGATE.format(expression) in  list_or:
+                    # we remove x and not X
+                    list_or.remove(TRICC_NEGATE.format(expression))
+                elif  expression in  list_or:
+                    # we remove  x and x
+                    list_or.remove(expression)
+                else:
+                    for exp_prev in list_or:
+                        if TRICC_NEGATE.format(exp_prev) == expression or exp_prev == expression :
+                            list_or.remove(exp_prev)
+                        if TRICC_NEGATE.format(exp_prev) in list_or :
+                            list_or.remove(exp_prev)
+                            list_or.remove(TRICC_NEGATE.format(exp_prev))
+                if  len(list_or)>0:
+                    expression_prev = ' or '.join(list_or)
+                    expression = "({} and ({}))".format(expression, expression_prev)
     return expression
 
 
@@ -314,7 +347,7 @@ def get_add_terms(node, processed_nodes, is_calculate = False, negate = False):
         if issubclass(prev_node, TriccNodeNumber) or isinstance(node, TriccNodeCount):
             terms.append("coalesce(${{{0}}},0)".format(prev_node.name))
         else:
-            terms.append("number({0})".format(get_node_expression(prev_node, processed_nodes, is_calculate, True)))
+            terms.append("number({0})".format(get_node_expression(prev_node, processed_nodes, is_calculate = False, is_prev = True)))
     if len(terms)>0:
         return  ' + '.join(terms)
             
@@ -328,9 +361,9 @@ def get_count_terms(node, processed_nodes, is_calculate, negate = False):
                 terms.append(TRICC_SELECT_MULTIPLE_CALC_EXPRESSION.format(prev_node.name))
         else:
             if negate:
-                terms.append("number(number({0})=0)".format(get_node_expression(prev_node, processed_nodes, is_calculate, True)))
+                terms.append("number(number({0})=0)".format(get_node_expression(prev_node, processed_nodes, is_calculate = False, is_prev = True)))
             else:
-                terms.append("number({0})".format(get_node_expression(prev_node, processed_nodes, is_calculate, True)))
+                terms.append("number({0})".format(get_node_expression(prev_node, processed_nodes, is_calculate= False, is_prev =  True)))
     if len(terms)>0:
         return  ' + '.join(terms)
 

@@ -19,10 +19,10 @@ import logging
 logger = logging.getLogger("default")
 
 def create_activity(diagram):
-    
+    id = diagram.attrib.get('id')    
     root = create_root_node(diagram)
     name = diagram.attrib.get('name')
-    id = diagram.attrib.get('id')
+
     if root is not None:
         activity = TriccNodeActivity(
             root=root,
@@ -54,7 +54,7 @@ def create_activity(diagram):
 def process_edges(diagram, activity, nodes):
     for edge in activity.edges:
         # enrich nodes
-        if edge.target not in nodes and nodes[edge.source] not in activity.end_prev_nodes and nodes[edge.source] not in activity.activity_end_prev_nodes:
+        if edge.target not in nodes :
             activity.unused_edges.append(edge)
         elif edge.source not in nodes and edge.target in nodes:
             node_used = enrich_node(diagram, edge, nodes[edge.target])
@@ -94,7 +94,8 @@ def process_edges(diagram, activity, nodes):
                         id = generate_id(),
                         reference = nodes[edge.source].name,
                         activity = nodes[edge.source].activity,
-                        group = nodes[edge.source].group
+                        group = nodes[edge.source].group,
+                        label= label
                     )
                     break
             if label.lower() in TRICC_FOLOW_LABEL:
@@ -166,7 +167,7 @@ def create_root_node(diagram):
         return  TriccNodeMainStart(
             id = elm.attrib.get('id'),
             parent= elm.attrib.get('parent'),
-            name = diagram.attrib.get('name'),
+            name = 'ms'+diagram.attrib.get('id'),
             label = elm.attrib.get('label')
         )
     elm = get_odk_type(diagram, 'object', TriccExtendedNodeType.activity_start)
@@ -174,7 +175,8 @@ def create_root_node(diagram):
         return  TriccNodeActivityStart(
             id = elm.attrib.get('id'),
             parent= elm.attrib.get('parent'),
-            name = diagram.attrib.get('name')
+            name = 'ma'+diagram.attrib.get('id'),
+            label = diagram.attrib.get('name')
         )
 
 
@@ -216,7 +218,7 @@ def add_input_nodes(nodes, diagram, group= None):
 
 def add_calculate_nodes(nodes, diagram, group=None):
     list = get_odk_type_list(diagram, ['UserObject','object'], TriccNodeType.calculate)
-    add_tricc_nodes(nodes, TriccNodeCalculate, list, group, ['save','expression'])
+    add_tricc_nodes(nodes, TriccNodeCalculate, list, group, ['save','expression','help', 'hint'])
     list = get_odk_type_list(diagram, ['UserObject','object'], TriccExtendedNodeType.add)
     add_tricc_nodes(nodes, TriccNodeAdd, list, group, ['save','expression'])
     list = get_odk_type_list(diagram, ['UserObject','object'], TriccExtendedNodeType.count)
@@ -225,7 +227,7 @@ def add_calculate_nodes(nodes, diagram, group=None):
     add_tricc_nodes(nodes, TriccNodeRhombus, list, group, ['save','expression'],['reference'])
     list = get_odk_type_list(diagram, ['UserObject','object'], TriccExtendedNodeType.exclusive)
     add_tricc_base_node(nodes, TriccNodeExclusive, list, group)
-    
+ 
 def get_hybride_node(nodes, diagram, group=None):
     list = get_odk_type_list(diagram, ['UserObject','object'], TriccExtendedNodeType.not_available)
     add_tricc_hybrid_select_nodes(nodes, TriccNodeSelectNotAvailable, list, group, [])
@@ -283,10 +285,12 @@ def add_save_calculate(node, calculates, used_calculates,processed_nodes, stashe
      # used_calculates dict[name, Dict[id, node]]
      # processed_nodes Dict[id, node]
      # calculates  dict[name, Dict[id, node]]
+    if isinstance(node, (TriccNodeActivityEnd, TriccNodeEnd)):
+        pass
     if is_ready_to_process(node, processed_nodes) and node.id not in processed_nodes:
         if process_calculate_version_requirement(node, calculates, used_calculates,processed_nodes):
             calc_node = generate_save_calculate(node)
-            if isinstance(node, (TriccNodeCount, TriccNodeAdd, TriccNodeCalculate )) and node.name is not None:            
+            if issubclass(node.__class__, (TriccNodeDisplayCalculateBase )) and node.name is not None:            
                 # generate the calc node version by looking in the processed calculate
                 if node.name in calculates:
                     # get max version existing
@@ -303,6 +307,9 @@ def add_save_calculate(node, calculates, used_calculates,processed_nodes, stashe
                             for node_id in node_to_delete:
                                 del calculates[node.name][node_id]
                                 del processed_nodes[node_id]
+                                if node_id in node.activity.nodes:
+                                    # mostly for end nodes
+                                    del node.activity.nodes[node_id]
                                 if node_id in stashed_nodes:
                                     del stashed_nodes[node_id]
                         if last_used_version > 0 :
@@ -442,7 +449,7 @@ def add_used_calculate(node, prev_node, calculates, used_calculates, processed_n
             if node_clean_name not in used_calculates:
                 node_clean_name =prev_node.name
             if node_clean_name not in calculates :
-                logger.warning("node {} refered before being processed".format(node.get_name()))
+                logger.debug("node {} refered before being processed".format(node.get_name()))
                 return False
             max_version = get_max_version(calculates[node_clean_name])
             if node_clean_name not in used_calculates:
@@ -450,11 +457,7 @@ def add_used_calculate(node, prev_node, calculates, used_calculates, processed_n
             #save the max version only once
             if max_version.id not in used_calculates[node_clean_name]:
                 used_calculates[node_clean_name][max_version.id] = max_version
-    elif isinstance(prev_node, TriccNodeActivity):
-        for prev_end_node in prev_node.activity_end_prev_nodes:
-            add_used_calculate(node, prev_end_node, calculates, used_calculates, processed_nodes)
-        for prev_end_node in prev_node.end_prev_nodes:
-            add_used_calculate(node, prev_end_node, calculates, used_calculates, processed_nodes)
+
 
 
 def merge_calculate(node, calculates, from_version):

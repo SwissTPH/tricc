@@ -1,5 +1,7 @@
 from __future__ import annotations 
 from enum import Enum
+import random
+import string
 
 from typing import Dict, List, Optional,  Union
 from pydantic import BaseModel, constr
@@ -18,6 +20,9 @@ base64 = constr(regex="[^-A-Za-z0-9+/=]|=[^=]|={3,}$")
 #data:page/id,UkO_xCL5ZjyshJO9Bexg
 
 TRICC_INSTANCE = "I_{0}_{1}"
+
+ACTIVITY_END_NODE_FORMAT = "aend_{}"
+END_NODE_FORMAT = "end_{}"
 
 class TriccNodeType(str, Enum):
     note='note'
@@ -177,10 +182,6 @@ class TriccNodeActivity(TriccNodeBaseModel):
     groups : Dict[str, TriccGroup] = {}
     # save the instance on the base activity     
     instances : Dict[int,TriccNodeBaseModel] = {}
-    # node that lead to the end of the interogation
-    end_prev_nodes:  List[TriccBaseModel] = []
-    # node that leads to the end of the activity
-    activity_end_prev_nodes:  List[TriccBaseModel] = []
     relevance: Optional[Expression]
     # redefine 
     def make_instance(self,instance_nb, **kwargs):
@@ -198,10 +199,6 @@ class TriccNodeActivity(TriccNodeBaseModel):
             instance.edges = edges
             unused_edges = []
             instance.edges = unused_edges
-            end_prev_nodes = []
-            instance.end_prev_nodes = end_prev_nodes
-            activity_end_prev_nodes = []
-            instance.activity_end_prev_nodes = activity_end_prev_nodes
             relevance= None
             instance.relevance= relevance
             groups = {}
@@ -250,6 +247,8 @@ class TriccNodeActivity(TriccNodeBaseModel):
         if not isinstance(node_origin, TriccNodeSelectOption):
             node_instance = node_origin.make_instance(self.instance, activity = self)
             self.nodes[node_instance.id] = node_instance
+            if isinstance(node_instance, (TriccNodeActivityEnd, TriccNodeEnd)):
+                node_instance.set_name()
             # update root
             if isinstance(node_origin, TriccNodeActivityStart) and node_origin == node_origin.activity.root:
                 self.root = node_instance
@@ -257,12 +256,6 @@ class TriccNodeActivity(TriccNodeBaseModel):
             elif issubclass(node_instance.__class__, TriccNodeSelect):
                 for key,  option_instance in node_instance.options.items():
                     updated_edges += self.update_edges( node_origin.options[key], option_instance)
-            # update activity end nodes
-            if node_origin in node_origin.activity.activity_end_prev_nodes:
-                self.activity_end_prev_nodes.append(node_instance)
-            # update end nodes
-            if node_origin in node_origin.activity.end_prev_nodes:
-                self.end_prev_nodes.append(node_instance)
             updated_edges += self.update_edges( node_origin, node_instance)
             if updated_edges == 0:
                 logger.error("no edge was updated for node {}".format(node_instance.get_name()))
@@ -278,6 +271,17 @@ class TriccNodeActivity(TriccNodeBaseModel):
                 edge.target = node_instance.id
                 updates +=1
         return updates
+    
+    def get_end_nodes(self):
+        end_node = []
+        activity_end_node = []
+        for node in self.nodes.values():
+            if isinstance(node, TriccNodeActivityEnd):
+                activity_end_node.append(node)
+            elif isinstance(node, TriccNodeEnd):
+                end_node.append(node)
+                
+        return end_node+activity_end_node
         
         
 class TriccNodeDiplayModel(TriccNodeBaseModel):
@@ -297,23 +301,6 @@ class TriccNodeDiplayModel(TriccNodeBaseModel):
 class TriccNodeNote(TriccNodeDiplayModel):
     odk_type = TriccNodeType.note
         
-class TriccNodeActivityEnd(TriccBaseModel):
-    activity: Optional[TriccBaseModel]
-    odk_type = TriccExtendedNodeType.activity_end
-    def make_instance(self,instance_nb,activity,   **kwargs):
-        #shallow copy
-        instance = super().make_instance(instance_nb, activity = activity)
-        instance.activity = activity
-        return instance   
-
-class TriccNodeEnd(TriccBaseModel):
-    activity:Optional[TriccBaseModel]
-    odk_type = TriccExtendedNodeType.end
-    def make_instance(self,instance_nb,activity,  **kwargs):
-        #shallow copy
-        instance = super().make_instance(instance_nb, activity = activity)
-        instance.activity = activity
-        return instance   
     
 class TriccNodeInputModel(TriccNodeDiplayModel):
     required:Optional[Expression]
@@ -325,8 +312,6 @@ class TriccNodeInputModel(TriccNodeDiplayModel):
 class TriccNodeMainStart(TriccNodeBaseModel):
     odk_type = TriccExtendedNodeType.start
     
-class TriccNodeActivityStart(TriccNodeBaseModel):
-    odk_type = TriccExtendedNodeType.activity_start
    
 class TriccNodeLinkIn(TriccNodeBaseModel):
     odk_type = TriccExtendedNodeType.link_in
@@ -436,7 +421,7 @@ class TriccNodeCount(TriccNodeDisplayCalculateBase):
     
 class TriccNodeFakeCalculateBase(TriccNodeCalculateBase):
     pass
-class TriccNodeRhombus(TriccNodeFakeCalculateBase):
+class TriccNodeRhombus(TriccNodeDisplayCalculateBase):
     odk_type = TriccExtendedNodeType.rhombus
     reference: Optional[Union[TriccNodeBaseModel, triccId]]
     def make_instance(self,instance_nb,activity,   **kwargs):
@@ -445,6 +430,9 @@ class TriccNodeRhombus(TriccNodeFakeCalculateBase):
         reference = self.reference
         instance.reference = reference
         return instance
+    def __init__(self, **data):
+        super().__init__(**data)
+        self.name = ''.join(random.choices(string.ascii_lowercase, k=8))
     
 class TriccNodeExclusive(TriccNodeFakeCalculateBase):
     odk_type = TriccExtendedNodeType.exclusive
@@ -464,25 +452,13 @@ def set_prev_next_node( source_node, target_node, replaced_node = None):
 # Set the target_node prev node to source and clean prev nodes of replace_node
 def set_prev_node( source_node, target_node, replaced_node = None):
     #update the prev node of the target not if not an end node
-    if target_node.odk_type == TriccExtendedNodeType.end:
-        if replaced_node is not None and hasattr(target_node,'next_nodes') and replaced_node in source_node.activity.end_prev_nodes:
-            target_node.activity.end_prev_nodes.remove(replaced_node)
-        if replaced_node is not None and hasattr(source_node,'next_nodes') and replaced_node in source_node.activity.end_prev_nodes:
-            source_node.activity.end_prev_nodes.remove(replaced_node)
-        source_node.activity.end_prev_nodes.append(source_node)
-    elif target_node.odk_type == TriccExtendedNodeType.activity_end:
-        if replaced_node is not None and hasattr(target_node,'next_nodes') and replaced_node in source_node.activity.activity_end_prev_nodes:
-            source_node.activity.activity_end_prev_nodes.remove(replaced_node)
-        if target_node is not None and hasattr(source_node,'next_nodes') and replaced_node in source_node.activity.activity_end_prev_nodes:
-            source_node.activity.activity_end_prev_nodes.remove(replaced_node)
-        source_node.activity.activity_end_prev_nodes.append(source_node)
-    else:
         # update directly the prev node of the target
-        target_node.prev_nodes.append(source_node)
-        if replaced_node is not None and hasattr(target_node,'next_nodes') and replaced_node in target_node.prev_nodes:
+        
+        if replaced_node is not None and hasattr(target_node,'prev_nodes') and replaced_node in target_node.prev_nodes:
             target_node.prev_nodes.remove(replaced_node)
-        if replaced_node is not None and hasattr(source_node,'next_nodes') and replaced_node in source_node.prev_nodes:
+        if replaced_node is not None and hasattr(source_node,'prev_nodes') and replaced_node in source_node.prev_nodes:
             source_node.prev_nodes.remove(replaced_node)
+        target_node.prev_nodes.append(source_node)
         
 def replace_node(old, new, page):
     for prev_node in old.prev_nodes:
@@ -552,20 +528,15 @@ def is_ready_to_process(in_node, processed_nodes, recursive = False):
         # ensure the the previous node of the select are processed, not the option prev nodes
         for prev_node in node.prev_nodes:
             if isinstance(prev_node,TriccNodeActivity):
-                if len(prev_node.end_prev_nodes)==0 and len(prev_node.activity_end_prev_nodes)==0:
+                activity_end_nodes = prev_node.get_end_nodes()
+                if len(activity_end_nodes)==0 :
                     logger.error("is_ready_to_process:failed: {1} -act-> {0} NO end nodes".format(prev_node.get_name(), node.get_name() ))
                     return False
-                for end_node in prev_node.end_prev_nodes:
+                for end_node in activity_end_nodes:
                     if end_node.id not in processed_nodes:
                         logger.debug("is_ready_to_process:failed: {2} -act-> {0} -end-> {1}".format(prev_node.get_name(),end_node.get_name(), node.get_name() ))
                         if recursive :
                             is_ready_to_process(end_node, processed_nodes, recursive )
-                        return False
-                for activity_end_node in prev_node.activity_end_prev_nodes:
-                    if activity_end_node.id not in processed_nodes:
-                        logger.debug("is_ready_to_process:failed: {2} -act-> {0}({3}) -end-> {1}".format(prev_node.get_name(),activity_end_node.get_name(), node.get_name(), activity_end_node.instance ))
-                        if recursive :
-                            is_ready_to_process(activity_end_node, processed_nodes, recursive )
                         return False
             elif prev_node.id not in processed_nodes:
                 if isinstance(prev_node, TriccNodeExclusive):
@@ -604,7 +575,7 @@ def  check_stashed_loop(stashed_nodes,prev_stashed_nodes,processed_nodes, len_pr
         prev_stashed_nodes_ordered_id.sort()        
         if cur_stashed_nodes_ordered_id == prev_stashed_nodes_ordered_id and len(processed_nodes) ==len_prev_processed_nodes:
             loop_count += 1
-            if loop_count > 100*len(prev_stashed_nodes)+1:
+            if loop_count > 3*len(prev_stashed_nodes)+1:
                 logger.error("Stashed node list was unchanged: loop likely or a cyclic redundancy")
                 for es_node in list(cur_stashed_nodes.values()):
                     loop_out[es_node.id] = is_ready_to_process(es_node, processed_nodes, True)
@@ -615,3 +586,34 @@ def  check_stashed_loop(stashed_nodes,prev_stashed_nodes,processed_nodes, len_pr
     else:
         loop_count = 0
     return loop_count
+
+class TriccNodeActivityEnd(TriccNodeCalculate):
+    odk_type = TriccExtendedNodeType.activity_end
+    def __init__(self, **data):
+        super().__init__(**data)
+        # FOR END
+        self.set_name()
+    def set_name(self):
+        self.name = ACTIVITY_END_NODE_FORMAT.format(self.activity.id) 
+
+
+class TriccNodeEnd(TriccNodeCalculate):
+    odk_type = TriccExtendedNodeType.end
+    def __init__(self, **data):
+        super().__init__(**data)
+        # FOR END
+        self.set_name()
+    def set_name(self):
+        self.name = END_NODE_FORMAT.format(self.activity.id) 
+        
+
+class TriccNodeActivityStart(TriccNodeCalculate):
+    odk_type = TriccExtendedNodeType.activity_start
+
+
+class TriccExpression(BaseModel):
+    list_or: List[Union[TriccExpression, TriccExpressionNot, str]]
+    next_and: Optional[Union[TriccExpression, TriccExpressionNot, str]]
+    
+class TriccExpressionNot(BaseModel):
+    exp = TriccExpression
