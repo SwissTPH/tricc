@@ -15,6 +15,7 @@ TRICC_REF_EXPRESSION = "${{{0}}}"
 TRICC_NEGATE = "not({})"
 TRICC_NUMBER = "number({})"
 TRICC_NAND_EXPRESSION = '({0}) and not({1})'
+TRICC_AND_EXPRESSION = '({0}) and ({1})'
 
 import logging
 logger = logging.getLogger("default")
@@ -75,7 +76,7 @@ def generate_xls_form_relevance(node, processed_nodes, stashed_nodes, **kwargs):
                         parent_node = node.prev_nodes[0]
                         parent_empty = "${{{0}}}=''".format(parent_node.name)
                         if node.relevance is not None: 
-                            node.relevance += " and " + parent_empty
+                            TRICC_AND_EXPRESSION.format(node.relevance, parent_empty)
                         else:
                             node.relevance =  parent_empty
                         node.required = parent_empty
@@ -164,24 +165,22 @@ def get_prev_node_expression(node, processed_nodes, is_calculate = False, exclud
     #when getting the prev node, we calculate the  
     if hasattr(node, 'expression_inputs') and len(node.expression_inputs)>0:
         expression_inputs = node.expression_inputs
-        if 'false()' in expression_inputs:
-            expression_inputs.remove('false()')
+        clean_list_or(expression_inputs)
     else:
         expression_inputs = []
     for  prev_node in node.prev_nodes:
-        if excluded_name is None or  hasattr(prev_node,'name') and prev_node.name != excluded_name:
+        if excluded_name is None or prev_node != excluded_name or  ( isinstance(excluded_name, str) and hasattr(prev_node,'name') and  prev_node.name != excluded_name):
             # the rumbus should calcualte only reference
-            if isinstance(node, TriccNodeRhombus):
+            if isinstance(node, TriccNodeRhombus) and not isinstance(prev_node, (TriccNodeRhombus, TriccNodeExclusive)):
                 is_calculate = False
             add_sub_expression(expression_inputs, get_node_expression(prev_node, processed_nodes, is_calculate, True))
         # avoid void is there is not conditions to avoid looping too much itme
     if len(expression_inputs)>0:
-        if 'false()' in expression_inputs:
-            expression_inputs.remove('false()')
+        clean_list_or(expression_inputs)
         expression =  ' or '.join(expression_inputs)
         expression_inputs = None
-        if isinstance(node,  TriccNodeExclusive):
-            expression =  TRICC_NEGATE.format(expression)
+        #if isinstance(node,  TriccNodeExclusive):
+        #    expression =  TRICC_NEGATE.format(expression)
     if isinstance(node, TriccNodeActivity) and node.base_instance is not None:
         activity = node
         expression_inputs = []
@@ -190,22 +189,27 @@ def get_prev_node_expression(node, processed_nodes, is_calculate = False, exclud
         for instance_nb, past_instance in activity.base_instance.instances.items():
             if int(instance_nb) < int(activity.instance):
                 add_sub_expression(expression_inputs, get_node_expression(past_instance, processed_nodes, False, True))
-        if 'false()' in expression_inputs:
-            expression_inputs.remove('false()')
+        clean_list_or(expression_inputs)
         expression_activity =  ' or '.join(expression_inputs)
         expression = TRICC_NAND_EXPRESSION.format(expression,expression_activity)         
     return expression
+
 
 def get_node_expression(node,processed_nodes, is_calculate = False, is_prev = False, negate = False ):
     # in case of calculate we only use the select multiple if none is not selected
     expression = None
     negate_expression = None
     if is_calculate and isinstance(node, (TriccNodeSelectMultiple, TriccNodeSelectOne )):
-        expression = TRICC_SELECT_MULTIPLE_CALC_EXPRESSION.format(node.name)
+        expression =  TRICC_SELECT_MULTIPLE_CALC_EXPRESSION.format(node.name)
+        if node.relevance is not None and node.relevance !='':
+            negate_expression = TRICC_NAND_EXPRESSION.format(node.relevance,expression)
+            expression = TRICC_AND_EXPRESSION.format(node.relevance,expression)
     elif is_calculate and isinstance(node, (TriccNodeSelectYesNo,TriccNodeSelectNotAvailable)):
         expression = TRICC_CALC_EXPRESSION.format(node.name)
+        if node.relevance is not None and node.relevance !='':
+            negate_expression = TRICC_NAND_EXPRESSION.format(node.relevance,expression)
+            expression = TRICC_AND_EXPRESSION.format(node.relevance,expression)
     elif is_prev  and issubclass(node.__class__, TriccNodeDisplayCalculateBase) and not ( negate and isinstance(node, TriccNodeRhombus)):
-            
         expression = TRICC_CALC_EXPRESSION.format(node.name)
     elif issubclass(node.__class__, TriccNodeCalculateBase):
         if negate:
@@ -250,7 +254,9 @@ def get_calculation_terms(node, processed_nodes, is_calculate = False, negate = 
         return get_rhumbus_terms(node, processed_nodes, False, negate)
     elif isinstance(node, TriccNodeExclusive):
         if len(node.prev_nodes) == 1:
-            if issubclass(node.prev_nodes[0].__class__, TriccNodeDisplayCalculateBase):
+            if isinstance(node.prev_nodes[0], TriccNodeExclusive):
+                return get_node_expression(node.prev_nodes[0], processed_nodes, is_calculate = True, is_prev = True, negate=True) 
+            elif issubclass(node.prev_nodes[0].__class__, TriccNodeDisplayCalculateBase):
                 return get_node_expression(node.prev_nodes[0], processed_nodes, is_prev = True, negate=True) 
             elif issubclass(node.prev_nodes[0].__class__, (TriccNodeFakeCalculateBase, TriccNodeSelect)):
                 return  get_node_expression(node.prev_nodes[0], processed_nodes, is_calculate = False, is_prev = True, negate=True)
@@ -316,26 +322,34 @@ def get_rhumbus_terms(node, processed_nodes, is_calculate= False, negate = False
             if expression == 'false()' or  expression_prev == 'false()' or expression_prev == TRICC_NEGATE.format(expression) or TRICC_NEGATE.format(expression_prev) == expression:
                 expression = 'false()'
             else:
-                list_or = expression_prev.split(' or ')
-                if TRICC_NEGATE.format(expression) in  list_or:
-                    # we remove x and not X
-                    list_or.remove(TRICC_NEGATE.format(expression))
-                elif  expression in  list_or:
-                    # we remove  x and x
-                    list_or.remove(expression)
-                else:
-                    for exp_prev in list_or:
-                        if TRICC_NEGATE.format(exp_prev) == expression or exp_prev == expression :
-                            list_or.remove(exp_prev)
-                        if TRICC_NEGATE.format(exp_prev) in list_or :
-                            list_or.remove(exp_prev)
-                            list_or.remove(TRICC_NEGATE.format(exp_prev))
-                if  len(list_or)>0:
-                    expression_prev = ' or '.join(list_or)
-                    expression = "({} and ({}))".format(expression, expression_prev)
+                if not re.search(' and ', expression_prev):
+                    list_or = expression_prev.split(' or ')
+                    list_or= clean_list_or(list_or, expression)
+                    if  len(list_or)>0:
+                        expression_prev = ' or '.join(list_or)
+                expression = "({} and ({}))".format(expression, expression_prev)
     return expression
 
 
+def clean_list_or(list_or, elm_and = None):
+    if 'false()' in list_or:
+            list_or.remove('false()')
+    if elm_and is not None:
+        if TRICC_NEGATE.format(elm_and) in  list_or:
+            # we remove x and not X
+            list_or.remove(TRICC_NEGATE.format(elm_and))
+        elif  elm_and in  list_or:
+            # we remove  x and x
+            list_or.remove(elm_and)
+        else:
+            for exp_prev in list_or:
+                if TRICC_NEGATE.format(exp_prev) == elm_and or exp_prev == elm_and :
+                    list_or.remove(exp_prev)
+                if TRICC_NEGATE.format(exp_prev) in list_or :
+                    # if there is x and not(X) in an OR list them the list is always true
+                    list_or = []
+    return list_or
+                
 
         
    

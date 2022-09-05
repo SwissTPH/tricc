@@ -91,8 +91,6 @@ def linking_nodes(node, page, pages, processed_nodes = [], path = []):
         logger.debug("node {0} without edges out found in page {1}, full path {2}"\
             .format(node.get_name(), page.label, current_path))
     for edge in node_edge:
-        if edge.source == 'riWwHZSOlnyXQeD96wbB-9':
-            pass
         #get target node
         if edge.target in page.nodes:
             target_node = page.nodes[edge.target]
