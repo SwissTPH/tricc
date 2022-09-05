@@ -152,7 +152,10 @@ def generate_xls_form_export(node, processed_nodes, stashed_nodes, df_survey, df
                 elif node.odk_type in ODK_TRICC_TYPE_MAP and ODK_TRICC_TYPE_MAP[node.odk_type] is not None:
                     values = []
                     for column in SURVEY_MAP:
-                        values.append(get_attr_if_exists(node,column,SURVEY_MAP))
+                        if column == 'default' and issubclass(node.__class__, TriccNodeDisplayCalculateBase):
+                            values.append(0)
+                        else:
+                            values.append(get_attr_if_exists(node,column,SURVEY_MAP))
                     
                         
                     df_survey.loc[len(df_survey)] = values
