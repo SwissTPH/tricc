@@ -165,7 +165,11 @@ option can have only incoming edge from images to be placed as option$
 
 ## generation of the expressions [get_node_expressions]
 
+### add calcualte:
 
+ - Non or No will generate a negate node
+ - save adds a calcualte
+ - a rhombus will generate a calcualte in reference unless is is already the case (no left expression too)
 
 ### if the node is a calculate [get_node_expression, calculate = true]
 

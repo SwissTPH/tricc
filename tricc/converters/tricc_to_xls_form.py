@@ -31,8 +31,11 @@ def generate_xls_form_condition(node, processed_nodes, stashed_nodes, **kwargs):
                 node.name = clean_str(node.name)
             if hasattr(node, 'reference'):
                 if isinstance(node.reference,str):
-                    node.reference = clean_str(node.reference)
-                    logger.warning("node  {} still usign the reference string".format(node.get_name()))
+                    stashed_nodes[node.id]=node
+                    return False
+                    #node.reference = clean_str(node.reference)
+                    #logger.warning("node {} still using the reference string".format(node.get_name()))
+                    
             if issubclass( node.__class__, TriccNodeInputModel):
                 # we don't overright if define in the diagram
                 if node.constraint is None:
@@ -171,8 +174,6 @@ def get_prev_node_expression(node, processed_nodes, is_calculate = False, exclud
     for  prev_node in node.prev_nodes:
         if excluded_name is None or prev_node != excluded_name or  ( isinstance(excluded_name, str) and hasattr(prev_node,'name') and  prev_node.name != excluded_name):
             # the rumbus should calcualte only reference
-            if isinstance(node, TriccNodeRhombus) and not isinstance(prev_node, (TriccNodeRhombus, TriccNodeExclusive)):
-                is_calculate = False
             add_sub_expression(expression_inputs, get_node_expression(prev_node, processed_nodes, is_calculate, True))
         # avoid void is there is not conditions to avoid looping too much itme
     if len(expression_inputs)>0:
@@ -199,17 +200,9 @@ def get_node_expression(node,processed_nodes, is_calculate = False, is_prev = Fa
     # in case of calculate we only use the select multiple if none is not selected
     expression = None
     negate_expression = None
-    if is_calculate and isinstance(node, (TriccNodeSelectMultiple, TriccNodeSelectOne )):
-        expression =  TRICC_SELECT_MULTIPLE_CALC_EXPRESSION.format(node.name)
-        if node.relevance is not None and node.relevance !='':
-            negate_expression = TRICC_NAND_EXPRESSION.format(node.relevance,expression)
-            expression = TRICC_AND_EXPRESSION.format(node.relevance,expression)
-    elif is_calculate and isinstance(node, (TriccNodeSelectYesNo,TriccNodeSelectNotAvailable)):
-        expression = TRICC_CALC_EXPRESSION.format(node.name)
-        if node.relevance is not None and node.relevance !='':
-            negate_expression = TRICC_NAND_EXPRESSION.format(node.relevance,expression)
-            expression = TRICC_AND_EXPRESSION.format(node.relevance,expression)
-    elif is_prev  and issubclass(node.__class__, TriccNodeDisplayCalculateBase) and not ( negate and isinstance(node, TriccNodeRhombus)):
+    if isinstance(node, TriccNodeSelectOption):
+       expression = get_selected_option_expression(node)
+    elif is_prev  and issubclass(node.__class__, TriccNodeDisplayCalculateBase):
         expression = TRICC_CALC_EXPRESSION.format(node.name)
     elif issubclass(node.__class__, TriccNodeCalculateBase):
         if negate:
@@ -223,15 +216,12 @@ def get_node_expression(node,processed_nodes, is_calculate = False, is_prev = Fa
         expression_inputs = []
         for end_node in end_nodes:
             add_sub_expression(expression_inputs, get_node_expression(end_node,processed_nodes, is_calculate = False, is_prev = True))
+        expression_inputs = clean_list_or(expression_inputs)
         expression = ' or '.join(expression_inputs)
     elif is_prev  and   hasattr(node, 'relevance') and node.relevance is not None:
             expression = node.relevance
-    elif isinstance(node, TriccNodeSelectOption):
-       expression = get_selected_option_expression(node)
-
     if expression is None:
         expression= get_prev_node_expression(node,processed_nodes,is_calculate)
-
     if negate:
         if negate_expression is not None:
             return negate_expression
@@ -255,11 +245,10 @@ def get_calculation_terms(node, processed_nodes, is_calculate = False, negate = 
     elif isinstance(node, TriccNodeExclusive):
         if len(node.prev_nodes) == 1:
             if isinstance(node.prev_nodes[0], TriccNodeExclusive):
-                return get_node_expression(node.prev_nodes[0], processed_nodes, is_calculate = True, is_prev = True, negate=True) 
-            elif issubclass(node.prev_nodes[0].__class__, TriccNodeDisplayCalculateBase):
+                logger.error("2 exclusives cannot be on a row")
+                exit()
+            elif issubclass(node.prev_nodes[0].__class__, TriccNodeCalculateBase):
                 return get_node_expression(node.prev_nodes[0], processed_nodes, is_prev = True, negate=True) 
-            elif issubclass(node.prev_nodes[0].__class__, (TriccNodeFakeCalculateBase, TriccNodeSelect)):
-                return  get_node_expression(node.prev_nodes[0], processed_nodes, is_calculate = False, is_prev = True, negate=True)
             elif isinstance(node.prev_nodes[0],TriccNodeActivity):
                 return get_node_expression(node.prev_nodes[0], processed_nodes, is_calculate = False, is_prev=True, negate=True)
             else:
@@ -293,7 +282,7 @@ def get_rhumbus_terms(node, processed_nodes, is_calculate= False, negate = False
         left_term = '>0'
     # calcualte the expression only for select muzltiple and fake calculate
     if  node.reference is not None and issubclass(node.reference.__class__, TriccBaseModel):
-        if issubclass(node.reference.__class__, TriccNodeFakeCalculateBase) or isinstance(node.reference, (TriccNodeSelectMultiple, TriccNodeSelectOne, TriccNodeSelectYesNo,TriccNodeSelectNotAvailable )):
+        if issubclass(node.reference.__class__, TriccNodeFakeCalculateBase):
             expression = get_node_expression(node.reference, processed_nodes, is_calculate = True, is_prev = True)
         else:
             expression = TRICC_REF_EXPRESSION.format(node.reference.name)
@@ -373,6 +362,10 @@ def get_count_terms(node, processed_nodes, is_calculate, negate = False):
                 terms.append(TRICC_SELECT_MULTIPLE_CALC_NONE_EXPRESSION.format(prev_node.name))
             else:
                 terms.append(TRICC_SELECT_MULTIPLE_CALC_EXPRESSION.format(prev_node.name))
+        elif isinstance(prev_node, (TriccNodeSelectYesNo, TriccNodeSelectNotAvailable)):
+            terms.append(TRICC_SELECTED_EXPRESSION.format(prev_node.name,'1'))
+        elif isinstance(prev_node, TriccNodeSelectOption):
+            terms.append(get_selected_option_expression(prev_node))
         else:
             if negate:
                 terms.append("number(number({0})=0)".format(get_node_expression(prev_node, processed_nodes, is_calculate = False, is_prev = True)))
