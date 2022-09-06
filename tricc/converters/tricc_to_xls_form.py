@@ -14,8 +14,8 @@ TRICC_SELECTED_EXPRESSION = 'selected(${{{0}}}, "{1}")'
 TRICC_REF_EXPRESSION = "${{{0}}}"
 TRICC_NEGATE = "not({})"
 TRICC_NUMBER = "number({})"
-TRICC_NAND_EXPRESSION = '({0}) and not({1})'
-TRICC_AND_EXPRESSION = '({0}) and ({1})'
+TRICC_NAND_EXPRESSION = '(({0}) and not({1}))'
+TRICC_AND_EXPRESSION = '(({0}) and ({1}))'
 
 import logging
 logger = logging.getLogger("default")
@@ -154,7 +154,7 @@ def get_node_expressions(node, processed_nodes):
             expression = ''
     if issubclass(node.__class__, TriccNodeCalculateBase) and expression == '':
         logger.warning("Calculate {0} returning no calcualtions".format(node.get_name()))
-        expression = 'true()'
+        expression = '1'
     return expression
 
 
@@ -202,6 +202,13 @@ def get_node_expression(node,processed_nodes, is_calculate = False, is_prev = Fa
     negate_expression = None
     if isinstance(node, TriccNodeSelectOption):
        expression = get_selected_option_expression(node)
+    elif is_prev  and isinstance(node, TriccNodeRhombus):
+        right = get_node_expression(node.path,processed_nodes, is_calculate, is_prev  )
+        if right != '1':
+            expression = TRICC_AND_EXPRESSION.format(right, TRICC_CALC_EXPRESSION.format(node.name))
+            negate_expression = TRICC_NAND_EXPRESSION.format(right, TRICC_CALC_EXPRESSION.format(node.name))
+        else:
+            expression = TRICC_CALC_EXPRESSION.format(node.name)
     elif is_prev  and issubclass(node.__class__, TriccNodeDisplayCalculateBase):
         expression = TRICC_CALC_EXPRESSION.format(node.name)
     elif issubclass(node.__class__, TriccNodeCalculateBase):
@@ -291,7 +298,7 @@ def get_rhumbus_terms(node, processed_nodes, is_calculate= False, negate = False
         #expression = "${{{}}}".format(node.reference)
         logger.error('reference {0} was not found in the previous nodes of node {1}'.format(node.reference, node.get_name()))
         exit()
-    expression_prev = get_prev_node_expression(node,processed_nodes, excluded_name =node.reference )
+
     if expression is not None:
         if re.search(" (or)|(and) ", expression):
             expression =  "({0}){1}".format(expression,left_term)
@@ -303,20 +310,7 @@ def get_rhumbus_terms(node, processed_nodes, is_calculate= False, negate = False
             node.get_name(),
             node.reference
         ))
-    if negate:
-        expression = TRICC_NEGATE.format(expression)
-    if expression_prev is not None:
-        if expression_prev != expression:
-            # to avoid useless code
-            if expression == 'false()' or  expression_prev == 'false()' or expression_prev == TRICC_NEGATE.format(expression) or TRICC_NEGATE.format(expression_prev) == expression:
-                expression = 'false()'
-            else:
-                if not re.search(' and ', expression_prev):
-                    list_or = expression_prev.split(' or ')
-                    list_or= clean_list_or(list_or, expression)
-                    if  len(list_or)>0:
-                        expression_prev = ' or '.join(list_or)
-                expression = "({} and ({}))".format(expression, expression_prev)
+   
     return expression
 
 
@@ -332,6 +326,12 @@ def clean_list_or(list_or, elm_and = None):
             list_or.remove(elm_and)
         else:
             for exp_prev in list_or:
+                if re.search(exp_prev, ' and ') and exp_prev.replace('and ','and not' ) in list_or  :
+                    right = exp_prev.split(' and ')[0]
+                    list_or.remove(exp_prev)
+                    list_or.remove(exp_prev.replace('and ','and not' ))
+                    list_or.append(right)
+                    
                 if TRICC_NEGATE.format(exp_prev) == elm_and or exp_prev == elm_and :
                     list_or.remove(exp_prev)
                 if TRICC_NEGATE.format(exp_prev) in list_or :

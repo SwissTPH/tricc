@@ -382,6 +382,7 @@ def generate_calculates(node,calculates, used_calculates,processed_nodes):
                         activity = node.activity,
                         label = "path " + node.get_name()
                     )
+            node.path = calc_node
             for prev in node.prev_nodes:
                 set_prev_next_node(prev,calc_node, node)
             set_prev_next_node(calc_node, node)
@@ -458,8 +459,9 @@ def process_calculate_version_requirement(node, calculates,used_calculates,proce
                 last_unfound_ref = node
                 return False
             else:
-                node.reference = last_found    
-                set_prev_next_node(last_found, node)
+                node.reference = last_found 
+                node.reference.next_nodes.append(node)
+                #set_prev_next_node(last_found, node)
                 # just to be safe even if it should be covered after
             if issubclass(last_found.__class__, TriccNodeDisplayCalculateBase):
                 add_used_calculate(node, last_found, calculates, used_calculates, processed_nodes)

@@ -418,9 +418,10 @@ class TriccNodeCount(TriccNodeDisplayCalculateBase):
     
 class TriccNodeFakeCalculateBase(TriccNodeCalculateBase):
     pass
-class TriccNodeRhombus(TriccNodeFakeCalculateBase):
+class TriccNodeRhombus(TriccNodeDisplayCalculateBase):
     odk_type = TriccExtendedNodeType.rhombus
     reference: Optional[Union[TriccNodeBaseModel, triccId]]
+    path: Optional[TriccNodeBaseModel]
     def make_instance(self,instance_nb,activity,   **kwargs):
         #shallow copy
         instance = super().make_instance(instance_nb, activity = activity)
@@ -441,6 +442,10 @@ class TriccNodeRhombus(TriccNodeFakeCalculateBase):
             exit()
         instance.reference = reference
         return instance
+    def __init__(self, **data):
+        super().__init__(**data)
+        # rename rhombus
+        self.name = ''.join(random.choices(string.ascii_lowercase, k=8))
 
     
 class TriccNodeExclusive(TriccNodeFakeCalculateBase):
@@ -590,6 +595,9 @@ def is_ready_to_process(in_node, processed_nodes, recursive = False):
                         else:
                             logger.debug("node {}:{} was processable but not processed".format(prev_node.__class__,prev_node.get_name()))
                             
+                return False
+        if isinstance(node, TriccNodeRhombus) and issubclass(node.reference.__class__, TriccNodeBaseModel):
+            if node.reference.id not in processed_nodes:
                 return False
         return True
     else:
