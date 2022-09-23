@@ -4,7 +4,8 @@
 
 import os
 import html2text
-from tricc.converters.utils import clean_name, generate_id
+from tricc.converters.utils import clean_name
+from gettext import gettext as _
 from tricc.models import *
 from tricc.parsers.xml import  get_edges_list, get_mxcell, get_mxcell_parent_list, get_odk_type,  get_odk_type_list
 
@@ -92,29 +93,30 @@ def process_edges(diagram, activity, nodes):
                     # insert rhombus
                     calc = TriccNodeRhombus(
                         id = generate_id(),
-                        reference = nodes[edge.source].name,
+                        reference = [nodes[edge.source]],
                         activity = nodes[edge.source].activity,
                         group = nodes[edge.source].group,
                         label= label
                     )
                     break
-            if label.lower() in TRICC_FOLOW_LABEL:
-                pass
-            elif label.lower() in TRICC_YES_LABEL:
-                if  not isinstance(nodes[edge.source], TriccNodeRhombus):
-                    error = "Yes not after a rhombus"
-            elif label.lower() in TRICC_NO_LABEL:
-                # insert Negate
-                if not isinstance(nodes[edge.source], TriccNodeExclusive) and not isinstance(nodes[edge.target], TriccNodeExclusive):
-                    calc = TriccNodeExclusive(
-                        id = generate_id(),
-                        activity = nodes[edge.target].activity,
-                        group = nodes[edge.target].group                    
-                    )
-                else:
-                    error = "No after or before a exclusice/negate node"
-            else:        
-                error = "label don't match with test, no "
+            if calc is None:
+                if label.lower() in TRICC_FOLOW_LABEL:
+                    pass
+                elif label.lower() in TRICC_YES_LABEL:
+                    if  not isinstance(nodes[edge.source], TriccNodeRhombus):
+                        error = "Yes not after a rhombus"
+                elif label.lower() in TRICC_NO_LABEL:
+                    # insert Negate
+                    if not isinstance(nodes[edge.source], TriccNodeExclusive) and not isinstance(nodes[edge.target], TriccNodeExclusive):
+                        calc = TriccNodeExclusive(
+                            id = generate_id(),
+                            activity = nodes[edge.target].activity,
+                            group = nodes[edge.target].group                    
+                        )
+                    else:
+                        error = "No after or before a exclusice/negate node"
+                else:        
+                    error = "label don't match with test, no "
             if calc is not None:
                 nodes[calc.id] = calc
                 # add edge between calc and 
@@ -281,56 +283,61 @@ def get_select_options(diagram, select_node, nodes):
 
 
 
-def add_save_calculate(node, calculates, used_calculates,processed_nodes, stashed_nodes,  **kwargs ):
+def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calculates,  **kwargs ):
      # used_calculates dict[name, Dict[id, node]]
      # processed_nodes Dict[id, node]
      # calculates  dict[name, Dict[id, node]]
-    if node.id not in processed_nodes:
-        if is_ready_to_process(node, processed_nodes):
-            if process_calculate_version_requirement(node, calculates, used_calculates,processed_nodes):
+    if node not in processed_nodes:
+                    # generate condition
+
+        if is_ready_to_process(node, processed_nodes, stashed_nodes, False,False) and process_calculate_version_requirement(node, calculates, used_calculates,processed_nodes):
+            if is_rhombus_ready_to_process(node,processed_nodes):
                 generate_calculates(node,calculates, used_calculates,processed_nodes)
                 if issubclass(node.__class__, (TriccNodeDisplayCalculateBase )) and node.name is not None:
-                    node_clean_name = get_calculate_cleaned_name(node.name)
                     # generate the calc node version by looking in the processed calculate
-                    if node.name in calculates:
-                        # get max version existing
-                        last_version = get_max_named_version(calculates,node.name)
-                        # get max version used 
-                        last_used_version = get_max_named_version(used_calculates, node.name)
-                        # merge is there is unsued version -> 
-                        # current node not yet in the list so 1 item is enough
-                        #if  last_version>last_used_version:
-                        node.version = last_version +1
-                        if node.version > 1:
-                            node_to_delete = merge_calculate(node, calculates[node.name], last_used_version)
-                            if node_to_delete is not None:
-                                for node_id in node_to_delete:
-                                    del calculates[node.name][node_id]
-                                    if node_id in node.activity.nodes:
-                                        # mostly for end nodes
-                                        del node.activity.nodes[node_id]
-                                    if node_id in stashed_nodes:
-                                        del stashed_nodes[node_id]
-                            if last_used_version > 0 :
-                                # chaining the calculate, only one way FIXME it can create issue
-                                last_used_calc = get_max_version(used_calculates[node.name])
-                                if last_used_calc is not None:
-                                    set_prev_next_node(last_used_calc,node)
-                                    last_used_calc.name += VERSION_SEPARATOR + str(last_used_calc.version)
-                                else:
-                                    logger.error("add_save_calculate: last used calc not found for {}".format(node.get_name()))
-                                    exit(-2)
-                        else:
-                            node.version = 0
+                    add_calculate(calculates,node)                    # get max version existing
+
+                    #update_calc_version(calculates,node.name)
+                    last_version = get_max_named_version(calculates,node.name)
+                    # get max version used 
+                    last_used_version = get_max_named_version(used_calculates, node.name)
+                    # merge is there is unused version ->
+                    # current node not yet in the list so 1 item is enough
+                    node.version = last_version + 1
+                    if last_version > last_used_version:
+
+                    #if last_version > 0:
+                        
+                        node_to_delete = merge_calculate(node, calculates[node.name], last_used_version)
+                        if node_to_delete is not None:
+                            for d_node in node_to_delete:
+                                del calculates[d_node.name][d_node.id]
+                                node_clean_name = get_calculate_cleaned_name(d_node.name)
+                                if node_clean_name in used_calculates:
+                                    if d_node.id in used_calculates[node_clean_name]:
+                                        logger.error("node {} used but deleted".format(d_node.get_name()))
+                        #                del used_calculates[node.name][node.id]
+                                if d_node.id in d_node.activity.nodes:
+                                    # mostly for end nodes
+                                    del d_node.activity.nodes[d_node.id]
+                                if  d_node  in stashed_nodes:
+                                    logger.error("node {} not porcessed but deleted".format(d_node.get_name()))
+                        #            stashed_nodes.remove(node)
+                        if last_used_version > 0 :
+                            # chaining the calculate, only one way FIXME it can create issue
+                            last_used_calc = list(filter(lambda x: x.version == last_used_version , used_calculates[node.name].values))[0]
+                            if last_used_calc is not None:
+                                set_prev_next_node(last_used_calc,node)
+                                last_used_calc.name += VERSION_SEPARATOR + str(last_used_calc.version)
+                            else:
+                                logger.error("process_calculate_calculate: last used calc not found for {}".format(node.get_name()))
+                                exit(-2)
+                    
                     else:
-                        calculates[node_clean_name]= {}
-                    calculates[node_clean_name][node.id]=node
+                        node.version = 0
                 
-                processed_nodes[node.id] = node
-                if node.id  in stashed_nodes:
-                    del stashed_nodes[node.id]
-                    logger.debug("add_save_calculate:unstashing processed node{} ".format(node.get_name()))
-                #group_next_nodes(node)
+                if hasattr(node, 'next_nodes'):
+                    node.next_nodes=reorder_node_list(node.next_nodes, node.group)
                 # it seems that the "next nodes" don't take newly created node
                 #if calc_node is not None:
                 #    processed_nodes[calc_node.id]=calc_node
@@ -338,13 +345,18 @@ def add_save_calculate(node, calculates, used_calculates,processed_nodes, stashe
                 #        calculates[calc_node.name]= {}
                 #    calculates[calc_node.name][calc_node.id]=calc_node
                 return True
-        # not ready to process or process
-        if node.id not in stashed_nodes:
-            logger.debug("add_save_calculate:stashed {}".format(node.get_name()))
-            stashed_nodes[node.id] = node
-        return False
+        # not ready to process or already processed
+
     return False
 
+def update_calc_version(calculates,name):
+    if len(calculates[name])>1:
+        ordered_list = sorted(list(calculates[name].values()), key=lambda x:x.path_len)
+        i = 1
+        for elm in ordered_list:
+            elm.version=i
+            i+=1
+        
 
 def get_max_named_version(calculates,name):
     max = 0
@@ -360,49 +372,73 @@ def generate_calculates(node,calculates, used_calculates,processed_nodes):
     ## add select calcualte
     if issubclass(node.__class__, TriccNodeCalculateBase):
         if  isinstance(node,TriccNodeRhombus):
-            if issubclass(node.reference.__class__, TriccNodeSelect):
-                calc_node = TriccNodeCount(
-                    id = generate_id(),
+            if len(node.reference)==1 and issubclass(node.reference[0].__class__, TriccNodeSelect):
+                count_id = generate_id()
+                count_name = "cnt_"+count_id
+                count_node = TriccNodeCount(
+                    id = count_id,
                     group = node.group,
                     activity = node.activity,
-                    label = "ref: "+node.get_name()
+                    label = "ref: "+node.get_name(),
+                    name = count_name,
+                    path_len=node.path_len
                 )
-                list_calc.append(calc_node)
-                set_prev_next_node(node.reference,calc_node, node)
-                set_prev_next_node(calc_node,node)
-                node.reference =  calc_node
-                processed_nodes[calc_node.id] = calc_node
-                add_used_calculate(node, calc_node, calculates, used_calculates, processed_nodes)
+                list_calc.append(count_node)
+                
+                set_prev_next_node(node.reference[0],count_node)
+                node.path_len+=1
+                node.reference[0] =  count_node
+                processed_nodes.append(count_node)
+                add_calculate(calculates, count_node)
+                add_used_calculate(node, count_node, calculates, used_calculates, processed_nodes)
             else:
                 pass
             # generate rhombuse path 
+            calc_id  = generate_id()
+            calc_name = "path_"+calc_id
             calc_node = TriccNodeCalculate(
-                        id = generate_id(),
+                        id =calc_id,
                         group = node.group,
                         activity = node.activity,
-                        label = "path " + node.get_name()
+                        label = "path " + node.get_name(),
+                        name = calc_name,
+                        path_len = node.path_len
                     )
             node.path = calc_node
+            list_nodes=[]
             for prev in node.prev_nodes:
+                list_nodes.append(prev)
+            for prev in list_nodes:
                 set_prev_next_node(prev,calc_node, node)
             set_prev_next_node(calc_node, node)
+            node.path_len +=1
             list_calc.append(calc_node)
-            processed_nodes[calc_node.id] = calc_node
-            add_used_calculate(node, calc_node, calculates, used_calculates, processed_nodes)
+            processed_nodes.append(calc_node)
+            add_calculate(calculates, calc_node)
+    for prev in node.prev_nodes:
+        add_used_calculate(node, prev, calculates, used_calculates, processed_nodes)
+
+            
                 
 
     if hasattr(node, 'save') and node.save is not None and node.save != '':
         count_node = None
-        logger.debug("generate_save_calculate:{}".format(node.name if hasattr(node,'name') else node.id))
+        
         if issubclass(node.__class__, TriccNodeSelect):
+            count_id = generate_id()
+            count_name = "cnt_"+count_id
             count_node = TriccNodeCount(
-                id = generate_id(),
+                id = count_id,
                 group = node.group,
                 activity = node.activity,
-                label = "count SM: " +node.get_name()
+                label = "count SM: " +node.get_name(),
+                path_len=node.path_len+1,
+                name=count_name
             )
+            add_calculate(calculates, count_node)
             list_calc.append(count_node)
             set_prev_next_node(node,count_node)
+            processed_nodes.append(count_node)
             
         # get fragments type.name.icdcode
         save_fragments=node.save.split('.')
@@ -410,17 +446,22 @@ def generate_calculates(node,calculates, used_calculates,processed_nodes):
             calculate_name = "{0}.{1}".format(save_fragments[0], save_fragments[1])
         else:
             calculate_name = "{0}.{1}".format(save_fragments[0], node.name)
+        logger.debug("generate_save_calculate:{} as {}".format(node.name if hasattr(node,'name') else node.id, calculate_name))
+        calc_id = generate_id()
         calc_node = TriccNodeCalculate(
             name=calculate_name,
-            id = generate_id(),
+            id = calc_id,
             group = node.group,
             activity = node.activity,
-            label =  "Save SM: " +node.get_name()
+            label =  "Save: " +node.get_name(),
+            path_len=node.path_len+ (2 if count_node is not None else 1)
         )
-                
+        processed_nodes.append(calc_node)
+        add_calculate(calculates, calc_node)       
         
         if count_node is not None:
             set_prev_next_node(count_node,calc_node)
+            add_used_calculate(calc_node, count_node, calculates, used_calculates, processed_nodes)
         else:
             set_prev_next_node(node,calc_node)
         list_calc.append(calc_node)
@@ -442,55 +483,72 @@ last_unfound_ref = None
 VERSION_SEPARATOR = '_v_'
 #this function adds the reference if any 
 def process_calculate_version_requirement(node, calculates,used_calculates,processed_nodes):
-    global last_unfound_ref
-    if isinstance(node, (TriccNodeRhombus)):
-        if isinstance(node.reference, str) :
-            logger.debug("process_calculate_version_requirement:{} ".format(node.name if hasattr(node,'name') else node.id))
-            last_found = get_prev_node_by_name(processed_nodes, node.reference, node.instance)
-            # ref is still a string here
-            if last_found is None  or issubclass(last_found.__class__, TriccNodeCalculateBase):
-                if node.reference in calculates and len(calculates[node.reference])>0 :
-                    # issue is that it can be further in another path
-                    last_found = get_max_version(calculates[node.reference])
-            if last_found is None:
-                logger.debug("reference not found for a calculate {}".format(node.get_name()))
-                if last_unfound_ref == node:
-                    logger.warning("reference not found for a calculate twice in a row {}".format(node.get_name()))
-                last_unfound_ref = node
-                return False
-            else:
-                node.reference = last_found 
-                node.reference.next_nodes.append(node)
-                #set_prev_next_node(last_found, node)
-                # just to be safe even if it should be covered after
-            if issubclass(last_found.__class__, TriccNodeDisplayCalculateBase):
-                add_used_calculate(node, last_found, calculates, used_calculates, processed_nodes)
-            else:
-                pass#return False
-        elif node.reference is None:
-            logger.error("process_calculate_version_requirement:reference is None for {0} ".format(node.get_name()))
-            exit()
-    if hasattr(node, 'prev_nodes'):
-        for prev_node in node.prev_nodes:
-            add_used_calculate(node, prev_node, calculates, used_calculates, processed_nodes)
+    if(process_reference(node, calculates,used_calculates,processed_nodes)):
+        return False
+    #if hasattr(node, 'prev_nodes'):
+    #    for prev_node in node.prev_nodes:
+    #        add_used_calculate(node, prev_node, calculates, used_calculates, processed_nodes)
 
         
     # update the used_calculates         
     return True
+
+def add_calculate(calculates, calc_node):
+    if issubclass(calc_node.__class__, TriccNodeDisplayCalculateBase):
+        node_clean_name = get_calculate_cleaned_name(calc_node.name)
+        if node_clean_name not in calculates:
+            calculates[node_clean_name]= {}
+        calculates[node_clean_name][calc_node.id] = calc_node
+
+def process_reference(node,  calculates ,used_calculates,processed_nodes):
+    #global last_unfound_ref
+    reference = []
+    if isinstance(node, (TriccNodeRhombus)):
+        if isinstance(node.reference, str) :
+            logger.debug("process_reference:{}: {} ".format(node.get_name(), node.reference))
+            ref_list = node.reference.split(';')
+            for ref in ref_list:
+                last_found = get_prev_node_by_name(processed_nodes, ref, node)
+                # ref is still a string here
+                if last_found is None  or issubclass(last_found.__class__, TriccNodeCalculateBase):
+                    if ref in calculates and len(calculates[ref])>0 :
+                        # issue is that it can be further in another path
+                        last_found = get_max_version(calculates[ref])
+                if last_found is None:
+                    logger.debug("reference {} not found for a calculate {}".format(ref, node.get_name()))
+                    #if last_unfound_ref == node:
+                    #    logger.warning("reference not found for a calculate twice in a row {}".format(node.get_name()))
+                    #last_unfound_ref = node
+                    return False
+                else:
+                    reference.append(last_found) 
+                    last_found.next_nodes.append(node)
+                    #set_prev_next_node(last_found, node)
+                    # just to be safe even if it should be covered after
+                    add_used_calculate(node, last_found, calculates, used_calculates, processed_nodes)
+
+            node.reference = reference
+        elif isinstance(node.reference,list):
+            for ref in node.reference:
+                add_calculate(calculates,ref )
+                add_used_calculate(ref, node,calculates, used_calculates, processed_nodes)
+        elif node.reference is None:
+            logger.error("process_calculate_version_requirement:reference is None for {0} ".format(node.get_name()))
+            exit()
+
 
 def get_calculate_cleaned_name(name):
     index = name.rfind(VERSION_SEPARATOR)
      #remove the leading part with version 
     return name[:index] if index > 0 else name
 
+#add_used_calculate(node, calc_node, calculates, used_calculates, processed_nodes)
 
 def add_used_calculate(node, prev_node, calculates, used_calculates, processed_nodes):
     if issubclass(prev_node.__class__, TriccNodeDisplayCalculateBase):
-        if prev_node.id in processed_nodes:
+        if prev_node in processed_nodes:
             # if not a verison, index will equal -1
             node_clean_name = get_calculate_cleaned_name(prev_node.name)
-            if node_clean_name not in used_calculates:
-                node_clean_name =prev_node.name
             if node_clean_name not in calculates :
                 logger.debug("node {} refered before being processed".format(node.get_name()))
                 return False
@@ -502,13 +560,15 @@ def add_used_calculate(node, prev_node, calculates, used_calculates, processed_n
                 used_calculates[node_clean_name][max_version.id] = max_version
         else:
             logger.debug("process_calculate_version_requirement: failed for {0} , prev Node {1} ".format(node.get_name(), prev_node.get_name()))
-
+    
+    
         
 
 
 
 def merge_calculate(node, calculates, from_version):
-    #calcualtes list[ node] 
+    #calcualtes list[ node]
+
     version = node.version
     node_to_delete = []
     for id, calc_node in calculates.items():
@@ -517,15 +577,21 @@ def merge_calculate(node, calculates, from_version):
             cur_version = calc_node.version
             if cur_version > from_version and  cur_version<version:
                 logger.debug("merge_calculate:{} ".format(node.name if hasattr(node,'name') else node.id))
-               
                 # unlink the merged node in its next nodes
-
+                # list node is used to not update calc_node.next_nodes in a loop
+                list_nodes = []
                 for next_node in calc_node.next_nodes:
+                    list_nodes.append(next_node)
+                for next_node in list_nodes:
                     set_prev_next_node(node, next_node, calc_node )
                 # unlink the merged node in its prev nodes
+                # list node is used to not update calc_node.prev_nodes in a loop
+                list_nodes = []
                 for prev_node in calc_node.prev_nodes:
+                    list_nodes.append(prev_node)
+                for prev_node in list_nodes:
                     set_prev_next_node(prev_node, node, calc_node )
-                node_to_delete.append(calc_node.id)
+                node_to_delete.append(calc_node)
         else:
             logger.error("two different type of calculate node share the same name {}".format(node.name))
     return node_to_delete
@@ -630,12 +696,12 @@ def add_tricc_base_node(nodes, type, list, group, attributes = [], mandatory_att
             parent= parent,
             group = group,
             activity = group,
-            **set_mandatory_attribute(elm, mandatory_attributes)
+            **set_mandatory_attribute(elm, mandatory_attributes, group.name)
         )
         set_additional_attributes(attributes, elm, node)
         nodes[id]=node
     
-def set_mandatory_attribute(elm, mandatory_attributes):
+def set_mandatory_attribute(elm, mandatory_attributes, groupname = None):
     param = {}
     for attributes in mandatory_attributes:
         attribute_value = elm.attrib.get(attributes)
@@ -646,7 +712,7 @@ def set_mandatory_attribute(elm, mandatory_attributes):
                 display_name = elm.attrib.get('name')
             else:
                 display_name = elm.attrib.get('id')
-            logger.error("the attibute {} is mandatory but not found in {}".format(attributes, display_name))
+            logger.error("the attibute {} is mandatory but not found in {} within group {}".format(attributes, display_name, groupname if groupname is not None else ''))
             exit()
         if attributes == 'link':
             param[attributes] = clean_link(attribute_value)
@@ -755,7 +821,7 @@ def get_edges( diagram):
         id = elm.attrib.get('id')
         edge = TriccEdge(
             id = id,
-            **set_mandatory_attribute(elm, ['source' , 'parent', 'target'])
+            **set_mandatory_attribute(elm, ['source' , 'parent', 'target'], diagram.attrib.get('name'))
         )
         set_additional_attributes(['value'], elm, edge)
         if edge.value is not None:
@@ -763,29 +829,3 @@ def get_edges( diagram):
         edges.append(edge)
     return edges
         
-def group_next_nodes(node):
-    if hasattr(node, 'next_nodes') and len(node.next_nodes)>1:
-        # set list to len
-        new_order = [ len(node.next_nodes) for i in node.next_nodes]
-        curent_place = 0
-        # fist the one from the same group
-        order_group_hierachy_nodes(node, new_order, curent_place, node.group)
-        if curent_place > 0:
-            node.next_nodes =  [node.next_nodes[i] for i in new_order]
-           
-        # then loop over the parent group
-def order_group_hierachy_nodes(node, new_order, curent_place, group):
-    if group is not None:
-        order_group_nodes(node.next_nodes, new_order, curent_place, node.group)
-        if group is not group.group:
-            order_group_hierachy_nodes(node, new_order, curent_place, group.group)
-    
-
-    
-def order_group_nodes(nodes, new_order, curent_place, group):
-    for i in range(len(nodes)):
-        next_node = nodes[i]
-        #if same group give the first place available
-        if next_node.group == group:
-            new_order[i] = curent_place
-            curent_place += 1

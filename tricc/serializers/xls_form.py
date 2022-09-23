@@ -1,9 +1,10 @@
 
 
 from tricc.converters.utils import clean_name
-from tricc.converters.xml_to_tricc import is_ready_to_process
 from tricc.converters.tricc_to_xls_form import TRICC_CALC_EXPRESSION, TRICC_NEGATE
+from gettext import gettext as _
 from tricc.models import *
+
 import logging
 logger = logging.getLogger('default')
 
@@ -69,7 +70,7 @@ ODK_TRICC_TYPE_MAP = { 'note':'note'
     ,'text':'text'
     ,'rhombus':'calculate'
     ,'goto':''#: start the linked activity within the target activity
-    ,'start':'begin group'
+    ,'start':''
     ,'activity_start':'calculate'
     ,'link_in':''
     ,'link_out':''
@@ -84,7 +85,7 @@ ODK_TRICC_TYPE_MAP = { 'note':'note'
     ,'end':'calculate'
     ,'activity_end':'calculate'
     ,'edge':''
-    ,'page':'begin group'
+    ,'page':''
     }
 
 GROUP_ODK_TYPE = [TriccExtendedNodeType.page,TriccExtendedNodeType.activity]
@@ -127,21 +128,19 @@ def get_attr_if_exists(node,column, map_array):
         return ''
     
 
-def generate_xls_form_export(node, processed_nodes, stashed_nodes, df_survey, df_choice, cur_group, **kargs):
+def generate_xls_form_export(node, processed_nodes, stashed_nodes, df_survey, df_choice,df_calculate, cur_group, **kargs):
     # check that all prev nodes were processed
 
-    if is_ready_to_process(node,processed_nodes):
-        if node.id not in processed_nodes :
+    if is_ready_to_process(node,processed_nodes,stashed_nodes):
+        if node not in processed_nodes :
             if node.group != cur_group :
-                logger.debug("generate_xls_form_export:stashing node {}".format(node.get_name()))
-                stashed_nodes[node.id]=node
                 return False
             logger.debug("printing node {}".format(node.get_name()))
             # clean stashed node when processed
-            if node.id in stashed_nodes:
-                del stashed_nodes[node.id]
+            if node in stashed_nodes:
+                stashed_nodes.remove(node)
                 logger.debug("generate_xls_form_export: unstashing processed node{} ".format(node.get_name()))
-            if issubclass(node.__class__, (TriccNodeDisplayCalculateBase,TriccNodeDiplayModel)):
+            if issubclass(node.__class__, ( TriccNodeDisplayCalculateBase,TriccNodeDiplayModel)):
                 if isinstance(node, TriccNodeSelectOption):
                     values = []
                     for column in CHOICE_MAP:
@@ -150,23 +149,25 @@ def generate_xls_form_export(node, processed_nodes, stashed_nodes, df_survey, df
                     if len(df_choice[(df_choice['list_name'] == node.list_name) & (df_choice['value'] == node.name)])  == 0:
                         df_choice.loc[len(df_choice)] = values
                 elif node.odk_type in ODK_TRICC_TYPE_MAP and ODK_TRICC_TYPE_MAP[node.odk_type] is not None:
-                    values = []
-                    for column in SURVEY_MAP:
-                        if column == 'default' and issubclass(node.__class__, TriccNodeDisplayCalculateBase):
-                            values.append(0)
-                        else:
+                    if ODK_TRICC_TYPE_MAP[node.odk_type] =='calculate':
+                        values = []
+                        for column in SURVEY_MAP:
+                            if column == 'default' and issubclass(node.__class__, TriccNodeDisplayCalculateBase):
+                                values.append(0)
+                            else:
+                                values.append(get_attr_if_exists(node,column,SURVEY_MAP))
+                        df_calculate.loc[len(df_calculate)] = values
+                    elif  ODK_TRICC_TYPE_MAP[node.odk_type] !='':
+                        values = []
+                        for column in SURVEY_MAP:
                             values.append(get_attr_if_exists(node,column,SURVEY_MAP))
-                    
-                        
-                    df_survey.loc[len(df_survey)] = values
+                        df_survey.loc[len(df_survey)] = values
+                    else:
+                        logger.warning("node {} have an unmapped type {}".format(node.get_name(),node.odk_type))
                 else:
                     logger.warning("node {} have an unsupported type {}".format(node.get_name(),node.odk_type))
-            processed_nodes[node.id] = node
             #continue walk °
             return True
-    elif node.id not in stashed_nodes and node.id not in processed_nodes:
-        logger.debug("generate_xls_form_condition: stashing processed node{} ".format(node.get_name()))
-        stashed_nodes[node.id]=node
     return False
 
 

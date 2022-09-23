@@ -1,6 +1,6 @@
 
 
-from tricc.converters.xml_to_tricc import add_save_calculate, create_activity
+from tricc.converters.xml_to_tricc import process_calculate, create_activity
 from tricc.models import *
 
 from tricc.parsers.xml import read_drawio
@@ -38,24 +38,12 @@ def build_tricc_graph(in_filepath):
         calculates = {}
         # save when a calcualte is used dict[name, Dict[id, node]]
         used_calculates = {}
+        
         # save the node that are processed dict[id, node]
-        processed_nodes = {}
-        stashed_nodes = {}
+        
         # add save nodes and merge nodes
-        logger.info("# add save calculate")
-        walktrhough_tricc_node(start_page.root, add_save_calculate, calculates=calculates,
-                               used_calculates=used_calculates, processed_nodes=processed_nodes, stashed_nodes=stashed_nodes)
-        prev_stashed_nodes = {}
-        len_prev_processed_nodes = 0
-        loop_count = 0
-        while len(stashed_nodes)>0:
-            loop_count = check_stashed_loop(stashed_nodes,prev_stashed_nodes,processed_nodes,len_prev_processed_nodes,loop_count)
-            prev_stashed_nodes = stashed_nodes.copy()
-            len_prev_processed_nodes = len(processed_nodes) 
-            s_node = stashed_nodes.pop(list(stashed_nodes.keys())[0])
-            logger.debug("add_save_calculate:unstashed:{}".format(s_node.get_name()))
-            walktrhough_tricc_node(s_node, add_save_calculate, calculates=calculates,
-                               used_calculates=used_calculates, processed_nodes=processed_nodes, stashed_nodes=stashed_nodes)
+        stashed_node_func( start_page.root, process_calculate, used_calculates=used_calculates, calculates =calculates, recusive=False )
+        
             
         logger.info("# check if all edges (arrow where used)")
         for key, page in pages.items():
@@ -96,7 +84,7 @@ def linking_nodes(node, page, pages, processed_nodes = [], path = []):
             target_node = page.nodes[edge.target]
                             # link perv / next nodes
             # walk only if the target node was not processed already
-            if edge.target not in processed_nodes:
+            if target_node  not in processed_nodes:
                 if target_node.odk_type == TriccExtendedNodeType.goto:
                     next_page = walkthrough_goto_node(target_node, page, pages, processed_nodes, current_path)
                 # set next page as node to link the next_node of the activity
@@ -111,7 +99,7 @@ def linking_nodes(node, page, pages, processed_nodes = [], path = []):
                         linking_nodes(option, page, pages, processed_nodes, current_path)
 
                 # don't save the link out because the real node is the page
-                processed_nodes.append(target_node.id)
+                processed_nodes.append(target_node)
                 linking_nodes(target_node, page, pages, processed_nodes, current_path)
             elif edge.target in current_path:
                 logger.warning("possible loop detected for node {0} in page {1}; path: {2} ".format(node.get_name(), page.label, current_path))
@@ -130,7 +118,7 @@ def walkthrough_goto_node(node, page, pages, processed_nodes, current_path):
     if node.link in pages:
         next_page = pages[node.link]
         # walk thought the next page
-        if next_page.id not in processed_nodes:
+        if next_page not in processed_nodes:
         # will be added in process nod later
         # add the id to avoid loop: 
             logger.debug("jumping to page {0}".format(next_page.label))
@@ -174,8 +162,9 @@ def walkthrough_link_out_node(node, page, pages, processed_nodes, current_path):
             # steal the edges
             replace_node(node, linked_target_node, page)
             
-            if linked_target_node.id not in processed_nodes:
+            if linked_target_node not in processed_nodes:
                 linking_nodes(linked_target_node, link_in_page, pages, processed_nodes, current_path)
+            return linked_target_node
     else:
             logger.warning("link out {0} in page {1} : reference not found"\
                 .format(node.name,page.label))

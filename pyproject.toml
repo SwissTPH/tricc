@@ -1,9 +1,10 @@
 [build-system]
 requires = [
     "lxml",
-    "abc",
     "html2text",
     "pydantic",
     "babel",
+    "xlsxwriter",
+    "pandas"
 ]
 build-backend = "setuptools.build_meta"

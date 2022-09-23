@@ -6,7 +6,7 @@
             "type": "python",
             "request": "launch",
             "program": "main.py",
-            "args":["-i","C:\\Users\\delcpa\\Development\\sysref_cdss\\adult_v1.drawio"],
+            "args":["-i","/home/delcpa/switchdrive/DHU/Projects/Sysref/adult_v0.drawio"],
             "console": "integratedTerminal",
             "justMyCode": true
         }

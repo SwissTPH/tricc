@@ -8,7 +8,7 @@ import datetime
 import pandas as pd
 from tricc.converters.tricc_to_xls_form import generate_xls_form_calculate, generate_xls_form_condition,  generate_xls_form_relevance
 from tricc.converters.xml_to_tricc import VERSION_SEPARATOR
-from tricc.models import TriccNodeActivity,check_stashed_loop ,walktrhough_tricc_node
+from tricc.models import TriccNodeActivity,check_stashed_loop ,walktrhough_tricc_node_processed_stached
 
 
 from tricc.serializers.xls_form import CHOICE_MAP, SURVEY_MAP, end_group, generate_xls_form_export, get_diagnostic_line, get_diagnostic_none_line, get_diagnostic_start_group_line, get_diagnostic_stop_group_line,  start_group
@@ -18,11 +18,9 @@ logger = logging.getLogger('default')
 
 
 class XLSFormStrategy(BaseStrategy):
-    processed_nodes = {}
-    stashed_nodes = {}
-    used_calculates = {}
-    calculates = {}
+
     df_survey = pd.DataFrame(columns=SURVEY_MAP.keys())
+    df_calculate = pd.DataFrame(columns=SURVEY_MAP.keys())
     df_choice = pd.DataFrame(columns=CHOICE_MAP.keys())
     
     
@@ -38,23 +36,18 @@ class XLSFormStrategy(BaseStrategy):
         return generate_xls_form_calculate( node, **kwargs)
 
 
-
-    
+    def __init__(self):
+        self.calculates= {}
+        self.used_calculates = {}
 
     def do_clean(self, **kwargs):
-        self.calculates= {}
-        self.processed_nodes = {}
-        self.stashed_nodes = {}
-        self.used_calculates = {}
+        self.__init__()
     
     def get_kwargs(self):  
         return { 
-            'processed_nodes':self.processed_nodes, 
-            'stashed_nodes':self.stashed_nodes,
             'df_survey':self.df_survey, 
             'df_choice':self.df_choice,
-            'calculates':self.calculates,
-            'used_calculates':self.used_calculates
+            'df_calculate':self.df_calculate
             }  
 
     def generate_export(self, node, **kwargs):
@@ -77,61 +70,66 @@ class XLSFormStrategy(BaseStrategy):
         df_settings.to_excel(writer, sheet_name='settings',index=False)
 
         #close the Pandas Excel writer and output the Excel file
-        writer.save()
+        #writer.save()
 
         # run this on a windows python instance because if not then the generated xlsx file remains open
-        #writer.close()
-        writer.handles = None
+        writer.close()
+        #writer.handles = None
     
     def process_export(self, activity,  **kwargs):
         # The stashed node are all the node that have all their prevnode processed but not from the same group
         # This logic works only because the prev node are ordered by group/parent .. 
-    
+        processed_nodes = []
+        stashed_nodes =  []
+        skip_header = 0
         groups= {}
         cur_group=activity
         groups[activity.id] = 0
+        path_len = 0
         # keep the vesrions on the group id, max version
         start_group( cur_group=cur_group, groups=groups, **self.get_kwargs())
-        walktrhough_tricc_node(activity.root, self.generate_export, cur_group = activity.root.group, **self.get_kwargs() )
+        walktrhough_tricc_node_processed_stached(activity.root, self.generate_export, processed_nodes, stashed_nodes,path_len , cur_group = activity.root.group, **self.get_kwargs() )
         end_group( cur_group =activity, groups=groups, **self.get_kwargs())
-        
         # we save the survey data frame
-        df_survey_final = self.df_survey
-        self.df_survey = pd.DataFrame(columns=SURVEY_MAP.keys())
-        
+        df_survey_final =   pd.DataFrame(columns=SURVEY_MAP.keys())
+        self.df_calculate=   pd.DataFrame(columns=SURVEY_MAP.keys())
+        if len(self.df_survey)>(2+skip_header):
+            df_survey_final = self.df_survey
         ## MANAGE STASHED NODES
-        prev_stashed_nodes = self.stashed_nodes.copy()
+        prev_stashed_nodes = stashed_nodes.copy()
         loop_count = 0
         len_prev_processed_nodes = 0
-        while len(self.stashed_nodes)>0:
-            loop_count = check_stashed_loop(self.stashed_nodes,prev_stashed_nodes, self.processed_nodes,len_prev_processed_nodes, loop_count)
-            prev_stashed_nodes = self.stashed_nodes.copy()
-            len_prev_processed_nodes = len(self.processed_nodes)   
-            if len(self.stashed_nodes)>0:
-                s_node = self.stashed_nodes.pop(list(self.stashed_nodes.keys())[0])
-                start_group( cur_group =s_node.group, groups=groups, relevance= isinstance(s_node, TriccNodeActivity),  **self.get_kwargs())          
+        while len(stashed_nodes)>0:
+            self.df_survey = pd.DataFrame(columns=SURVEY_MAP.keys())
+            loop_count = check_stashed_loop(stashed_nodes,prev_stashed_nodes, processed_nodes,len_prev_processed_nodes, loop_count)
+            prev_stashed_nodes = stashed_nodes.copy()
+            len_prev_processed_nodes = len(processed_nodes)   
+            if len(stashed_nodes)>0:
+                s_node = stashed_nodes.pop()
+                path_len = sorted(s_node.prev_nodes, key=lambda p_node:p_node.path_len, reverse=True )[0].path_len+1
+                if s_node.group is None:
+                    print("ERROR group is none for node {}".format(s_node.get_name()))
+                start_group( cur_group =s_node.group, groups=groups, relevance= True,  **self.get_kwargs())
                 # arrange empty group
-                walktrhough_tricc_node(s_node, self.generate_export, groups=groups,cur_group = s_node.group, **self.get_kwargs() )
+                walktrhough_tricc_node_processed_stached(s_node, self.generate_export, processed_nodes, stashed_nodes, path_len, groups=groups,cur_group = s_node.group, **self.get_kwargs() )
                 # add end group if new node where added OR if the previous end group was removed
                 end_group( cur_group =s_node.group, groups=groups, **self.get_kwargs())
-                
                 # if two line then empty grou
-                if len(self.df_survey)>2:
+                if len(self.df_survey)>(2+skip_header):
                     if cur_group == s_node.group:
                         # drop the end group (to merge)
+                        print("printing same group {}::{} len {}".format(s_node.group.__class__, s_node.group.get_name(), len(self.df_survey)))
                         df_survey_final.drop(index=df_survey_final.index[-1], axis=0, inplace=True)
-                        df_survey_final  =pd.concat([df_survey_final,self.df_survey[1:]])
-                    ## only caalculate
-                    elif len(self.df_survey[self.df_survey['type']=='calculate']) == len(self.df_survey) -2:
-                        df_survey_final =pd.concat([df_survey_final, self.df_survey[1:-1]])
+                        self.df_survey = self.df_survey[(1+skip_header):]
+                        df_survey_final=pd.concat([df_survey_final, self.df_survey], ignore_index=True)
+
                     else:
-                        df_survey_final =pd.concat([df_survey_final, self.df_survey])
+                        print("printing group {}::{} len {}".format(s_node.group.__class__, s_node.group.get_name(), len(self.df_survey)))
+                        df_survey_final =pd.concat([df_survey_final, self.df_survey], ignore_index=True)
                     cur_group = s_node.group
-                #else:
-                #    find_dependants(s_node, self.stashed_nodes,self.processed_nodes, [])
-                    
-                self.df_survey = pd.DataFrame(columns=SURVEY_MAP.keys())
-        self.df_survey = df_survey_final
+        # add the calulate
+        self.df_survey = pd.concat([df_survey_final,self.df_calculate], ignore_index=True)
+        # add the diag
         self.df_survey.loc[len(self.df_survey)] = get_diagnostic_start_group_line()
         # TODO inject flow driven diag list, the folowing fonction will fill the missing ones
         diags = self.export_diag( activity,  **kwargs)

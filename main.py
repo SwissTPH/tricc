@@ -8,7 +8,7 @@ from babel import Locale
 import gettext
 #gettext.bindtextdomain('tricc', './locale/')
 #gettext.textdomain('tricc')
-langage =   Locale('Fr')
+language =   Locale('Fr')
 fr =  gettext.translation('tricc', './locales' , languages=['fr'])
 fr.install()
 
@@ -79,7 +79,7 @@ if __name__ == "__main__":
         # if output file path not specified, just chagne the extension
         out_filepath= pre + '.xlsx'
     if out_filepath is None:
-        # if output file path not specified, jsut take the name without extension
+        # if output file path not specified, just take the name without extension
         formid= pre
     logger.info("build the graph from XML")
     start_page = build_tricc_graph(in_filepath)
@@ -87,7 +87,7 @@ if __name__ == "__main__":
     strategy = XLSFormStrategy()
     logger.info("Using strategy {}".format(strategy.__class__))
     logger.info("update the node with basic information")
-    # create constaints, clean name
+    # create constraints, clean name
     strategy.process_base(start_page)
     logger.info("generate the relevance based on edges")
     # create relevance Expression
