@@ -1,13 +1,11 @@
 
 
-from tricc.converters.xml_to_tricc import process_calculate, create_activity
-from tricc.models import *
-
-from tricc.parsers.xml import read_drawio
-
 import logging
+from copy import copy
 
-
+from tricc.converters.xml_to_tricc import create_activity, process_calculate
+from tricc.models import *
+from tricc.parsers.xml import read_drawio
 
 logger = logging.getLogger('default')
 
@@ -18,7 +16,7 @@ def build_tricc_graph(in_filepath):
     logger.info("# Create the activities from diagram pages")
     diagrams = read_drawio(in_filepath)
     for diagram in diagrams:
-        logger.debug("Create the activity {0}".format(diagram.attrib.get('name')))
+        logger.info("Create the activity {0}".format(diagram.attrib.get('name')))
         page = create_activity(diagram)
         if page is not None:
             if page.root is not None:
@@ -69,15 +67,24 @@ def build_tricc_graph(in_filepath):
     
 def linking_nodes(node, page, pages, processed_nodes = [], path = []):
     # get the edges that have that node as source
+    
     node_edge = list(filter(lambda x: (x.source == node.id) , page.edges))
     node.activity = page
     #build current path
     current_path = path + [node.id]
     # don't stop the walkthroug by default
     logger.debug("linking node {0}".format(node.get_name()))
-    if len(node_edge) == 0:
-        logger.debug("node {0} without edges out found in page {1}, full path {2}"\
-            .format(node.get_name(), page.label, current_path))
+    #FIXME remove note
+    if len(node_edge) == 0 and not issubclass(node.__class__, (TriccNodeCalculateBase, TriccNodeSelectOption,TriccNodeActivity, TriccNodeNote)):
+        if issubclass(node.__class__, TriccNodeSelect):
+            option_edge = list(filter(lambda x: (lambda y: x.source == y.id, node.options) , page.edges))
+            if len(option_edge) == 0:
+                logger.error("node {0} without edges out found in page {1}, full path {2}"\
+                    .format(node.get_name(), page.label, current_path))
+        else:                  
+            logger.error("node {0} without edges out found in page {1}, full path {2}"\
+                .format(node.get_name(), page.label, current_path))
+            exit()
     for edge in node_edge:
         #get target node
         if edge.target in page.nodes:
@@ -97,18 +104,22 @@ def linking_nodes(node, page, pages, processed_nodes = [], path = []):
                 elif issubclass(target_node.__class__, TriccNodeSelect):
                     for key, option in target_node.options.items():
                         linking_nodes(option, page, pages, processed_nodes, current_path)
-
+                if target_node  not in processed_nodes:
                 # don't save the link out because the real node is the page
-                processed_nodes.append(target_node)
+                    processed_nodes.append(target_node)
                 linking_nodes(target_node, page, pages, processed_nodes, current_path)
             elif edge.target in current_path:
-                logger.warning("possible loop detected for node {0} in page {1}; path: {2} ".format(node.get_name(), page.label, current_path))
+                logger.warning("possible loop detected for node {0} in page {1}; path:".format(node.get_name(), page.label))
+                for node_id in current_path:
+                    node = get_node_from_list(processed_nodes,node_id)
+                    if node is not None:
+                        logger.warning(node.get_name())
             if isinstance(node, TriccNodeSelectNotAvailable):
                 set_prev_next_node( node.options[0], target_node)
             else:  
                 set_prev_next_node( node, target_node)
         else:
-            logger.warning("target not found {0}".format(edge.target))
+            logger.warning("target not found {0} for node {1}".format(edge.target, node.get_name()))
         #page.edges.remove(edge)
   
 
@@ -118,24 +129,49 @@ def walkthrough_goto_node(node, page, pages, processed_nodes, current_path):
     if node.link in pages:
         next_page = pages[node.link]
         # walk thought the next page
-        if next_page not in processed_nodes:
-        # will be added in process nod later
-        # add the id to avoid loop: 
-            logger.debug("jumping to page {0}".format(next_page.label))
-        if int(next_page.instance) != int(node.instance):
-            #FIXME find if there is other instance (list in activity ?)
-            # must look in pages thans to base_instance
+        max_instance = 1
+        if int(node.instance)  == 0 or int(next_page.root.instance) == 0:
+            for other_page in next_page.instances.values():
+                if int(other_page.instance) > int(max_instance):
+                    max_instance = other_page.instance
+            #auto instance starts at 101
+            next_page = next_page.make_instance(max(100,max_instance)+1)
+        elif int(node.instance) != 1:
+            #return existing instance if any
             next_page = next_page.make_instance(node.instance)
+        if next_page.id not in pages:
             pages[next_page.id]=next_page
-        linking_nodes(next_page.root, next_page, pages, processed_nodes, current_path)
-        # attach the page
-        #for got_to_prev_nodes in node.prev_nodes:
-        #    set_prev_next_node(got_to_prev_nodes, next_page, node )
-        # steal the edges
-        replace_node(node, next_page, page)
+        logger.debug("jumping to page {0}::{1} from {2}".format(next_page.label, next_page.instance, node.get_name()))
+        if next_page not in processed_nodes:
+            linking_nodes(next_page.root, next_page, pages, processed_nodes, current_path)
+        
+        # create a path logic for the nodes following
+        # next node AND former path
+        if node.next_nodes is not None and len(node.next_nodes)>0:
+            calc_node = TriccNodeRhombus(
+                id = "aj_"+generate_id(),
+                reference = [next_page],
+                activity = page,
+                group = page,
+            )
+            page.nodes[calc_node.id]=calc_node
+            # triggering the page from the path
+            for prev in node.prev_node:
+                set_prev_next_node(prev,next_page)
+            replace_node(node, calc_node, page)
+            
+            # linking the next page a 
+            #set_prev_next_node(next_page, calc_node)
+            return calc_node
+        else:   
+            # attach the page
+            #for got_to_prev_nodes in node.prev_nodes:
+            #    set_prev_next_node(got_to_prev_nodes, next_page, node )
+            # steal the edges
+            replace_node(node, next_page, page)   
                 
         # continue on the initial page
-        return next_page
+            return next_page
     else:
         logger.warning("node {0} from page {1} doesnot have a valid link".format(node.label, page.label))
 

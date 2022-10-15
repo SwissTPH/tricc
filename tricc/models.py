@@ -1,14 +1,15 @@
-from __future__ import annotations 
-from enum import Enum
+from __future__ import annotations
+
+import logging
 import random
 import string
+from enum import Enum
+from typing import Dict, ForwardRef, List, Optional, Union
 
-from typing import Dict, List, Optional,  Union,ForwardRef
-from unittest.util import strclass
 from pydantic import BaseModel, constr
 
 from tricc.converters.utils import generate_id
-import logging
+
 logger = logging.getLogger("default")
 
 
@@ -17,14 +18,13 @@ Expression= constr(regex="^[^\\/]+$")
 triccId = constr(regex="^.+$")
 triccIdList = constr(regex="^.+$")
 
-base64 = constr(regex="[^-A-Za-z0-9+/=]|=[^=]|={3,}$")
+b64 = constr(regex="[^-A-Za-z0-9+/=]|=[^=]|={3,}$")
 
 
 
 TriccEdge = ForwardRef('TriccEdge')
 #data:page/id,UkO_xCL5ZjyshJO9Bexg
 
-TRICC_INSTANCE = "I_{0}_{1}"
 
 ACTIVITY_END_NODE_FORMAT = "aend_{}"
 END_NODE_FORMAT = "end_{}"
@@ -59,6 +59,7 @@ class TriccExtendedNodeType(str, Enum):
     edge='edge'
     page='page'
     not_available='not_available'
+    quantity='quantity'
 
 class TriccOperation(str, Enum):
     _and='and'
@@ -174,13 +175,6 @@ class TriccNodeBaseModel(TriccBaseModel):
     def  make_instance(self, instance_nb, activity = None):
         instance = super().make_instance(instance_nb)
         instance.group = activity
-        if hasattr(self, 'name') \
-            and not isinstance(self, TriccNodeSelectOption)\
-            and not issubclass(self.__class__, TriccNodeDisplayCalculateBase):
-                
-            instance.name = TRICC_INSTANCE.format(instance_nb, self.name)
-        elif isinstance(self, (TriccNodeActivityStart,TriccNodeActivityEnd)):
-            instance.name = TRICC_INSTANCE.format(instance_nb, self.name)
         if hasattr(self, 'activity') and activity is not None:
             instance.activity = activity
         next_nodes = []
@@ -192,6 +186,9 @@ class TriccNodeBaseModel(TriccBaseModel):
         
         return instance
             
+    def gen_name(self):
+        if self.name is None:
+            self.name = ''.join(random.choices(string.ascii_lowercase, k=8))
 
 
 
@@ -282,7 +279,7 @@ class TriccNodeActivity(TriccNodeBaseModel):
                     updated_edges += self.update_edges( node_origin.options[key], option_instance)
             updated_edges += self.update_edges( node_origin, node_instance)
             if updated_edges == 0:
-                logger.error("no edge was updated for node {}".format(node_instance.get_name()))
+                logger.error("no edge was updated for node {}::{}::{}::{}".format(node_instance.activity.get_name(),node_instance.__class__,node_instance.get_name(),node_instance.instance))
 
 
     def update_edges(self, node_origin, node_instance):
@@ -310,7 +307,7 @@ class TriccNodeActivity(TriccNodeBaseModel):
         
 class TriccNodeDiplayModel(TriccNodeBaseModel):
     name: str
-    image: Optional[base64]
+    image: Optional[b64]
     hint: Optional[str]
     help: Optional[str]
     group:Optional[Union[TriccGroup,TriccNodeActivity]]
@@ -335,6 +332,7 @@ class TriccNodeInputModel(TriccNodeDiplayModel):
     
 class TriccNodeMainStart(TriccNodeBaseModel):
     odk_type: Union[TriccNodeType,TriccExtendedNodeType] = TriccExtendedNodeType.start
+    form_id : Optional[str]
     
    
 class TriccNodeLinkIn(TriccNodeBaseModel):
@@ -364,6 +362,10 @@ class TriccNodeSelectOption(TriccNodeDiplayModel):
         instance = super().make_instance(instance_nb, activity = activity)
         instance.select = select
         return instance
+    def get_name(self):
+        name = super().get_name()
+        select_name = self.select.get_name()
+        return select_name+"::"+name
     
 
 class TriccNodeSelect(TriccNodeInputModel):
@@ -413,6 +415,7 @@ class TriccNodeCalculateBase(TriccNodeBaseModel):
     input: Dict[TriccOperation, TriccNodeBaseModel] = {}
     expression : Optional[Expression] # will be generated based on the input
     version: int = 1
+    last: bool = True
     # to use the enum value of the TriccNodeType
     class Config:  
         use_enum_values = True  # <--
@@ -426,18 +429,22 @@ class TriccNodeCalculateBase(TriccNodeBaseModel):
         version = 1 
         instance.version = version
         return instance
+
+
+        
     def __init__(self, **data):
         super().__init__(**data)
-        if self.name is None:
-            self.name = ''.join(random.choices(string.ascii_lowercase, k=8))
-
+        self.gen_name()
+        
 class TriccNodeDisplayCalculateBase(TriccNodeCalculateBase):
     save: Optional[str] # contribute to another calculate
     hint: Optional[str] # for diagnostic display
     help: Optional[str] # for diagnostic display
     # no need to copy save
-    
 
+#qualculate that saves quantity, or we may merge integer/decimals
+class TriccNodeQuantity(TriccNodeDisplayCalculateBase):
+    odk_type: Union[TriccNodeType,TriccExtendedNodeType] = TriccExtendedNodeType.quantity
 class TriccNodeCalculate(TriccNodeDisplayCalculateBase):
     odk_type: Union[TriccNodeType,TriccExtendedNodeType] = TriccNodeType.calculate
 class TriccNodeAdd(TriccNodeDisplayCalculateBase):
@@ -450,7 +457,8 @@ class TriccNodeFakeCalculateBase(TriccNodeCalculateBase):
     pass
 class TriccNodeRhombus(TriccNodeDisplayCalculateBase):
     odk_type: Union[TriccNodeType,TriccExtendedNodeType] = TriccExtendedNodeType.rhombus
-    reference: Union[List[TriccNodeBaseModel],triccIdList]
+    reference: Union[List[TriccNodeBaseModel],Expression]
+    expression_reference:Optional[str]
     path: Optional[TriccNodeBaseModel]
     def make_instance(self,instance_nb,activity,   **kwargs):
         #shallow copy
@@ -461,6 +469,7 @@ class TriccNodeRhombus(TriccNodeDisplayCalculateBase):
         elif isinstance(self.reference, list):
             for ref in self.reference:
                 if issubclass(ref.__class__, TriccBaseModel):
+                    pass
                     # get the reference
                     if self.activity == ref.activity:
                         for sub_node in activity.nodes.values():
@@ -522,6 +531,7 @@ def set_prev_node( source_node, target_node, replaced_node = None):
         target_node.prev_nodes.append(source_node)
         
 def replace_node(old, new, page):
+    logger.debug("replacing node {} with node {} from page {}".format(old.get_name(), new.get_name(), page.get_name()))
     #list_node used to avoid updating a list in the loop
     list_nodes=[]
     for prev_node in old.prev_nodes:
@@ -536,6 +546,7 @@ def replace_node(old, new, page):
         set_prev_next_node( new, next_node,old)
     old.next_nodes = []
     page.nodes[new.id]=new
+    #if old.id in page.nodes:
     del page.nodes[old.id]
     for edge in page.edges:
         if edge.source == old.id:
@@ -687,8 +698,6 @@ def stashed_node_func( node,callback, recusive=True, **kwargs):
 
 # check if the all the prev nodes are processed
 def is_ready_to_process(in_node, processed_nodes, stashed_nodes = None, recursive = False, strict = True):
-    if in_node.id in ('qW5RDNnEHnH2J5cjuda7-0','mQ1QYy0fmvMdh6GMffJX-0'):
-        pass
     if isinstance(in_node, TriccNodeSelectOption):
         node = in_node.select
     elif isinstance(in_node, TriccNodeActivityStart):
@@ -701,11 +710,11 @@ def is_ready_to_process(in_node, processed_nodes, stashed_nodes = None, recursiv
             if isinstance(prev_node,TriccNodeActivity):
                 activity_end_nodes = prev_node.get_end_nodes()
                 if len(activity_end_nodes)==0 :
-                    #logger.error("is_ready_to_process:failed: {1} -act-> {0} NO end nodes".format(prev_node.get_name(), node.get_name() ))
+                    logger.error("is_ready_to_process:failed: {1} -act-> {0} NO end nodes".format(prev_node.get_name(), node.get_name() ))
                     return False
                 for end_node in activity_end_nodes:
                     if end_node not in processed_nodes:
-                        #logger.debug("is_ready_to_process:failed: {2} -act-> {0} -end-> {1}".format(prev_node.get_name(),end_node.get_name(), node.get_name() ))
+                        logger.debug("is_ready_to_process:failed: {2} -act-> {0} -end-> {1}".format(prev_node.get_name(),end_node.get_name(), node.get_name() ))
                         return False
             elif prev_node not in processed_nodes:
                 if isinstance(prev_node, TriccNodeExclusive):
@@ -725,10 +734,11 @@ def is_ready_to_process(in_node, processed_nodes, stashed_nodes = None, recursiv
 def print_trace(node, prev_node, processed_nodes, stashed_nodes):
     if node != prev_node:
         if node in processed_nodes:
-            logger.warning("print trace :: node {}::{} was the last not processed ({}::{} is porcessed)".format(prev_node.__class__,prev_node.get_name(),node.id,node.get_name()))
+            logger.warning("print trace :: node {}::{}::{} was the last not processed ({}::{} is porcessed)".format(prev_node.__class__,prev_node.get_name(),prev_node.instance,node.id,node.get_name()))
+            processed_nodes.append(prev_node)
             return False
         elif node in stashed_nodes :
-            logger.debug("print trace :: node {}::{} in stashed".format(node.__class__,node.get_name()))
+#            logger.debug("print trace :: node {}::{} in stashed".format(node.__class__,node.get_name()))
             return False       
     #else:
         #logger.debug("print trace :: node {} not processed/stashed".format(node.get_name()))     
@@ -738,29 +748,28 @@ def print_trace(node, prev_node, processed_nodes, stashed_nodes):
                                 
 def reverse_walkthrough(in_node, next_node, callback, processed_nodes, stashed_nodes):
     # transform deadend nodes
-    if isinstance(in_node, TriccNodeActivity):
-        prev_nodes = in_node.get_end_nodes()
-        for prev in prev_nodes:
-            reverse_walkthrough(prev, next_node ,callback, processed_nodes, stashed_nodes)
-    else:
-    
-        if isinstance(in_node, TriccNodeSelectOption):
-            node = in_node.select
-        elif isinstance(in_node, TriccNodeActivityStart):
-            node = in_node.activity
-        else:
-            node = in_node
-        if callback(node,next_node,processed_nodes, stashed_nodes):
-            
-            if hasattr(node, 'prev_nodes'):
-                for prev in node.prev_nodes:
-                    reverse_walkthrough(prev, node ,callback, processed_nodes, stashed_nodes)
-            if isinstance(node,TriccNodeRhombus):
-                if isinstance(node.reference, list):
-                    for ref in node.reference:
-                        reverse_walkthrough(ref, node, callback, processed_nodes, stashed_nodes)
-                    
+    if next_node == in_node and next_node not in stashed_nodes:
+        # warkarround fir loop
+        return False
 
+    if isinstance(in_node, TriccNodeSelectOption):
+        node = in_node.select
+    elif isinstance(in_node, TriccNodeActivityStart):
+        node = in_node.activity
+    else:
+        node = in_node
+    if callback(node,next_node,processed_nodes, stashed_nodes):
+        if isinstance(in_node, TriccNodeActivity):
+            prev_nodes = in_node.get_end_nodes()
+            for prev in prev_nodes:
+                reverse_walkthrough(prev, next_node ,callback, processed_nodes, stashed_nodes)
+        if hasattr(node, 'prev_nodes'):
+            for prev in node.prev_nodes:
+                reverse_walkthrough(prev, node ,callback, processed_nodes, stashed_nodes)
+        if isinstance(node,TriccNodeRhombus):
+            if isinstance(node.reference, list):
+                for ref in node.reference:
+                    reverse_walkthrough(ref, node, callback, processed_nodes, stashed_nodes)
 
 def is_rhombus_ready_to_process(node,processed_nodes):
     if isinstance(node, TriccNodeRhombus) :
@@ -773,8 +782,9 @@ def is_rhombus_ready_to_process(node,processed_nodes):
                 elif issubclass(ref.__class__, str):
                     logger.debug("Node {1} as still a reference to string")              
     return True
+
 def get_prev_node_by_name(processed_nodes, name, node):
-    filtered = list(filter(lambda p_node:hasattr(p_node,'name') and p_node.name == name and p_node.instance==node.instance and p_node.path_len <= node.path_len  , processed_nodes))
+    filtered = list(filter(lambda p_node:hasattr(p_node,'name') and p_node.name == name  and p_node.instance==node.instance and p_node.path_len <= node.path_len  , processed_nodes))
     if len(filtered)==0: 
         #FIXME lastfound activity MUST be in node past 
         filtered = list(filter(lambda p_node:hasattr(p_node,'name') and p_node.name == name and p_node.path_len <= node.path_len  , processed_nodes))
@@ -839,6 +849,11 @@ class TriccExpression(BaseModel):
     
 class TriccExpressionNot(BaseModel):
     exp = TriccExpression
-    
+
+def get_node_from_list(in_nodes, node_id):
+    nodes =  list(filter(lambda x: x.id ==  node_id, in_nodes))
+    if len(nodes)>0:
+        return nodes[0]
+
 # update FF
 TriccEdge.update_forward_refs()

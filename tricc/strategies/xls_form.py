@@ -4,16 +4,24 @@ Strategy to build the skyp logic following the XLSForm way
 '''
 
 import datetime
+import logging
 
 import pandas as pd
-from tricc.converters.tricc_to_xls_form import generate_xls_form_calculate, generate_xls_form_condition,  generate_xls_form_relevance
-from tricc.converters.xml_to_tricc import VERSION_SEPARATOR
-from tricc.models import TriccNodeActivity,check_stashed_loop ,walktrhough_tricc_node_processed_stached
 
-
-from tricc.serializers.xls_form import CHOICE_MAP, SURVEY_MAP, end_group, generate_xls_form_export, get_diagnostic_line, get_diagnostic_none_line, get_diagnostic_start_group_line, get_diagnostic_stop_group_line,  start_group
+from tricc.converters.tricc_to_xls_form import (generate_xls_form_calculate,
+                                                generate_xls_form_condition,
+                                                generate_xls_form_relevance)
+from tricc.models import (TriccNodeActivity, check_stashed_loop,
+                          walktrhough_tricc_node_processed_stached)
+from tricc.serializers.xls_form import (CHOICE_MAP, SURVEY_MAP, end_group,
+                                        generate_xls_form_export,
+                                        get_diagnostic_line,
+                                        get_diagnostic_none_line,
+                                        get_diagnostic_start_group_line,
+                                        get_diagnostic_stop_group_line,
+                                        start_group)
 from tricc.strategies.base_strategy import BaseStrategy
-import logging
+
 logger = logging.getLogger('default')
 
 
@@ -108,7 +116,7 @@ class XLSFormStrategy(BaseStrategy):
                 s_node = stashed_nodes.pop()
                 path_len = sorted(s_node.prev_nodes, key=lambda p_node:p_node.path_len, reverse=True )[0].path_len+1
                 if s_node.group is None:
-                    print("ERROR group is none for node {}".format(s_node.get_name()))
+                    logger.error("ERROR group is none for node {}".format(s_node.get_name()))
                 start_group( cur_group =s_node.group, groups=groups, relevance= True,  **self.get_kwargs())
                 # arrange empty group
                 walktrhough_tricc_node_processed_stached(s_node, self.generate_export, processed_nodes, stashed_nodes, path_len, groups=groups,cur_group = s_node.group, **self.get_kwargs() )
@@ -118,13 +126,13 @@ class XLSFormStrategy(BaseStrategy):
                 if len(self.df_survey)>(2+skip_header):
                     if cur_group == s_node.group:
                         # drop the end group (to merge)
-                        print("printing same group {}::{} len {}".format(s_node.group.__class__, s_node.group.get_name(), len(self.df_survey)))
+                        logger.info("printing same group {}::{}::{}::{}".format(s_node.group.__class__, s_node.group.get_name(),s_node.id, s_node.group.instance))
                         df_survey_final.drop(index=df_survey_final.index[-1], axis=0, inplace=True)
                         self.df_survey = self.df_survey[(1+skip_header):]
                         df_survey_final=pd.concat([df_survey_final, self.df_survey], ignore_index=True)
 
                     else:
-                        print("printing group {}::{} len {}".format(s_node.group.__class__, s_node.group.get_name(), len(self.df_survey)))
+                        logger.info("printing group {}::{}::{}::{}".format(s_node.group.__class__, s_node.group.get_name(),s_node.id,s_node.group.instance))
                         df_survey_final =pd.concat([df_survey_final, self.df_survey], ignore_index=True)
                     cur_group = s_node.group
         # add the calulate
@@ -140,15 +148,14 @@ class XLSFormStrategy(BaseStrategy):
         
                 
 
-    def export_diag(self, activity,  **kwargs):
-        diags = []
+    def export_diag(self, activity, diags = [], **kwargs):
         for node in activity.nodes.values():
             if isinstance(node, TriccNodeActivity):
-                diags += self.export_diag(node,  **kwargs)
+                diags = self.export_diag(node, diags, **kwargs)
             if hasattr(node, 'name') and node.name is not None:
                 if node.name.startswith('diag_'):
                     nb_found = len(self.df_survey[self.df_survey.name == "label_"+node.name])
-                    if VERSION_SEPARATOR not in node.name and nb_found == 0:
+                    if node.last == True and nb_found == 0:
                         self.df_survey.loc[len(self.df_survey)] = get_diagnostic_line(node)
                         diags.append(node)
         return diags

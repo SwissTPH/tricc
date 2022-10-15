@@ -1,12 +1,16 @@
 
 
-from tricc.converters.utils import clean_name
-from tricc.converters.tricc_to_xls_form import TRICC_CALC_EXPRESSION, TRICC_NEGATE
+import logging
 from gettext import gettext as _
+
+from tricc.converters.tricc_to_xls_form import (TRICC_CALC_EXPRESSION,
+                                                TRICC_NEGATE)
+from tricc.converters.utils import clean_name
 from tricc.models import *
 
-import logging
 logger = logging.getLogger('default')
+
+
 
 def start_group( cur_group, groups, df_survey, relevance = False, **kargs):
     values = []
@@ -126,7 +130,7 @@ def get_attr_if_exists(node,column, map_array):
        return str(getattr(node, column))
     else:
         return ''
-    
+
 
 def generate_xls_form_export(node, processed_nodes, stashed_nodes, df_survey, df_choice,df_calculate, cur_group, **kargs):
     # check that all prev nodes were processed

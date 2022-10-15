@@ -1,7 +1,6 @@
 from typing import List
-import lxml.etree as etree
 
- 
+import lxml.etree as etree
 
 
 def read_drawio(filepath):

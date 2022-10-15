@@ -1,5 +1,5 @@
-from uuid import uuid4
 import logging
+from uuid import uuid4
 
 OPERATION_LIST = [ '>=', '<=', '==','=','>','<']
 

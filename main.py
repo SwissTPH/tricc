@@ -1,11 +1,15 @@
-import sys, getopt, os
-
-from tricc.services.process_diagram import build_tricc_graph
+import getopt
+import gettext
 import logging
-from tricc.strategies.xls_form import XLSFormStrategy
+import os
+import sys
+
 # set up logging to file
 from babel import Locale
-import gettext
+
+from tricc.services.process_diagram import build_tricc_graph
+from tricc.strategies.xls_form import XLSFormStrategy
+
 #gettext.bindtextdomain('tricc', './locale/')
 #gettext.textdomain('tricc')
 language =   Locale('Fr')
@@ -100,6 +104,8 @@ if __name__ == "__main__":
     
     strategy.process_export(start_page)
     logger.info("print the export")
+    if start_page.root.form_id is not None:
+        formid= start_page.root.form_id 
     strategy.do_export(start_page.root.label,out_filepath, formid)
 
 

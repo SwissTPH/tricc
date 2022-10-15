@@ -1,8 +1,10 @@
 
 import re
-from tricc.converters.utils import   OPERATION_LIST, clean_str
+from gettext import gettext as _  # plurals: , ngettext as __
+
+from tricc.converters.utils import OPERATION_LIST, clean_str
 from tricc.models import *
-from gettext import gettext as _ # plurals: , ngettext as __
+
 #from babel import _
 
 TRICC_SELECT_MULTIPLE_CALC_EXPRESSION = "count-selected(${{{0}}}) - number(selected(${{{0}}},'opt_none'))"
@@ -15,11 +17,16 @@ TRICC_NEGATE = "not({})"
 TRICC_NUMBER = "number({})"
 TRICC_NAND_EXPRESSION = '(({0}) and not({1}))'
 TRICC_AND_EXPRESSION = '(({0}) and ({1}))'
+VERSION_SEPARATOR = '_v_'
+INSTANCE_SEPARATOR = "I_{0}_{1}"
+
 
 import logging
+
 logger = logging.getLogger("default")
 
 def generate_xls_form_condition(node, processed_nodes, stashed_nodes, **kwargs):
+    node.name = get_printed_name(node)
     if is_ready_to_process(node, processed_nodes, stashed_nodes,strict  =False):
         if node not in processed_nodes:
             if hasattr(node, 'name') and node.name is not None:
@@ -159,11 +166,12 @@ def get_prev_node_expression(node, processed_nodes, is_calculate = False, exclud
         # relevance of the previous instance must be false to display this activity
         add_sub_expression(expression_inputs, get_node_expression(activity.base_instance, processed_nodes, False, True))
         for instance_nb, past_instance in activity.base_instance.instances.items():
-            if int(instance_nb) < int(activity.instance):
+            if int(past_instance.path_len) < int(activity.path_len):
                 add_sub_expression(expression_inputs, get_node_expression(past_instance, processed_nodes, False, True))
         #clean_list_or(expression_inputs)
         expression_activity =  ' or '.join(expression_inputs)
-        expression = TRICC_NAND_EXPRESSION.format(expression,expression_activity)         
+        if expression_activity is not None and expression_activity != '':
+            expression = TRICC_NAND_EXPRESSION.format(expression,expression_activity)         
     return expression
 
 #calculate or retrieve a node expression
@@ -191,12 +199,7 @@ def get_node_expression(in_node,processed_nodes, is_calculate = False, is_prev =
     elif is_prev  and hasattr(node,'required') and node.required == True:
         expression = get_required_node_expression(node) 
     elif is_prev and isinstance(node, TriccNodeActivity) and node.base_instance is not None:
-        end_nodes = node.get_end_nodes()
-        expression_inputs = []
-        for end_node in end_nodes:
-            add_sub_expression(expression_inputs, get_node_expression(end_node,processed_nodes, is_calculate = False, is_prev = True))
-        expression_inputs = clean_list_or(expression_inputs)
-        expression = ' or '.join(expression_inputs)
+        expression= get_activity_end_terms(node, processed_nodes)
     elif is_prev  and   hasattr(node, 'relevance') and node.relevance is not None and node.relevance != '':
             expression = node.relevance
     if expression is None:
@@ -212,6 +215,13 @@ def get_node_expression(in_node,processed_nodes, is_calculate = False, is_prev =
     else:
         return expression
 
+def get_activity_end_terms(node, processed_nodes):
+    end_nodes = node.get_end_nodes()
+    expression_inputs = []
+    for end_node in end_nodes:
+        add_sub_expression(expression_inputs, get_node_expression(end_node,processed_nodes, is_calculate = False, is_prev = True))
+    expression_inputs = clean_list_or(expression_inputs)
+    return ' or '.join(expression_inputs)
 
 
 def get_calculation_terms(node, processed_nodes, is_calculate = False, negate = False):
@@ -233,7 +243,7 @@ def get_calculation_terms(node, processed_nodes, is_calculate = False, negate = 
             elif isinstance(node.prev_nodes[0],TriccNodeActivity):
                 return get_node_expression(node.prev_nodes[0], processed_nodes, is_calculate = False, is_prev=True, negate=True)
             else:
-                logger.error("exclusive node {} does not depend of a calculate".format(node.get_name()))
+                logger.error("exclusive node {} does not depend of a calculate but on {}::{}".format(node.get_name(), node.prev_nodes[0].__class__,node.prev_nodes[0].get_name() ))
         else:
             logger.error("exclusive node {} has no ou too much parent".format(node.get_name()))
     elif negate:
@@ -254,37 +264,42 @@ def process_rhumbus_expression(label, operation):
 def get_rhumbus_terms(node, processed_nodes, is_calculate= False, negate = False):
     expression = None
     left_term = None
-    if node.label is not None:
-        for operation in OPERATION_LIST:
-            left_term =  process_rhumbus_expression( node.label, operation)
-            if left_term is not None:
-                break
-    if left_term is None:
-        left_term = '>0'
     # calcualte the expression only for select muzltiple and fake calculate
     if  node.reference is not None and issubclass(node.reference.__class__, list):
-            if len(node.reference) == 1:
+            if node.expression_reference is None and len(node.reference) == 1:
+                if node.label is not None:
+                    for operation in OPERATION_LIST:
+                        left_term =  process_rhumbus_expression( node.label, operation)
+                        if left_term is not None:
+                            break
+                if left_term is None:
+                    left_term = '>0'
                 ref = node.reference[0]
                 if issubclass(ref.__class__, TriccNodeBaseModel):
-                    if issubclass(ref.__class__, TriccNodeFakeCalculateBase):
+                    if isinstance(ref, TriccNodeActivity):
+                        expression = get_activity_end_terms(ref, processed_nodes)
+                    elif issubclass(ref.__class__, TriccNodeFakeCalculateBase):
                         expression = get_node_expression(ref, processed_nodes, is_calculate = True, is_prev = True)
                     else:
                         expression = TRICC_REF_EXPRESSION.format(ref.name)
                 else: 
-                    #expression = TRICC_REF_EXPRESSION.format(node.reference)
+                    #expression = TRICC_REF_EXPRES
+                    # SION.format(node.reference)
                     #expression = "${{{}}}".format(node.reference)
                     logger.error('reference {0} was not found in the previous nodes of node {1}'.format(node.reference, node.get_name()))
                     exit()
-            elif node.expression is not None and node.expression != '':
-                expression = node.expression.format(*get_list_names(node.reference))
+            elif node.expression_reference is not None and node.expression_reference != '':
+                left_term=''
+                expression = node.expression_reference.format(*get_list_names(node.reference))
             else:
                 logger.warning("missing epression for node {}".format(node.get_name()))
     else:
         logger.error('reference {0} is not a list {1}'.format(node.reference, node.get_name()))
         exit()        
 
-    if expression is not None:
-        if re.search(" (\+)|(\-)|(or)|(and) ", expression):
+    if expression is not None :
+       
+        if  left_term is not None and re.search(" (\+)|(\-)|(or)|(and) ", expression):
             expression =  "({0}){1}".format(expression,left_term)
         else:
             expression =  "{0}{1}".format(expression,left_term)
@@ -323,9 +338,22 @@ def clean_list_or(list_or, elm_and = None):
                     list_or = []
     return list_or
                 
-
+def get_printed_name(node):
+    if issubclass(node.__class__, TriccNodeDiplayModel):
+        node.gen_name()
+        if not isinstance(node, TriccNodeSelectOption)\
+            and not issubclass(node.__class__, TriccNodeDisplayCalculateBase)\
+            and INSTANCE_SEPARATOR.format(node.instance,node.name) != node.name:
+            return INSTANCE_SEPARATOR.format(node.instance, node.name)
+    elif issubclass(node.__class__, TriccNodeCalculateBase):
+        node.gen_name()
+        if node.last == False\
+                    and VERSION_SEPARATOR not in node.name:
         
-   
+            return node.name + VERSION_SEPARATOR + str(node.version)  
+    return node.name
+                
+    
 def get_add_terms(node, processed_nodes, is_calculate = False, negate = False): 
     if negate:
         logger.warning("negate not supported for Add node {}".format(node.get_name()))
