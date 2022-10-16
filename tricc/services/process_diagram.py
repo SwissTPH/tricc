@@ -130,13 +130,13 @@ def walkthrough_goto_node(node, page, pages, processed_nodes, current_path):
         next_page = pages[node.link]
         # walk thought the next page
         max_instance = 1
-        if int(node.instance)  == 0 or int(next_page.root.instance) == 0:
+        if node.instance == 0 or next_page.root.instance == 0:
             for other_page in next_page.instances.values():
                 if int(other_page.instance) > int(max_instance):
                     max_instance = other_page.instance
             #auto instance starts at 101
             next_page = next_page.make_instance(max(100,max_instance)+1)
-        elif int(node.instance) != 1:
+        elif node.instance != 1:
             #return existing instance if any
             next_page = next_page.make_instance(node.instance)
         if next_page.id not in pages:

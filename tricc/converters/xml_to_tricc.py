@@ -204,7 +204,7 @@ def create_root_node(diagram):
                 parent= elm.attrib.get('parent'),
                 name = 'ma'+diagram.attrib.get('id'),
                 label = diagram.attrib.get('name'),
-                instance =  elm.attrib.get('instance') if  elm.attrib.get('instance') is not None else 1
+                instance = int(elm.attrib.get('instance') if elm.attrib.get('instance') is not None else 1)
             )
             
     return node
@@ -222,7 +222,12 @@ def set_additional_attributes(attribute_names, elm, node):
         attribute =  elm.attrib.get(attributename)
         if attribute is not None:
             # input expression can add a condition to either relevance (display) or calculate expression
-            attribute = [attribute] if attributename == 'expression_inputs' else attribute
+            if attributename == 'expression_inputs':
+                attribute = [attribute]
+            elif attributename == 'instance':
+                attribute = int(attribute)
+            else:
+                attribute
             setattr(node, attributename, attribute)        
 
 def add_note_nodes(nodes, diagram, group):
@@ -531,6 +536,25 @@ def process_reference(node,  calculates ,used_calculates,processed_nodes):
         elif node.reference is None:
             logger.error("process_calculate_version_requirement:reference is None for {0} ".format(node.get_name()))
             exit()
+    else:
+        for prev_node in node.prev_nodes: 
+            # find the dandling calculate
+            if issubclass(prev_node.__class__, TriccNodeDisplayCalculateBase) and  len(prev_node.prev_nodes) ==0:
+                new_node = TriccNodeRhombus(
+                    id = "r_" + generate_id(),
+                    prev_nodes = [node.activity.root],
+                    reference = prev_node.name,
+                    instance = node.instance,
+                    activity = node.activity,
+                    group = node.group                   
+                )
+                set_prev_next_node(new_node,node,prev_node)
+                if process_reference(new_node,  calculates ,used_calculates,processed_nodes):
+                    processed_nodes.append(new_node)
+                    return True
+
+                
+            
     return True
 
 #FIXME it version name not required anymore
