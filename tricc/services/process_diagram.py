@@ -27,7 +27,7 @@ def build_tricc_graph(in_filepath):
                     else:
                         logger.warning(
                             "Page {0} has a start node but there is already a start node in page  {1}"\
-                                .format(page.name, start_page.name))
+                                .format(page.label, start_page.label))
     logger.info("# Create the graph from the start node")
     if start_page is not None:
         # create the graph
