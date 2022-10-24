@@ -493,7 +493,7 @@ class TriccNodeFakeCalculateBase(TriccNodeCalculateBase):
     pass
 
 
-class TriccNodeRhombus(TriccNodeDisplayCalculateBase):
+class TriccNodeRhombus(TriccNodeCalculateBase):
     odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccExtendedNodeType.rhombus
     reference: Union[List[TriccNodeBaseModel], Expression]
     expression_reference: Optional[str]
@@ -599,7 +599,7 @@ def replace_node(old, new, page):
             edge.target = new.id
 
 
-def reorder_node_list(list_node, group):
+def reorder_node_list(list_node, group):    
     return list_node
     grouped_nodes = {}
     for i in range(len(list_node)):

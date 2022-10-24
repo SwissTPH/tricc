@@ -188,10 +188,10 @@ def get_node_expression(in_node, processed_nodes, is_calculate=False, is_prev=Fa
     elif is_prev and isinstance(node, TriccNodeRhombus):
         right = get_node_expression(node.path, processed_nodes, is_calculate, is_prev)
         if right != '1':
-            expression = TRICC_AND_EXPRESSION.format(right, TRICC_CALC_EXPRESSION.format(node.name))
-            negate_expression = TRICC_NAND_EXPRESSION.format(right, TRICC_CALC_EXPRESSION.format(node.name))
+            expression = TRICC_AND_EXPRESSION.format(right, get_rhombus_terms(node, processed_nodes))
+            negate_expression = TRICC_NAND_EXPRESSION.format(right,get_rhombus_terms(node, processed_nodes))
         else:
-            expression = TRICC_CALC_EXPRESSION.format(node.name)
+            expression = get_rhombus_terms(node, processed_nodes)
     elif is_prev and issubclass(node.__class__, TriccNodeDisplayCalculateBase):
         expression = TRICC_CALC_EXPRESSION.format(node.name)
     elif issubclass(node.__class__, TriccNodeCalculateBase):
@@ -201,7 +201,7 @@ def get_node_expression(in_node, processed_nodes, is_calculate=False, is_prev=Fa
             expression = get_calculation_terms(node, processed_nodes, is_calculate)
     elif is_prev and hasattr(node, 'required') and node.required == True:
         expression = get_required_node_expression(node)
-    elif is_prev and isinstance(node, TriccNodeActivity) and node.base_instance is not None:
+    elif is_prev and isinstance(node, TriccNodeActivity):
         expression = get_activity_end_terms(node, processed_nodes)
     elif is_prev and hasattr(node, 'relevance') and node.relevance is not None and node.relevance != '':
         expression = node.relevance
@@ -235,7 +235,7 @@ def get_calculation_terms(node, processed_nodes, is_calculate=False, negate=Fals
     elif isinstance(node, TriccNodeCount):
         return get_count_terms(node, False, negate)
     elif isinstance(node, TriccNodeRhombus):
-        return get_rhumbus_terms(node, processed_nodes, False, negate)
+        return get_rhombus_terms(node, processed_nodes, False, negate)
     elif isinstance(node, TriccNodeActivityStart):
         return get_prev_node_expression(node.activity, processed_nodes, is_calculate=False, excluded_name=None)
     elif isinstance(node, TriccNodeExclusive):
@@ -272,7 +272,7 @@ def process_rhumbus_expression(label, operation):
             return operation + terms[1].replace('?', '').strip()
 
 
-def get_rhumbus_terms(node, processed_nodes, is_calculate=False, negate=False):
+def get_rhombus_terms(node, processed_nodes, is_calculate=False, negate=False):
     expression = None
     left_term = None
     # calcualte the expression only for select muzltiple and fake calculate

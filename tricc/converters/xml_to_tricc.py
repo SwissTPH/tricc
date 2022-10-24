@@ -423,9 +423,8 @@ def generate_calculates(node,calculates, used_calculates,processed_nodes):
                 processed_nodes.append(count_node)
                 add_calculate(calculates, count_node)
                 add_used_calculate(node, count_node, calculates, used_calculates, processed_nodes)
-            else:
-                pass
-            # generate rhombuse path 
+            
+            # generate rhombuse path
             calc_node = get_rhombus_path(node)
             node.path = calc_node
             list_nodes = []
@@ -539,7 +538,7 @@ def process_reference(node,  calculates ,used_calculates,processed_nodes):
     else:
         for prev_node in node.prev_nodes: 
             # find the dandling calculate
-            if issubclass(prev_node.__class__, TriccNodeDisplayCalculateBase) and  len(prev_node.prev_nodes) ==0:
+            if  not isinstance(prev_node, TriccNodeActivityStart) and issubclass(prev_node.__class__, TriccNodeDisplayCalculateBase) and  len(prev_node.prev_nodes) ==0:
                 new_node = TriccNodeRhombus(
                     id = "r_" + generate_id(),
                     prev_nodes = [node.activity.root],
