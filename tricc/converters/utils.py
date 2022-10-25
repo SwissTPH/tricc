@@ -1,4 +1,6 @@
 import logging
+import random
+import string
 from uuid import uuid4
 
 OPERATION_LIST = [ '>=', '<=', '==','=','>','<']
@@ -21,7 +23,8 @@ def clean_name( name, prefix='' ):
     return name
 
 def generate_id():
-    return str(uuid4())
+    return ''.join(random.choices(string.ascii_lowercase, k=8))
+
 
 
 

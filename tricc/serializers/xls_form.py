@@ -134,8 +134,7 @@ def get_attr_if_exists(node,column, map_array):
 
 def generate_xls_form_export(node, processed_nodes, stashed_nodes, df_survey, df_choice,df_calculate, cur_group, **kargs):
     # check that all prev nodes were processed
-
-    if is_ready_to_process(node,processed_nodes,stashed_nodes):
+    if is_ready_to_process(node,processed_nodes):
         if node not in processed_nodes :
             if node.group != cur_group :
                 return False
@@ -160,7 +159,11 @@ def generate_xls_form_export(node, processed_nodes, stashed_nodes, df_survey, df
                                 values.append(0)
                             else:
                                 values.append(get_attr_if_exists(node,column,SURVEY_MAP))
-                        df_calculate.loc[len(df_calculate)] = values
+                        if len(df_calculate[df_calculate.name == node.name])==0:
+                            df_calculate.loc[len(df_calculate)] = values
+                        else:
+                            logger.error("name {} found twice".format(node.name))
+                        
                     elif  ODK_TRICC_TYPE_MAP[node.odk_type] !='':
                         values = []
                         for column in SURVEY_MAP:

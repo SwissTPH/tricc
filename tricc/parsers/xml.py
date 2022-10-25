@@ -13,9 +13,7 @@ def read_drawio(filepath):
         #etree = ET.fromstringlist(it)
         #get all the pages
     diagram_list = root.findall('//diagram')
-
-
-    
+  
     return diagram_list
 
 

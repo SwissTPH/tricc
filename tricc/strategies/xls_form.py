@@ -114,7 +114,8 @@ class XLSFormStrategy(BaseStrategy):
             len_prev_processed_nodes = len(processed_nodes)   
             if len(stashed_nodes)>0:
                 s_node = stashed_nodes.pop()
-                path_len = sorted(s_node.prev_nodes, key=lambda p_node:p_node.path_len, reverse=True )[0].path_len+1
+                if len(s_node.prev_nodes)>0:
+                    path_len = sorted(s_node.prev_nodes, key=lambda p_node:p_node.path_len, reverse=True )[0].path_len+1
                 if s_node.group is None:
                     logger.error("ERROR group is none for node {}".format(s_node.get_name()))
                 start_group( cur_group =s_node.group, groups=groups, relevance= True,  **self.get_kwargs())

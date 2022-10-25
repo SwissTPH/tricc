@@ -136,7 +136,7 @@ def walkthrough_goto_node(node, page, pages, processed_nodes, current_path):
                     max_instance = other_page.instance
             #auto instance starts at 101
             next_page = next_page.make_instance(max(100,max_instance)+1)
-        elif node.instance != 1:
+        else:
             #return existing instance if any
             next_page = next_page.make_instance(node.instance)
         if next_page.id not in pages:

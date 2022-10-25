@@ -16,17 +16,17 @@ TRICC_NEGATE = "not({})"
 TRICC_NUMBER = "number({})"
 TRICC_NAND_EXPRESSION = '(({0}) and not({1}))'
 TRICC_AND_EXPRESSION = '(({0}) and ({1}))'
-VERSION_SEPARATOR = '_v_'
-INSTANCE_SEPARATOR = "I_{0}_{1}"
+VERSION_SEPARATOR = '_Vv_'
+INSTANCE_SEPARATOR = "_Ii_"
 
 import logging
 
 logger = logging.getLogger("default")
 
 
-def generate_xls_form_condition(node, processed_nodes, stashed_nodes, **kwargs):
+def generate_xls_form_condition(node, processed_nodes, **kwargs):
     node.name = get_printed_name(node)
-    if is_ready_to_process(node, processed_nodes, stashed_nodes, strict=False):
+    if is_ready_to_process(node, processed_nodes, strict=False):
         if node not in processed_nodes:
             if hasattr(node, 'name') and node.name is not None:
                 node.name = clean_str(node.name)
@@ -57,7 +57,7 @@ def generate_xls_form_condition(node, processed_nodes, stashed_nodes, **kwargs):
 
 
 def generate_xls_form_relevance(node, processed_nodes, stashed_nodes, **kwargs):
-    if is_ready_to_process(node, processed_nodes, stashed_nodes):
+    if is_ready_to_process(node, processed_nodes):
         if node not in processed_nodes:
             logger.debug('Processing relevance for node {0}'.format(node.get_name()))
             # if has prev, create condition
@@ -86,7 +86,7 @@ def generate_xls_form_relevance(node, processed_nodes, stashed_nodes, **kwargs):
 
 
 def generate_xls_form_calculate(node, processed_nodes, stashed_nodes, **kwargs):
-    if is_ready_to_process(node, processed_nodes, stashed_nodes):
+    if is_ready_to_process(node, processed_nodes):
         if node not in processed_nodes:
             logger.debug("generation of calculate for node {}".format(node.get_name()))
             if hasattr(node, 'expression') and (node.expression is None):
@@ -151,7 +151,7 @@ def get_prev_node_expression(node, processed_nodes, is_calculate=False, excluded
     for prev_node in node.prev_nodes:
 
         if excluded_name is None or prev_node != excluded_name or (
-                isinstance(excluded_name, str) and hasattr(prev_node, 'name') and prev_node.name != excluded_name):
+                isinstance(excluded_name, str) and hasattr(prev_node, 'name') and prev_node.name != excluded_name) or isinstance(prev_node, TriccNodeActivityEnd):
             # the rhombus should calculate only reference
             add_sub_expression(expression_inputs, get_node_expression(prev_node, processed_nodes, is_calculate, True))
             # avoid void is there is not conditions to avoid looping too much itme
@@ -165,14 +165,16 @@ def get_prev_node_expression(node, processed_nodes, is_calculate=False, excluded
     if isinstance(node, TriccNodeActivity) and node.base_instance is not None:
         activity = node
         expression_inputs = []
+        #exclude base node only if the defaulf instance number is not 0
+        if activity.base_instance.instance >0:
+            add_sub_expression(expression_inputs, get_node_expression(activity.base_instance, processed_nodes, False, True))
         # relevance of the previous instance must be false to display this activity
-        add_sub_expression(expression_inputs, get_node_expression(activity.base_instance, processed_nodes, False, True))
         for instance_nb, past_instance in activity.base_instance.instances.items():
             if int(past_instance.path_len) < int(activity.path_len):
                 add_sub_expression(expression_inputs, get_node_expression(past_instance, processed_nodes, False, True))
         # clean_list_or(expression_inputs)
         expression_activity = ' or '.join(expression_inputs)
-        if expression_activity is not None and expression_activity != '':
+        if expression_activity is not None and expression_activity != ''  :
             expression = TRICC_NAND_EXPRESSION.format(expression, expression_activity)
     return expression
 
@@ -352,18 +354,20 @@ def clean_list_or(list_or, elm_and=None):
 
 
 def get_printed_name(node):
-    if issubclass(node.__class__, TriccNodeDiplayModel):
+    if INSTANCE_SEPARATOR  in node.name or  VERSION_SEPARATOR in node.name:
+        return node.name 
+    elif issubclass(node.__class__, (TriccNodeDiplayModel)):
         node.gen_name()
-        if not isinstance(node, TriccNodeSelectOption) \
-                and not issubclass(node.__class__, TriccNodeDisplayCalculateBase) \
-                and INSTANCE_SEPARATOR.format(node.instance, node.name) != node.name:
-            return INSTANCE_SEPARATOR.format(node.instance, node.name)
+        if not isinstance(node, TriccNodeSelectOption):
+            return node.name +  INSTANCE_SEPARATOR + str(node.instance)
+    elif isinstance(node, (TriccNodeActivityEnd, TriccNodeActivityStart)):
+        return  node.name +  INSTANCE_SEPARATOR + str(node.instance)
+
     elif issubclass(node.__class__, TriccNodeCalculateBase):
         node.gen_name()
-        if node.last == False \
-                and VERSION_SEPARATOR not in node.name:
-            return node.name + VERSION_SEPARATOR + str(node.version)
-    return node.name
+        if node.last == False:
+            return node.name + VERSION_SEPARATOR + str(node.path_len)
+    return node.name 
 
 
 def get_add_terms(node, processed_nodes, is_calculate=False, negate=False):
