@@ -1,7 +1,3 @@
-#FIXME, romhbus should not be a next node of the previous but a next node of the ref
-# and then nodes before the rombus should be "linked" node after the rombhus but in a way that 
-# won't impact the relevance/calcualteg
-
 import base64
 import os
 import re
@@ -356,17 +352,12 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
                         if last_used_calc is None or last_calc.path_len > last_used_calc.path_len:
                             node.version = last_calc.version + 1
                             node_to_delete = merge_calculate(node, calculates[node.name],last_used_calc)
-                            # FIXME remove merge calcualte and force all version, issue with obs.
-                            #node_to_delete = []
-                            #add_used_calculate(node, last_version, calculates, used_calculates, processed_nodes)
-                            ## end wa
-                            #last_used_calc = node
                             if node_to_delete is not None:  
                                 for d_node in node_to_delete:                  
                                     del calculates[d_node.name][d_node.id]
-                                    node_clean_name = get_calculate_cleaned_name(d_node.name)
-                                    if node_clean_name in used_calculates:
-                                        if d_node.id in used_calculates[node_clean_name]:
+                                    
+                                    if d_node.name in used_calculates:
+                                        if d_node.id in used_calculates[d_node.name]:
                                             logger.error("node {} used but deleted".format(d_node.get_name()))
                                     if d_node.id in d_node.activity.nodes:
                                         # mostly for end nodes
@@ -504,10 +495,9 @@ last_unfound_ref = None
 
 def add_calculate(calculates, calc_node):
     if issubclass(calc_node.__class__, TriccNodeDisplayCalculateBase):
-        node_clean_name = get_calculate_cleaned_name(calc_node.name)
-        if node_clean_name not in calculates:
-            calculates[node_clean_name]= {}
-        calculates[node_clean_name][calc_node.id] = calc_node
+        if calc_node.name not in calculates:
+            calculates[calc_node.name]= {}
+        calculates[calc_node.name][calc_node.id] = calc_node
 
 def process_reference(node,  calculates ,used_calculates,processed_nodes):
     #global last_unfound_ref
@@ -573,9 +563,6 @@ def process_reference(node,  calculates ,used_calculates,processed_nodes):
             
     return True
 
-#FIXME it version name not required anymore
-def get_calculate_cleaned_name(name):
-    return name
 
 #add_used_calculate(node, calc_node, calculates, used_calculates, processed_nodes)
 
@@ -583,16 +570,15 @@ def add_used_calculate(node, prev_node, calculates, used_calculates, processed_n
     if issubclass(prev_node.__class__, TriccNodeDisplayCalculateBase):
         if prev_node in processed_nodes:
             # if not a verison, index will equal -1
-            node_clean_name = get_calculate_cleaned_name(prev_node.name)
-            if node_clean_name not in calculates :
+            if prev_node.name not in calculates :
                 logger.debug("node {} refered before being processed".format(node.get_name()))
                 return False
             max_version = prev_node#get_max_version(calculates[node_clean_name])
-            if node_clean_name not in used_calculates:
-                used_calculates[node_clean_name] = {}
+            if prev_node.name not in used_calculates:
+                used_calculates[prev_node.name] = {}
             #save the max version only once
-            if max_version.id not in used_calculates[node_clean_name]:
-                used_calculates[node_clean_name][max_version.id] = max_version
+            if max_version.id not in used_calculates[prev_node.name]:
+                used_calculates[prev_node.name][max_version.id] = max_version
         else:
             logger.debug("process_calculate_version_requirement: failed for {0} , prev Node {1} ".format(node.get_name(), prev_node.get_name()))
 

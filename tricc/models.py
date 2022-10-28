@@ -600,39 +600,37 @@ def replace_node(old, new, page):
 
 
 def reorder_node_list(list_node, group):
-    if len(list_node)<2:
-        return list_node
-    grouped_nodes = {}
-    list_out = []
-    for l_node in list_node:
-        if hasattr(l_node, 'group'):
-            group_id = l_node.group.id
-            if group_id not in grouped_nodes:
-                grouped_nodes[group_id] = []
-            grouped_nodes[group_id].append(l_node)
-        else:
-            if 'none' not in grouped_nodes:
-                grouped_nodes['none'] = []
-            grouped_nodes['none'].append(l_node)
-    # add the elm of the same group first   
-    if group.id in grouped_nodes:
-        list_out = grouped_nodes[group.id]
-        del grouped_nodes[group.id]
+    if len(list_node)>1:
+        list_out = []
+        list_out_group = []
+        list_out_other = []
+        for l_node in list_node:
+            group_id = l_node.group.id if hasattr(l_node, 'group') and l_node.group is not None else None
+            if group is not None and group.id == group_id:
+                list_out.append(l_node)
+            elif hasattr(group, 'group') and group.group.id == group_id:
+                list_out_group.append(l_node)
+            else:
+                list_out_other.append(l_node)
 
-    if group.group is not None and group.group.id in grouped_nodes:
-        list_out += grouped_nodes[group.group.id]
-        del grouped_nodes[group.group.id]
-    # print all other element
-    for other_list in grouped_nodes.values():
-        list_out += other_list
-    return list_out
+        list_node = []
+        if len(list_out)>0:
+            list_node.extend(list_out)
+        if len(list_out_group)>0:
+            list_node.extend(list_out_group)
+        if len(list_out_other)>0:
+            list_node.extend(list_out_other)
+            
+        logger.debug("reorder list init len: {}, group : {} group.group: {} other: {}".format(len(list_node), len(list_out), len(list_out_group), len(list_out_other)))
+
+
 
 
 # walkthough all node in an iterative way, the same node might be parsed 2 times 
 # therefore to avoid double processing the nodes variable saves the node already processed
 # there 2 strategies : process it the first time or the last time (wait that all the previuous node are processed)
 
-def walktrhough_tricc_node_processed_stached(node, callback, processed_nodes, stashed_nodes, path_len, recursive=False,
+def walktrhough_tricc_node_processed_stached(node, callback, processed_nodes, stashed_nodes, path_len, recursive=True,
                                              **kwargs):
     # logger.debug("walkthrough::{}::{}".format(callback.__name__, node.get_name()))
     if hasattr(node, 'prev_nodes') and len(node.prev_nodes) > 0:
@@ -650,7 +648,8 @@ def walktrhough_tricc_node_processed_stached(node, callback, processed_nodes, st
         # put the stached node from that group first
         # if has next, walkthrough them (support options)
         # if len(stashed_nodes)>1:
-        stashed_nodes=reorder_node_list(stashed_nodes, node.group)
+        if not recursive:
+            reorder_node_list(stashed_nodes, node.group)
         # logger.debug("{}::{}: reorder stashed ({})".format(callback.__name__, node.get_name(), len(stashed_nodes)))
         if isinstance(node, TriccNodeActivity):
             if node.root is not None:
@@ -658,12 +657,13 @@ def walktrhough_tricc_node_processed_stached(node, callback, processed_nodes, st
                 if recursive:
                     walktrhough_tricc_node_processed_stached(node.root, callback, processed_nodes, stashed_nodes, path_len,
                                                          recursive, **kwargs)
-                else:
-                    stashed_nodes.append(node.root)
+                elif node.root not in stashed_nodes:
+                    stashed_nodes.insert(0,node.root)
                 return
         elif isinstance(node, TriccNodeActivityEnd):
             for next_node in node.activity.next_nodes:
-                stashed_nodes.insert(0, next_node)
+                if next_node not in stashed_nodes:
+                    stashed_nodes.insert(0,next_node)
 
         elif issubclass(node.__class__, TriccNodeSelect):
             for option in node.options.values():
@@ -680,14 +680,16 @@ def walktrhough_tricc_node_processed_stached(node, callback, processed_nodes, st
                                              **kwargs)
     else:
         if node not in processed_nodes and node not in stashed_nodes:
-            stashed_nodes.insert(0, node)
-            logger.debug("{}::{}: stashed({})".format(callback.__name__, node.get_name(), len(stashed_nodes)))
+            if node not in stashed_nodes:
+                stashed_nodes.insert(0,node)
+                logger.debug("{}::{}: stashed({})".format(callback.__name__, node.get_name(), len(stashed_nodes)))
 
 
 def walkthrough_tricc_next_nodes(node, callback, processed_nodes, stashed_nodes, path_len, recursive, **kwargs):
     if not recursive:
         for next_node in node.next_nodes:
-            stashed_nodes.insert(0, next_node)
+            if next_node not in stashed_nodes:
+                stashed_nodes.append(next_node)
     else:
         list_next = []
         while not all(elem in list_next for elem in node.next_nodes):
@@ -696,7 +698,7 @@ def walkthrough_tricc_next_nodes(node, callback, processed_nodes, stashed_nodes,
                     list_next.append(next_node)
                     if not isinstance(node, (TriccNodeActivityEnd, TriccNodeEnd)):
                         walktrhough_tricc_node_processed_stached(next_node, callback, processed_nodes, stashed_nodes,
-                                                                path_len + 1, **kwargs)
+                                                                path_len + 1,recursive, **kwargs)
                     else:
                         logger.error(
                             "{}::end node of {} has a next node".format(callback.__name__.node.activity.get_name()))
@@ -708,7 +710,8 @@ def walkthrough_tricc_option(node, callback, processed_nodes, stashed_nodes, pat
         for option in node.options.values():
             if hasattr(option, 'next_nodes') and len(option.next_nodes) > 0:
                 for next_node in option.next_nodes:
-                    stashed_nodes.insert(0, next_node)
+                    if next_node not in stashed_nodes:
+                        stashed_nodes.append(next_node)
     else:
         list_option = []
         while not all(elem in list_option for elem in list(node.options.values())):
@@ -745,6 +748,9 @@ def stashed_node_func(node, callback, recusive=False, **kwargs):
         len_prev_processed_nodes = len(processed_nodes)
         if len(stashed_nodes) > 0:
             s_node = stashed_nodes.pop()
+            # remove duplicates
+            if s_node in stashed_nodes:
+                stashed_nodes.remove(s_node)
             logger.debug("{}::{}: unstashed for processing ({})".format(callback.__name__, s_node.get_name(),
                                                                         len(stashed_nodes)))
             walktrhough_tricc_node_processed_stached(s_node, callback, processed_nodes, stashed_nodes, path_len,
@@ -885,7 +891,7 @@ def check_stashed_loop(stashed_nodes, prev_stashed_nodes, processed_nodes, len_p
     return loop_count
 
 
-class TriccNodeActivityEnd(TriccNodeCalculate):
+class TriccNodeActivityEnd(TriccNodeCalculateBase):
     odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccExtendedNodeType.activity_end
 
     def __init__(self, **data):

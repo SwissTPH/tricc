@@ -169,10 +169,10 @@ def get_prev_node_expression(node, processed_nodes, is_calculate=False, excluded
         if activity.base_instance.instance >0:
             add_sub_expression(expression_inputs, get_node_expression(activity.base_instance, processed_nodes, False, True))
         # relevance of the previous instance must be false to display this activity
-        for instance_nb, past_instance in activity.base_instance.instances.items():
-            if int(past_instance.path_len) < int(activity.path_len):
+        for past_instance in activity.base_instance.instances.values():
+            if int(past_instance.root.path_len) < int(activity.root.path_len) and past_instance in processed_nodes:
                 add_sub_expression(expression_inputs, get_node_expression(past_instance, processed_nodes, False, True))
-        # clean_list_or(expression_inputs)
+        clean_list_or(expression_inputs)
         expression_activity = ' or '.join(expression_inputs)
         if expression_activity is not None and expression_activity != ''  :
             expression = TRICC_NAND_EXPRESSION.format(expression, expression_activity)
@@ -203,12 +203,12 @@ def get_node_expression(in_node, processed_nodes, is_calculate=False, is_prev=Fa
             expression = get_calculation_terms(node, processed_nodes, is_calculate)
     elif is_prev and hasattr(node, 'required') and node.required == True:
         expression = get_required_node_expression(node)
-    elif is_prev and isinstance(node, TriccNodeActivity):
-        expression = get_activity_end_terms(node, processed_nodes)
-    elif is_prev and hasattr(node, 'relevance') and node.relevance is not None and node.relevance != '':
-        expression = node.relevance
-    if expression is None:
-        expression = get_prev_node_expression(node, processed_nodes, is_calculate)
+    elif not (is_prev and isinstance(node, TriccNodeActivity)):
+            #expression = None#FIXME  not required, only used for ordering get_activity_end_terms(node, processed_nodes)
+        if is_prev and hasattr(node, 'relevance') and node.relevance is not None and node.relevance != '':
+            expression = node.relevance
+        if expression is None:
+            expression = get_prev_node_expression(node, processed_nodes, is_calculate)
     if negate:
         if negate_expression is not None:
             return negate_expression
