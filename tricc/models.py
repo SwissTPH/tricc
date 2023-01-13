@@ -59,6 +59,7 @@ class TriccExtendedNodeType(str, Enum):
     page = 'page'
     not_available = 'not_available'
     quantity = 'quantity'
+    bridge = 'bridge'
 
 
 class TriccOperation(str, Enum):
@@ -196,6 +197,8 @@ class TriccNodeBaseModel(TriccBaseModel):
         if self.name is None:
             self.name = ''.join(random.choices(string.ascii_lowercase, k=8))
 
+class TriccNodeBridge(TriccNodeBaseModel):
+    odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccExtendedNodeType.bridge
 
 class TriccNodeActivity(TriccNodeBaseModel):
     odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccExtendedNodeType.activity
@@ -635,7 +638,7 @@ def walktrhough_tricc_node_processed_stached(node, callback, processed_nodes, st
     # logger.debug("walkthrough::{}::{}".format(callback.__name__, node.get_name()))
     if hasattr(node, 'prev_nodes') and len(node.prev_nodes) > 0:
         sorted_list = sorted(node.prev_nodes, key=lambda p_node: p_node.path_len, reverse=True)
-        path_len = max(path_len, sorted_list[0].path_len + 1)
+        path_len = max(path_len, sorted_list[0].path_len + 1, len(processed_nodes)+1)
     node.path_len = max(node.path_len, path_len)
     if (callback(node, processed_nodes=processed_nodes, stashed_nodes=stashed_nodes, **kwargs)):
         # node processing succeed 
@@ -751,7 +754,7 @@ def stashed_node_func(node, callback, recusive=False, **kwargs):
             # remove duplicates
             if s_node in stashed_nodes:
                 stashed_nodes.remove(s_node)
-            logger.debug("{}::{}: unstashed for processing ({})".format(callback.__name__, s_node.get_name(),
+            logger.debug("{}::{}::{}: unstashed for processing ({})".format(callback.__name__, s_node.__class__, s_node.get_name(),
                                                                         len(stashed_nodes)))
             walktrhough_tricc_node_processed_stached(s_node, callback, processed_nodes, stashed_nodes, path_len,
                                                      recusive, **kwargs)
@@ -936,3 +939,4 @@ def get_node_from_list(in_nodes, node_id):
 
 # update FF
 TriccEdge.update_forward_refs()
+TriccNodeBridge.update_forward_refs()

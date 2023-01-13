@@ -32,7 +32,6 @@ def generate_xls_form_condition(node, processed_nodes, **kwargs):
                 node.name = clean_str(node.name)
             if isinstance(node, TriccNodeRhombus) and isinstance(node.reference, str):
                 logger.warning("node {} still using the reference string".format(node.get_name()))
-
             if issubclass(node.__class__, TriccNodeInputModel):
                 # we don't overright if define in the diagram
                 if node.constraint is None:
@@ -185,8 +184,12 @@ def get_node_expression(in_node, processed_nodes, is_calculate=False, is_prev=Fa
     expression = None
     negate_expression = None
     node = in_node
+    
     if is_prev and isinstance(node, TriccNodeSelectOption):
         expression = get_selected_option_expression(node)
+        #TODO remove that and manage it on the "Save" part
+    elif is_prev and isinstance(in_node, TriccNodeSelectNotAvailable):
+        expression =  TRICC_SELECTED_EXPRESSION.format(node.name, '1')
     elif is_prev and isinstance(node, TriccNodeRhombus):
         right = get_node_expression(node.path, processed_nodes, is_calculate, is_prev)
         if right != '1':
@@ -203,11 +206,10 @@ def get_node_expression(in_node, processed_nodes, is_calculate=False, is_prev=Fa
             expression = get_calculation_terms(node, processed_nodes, is_calculate)
     elif is_prev and hasattr(node, 'required') and node.required == True:
         expression = get_required_node_expression(node)
-    elif not (is_prev and isinstance(node, TriccNodeActivity)):
-            #expression = None#FIXME  not required, only used for ordering get_activity_end_terms(node, processed_nodes)
-        if is_prev and hasattr(node, 'relevance') and node.relevance is not None and node.relevance != '':
+
+    elif is_prev and hasattr(node, 'relevance') and node.relevance is not None and node.relevance != '':
             expression = node.relevance
-        if expression is None:
+    if expression is None:
             expression = get_prev_node_expression(node, processed_nodes, is_calculate)
     if negate:
         if negate_expression is not None:
@@ -354,7 +356,9 @@ def clean_list_or(list_or, elm_and=None):
 
 
 def get_printed_name(node):
-    if INSTANCE_SEPARATOR  in node.name or  VERSION_SEPARATOR in node.name:
+    if node.name is None:
+        return "id_" + node.id
+    elif INSTANCE_SEPARATOR  in node.name or  VERSION_SEPARATOR in node.name:
         return node.name 
     elif issubclass(node.__class__, (TriccNodeDiplayModel)):
         node.gen_name()

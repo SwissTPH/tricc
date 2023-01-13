@@ -183,7 +183,7 @@ def walkthrough_link_out_node(node, page, pages, processed_nodes, current_path):
         link_in_page=None
         for page in pages:
             link_in_list += list(filter(lambda x: (x.name == node.reference) , page.nodes))
-            #save the first page wheere a link is found to continue the walktrhough
+            #save the first page where a link is found to continue the walktrhough
             if len(link_in_list)>0 and link_in_page is None:
                 link_in_page = page
         if len(link_in_list) == 0:

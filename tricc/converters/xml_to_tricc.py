@@ -280,6 +280,8 @@ def add_link_nodes(nodes, diagram, group=None):
     add_tricc_base_node(nodes, TriccNodeActivityEnd, list, group)
     list = get_odk_type_list(diagram, ['UserObject','object'], TriccExtendedNodeType.end)
     add_tricc_base_node(nodes, TriccNodeEnd, list, group)
+    list = get_odk_type_list(diagram, ['UserObject','object'], TriccExtendedNodeType.bridge)
+    add_tricc_base_node(nodes, TriccNodeBridge, list, group)
 
  
     
@@ -353,7 +355,7 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
                             node.version = last_calc.version + 1
                             node_to_delete = merge_calculate(node, calculates[node.name],last_used_calc)
                             if node_to_delete is not None:  
-                                for d_node in node_to_delete:                  
+                                for d_node in node_to_delete:               
                                     del calculates[d_node.name][d_node.id]
                                     
                                     if d_node.name in used_calculates:
@@ -397,7 +399,7 @@ def get_max_named_version(calculates,name):
                 max = node.version
     return max
 
-def get_select_multiple_count(node):
+def get_count_node(node):
     count_id = generate_id()
     count_name = "cnt_"+count_id
     return TriccNodeCount(
@@ -427,7 +429,7 @@ def generate_calculates(node,calculates, used_calculates,processed_nodes):
     if issubclass(node.__class__, TriccNodeCalculateBase):
         if  isinstance(node,TriccNodeRhombus):
             if node.expression_reference is None and len(node.reference)==1 and issubclass(node.reference[0].__class__, TriccNodeSelect):
-                count_node = get_select_multiple_count(node)
+                count_node = get_count_node(node)
                 list_calc.append(count_node)
                 set_prev_next_node(node.reference[0],count_node)
                 node.path_len+=1
@@ -461,13 +463,14 @@ def generate_calculates(node,calculates, used_calculates,processed_nodes):
         else:
             calculate_name = "{0}.{1}".format(save_fragments[0], node.name)
             
-        logger.debug("generate_save_calculate:{} as {}".format(node.name if hasattr(node,'name') else node.id, calculate_name))
-        count_node = None
-        if issubclass(node.__class__, TriccNodeSelect):
-            calc_node = get_select_multiple_count(node)
+        
+
+    
+        if not isinstance(node, TriccNodeSelectYesNo) and  issubclass(node.__class__, (TriccNodeSelect)):
+            calc_node = get_count_node(node)
             calc_node.path_len += 1
             calc_node.name=calculate_name
-            calc_node.label =  "save: " +node.get_name()    
+            calc_node.label =  "save select: " +node.get_name()        
         else:
             calc_id = generate_id()
             calc_node = TriccNodeCalculate(
@@ -476,9 +479,14 @@ def generate_calculates(node,calculates, used_calculates,processed_nodes):
                 group = node.group,
                 activity = node.activity,
                 label =  "save: " +node.get_name(),
-                path_len=node.path_len+ (2 if count_node is not None else 1)
+                path_len=node.path_len+ 1
             )
-        set_prev_next_node(node,calc_node)
+        logger.debug("generate_save_calculate:{}:{} as {}".format(calc_node.odk_type, node.name if hasattr(node,'name') else node.id, calculate_name))
+        if isinstance(node, TriccNodeSelectYesNo):
+            yesNode =  node.options[0]
+            set_prev_next_node(yesNode,calc_node)
+        else:
+            set_prev_next_node(node,calc_node)
         list_calc.append(calc_node)
         #add_save_calculate(calc_node, calculates, used_calculates,processed_nodes)
     return list_calc
@@ -587,29 +595,32 @@ def merge_calculate(node, calculates, last_used_calc):
     node_to_delete = []
     for calc_node in calculates.values():
         # merge only if same name, version >= fromm version but < node version   and we don't merge the end node from differentes instance 
-        if  node.odk_type == calc_node.odk_type and calc_node!=node :
-            if not(isinstance(node,(TriccNodeActivityEnd, TriccNodeActivityStart))) or node.instance == calc_node.instance:
-                if (last_used_calc is None or calc_node.path_len > last_used_calc.path_len )and  calc_node.path_len<=node.path_len:
-                    logger.debug("merge_calculate:{} ".format(node.name if hasattr(node,'name') else node.id))
+        if  calc_node!=node and node.odk_type == calc_node.odk_type:
+            # if there is a calculate and a count, merge on the count
+            remaining = node
+            to_remove = calc_node
+            if not(isinstance(remaining,(TriccNodeActivityEnd, TriccNodeActivityStart))) or remaining.instance == to_remove.instance:
+                if (last_used_calc is None or to_remove.path_len > last_used_calc.path_len )and  to_remove.path_len<=remaining.path_len:
+                    logger.debug("merge_calculate:{} ".format(remaining.name if hasattr(remaining,'name') else remaining.id))
                     # unlink the merged node in its next nodes
-                    # list node is used to not update calc_node.next_nodes in a loop not porcessed but deleted
+                    # list node is used to not update to_remove.next_nodes in a loop not porcessed but deleted
                     list_nodes = []
-                    for next_node in calc_node.next_nodes:
+                    for next_node in to_remove.next_nodes:
                         list_nodes.append(next_node)
                     for next_node in list_nodes:
-                        set_prev_next_node(node, next_node, calc_node )
+                        set_prev_next_node(remaining, next_node, to_remove )
                     # unlink the merged node in its prev nodes
-                    # list node is used to not update calc_node.prev_nodes in a loop
+                    # list node is used to not update to_remove.prev_nodes in a loop
                     list_nodes = []
-                    for prev_node in calc_node.prev_nodes:
+                    for prev_node in to_remove.prev_nodes:
                         list_nodes.append(prev_node)
                     for prev_node in list_nodes:
-                        set_prev_next_node(prev_node, node, calc_node )                 
-                    node_to_delete.append(calc_node)
+                        set_prev_next_node(prev_node, remaining, to_remove )                 
+                    node_to_delete.append(to_remove)
             else:
-                logger.info("activity {} instance {} and {} might be merged (end node mergables)".format(node.activity.get_name(), node.activity.instance, calc_node.activity.instance))
+                logger.info("activity {} instance {} and {} might be merged (end node mergables)".format(remaining.activity.get_name(), remaining.activity.instance, to_remove.activity.instance))
         elif node.odk_type != calc_node.odk_type:
-            logger.warning("two different type of calculate node share the same name {}".format(node.name))
+            logger.warning("two different type of calculate node share the same name {}::{}::{}".format(node.name,node.odk_type, calc_node.odk_type))
     return node_to_delete
     
 
