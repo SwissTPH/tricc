@@ -1,15 +1,15 @@
 
 
 import logging
+import os
 from copy import copy
 
 from tricc.converters.xml_to_tricc import create_activity, process_calculate
-from tricc.models import *
+from tricc.models.tricc import *
 from tricc.parsers.xml import read_drawio
-
 logger = logging.getLogger('default')
 
-def build_tricc_graph(in_filepath):
+def build_tricc_graph(in_filepath, media_path):
     pages = {}
     start_page=None
     # read all pages
@@ -17,7 +17,7 @@ def build_tricc_graph(in_filepath):
     diagrams = read_drawio(in_filepath)
     for diagram in diagrams:
         logger.info("Create the activity {0}".format(diagram.attrib.get('name')))
-        page = create_activity(diagram)
+        page = create_activity(diagram, media_path)
         if page is not None:
             if page.root is not None:
                 pages[page.id] = page
@@ -50,7 +50,7 @@ def build_tricc_graph(in_filepath):
                     "Page {0} has still {1}/{2} edges that were not used:"\
                     .format(page.label, len(page.unused_edges) ,len(page.edges)))
          # refresh the edges (were remove by previous code)
-        return start_page
+        return start_page, pages
         
     else:
         logger.warning("start page not found")

@@ -1,12 +1,13 @@
 import base64
 import os
 import re
-from gettext import gettext as _
+from curses.ascii import isalnum, isalpha, isdigit
 
 import html2text
+from numpy import isnan
 
 from tricc.converters.utils import OPERATION_LIST, clean_name
-from tricc.models import *
+from tricc.models.tricc import *
 from tricc.parsers.xml import (get_edges_list, get_mxcell,
                                get_mxcell_parent_list, get_odk_type,
                                get_odk_type_list)
@@ -20,7 +21,10 @@ import logging
 
 logger = logging.getLogger("default")
 
-def create_activity(diagram):
+from tricc.models.lang import SingletonLangClass
+langs = SingletonLangClass()
+
+def create_activity(diagram, media_path):
     id = diagram.attrib.get('id')    
     root = create_root_node(diagram)
     name = diagram.attrib.get('name')
@@ -49,7 +53,7 @@ def create_activity(diagram):
             
         if edges and len(edges)>0:
             activity.edges = edges
-        process_edges(diagram, activity, nodes)
+        process_edges(diagram, media_path, activity, nodes)
 
         # link back the activity
         activity.root.activity = activity
@@ -57,14 +61,14 @@ def create_activity(diagram):
     else:
         logger.warning("root not found for page {0}".format(name))
             
-def process_edges(diagram, activity, nodes):
+def process_edges(diagram, media_path, activity, nodes):
     end_found = False
     for edge in activity.edges:
         # enrich nodes
         if edge.target not in nodes :
             activity.unused_edges.append(edge)
         elif edge.source not in nodes and edge.target in nodes:
-            enriched = enrich_node(diagram, edge, nodes[edge.target])
+            enriched = enrich_node(diagram, media_path, edge, nodes[edge.target])
             if enriched is None:
                 activity.unused_edges.append(edge)
         elif isinstance(nodes[edge.target], (TriccNodeActivityEnd, TriccNodeEnd)):
@@ -73,11 +77,15 @@ def process_edges(diagram, activity, nodes):
         # modify edge for selectyesNo
         if edge.source in nodes and isinstance(nodes[edge.source], TriccNodeSelectYesNo):
             process_yesno_edge(edge, nodes)
+            
         # create calculate based on edges label
         elif edge.value is not None:
             calc = None
-            # manage comment
-            calc = process_condition_edge(edge,nodes) 
+            if re.search(r'^\-?[0-9]+([.,][0-9]+)?$', edge.value.strip() ):
+                calc = process_factor_edge(edge,nodes)
+            else:
+                # manage comment
+                calc = process_condition_edge(edge,nodes) 
             if calc is None:
                 calc = process_exclusive_edge(edge, nodes)
             if calc is not None:
@@ -115,6 +123,18 @@ def process_yesno_edge(edge, nodes):
         edge.source = no_option.id
     else:
         logger.warning("edge {0} is coming from select {1}".format(edge.id, nodes[edge.source].get_name()))
+
+def process_factor_edge(edge,nodes):
+    factor  = edge.value.strip()
+    if factor != 1:
+        return TriccNodeCalculate(
+            id = edge.id,
+            reference = "number(${{{}}}) * {}".format(nodes[edge.source].name, factor),
+            activity = nodes[edge.source].activity,
+            group = nodes[edge.source].group, 
+            label= "factor {}".format(factor)
+        )
+
                          
 def process_condition_edge(edge,nodes):
     label  = edge.value.strip()
@@ -144,6 +164,8 @@ def process_exclusive_edge(edge, nodes):
                 )
             else:
                 error = "No after or before a exclusice/negate node"
+        if  isinstance(nodes[edge.source], TriccNodeRhombus) and label.lower() in TRICC_FOLOW_LABEL:
+            nodes[edge.source].folow.append(edge.target)
         elif not (label.lower() in TRICC_YES_LABEL):
             error = " label not reconized after a calculate"
     else:        
@@ -414,7 +436,7 @@ def get_count_node(node):
 def get_rhombus_path(node):
     calc_id  = generate_id()
     calc_name = "path_"+calc_id
-    return TriccNodeCalculate(
+    return TriccNodeBridge(
         id =calc_id,
         group = node.group,
         activity = node.activity,
@@ -447,6 +469,12 @@ def generate_calculates(node,calculates, used_calculates,processed_nodes):
             for prev in list_nodes:
                 set_prev_next_node(prev,calc_node, node)
             set_prev_next_node(calc_node, node)
+            # move to folow node on the path
+            if isinstance(node, TriccNodeRhombus) and len(node.folow)>0:
+                for folow_node in node.folow:
+                    for next_node in node.next_nodes:
+                        if next_node.id == folow_node:
+                            set_prev_next_node(calc_node, next_node, node)
             node.path_len += 1
             list_calc.append(calc_node)
             processed_nodes.append(calc_node)
@@ -624,7 +652,7 @@ def merge_calculate(node, calculates, last_used_calc):
     return node_to_delete
     
 
-def enrich_node(diagram, edge, node):
+def enrich_node(diagram, media_path, edge, node):
     if edge.target == node.id:
         # get node and process type
         type, message = get_message(diagram, edge.source)
@@ -638,7 +666,7 @@ def enrich_node(diagram, edge, node):
             else:
                 logger.warning("A attribute box of type {0} and value {1} is attached to an object not compatible {2}".format(type, message, node.get_name()))
         else:
-            image = get_image(diagram, edge.source ) 
+            image = get_image(diagram, media_path, edge.source ) 
             if image is not None :
                 if hasattr(node, 'image'):
                     node.image = image
@@ -686,14 +714,14 @@ def get_select_yes_no_options(node, group):
     return {0:TriccNodeSelectOption(
                 id = generate_id(),
                 name="1",
-                label=_("Yes"),
+                label=langs.get_trads("Yes"),
                 select = node,
                 group = group,
                 list_name =  node.list_name
             ), 1:TriccNodeSelectOption(
                 id = generate_id(),
                 name="-1",
-                label=_("No"),
+                label=langs.get_trads("No"),
                 select = node,
                 group = group,
                 list_name =  node.list_name
@@ -814,18 +842,18 @@ def add_group_to_child(group, diagram,list_child, nodes, groups, parent_group):
                 nodes[child_id].group = group
         
 
-def get_image(diagram, id, image_name = None ):
+def get_image(diagram,  path, id, image_name = None ):
     elm = get_mxcell(diagram, id)
     if elm is not None:
         style=elm.attrib.get('style')
         if image_name is None:
             image_name = id
-        file_name = add_image_from_style(style, image_name)
+        file_name = add_image_from_style(style, path, image_name)
         if file_name is not None:
             return file_name
 
         
-def add_image_from_style(style,image_name):
+def add_image_from_style(style,path, image_name):
     image_attrib = None
     if style is not None and 'image=data:image/' in style:
         image_attrib = style.split('image=data:image/')
@@ -833,13 +861,13 @@ def add_image_from_style(style,image_name):
         image_parts = image_attrib[1].split(',')
         if len(image_parts) == 2:
             payload = image_parts[1][:-1]
-            file_name = "media/"+image_name+ '.' + image_parts[0]
-            if not(os.path.isdir('media')): # check if it exists, because if it does, error will be raised 
+            file_name = os.path.join(path, image_name+ '.' + image_parts[0])
+            if not(os.path.isdir(path)): # check if it exists, because if it does, error will be raised 
                 # (later change to make folder complaint to CHT)
-                os.mkdir('media')
+                os.mkdir(path)
             with open(file_name , "wb") as fh:
                 fh.write(base64.decodebytes(payload.encode('ascii'))) 
-                return file_name
+                return os.path.basename(file_name)
 
 def get_contained_main_node(diagram, id):
     list = get_mxcell_parent_list(diagram, id, media_nodes)

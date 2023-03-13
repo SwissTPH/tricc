@@ -1,4 +1,12 @@
 # TRICC
+
+## Edges
+
+    the edge are in general labeless unless for :
+    - after a select multiple: can setup quick rhombus for the number of choice selected, an opperator is required (<>=)
+    - after a yes/no quesiton:  'Yes', 'No', 'Follow' (translation can be added in the code )
+    - before a calculate to put weight: integer only
+
 ## Shape
 
     odk_type:
@@ -181,3 +189,4 @@ option can have only incoming edge from images to be placed as option$
 
 ### if the node is NOT a calculate [get_node_expression, calculate = false]
 
+ 

@@ -1,0 +1,86 @@
+import datetime
+import logging
+import os
+import shutil
+
+import pandas as pd
+
+from tricc.serializers.xls_form import SURVEY_MAP
+from tricc.strategies.xlsform_cdss import XLSFormCDSSStrategy
+
+
+class XLSFormCHTStrategy(XLSFormCDSSStrategy):
+    def process_export(self, activity,  **kwargs):
+        
+        super().process_export( activity,  **kwargs)
+        cht_header = pd.DataFrame(columns=SURVEY_MAP.keys())
+        
+        
+        self.df_survey = pd.concat([self.get_cht_input(),self.df_survey,self.get_cht_summary() ], ignore_index=True)
+ 
+    def get_cht_input(self):
+        df_input = pd.DataFrame(columns=SURVEY_MAP.keys())
+         #[ #type, '',#name ''#label, '',#hint '',#help '',#default '',#'appearance',  '',#'constraint',  '',#'constraint_message' '',#'relevance' '',#'disabled' '',#'required' '',#'required message' '',#'read only' '',#'expression' '',#'repeat_count' ''#'image' ],
+        df_input.loc[len(df_input)] =  [ 'begin group', 'inputs' ,'Inputs', '', '', '',  'field-list',  '', '', './source = "user"', '', '','', '', '', '', '' ]
+        df_input.loc[len(df_input)] = [  'hidden', 'source', '', '', '', '',  '',  '', '', '', '', '', '', '', '', '','' ]
+        df_input.loc[len(df_input)] = [  'hidden', 'source_id', '', '', '', '',  '',  '', '', '', '', '', '', '', '','', '' ]
+        df_input.loc[len(df_input)] = [  'hidden', 'task_id' ,'Task_ID', '', '', '',  '',  '', '', '', '', '', '', '', '', '','' ]
+        df_input.loc[len(df_input)] = [  'begin group	', 'contact' ,'', '', '', '',  '',  '', '', '', '', '', '', '', '', '','' ]
+        df_input.loc[len(df_input)] = [  'db:person', '_id', 'Patient ID', '', '', '',  'db-object',  '', '', '', '', '', '', '', '','', '' ]
+        df_input.loc[len(df_input)] = [  'string', 'patient_id' ,'Medic ID', '', '', '',  'hidden',  '', '', '', '', '', '', '', '','', '' ]
+        df_input.loc[len(df_input)] = [  'string', 'patient_name', 'Patient Name', '', '', '',  'hidden',  '', '', '', '', '', '', '', '','', '' ]
+        df_input.loc[len(df_input)] = [  'end group', '' ,'', '', '', '',  '',  '', '', '', '', '', '', '', '','', '' ]
+        df_input.loc[len(df_input)] = [  'end group', '' ,'', '', '', '',  '',  '', '', '', '', '', '', '', '','', '' ]
+        df_input.loc[len(df_input)] = [  'calculate', '_id' ,'label', '', '', '',  '',  '', '', '', '', '', '', '','../inputs/contact/_id', '', '' ]
+        df_input.loc[len(df_input)] = [  'calculate', 'patient_uuid' ,'label', '', '', '',  '',  '', '', '', '', '','', '', '../inputs/contact/patient_id', '', '' ]
+        df_input.loc[len(df_input)] = [  'calculate', 'name' ,'label', '', '', '',  '',  '', '', '', '', '', '','', '../inputs/contact/patient_name', '', '' ]
+        return df_input
+        
+    def get_cht_summary(self):
+        
+        df_summary = pd.DataFrame(columns=SURVEY_MAP.keys())
+         #[ #type, '',#name ''#label, '',#hint '',#help '',#default '',#'appearance',  '',#'constraint',  '',#'constraint_message' '',#'relevance' '',#'disabled' '',#'required' '',#'required message' '',#'read only' '',#'expression' '',#'repeat_count' ''#'image' ],
+        df_summary.loc[len(df_summary)] = [  'begin group', 'group_summary' , 'Summary',                                  '', '', '',  'field-list summary',  '', '', '', '', '', '', '', '', '', '' ]
+        df_summary.loc[len(df_summary)] = [  'note',        'r_patient_info', '**${patient_name}** ID: ${patient_id}',  '', '', '',  '',                    '', '', '', '', '', '', '', '', '', '' ]
+        df_summary.loc[len(df_summary)] = [  'note',        'r_followup', 'Follow Up <i class=“fa fa-flag”></i>', '', '', '',  '',  '', '','', '', '', '', '', '', '', '' ]
+        df_summary.loc[len(df_summary)] = [  'note',        'r_followup_note' ,'FOLLOWUP instruction', '', '', '',  '',  '', '', '','', '', '', '', '', '', '' ]
+        df_summary.loc[len(df_summary)] = [  'end group', '' ,'', '', '', '',  '',  '', '', '', '', '', '', '', '','', '' ]
+        return df_summary
+    
+    def do_export(self, title , file_name, form_id):
+        # make a 'settings' tab
+        now = datetime.datetime.now()
+        version=now.strftime('%Y%m%d%H%M')
+        indx=[[1]]
+        # CHT FORCE file name to be equal to id
+        
+        newfilename = form_id + ".xlsx"
+        newpath = os.path.join(self.output_path, newfilename)
+        media_path = os.path.join(self.output_path, form_id + "-media")
+
+        settings={'form_title':title,'form_id':form_id,'version':version,'default_language':'English (en)','style':'pages'}
+        df_settings=pd.DataFrame(settings,index=indx)
+        df_settings.head()
+
+        #create a Pandas Excel writer using XlsxWriter as the engine
+        writer = pd.ExcelWriter(newpath, engine='xlsxwriter')
+        self.df_survey.to_excel(writer, sheet_name='survey',index=False)
+        self.df_choice.to_excel(writer, sheet_name='choices',index=False)
+        df_settings.to_excel(writer, sheet_name='settings',index=False)
+
+        #close the Pandas Excel writer and output the Excel file
+        #writer.save()
+
+        # run this on a windows python instance because if not then the generated xlsx file remains open
+        writer.close()
+        media_path_tmp = os.path.join(self.output_path, 'media-tmp')
+        if (os.path.isdir(media_path_tmp)):
+            if os.path.isdir(media_path): # check if it exists, because if it does, error will be raised 
+                shutil.rmtree(media_path)
+                # (later change to make folder complaint to CHT)
+            os.mkdir(media_path)
+            
+            file_names = os.listdir(media_path_tmp)
+            for file_name in file_names:
+                shutil.move(os.path.join(media_path_tmp, file_name), media_path)
+            shutil.rmtree(media_path_tmp)

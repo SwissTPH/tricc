@@ -5,21 +5,17 @@ Strategy to build the skyp logic following the XLSForm way
 
 import datetime
 import logging
+import os
 
 import pandas as pd
 
 from tricc.converters.tricc_to_xls_form import (generate_xls_form_calculate,
                                                 generate_xls_form_condition,
                                                 generate_xls_form_relevance)
-from tricc.models import (TriccNodeActivity, check_stashed_loop,
+from tricc.models.tricc import (TriccNodeActivity, check_stashed_loop,
                           walktrhough_tricc_node_processed_stached)
 from tricc.serializers.xls_form import (CHOICE_MAP, SURVEY_MAP, end_group,
-                                        generate_xls_form_export,
-                                        get_diagnostic_line,
-                                        get_diagnostic_none_line,
-                                        get_diagnostic_start_group_line,
-                                        get_diagnostic_stop_group_line,
-                                        start_group)
+                                        generate_xls_form_export, start_group)
 from tricc.strategies.base_strategy import BaseStrategy
 
 logger = logging.getLogger('default')
@@ -44,12 +40,14 @@ class XLSFormStrategy(BaseStrategy):
         return generate_xls_form_calculate( node, **kwargs)
 
 
-    def __init__(self):
-        self.calculates= {}
-        self.used_calculates = {}
+    def __init__(self, output_path):
+        super().__init__( output_path)
+        self.do_clean()
 
     def do_clean(self, **kwargs):
-        self.__init__()
+        self.calculates= {}
+        self.used_calculates = {}
+        
     
     def get_kwargs(self):  
         return { 
@@ -61,7 +59,7 @@ class XLSFormStrategy(BaseStrategy):
     def generate_export(self, node, **kwargs):
         return generate_xls_form_export(node, **kwargs)
 
-    def do_export(self, title , output_file, form_id):
+    def do_export(self, title , file_name, form_id):
         # make a 'settings' tab
         now = datetime.datetime.now()
         version=now.strftime('%Y%m%d%H%M')
@@ -70,9 +68,10 @@ class XLSFormStrategy(BaseStrategy):
         settings={'form_title':title,'form_id':form_id,'version':version,'default_language':'English (en)','style':'pages'}
         df_settings=pd.DataFrame(settings,index=indx)
         df_settings.head()
-
+        
+        newpath = os.path.join(self.output_path, file_name)
         #create a Pandas Excel writer using XlsxWriter as the engine
-        writer = pd.ExcelWriter(output_file, engine='xlsxwriter')
+        writer = pd.ExcelWriter(newpath, engine='xlsxwriter')
         self.df_survey.to_excel(writer, sheet_name='survey',index=False)
         self.df_choice.to_excel(writer, sheet_name='choices',index=False)
         df_settings.to_excel(writer, sheet_name='settings',index=False)
@@ -127,36 +126,31 @@ class XLSFormStrategy(BaseStrategy):
                 if len(self.df_survey)>(2+skip_header):
                     if cur_group == s_node.group:
                         # drop the end group (to merge)
-                        logger.info("printing same group {}::{}::{}::{}".format(s_node.group.__class__, s_node.group.get_name(),s_node.id, s_node.group.instance))
+                        logger.debug("printing same group {}::{}::{}::{}".format(s_node.group.__class__, s_node.group.get_name(),s_node.id, s_node.group.instance))
                         df_survey_final.drop(index=df_survey_final.index[-1], axis=0, inplace=True)
                         self.df_survey = self.df_survey[(1+skip_header):]
                         df_survey_final=pd.concat([df_survey_final, self.df_survey], ignore_index=True)
 
                     else:
-                        logger.info("printing group {}::{}::{}::{}".format(s_node.group.__class__, s_node.group.get_name(),s_node.id,s_node.group.instance))
+                        logger.debug("printing group {}::{}::{}::{}".format(s_node.group.__class__, s_node.group.get_name(),s_node.id,s_node.group.instance))
                         df_survey_final =pd.concat([df_survey_final, self.df_survey], ignore_index=True)
                     cur_group = s_node.group
+                    
+                    
         # add the calulate
         self.df_survey = pd.concat([df_survey_final,self.df_calculate], ignore_index=True)
-        # add the diag
-        self.df_survey.loc[len(self.df_survey)] = get_diagnostic_start_group_line()
-        # TODO inject flow driven diag list, the folowing fonction will fill the missing ones
-        diags = self.export_diag( activity,  **kwargs)
-        self.df_survey.loc[len(self.df_survey)] = get_diagnostic_none_line(diags)
-        self.df_survey.loc[len(self.df_survey)] = get_diagnostic_stop_group_line()
-        #TODO inject the TT flow
         
+        # remove duplicate calculate
         
-                
+        df_calculate = self.df_survey[self.df_survey.type == 'calculate']
+        
+        for index, calc_row in df_calculate.iterrows():
+            df_calculate_duplicate = df_calculate[(df_calculate.calculation == calc_row.calculation) & (df_calculate.name != calc_row.name)]
+            if len(df_calculate_duplicate)>0:
+                for id_d, calc_row_d in df_calculate_duplicate.iterrows():
+                    logger.debug('duplicate found and removed for %s: %s', calc_row.name, calc_row.calculation)
+                    self.df_survey.drop(id_d)
+                    self.df_survey.replace(calc_row_d.name, calc_row.name)
+                    
+            
 
-    def export_diag(self, activity, diags = [], **kwargs):
-        for node in activity.nodes.values():
-            if isinstance(node, TriccNodeActivity):
-                diags = self.export_diag(node, diags, **kwargs)
-            if hasattr(node, 'name') and node.name is not None:
-                if node.name.startswith('diag_'):
-                    nb_found = len(self.df_survey[self.df_survey.name == "label_"+node.name])
-                    if node.last == True and nb_found == 0:
-                        self.df_survey.loc[len(self.df_survey)] = get_diagnostic_line(node)
-                        diags.append(node)
-        return diags

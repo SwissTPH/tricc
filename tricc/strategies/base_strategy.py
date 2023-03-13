@@ -1,10 +1,13 @@
 import abc
 
-from tricc.models import stashed_node_func
+from tricc.models.tricc import stashed_node_func
 
 
 class BaseStrategy:
 
+    output_path = None
+    def __init__(self, output_path):
+        self.output_path = output_path
     
 
     ### walking function

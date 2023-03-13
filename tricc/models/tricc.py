@@ -133,7 +133,7 @@ class TriccGroup(TriccBaseModel):
     odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccExtendedNodeType.page
     group: Optional[TriccBaseModel]
     name: Optional[str]
-    label: Optional[str]
+    label: Optional[Union[str, Dict[str,str]]]
 
     def __init__(self, **data):
         super().__init__(**data)
@@ -141,11 +141,13 @@ class TriccGroup(TriccBaseModel):
             self.name = generate_id()
 
     def get_name(self):
+        
         if self.label is not None:
-            if len(self.label) < 50:
-                return self.label
+            name = self.label[self.label.keys()[0]] if isinstance(self.label, Dict) else self.label
+            if len(name) < 50:
+                return name
             else:
-                return self.label[:50]
+                return name[:50]
         else:
             return self.name
 
@@ -154,7 +156,7 @@ class TriccNodeBaseModel(TriccBaseModel):
     path_len: int = 0
     group: Optional[Union[TriccGroup, TriccNodeActivity]]
     name: Optional[str]
-    label: Optional[str]
+    label: Optional[Union[str, Dict[str,str]]]
     next_nodes: List[TriccNodeBaseModel] = []
     prev_nodes: List[TriccNodeBaseModel] = []
 
@@ -169,10 +171,11 @@ class TriccNodeBaseModel(TriccBaseModel):
 
     def get_name(self):
         if self.label is not None:
-            if len(self.label) < 50:
-                return self.label
+            name = next(iter(self.label.values())) if isinstance(self.label, Dict) else self.label
+            if len(name) < 50:
+                return name
             else:
-                return self.label[:50]
+                return name[:50]
         elif self.name is not None:
             return self.name
         else:
@@ -197,8 +200,6 @@ class TriccNodeBaseModel(TriccBaseModel):
         if self.name is None:
             self.name = ''.join(random.choices(string.ascii_lowercase, k=8))
 
-class TriccNodeBridge(TriccNodeBaseModel):
-    odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccExtendedNodeType.bridge
 
 class TriccNodeActivity(TriccNodeBaseModel):
     odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccExtendedNodeType.activity
@@ -321,8 +322,8 @@ class TriccNodeActivity(TriccNodeBaseModel):
 class TriccNodeDiplayModel(TriccNodeBaseModel):
     name: str
     image: Optional[b64]
-    hint: Optional[str]
-    help: Optional[str]
+    hint: Optional[Union[str, Dict[str,str]]]
+    help: Optional[Union[str, Dict[str,str]]]
     group: Optional[Union[TriccGroup, TriccNodeActivity]]
     relevance: Optional[Expression]
 
@@ -340,7 +341,7 @@ class TriccNodeNote(TriccNodeDiplayModel):
 
 class TriccNodeInputModel(TriccNodeDiplayModel):
     required: Optional[Expression]
-    constraint_message: Optional[str]
+    constraint_message: Optional[Union[str, Dict[str,str]]]
     constraint: Optional[Expression]
     save: Optional[str]  # contribute to another calculate
 
@@ -375,7 +376,7 @@ class TriccNodeGoTo(TriccNodeBaseModel):
 
 class TriccNodeSelectOption(TriccNodeDiplayModel):
     odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccExtendedNodeType.select_option
-    label: str
+    label: Union[str, Dict[str,str]]
     save: Optional[str]
     select: TriccNodeInputModel
     list_name: str
@@ -474,6 +475,9 @@ class TriccNodeDisplayCalculateBase(TriccNodeCalculateBase):
     help: Optional[str]  # for diagnostic display
     # no need to copy save
 
+class TriccNodeBridge(TriccNodeDisplayCalculateBase):
+    odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccExtendedNodeType.bridge
+
 
 # qualculate that saves quantity, or we may merge integer/decimals
 class TriccNodeQuantity(TriccNodeDisplayCalculateBase):
@@ -500,12 +504,17 @@ class TriccNodeRhombus(TriccNodeCalculateBase):
     odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccExtendedNodeType.rhombus
     reference: Union[List[TriccNodeBaseModel], Expression]
     expression_reference: Optional[str]
-    path: Optional[TriccNodeBaseModel]
+    path: Optional[TriccNodeBaseModel] = []
+    folow: Optional[TriccNodeBaseModel] = []
 
     def make_instance(self, instance_nb, activity, **kwargs):
         # shallow copy
         reference = []
         instance = super().make_instance(instance_nb, activity=activity)
+        path = []
+        instance.path = path
+        folow = []
+        instance.folow = folow
         if isinstance(self.reference, str):
             reference = self.reference
         elif isinstance(self.reference, list):

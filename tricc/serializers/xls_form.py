@@ -1,15 +1,16 @@
 
 
 import logging
-from gettext import gettext as _
 
 from tricc.converters.tricc_to_xls_form import (TRICC_CALC_EXPRESSION,
                                                 TRICC_NEGATE)
 from tricc.converters.utils import clean_name
-from tricc.models import *
+from tricc.models.lang import SingletonLangClass
+from tricc.models.tricc import *
 
 logger = logging.getLogger('default')
 
+langs = SingletonLangClass()
 
 
 def start_group( cur_group, groups, df_survey, relevance = False, **kargs):
@@ -90,18 +91,19 @@ ODK_TRICC_TYPE_MAP = { 'note':'note'
     ,'activity_end':'calculate'
     ,'edge':''
     ,'page':''
+    ,'bridge':'calculate'
     }
 
 GROUP_ODK_TYPE = [TriccExtendedNodeType.page,TriccExtendedNodeType.activity]
           
 SURVEY_MAP = {
     'type':ODK_TRICC_TYPE_MAP, 'name':'name',
-    'label':'label', 'hint':'hint',
+    **langs.get_trads_map('label'), 'hint':'hint',
     'help':'help', 'default':'default', 
     'appearance':'appearance', 'constraint':'constraint', 
-    'constraint_message':'constraint_message', 'relevance':'relevance',
+    **langs.get_trads_map('constraint_message'), 'relevance':'relevance',
     'disabled':'disabled','required':'required',
-    'required message':'required message', 'read only':'read only', 
+    **langs.get_trads_map('required message'), 'read only':'read only', 
     'calculation':'expression','repeat_count':'repeat_count','image':'image'
 }
 CHOICE_MAP = {'list_name':'list_name', 'value':'name', 'label':'label' }
@@ -179,20 +181,22 @@ def generate_xls_form_export(node, processed_nodes, stashed_nodes, df_survey, df
 
 
 def get_diagnostic_line(node):
+    label = langs.get_trads(node.label, True)
+    empty = langs.get_trads(' ', True)
     return [
-        'note',
-        "label_"+node.name,
-        node.get_name(),
-        '',#hint
-        '',#help
+        'select_one yes_no',
+        "cond_"+node.name,
+        *list(label.values()) ,
+        *list(empty.values()) ,#hint
+        *list(empty.values()) ,#help
         '',#default
         '',#'appearance', 
         '',#'constraint', 
-        '',#'constraint_message'
+        *list(empty.values()) ,#'constraint_message'
         TRICC_CALC_EXPRESSION.format(node.name),#'relevance'
         '',#'disabled'
         '',#'required'
-        '',#'required message'
+        *list(empty.values()) ,#'required message'
         '',#'read only'
         '',#'expression'
         '',#'repeat_count'
@@ -200,47 +204,77 @@ def get_diagnostic_line(node):
     ]
 
 def get_diagnostic_start_group_line():
+    label = langs.get_trads('List of diagnostics', True)
+    empty = langs.get_trads(' ', True)
     return [
         'begin group',
         "l_diag_list25",
-        _('List des diagnostic'),
-        '',#hint
-        '',#help
+        *list(label.values()) ,
+        *list(empty.values()) ,#hint
+        *list(empty.values()) ,#help
         '',#default
         'field-list',#'appearance', 
         '',#'constraint', 
-        '',#'constraint_message'
+        *list(empty.values()) ,#'constraint_message'
         '',#'relevance'
         '',#'disabled'
         '',#'required'
-        '',#'required message'
+        *list(empty.values()) ,#'required message'
         '',#'read only'
         '',#'expression'
         '',#'repeat_count'
         ''#'image'  
     ]
     
+def get_diagnostic_add_line(diags, df_choice):
+    for diag in diags:
+        df_choice.loc[len(df_choice)] =  [
+            "tricc_diag_add",
+            diag.name,
+            diag.label
+        ]
+    label = langs.get_trads('Add a missing diagnostic', True)
+    empty = langs.get_trads(' ', True)
+    return [
+        'select_multiple tricc_diag_add',
+        "new_diag",
+        *list(label.values()) ,
+        *list(empty.values()) ,#hint
+        *list(empty.values()) ,#help
+        '',#default
+        'minimal',#'appearance', 
+        '',#'constraint', 
+        *list(empty.values()) ,#'constraint_message',
+        '',#'relevance'
+        '',#'disabled'
+        '',#'required'
+        *list(empty.values()) ,#'required message'
+        '',#'read only'
+        '',#'expression'
+        '',#'repeat_count'
+        ''#'image'  
+    ]  
+    
 def get_diagnostic_none_line(diags):
     relevance = ''
     for diag in diags:
         relevance += TRICC_CALC_EXPRESSION.format(diag.name) + " or "
-    
-        
-    
+    label = langs.get_trads('Aucun diagnostic trouvé par l\'outil mais cela ne veut pas dire que le patient est en bonne santé', True)
+    empty = langs.get_trads(' ', True)
     return [
         'note',
         "l_diag_none25",
-        _('Aucun diagnostic trouvé par l\'outil mais cela ne veut pas dire que le patient est en bonne santé'),
-        '',#hint
-        '',#help
+        *list(label.values()) ,
+        *list(empty.values()) ,
+        *list(empty.values()) ,
         '',#default
         '',#'appearance', 
         '',#'constraint', 
-        '',#'constraint_message'
+        *list(empty.values()) ,
         TRICC_NEGATE.format(relevance[:-4]),#'relevance'
         '',#'disabled'
         '',#'required'
-        '',#'required message'
+        *list(empty.values()) ,
         '',#'read only'
         '',#'expression'
         '',#'repeat_count'
@@ -248,20 +282,21 @@ def get_diagnostic_none_line(diags):
     ]
     
 def  get_diagnostic_stop_group_line():
+        label = langs.get_trads(' ', True)
         return [
         'end group',
         "l_diag_list25",
-        '',
-        '',#hint
-        '',#help
+        *list(label.values()) ,
+        *list(label.values()) ,
+        *list(label.values()) ,#help
         '',#default
         '',#'appearance', 
         '',#'constraint', 
-        '',#'constraint_message'
+        *list(label.values()) ,
         '',#'relevance'
         '',#'disabled'
         '',#'required'
-        '',#'required message'
+        *list(label.values()) ,
         '',#'read only'
         '',#'expression'
         '',#'repeat_count'
