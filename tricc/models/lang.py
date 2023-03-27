@@ -3,7 +3,7 @@ from polib import POEntry, POFile
 
 class SingletonLangClass(object):
     languages = None
-
+    entries = []
     po_file = None
     
     def __init__(self):
@@ -19,19 +19,29 @@ class SingletonLangClass(object):
             self.languages = {}
         self.languages[code] = lang
     
-    def get_trads(self, message, force_dict = False):
-
-        self.po_file.insert(0,POEntry(msgid = message))
-        
-        if self.languages is None:
+    def get_trads(self, message,  force_dict = False,trad=None):
+        message = message.strip()
+        if message == '' and (self.languages is None or trad is not None):
             if force_dict:
-                return {'default', message}
+                return {'default': ''}
+            else :
+                return ''
+            
+        if message not in self.entries:
+            self.po_file.insert(0,POEntry(msgid = message))
+            self.entries.append(message)
+        
+        if self.languages is None or len(self.languages) == 0:
+            if force_dict:
+                return {'default': message}
             else :
                 return message
+        elif trad is not None:
+            return self.languages[trad].gettext(message) if len(message)>0 else ''
         else:
             trads = {}
             for code, lang in self.languages.items():
-                trads[code]= lang.gettext(message)
+                trads[code]= lang.gettext(message) if len(message)>0 else ''
             return trads
 
     def get_trads_map(self, col):

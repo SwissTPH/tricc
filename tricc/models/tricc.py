@@ -35,6 +35,8 @@ class TriccNodeType(str, Enum):
     decimal = 'decimal'
     integer = 'integer'
     text = 'text'
+    date = 'date'
+    
 
 
 class TriccExtendedNodeType(str, Enum):
@@ -338,6 +340,8 @@ class TriccNodeDiplayModel(TriccNodeBaseModel):
 class TriccNodeNote(TriccNodeDiplayModel):
     odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccNodeType.note
 
+class TriccNodeDate(TriccNodeDiplayModel):
+    odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccNodeType.date
 
 class TriccNodeInputModel(TriccNodeDiplayModel):
     required: Optional[Expression]
@@ -642,14 +646,14 @@ def reorder_node_list(list_node, group):
 # therefore to avoid double processing the nodes variable saves the node already processed
 # there 2 strategies : process it the first time or the last time (wait that all the previuous node are processed)
 
-def walktrhough_tricc_node_processed_stached(node, callback, processed_nodes, stashed_nodes, path_len, recursive=True,
+def walktrhough_tricc_node_processed_stached(node, callback, processed_nodes, stashed_nodes, path_len, recursive=True, warn = False,
                                              **kwargs):
     # logger.debug("walkthrough::{}::{}".format(callback.__name__, node.get_name()))
     if hasattr(node, 'prev_nodes') and len(node.prev_nodes) > 0:
         sorted_list = sorted(node.prev_nodes, key=lambda p_node: p_node.path_len, reverse=True)
         path_len = max(path_len, sorted_list[0].path_len + 1, len(processed_nodes)+1)
     node.path_len = max(node.path_len, path_len)
-    if (callback(node, processed_nodes=processed_nodes, stashed_nodes=stashed_nodes, **kwargs)):
+    if (callback(node, processed_nodes=processed_nodes, stashed_nodes=stashed_nodes, warn = warn,**kwargs)):
         # node processing succeed 
         if node not in processed_nodes:
             processed_nodes.append(node)
@@ -668,7 +672,7 @@ def walktrhough_tricc_node_processed_stached(node, callback, processed_nodes, st
                 node.root.path_len = max(path_len,  node.root.path_len)
                 if recursive:
                     walktrhough_tricc_node_processed_stached(node.root, callback, processed_nodes, stashed_nodes, path_len,
-                                                         recursive, **kwargs)
+                                                         recursive, warn = warn,**kwargs)
                 elif node.root not in stashed_nodes:
                     stashed_nodes.insert(0,node.root)
                 return
@@ -686,10 +690,10 @@ def walktrhough_tricc_node_processed_stached(node, callback, processed_nodes, st
                     logger.debug(
                         "{}::{}: processed ({})".format(callback.__name__, option.get_name(), len(processed_nodes)))
                 walkthrough_tricc_option(node, callback, processed_nodes, stashed_nodes, path_len + 1, recursive,
-                                         **kwargs)
+                                         warn = warn, **kwargs)
         if hasattr(node, 'next_nodes') and len(node.next_nodes) > 0:
             walkthrough_tricc_next_nodes(node, callback, processed_nodes, stashed_nodes, path_len + 1, recursive,
-                                             **kwargs)
+                                             warn = warn,**kwargs)
     else:
         if node not in processed_nodes and node not in stashed_nodes:
             if node not in stashed_nodes:
@@ -697,7 +701,7 @@ def walktrhough_tricc_node_processed_stached(node, callback, processed_nodes, st
                 logger.debug("{}::{}: stashed({})".format(callback.__name__, node.get_name(), len(stashed_nodes)))
 
 
-def walkthrough_tricc_next_nodes(node, callback, processed_nodes, stashed_nodes, path_len, recursive, **kwargs):
+def walkthrough_tricc_next_nodes(node, callback, processed_nodes, stashed_nodes, path_len, recursive, warn = False, **kwargs):
     if not recursive:
         for next_node in node.next_nodes:
             if next_node not in stashed_nodes:
@@ -710,14 +714,14 @@ def walkthrough_tricc_next_nodes(node, callback, processed_nodes, stashed_nodes,
                     list_next.append(next_node)
                     if not isinstance(node, (TriccNodeActivityEnd, TriccNodeEnd)):
                         walktrhough_tricc_node_processed_stached(next_node, callback, processed_nodes, stashed_nodes,
-                                                                path_len + 1,recursive, **kwargs)
+                                                                path_len + 1,recursive, warn = warn, **kwargs)
                     else:
                         logger.error(
                             "{}::end node of {} has a next node".format(callback.__name__.node.activity.get_name()))
                         exit()
 
 
-def walkthrough_tricc_option(node, callback, processed_nodes, stashed_nodes, path_len, recursive, **kwargs):
+def walkthrough_tricc_option(node, callback, processed_nodes, stashed_nodes, path_len, recursive, warn = False, **kwargs):
     if not recursive:
         for option in node.options.values():
             if hasattr(option, 'next_nodes') and len(option.next_nodes) > 0:
@@ -739,7 +743,7 @@ def walkthrough_tricc_option(node, callback, processed_nodes, stashed_nodes, pat
                                     list_next.append(next_node)
                                     walktrhough_tricc_node_processed_stached(next_node, callback, processed_nodes,
                                                                             stashed_nodes, path_len + 1, recursive,
-                                                                            **kwargs)
+                                                                            warn = warn,**kwargs)
 
 
 def stashed_node_func(node, callback, recusive=False, **kwargs):
@@ -765,15 +769,19 @@ def stashed_node_func(node, callback, recusive=False, **kwargs):
                 stashed_nodes.remove(s_node)
             logger.debug("{}::{}::{}: unstashed for processing ({})".format(callback.__name__, s_node.__class__, s_node.get_name(),
                                                                         len(stashed_nodes)))
+            warn = loop_count ==  (10 * len(stashed_nodes   )-1)
             walktrhough_tricc_node_processed_stached(s_node, callback, processed_nodes, stashed_nodes, path_len,
-                                                     recusive, **kwargs)
+                                                     recusive, warn= warn, **kwargs)
 
 
 # check if the all the prev nodes are processed
-def is_ready_to_process(in_node, processed_nodes, strict=True):
+def is_ready_to_process(in_node, processed_nodes, strict=True, local = False):
     if isinstance(in_node, TriccNodeSelectOption):
         node = in_node.select
     elif isinstance(in_node, TriccNodeActivityStart):
+        if local:
+            # an activitiy start iss always processable locally
+            return True
         node = in_node.activity
     else:
         node = in_node
@@ -781,19 +789,21 @@ def is_ready_to_process(in_node, processed_nodes, strict=True):
         # ensure the  previous node of the select are processed, not the option prev nodes
         for prev_node in node.prev_nodes:
             if isinstance(prev_node, TriccNodeActivity):
-                activity_end_nodes = prev_node.get_end_nodes()
-                if len(activity_end_nodes) == 0:
-                    logger.error("is_ready_to_process:failed: {1} -act-> {0} NO end nodes".format(prev_node.get_name(),
-                                                                                                  node.get_name()))
-                    return False
-                for end_node in activity_end_nodes:
-                    if end_node not in processed_nodes:
-                        logger.debug(
-                            "is_ready_to_process:failed: {2} -act-> {0} -end-> {1}".format(prev_node.get_name(),
-                                                                                           end_node.get_name(),
-                                                                                           node.get_name()))
+                if not local:
+                    # other activity dont affect local evaluation
+                    activity_end_nodes = prev_node.get_end_nodes()
+                    if len(activity_end_nodes) == 0:
+                        logger.error("is_ready_to_process:failed: {1} -act-> {0} NO end nodes".format(prev_node.get_name(),
+                                                                                                    node.get_name()))
                         return False
-            elif prev_node not in processed_nodes:
+                    for end_node in activity_end_nodes:
+                        if end_node not in processed_nodes:
+                            logger.debug(
+                                "is_ready_to_process:failed: {2} -act-> {0} -end-> {1}".format(prev_node.get_name(),
+                                                                                            end_node.get_name(),
+                                                                                            node.get_name()))
+                            return False
+            elif prev_node not in processed_nodes and (not local or prev_node.activity == node.activity):
                 if isinstance(prev_node, TriccNodeExclusive):
                     logger.debug("is_ready_to_process:failed: {0} -excl-> {2} --> {1}".format(node.get_name(),
                                                                                               prev_node.prev_nodes[
@@ -808,7 +818,7 @@ def is_ready_to_process(in_node, processed_nodes, strict=True):
                                                                                         node.get_name()))
                 return False
         if strict:
-            return is_rhombus_ready_to_process(node, processed_nodes)
+            return is_rhombus_ready_to_process(node, processed_nodes, local)
         else:
             return True
     else:
@@ -856,13 +866,13 @@ def reverse_walkthrough(in_node, next_node, callback, processed_nodes, stashed_n
                     reverse_walkthrough(ref, node, callback, processed_nodes, stashed_nodes)
 
 
-def is_rhombus_ready_to_process(node, processed_nodes):
+def is_rhombus_ready_to_process(node, processed_nodes, local = False):
     if isinstance(node, TriccNodeRhombus):
         if isinstance(node.reference, str):
             return False  # calculate not yet processed
         elif isinstance(node.reference, list):
             for ref in node.reference:
-                if issubclass(ref.__class__, TriccNodeBaseModel) and ref not in processed_nodes:
+                if issubclass(ref.__class__, TriccNodeBaseModel) and ref not in processed_nodes and (not local or ref.activity == node.activity):
                     return False
                 elif issubclass(ref.__class__, str):
                     logger.debug("Node {1} as still a reference to string")

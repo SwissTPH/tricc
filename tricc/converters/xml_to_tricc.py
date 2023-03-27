@@ -3,10 +3,9 @@ import os
 import re
 from curses.ascii import isalnum, isalpha, isdigit
 
-import html2text
 from numpy import isnan
 
-from tricc.converters.utils import OPERATION_LIST, clean_name
+from tricc.converters.utils import OPERATION_LIST, clean_name, remove_html
 from tricc.models.tricc import *
 from tricc.parsers.xml import (get_edges_list, get_mxcell,
                                get_mxcell_parent_list, get_odk_type,
@@ -21,8 +20,6 @@ import logging
 
 logger = logging.getLogger("default")
 
-from tricc.models.lang import SingletonLangClass
-langs = SingletonLangClass()
 
 def create_activity(diagram, media_path):
     id = diagram.attrib.get('id')    
@@ -179,14 +176,7 @@ def process_exclusive_edge(edge, nodes):
         ))     
     
 
-# the soup.text strips off the html formatting also
-def remove_html(string):
-    text = html2text.html2text(string) # retrive pure text from html
-    text = text.strip('\n') # get rid of empty lines at the end (and beginning)
-    text = text.split('\n') # split string into a list at new lines
-    text = '\n'.join([i.strip(' ') for i in text if i]) # in each element in that list strip empty space (at the end of line) 
-    # and delete empty lines
-    return text
+
 
 def get_nodes(diagram, activity):
     nodes = {}
@@ -271,6 +261,8 @@ def add_input_nodes(nodes, diagram, group= None):
     add_tricc_nodes(nodes, TriccNodeInteger, list, group, ['min','max', 'constraint','save','constraint_message','required'])
     list = get_odk_type_list(diagram, ['object','UserObject'], TriccNodeType.text)
     add_tricc_nodes(nodes, TriccNodeText, list, group, ['constraint','save','constraint_message','required'])
+    list = get_odk_type_list(diagram, ['object','UserObject'], TriccNodeType.date)
+    add_tricc_nodes(nodes, TriccNodeDate, list, group, ['constraint','save','constraint_message','required'])
 
 def add_calculate_nodes(nodes, diagram, group=None):
     list = get_odk_type_list(diagram, ['UserObject','object'], TriccNodeType.calculate)
@@ -353,13 +345,13 @@ def get_last_version(dict, name):
                 max_version = sim_node
     return max_version
 
-def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calculates,  **kwargs ):
+def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calculates, warn = False, **kwargs ):
      # used_calculates dict[name, Dict[id, node]]
      # processed_nodes Dict[id, node]
      # calculates  dict[name, Dict[id, node]]
     if node not in processed_nodes:
         # generate condition
-        if is_ready_to_process(node, processed_nodes,False) and process_reference(node, calculates,used_calculates,processed_nodes):
+        if is_ready_to_process(node, processed_nodes,False) and process_reference(node, calculates,used_calculates,processed_nodes,warn = warn):
             if is_rhombus_ready_to_process(node,processed_nodes):
                 generate_calculates(node,calculates, used_calculates,processed_nodes)
                 if issubclass(node.__class__, (TriccNodeDisplayCalculateBase )) and node.name is not None:
@@ -535,7 +527,7 @@ def add_calculate(calculates, calc_node):
             calculates[calc_node.name]= {}
         calculates[calc_node.name][calc_node.id] = calc_node
 
-def process_reference(node,  calculates ,used_calculates,processed_nodes):
+def process_reference(node,  calculates ,used_calculates,processed_nodes, warn = False ):
     #global last_unfound_ref
     reference = []
     expression_reference = None
@@ -558,7 +550,10 @@ def process_reference(node,  calculates ,used_calculates,processed_nodes):
                         # issue is that it can be further in another path
                         last_found = get_last_version(calculates, ref)
                 if last_found is None:
-                    logger.debug("reference {} not found for a calculate {}".format(ref, node.get_name()))
+                    if warn:
+                        logger.warning("reference {} not found for a calculate {}".format(ref, node.get_name()))
+                    else:
+                        logger.debug("reference {} not found for a calculate {}".format(ref, node.get_name()))
                     #if last_unfound_ref == node:
                     #    logger.warning("reference not found for a calculate twice in a row {}".format(node.get_name()))
                     #last_unfound_ref = node
@@ -591,7 +586,7 @@ def process_reference(node,  calculates ,used_calculates,processed_nodes):
                     group = node.group                   
                 )
                 set_prev_next_node(new_node,node,prev_node)
-                if process_reference(new_node,  calculates ,used_calculates,processed_nodes):
+                if process_reference(new_node,  calculates ,used_calculates,processed_nodes, warn = warn):
                     processed_nodes.append(new_node)
                     return True
 
@@ -714,14 +709,14 @@ def get_select_yes_no_options(node, group):
     return {0:TriccNodeSelectOption(
                 id = generate_id(),
                 name="1",
-                label=langs.get_trads("Yes"),
+                label="Yes",
                 select = node,
                 group = group,
                 list_name =  node.list_name
             ), 1:TriccNodeSelectOption(
                 id = generate_id(),
                 name="-1",
-                label=langs.get_trads("No"),
+                label="No",
                 select = node,
                 group = group,
                 list_name =  node.list_name

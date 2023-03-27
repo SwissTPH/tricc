@@ -7,7 +7,9 @@ import pandas as pd
 
 from tricc.serializers.xls_form import SURVEY_MAP
 from tricc.strategies.xlsform_cdss import XLSFormCDSSStrategy
+from tricc.models.lang import SingletonLangClass
 
+langs = SingletonLangClass()
 
 class XLSFormCHTStrategy(XLSFormCDSSStrategy):
     def process_export(self, activity,  **kwargs):
@@ -21,30 +23,30 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
     def get_cht_input(self):
         df_input = pd.DataFrame(columns=SURVEY_MAP.keys())
          #[ #type, '',#name ''#label, '',#hint '',#help '',#default '',#'appearance',  '',#'constraint',  '',#'constraint_message' '',#'relevance' '',#'disabled' '',#'required' '',#'required message' '',#'read only' '',#'expression' '',#'repeat_count' ''#'image' ],
-        df_input.loc[len(df_input)] =  [ 'begin group', 'inputs' ,'Inputs', '', '', '',  'field-list',  '', '', './source = "user"', '', '','', '', '', '', '' ]
-        df_input.loc[len(df_input)] = [  'hidden', 'source', '', '', '', '',  '',  '', '', '', '', '', '', '', '', '','' ]
-        df_input.loc[len(df_input)] = [  'hidden', 'source_id', '', '', '', '',  '',  '', '', '', '', '', '', '', '','', '' ]
-        df_input.loc[len(df_input)] = [  'hidden', 'task_id' ,'Task_ID', '', '', '',  '',  '', '', '', '', '', '', '', '', '','' ]
-        df_input.loc[len(df_input)] = [  'begin group	', 'contact' ,'', '', '', '',  '',  '', '', '', '', '', '', '', '', '','' ]
-        df_input.loc[len(df_input)] = [  'db:person', '_id', 'Patient ID', '', '', '',  'db-object',  '', '', '', '', '', '', '', '','', '' ]
-        df_input.loc[len(df_input)] = [  'string', 'patient_id' ,'Medic ID', '', '', '',  'hidden',  '', '', '', '', '', '', '', '','', '' ]
-        df_input.loc[len(df_input)] = [  'string', 'patient_name', 'Patient Name', '', '', '',  'hidden',  '', '', '', '', '', '', '', '','', '' ]
-        df_input.loc[len(df_input)] = [  'end group', '' ,'', '', '', '',  '',  '', '', '', '', '', '', '', '','', '' ]
-        df_input.loc[len(df_input)] = [  'end group', '' ,'', '', '', '',  '',  '', '', '', '', '', '', '', '','', '' ]
-        df_input.loc[len(df_input)] = [  'calculate', '_id' ,'label', '', '', '',  '',  '', '', '', '', '', '', '','../inputs/contact/_id', '', '' ]
-        df_input.loc[len(df_input)] = [  'calculate', 'patient_uuid' ,'label', '', '', '',  '',  '', '', '', '', '','', '', '../inputs/contact/patient_id', '', '' ]
-        df_input.loc[len(df_input)] = [  'calculate', 'name' ,'label', '', '', '',  '',  '', '', '', '', '', '','', '../inputs/contact/patient_name', '', '' ]
+        df_input.loc[len(df_input)] =  [ 'begin group', 'inputs' ,*list(langs.get_trads('Inputs', force_dict = True).values()), *list(langs.get_trads('', force_dict = True).values()), *list(langs.get_trads('', force_dict = True).values()), '',  'field-list',  '', *list(langs.get_trads('', force_dict = True).values()), './source = "user"', '','', *list(langs.get_trads('', force_dict = True).values()) ,'', '', '', '' ]
+        df_input.loc[len(df_input)] = [  'hidden', 'source', *list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', '',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()), '', '', '', '' ]
+        df_input.loc[len(df_input)] = [  'hidden', 'source_id',*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', '',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()), '', '', '', '' ]
+        df_input.loc[len(df_input)] = [  'hidden', 'task_id' ,*list(langs.get_trads('Task ID', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', '',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()), '', '', '', '']
+        df_input.loc[len(df_input)] = [  'begin group	', 'contact' ,*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', '',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()), '', '', '', '' ]
+        df_input.loc[len(df_input)] = [  'db:person', '_id', *list(langs.get_trads('Patient ID', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', 'db-object',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()), '', '', '', '' ]
+        df_input.loc[len(df_input)] = [  'string', 'patient_id' ,*list(langs.get_trads('Medic ID', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', 'hidden',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()), '', '', '', '' ]
+        df_input.loc[len(df_input)] = [  'string', 'patient_name',*list(langs.get_trads('Patient Name', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', 'hidden',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()), '', '',  '','' ]
+        df_input.loc[len(df_input)] = [  'end group', '' ,*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', '',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()), '', '', '', '']
+        df_input.loc[len(df_input)] = [  'end group', '' ,*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', '',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()), '', '', '', '' ]
+        df_input.loc[len(df_input)] = [  'calculate', '_id' ,*list(langs.get_trads('label', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', '',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()), '',  '../inputs/contact/_id', '', '' ]
+        df_input.loc[len(df_input)] = [  'calculate', 'patient_uuid' ,*list(langs.get_trads('label', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', '',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()), '',  '../inputs/contact/patient_id', '', '' ]
+        df_input.loc[len(df_input)] = [  'calculate', 'name' ,*list(langs.get_trads('label', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', '',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()), '', '../inputs/contact/patient_name', '', '' ]
         return df_input
         
     def get_cht_summary(self):
         
         df_summary = pd.DataFrame(columns=SURVEY_MAP.keys())
          #[ #type, '',#name ''#label, '',#hint '',#help '',#default '',#'appearance',  '',#'constraint',  '',#'constraint_message' '',#'relevance' '',#'disabled' '',#'required' '',#'required message' '',#'read only' '',#'expression' '',#'repeat_count' ''#'image' ],
-        df_summary.loc[len(df_summary)] = [  'begin group', 'group_summary' , 'Summary',                                  '', '', '',  'field-list summary',  '', '', '', '', '', '', '', '', '', '' ]
-        df_summary.loc[len(df_summary)] = [  'note',        'r_patient_info', '**${patient_name}** ID: ${patient_id}',  '', '', '',  '',                    '', '', '', '', '', '', '', '', '', '' ]
-        df_summary.loc[len(df_summary)] = [  'note',        'r_followup', 'Follow Up <i class=“fa fa-flag”></i>', '', '', '',  '',  '', '','', '', '', '', '', '', '', '' ]
-        df_summary.loc[len(df_summary)] = [  'note',        'r_followup_note' ,'FOLLOWUP instruction', '', '', '',  '',  '', '', '','', '', '', '', '', '', '' ]
-        df_summary.loc[len(df_summary)] = [  'end group', '' ,'', '', '', '',  '',  '', '', '', '', '', '', '', '','', '' ]
+        #df_summary.loc[len(df_summary)] = [  'begin group', 'group_summary' , 'Summary',                                  '', '', '',  'field-list summary',  '', '', '', '', '', '', '', '', '', '' ]
+        #df_summary.loc[len(df_summary)] = [  'note',        'r_patient_info', '**${patient_name}** ID: ${patient_id}',  '', '', '',  '',                    '', '', '', '', '', '', '', '', '', '' ]
+        #df_summary.loc[len(df_summary)] = [  'note',        'r_followup', 'Follow Up <i class=“fa fa-flag”></i>', '', '', '',  '',  '', '','', '', '', '', '', '', '', '' ]
+        #df_summary.loc[len(df_summary)] = [  'note',        'r_followup_note' ,'FOLLOWUP instruction', '', '', '',  '',  '', '', '','', '', '', '', '', '', '' ]
+        #df_summary.loc[len(df_summary)] = [  'end group', '' ,'', '', '', '',  '',  '', '', '', '', '', '', '', '','', '' ]
         return df_summary
     
     def do_export(self, title , file_name, form_id):

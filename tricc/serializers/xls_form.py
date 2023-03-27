@@ -4,7 +4,7 @@ import logging
 
 from tricc.converters.tricc_to_xls_form import (TRICC_CALC_EXPRESSION,
                                                 TRICC_NEGATE)
-from tricc.converters.utils import clean_name
+from tricc.converters.utils import clean_name, remove_html
 from tricc.models.lang import SingletonLangClass
 from tricc.models.tricc import *
 
@@ -25,15 +25,13 @@ def start_group( cur_group, groups, df_survey, relevance = False, **kargs):
                 value = value + "_" + str(groups[cur_group.name])
             else:
                 groups[cur_group.name] = 0
-            values.append(value)
-        elif column == 'label':
-            values.append(get_attr_if_exists(cur_group,column,SURVEY_MAP))        
+            values.append(value)   
         elif  column == 'appearance':
             values.append('field-list')
         elif relevance and column == 'relevance':
             values.append(get_attr_if_exists(cur_group,column,SURVEY_MAP))
         else:
-            values.append('')
+            values.append(get_xfrom_trad(cur_group,column,SURVEY_MAP))
     df_survey.loc[len(df_survey)] = values
     
 
@@ -42,13 +40,13 @@ def end_group( cur_group, groups, df_survey, **kargs):
     for column in SURVEY_MAP:
         if column == 'type':
             values.append('end group')
-        elif column in ('name','label'):
+        elif column in ('name'):
             value = get_attr_if_exists(cur_group,column,SURVEY_MAP)
             if cur_group.name in groups:
                 value = value + "_" + str(groups[cur_group.name])
             values.append(value)
         else:
-            values.append('')
+            values.append(get_xfrom_trad(cur_group,column,SURVEY_MAP))
     df_survey.loc[len(df_survey)] = values
 
 
@@ -92,22 +90,40 @@ ODK_TRICC_TYPE_MAP = { 'note':'note'
     ,'edge':''
     ,'page':''
     ,'bridge':'calculate'
+    ,'date':'date'
     }
 
 GROUP_ODK_TYPE = [TriccExtendedNodeType.page,TriccExtendedNodeType.activity]
           
 SURVEY_MAP = {
     'type':ODK_TRICC_TYPE_MAP, 'name':'name',
-    **langs.get_trads_map('label'), 'hint':'hint',
-    'help':'help', 'default':'default', 
+    **langs.get_trads_map('label'), **langs.get_trads_map('hint'),
+    **langs.get_trads_map('help'), 'default':'default', 
     'appearance':'appearance', 'constraint':'constraint', 
     **langs.get_trads_map('constraint_message'), 'relevance':'relevance',
     'disabled':'disabled','required':'required',
-    **langs.get_trads_map('required message'), 'read only':'read only', 
+    **langs.get_trads_map('required_message'), 'read only':'read only', 
     'calculation':'expression','repeat_count':'repeat_count','image':'image'
 }
-CHOICE_MAP = {'list_name':'list_name', 'value':'name', 'label':'label' }
-       
+CHOICE_MAP = {'list_name':'list_name', 'value':'name', **langs.get_trads_map('label') }
+     
+     
+TRAD_MAP = ['label','constraint_message', 'required_message', 'hint', 'help']  
+
+def get_xfrom_trad(node, column, maping, clean_html = False ):
+    arr = column.split('::')
+    column = arr[0]
+    trad =  arr[1] if len(arr)==2 else None
+    value = get_attr_if_exists(node, column, maping)
+    if clean_html and isinstance(value, str):
+        value = remove_html(value)
+    if column in TRAD_MAP:
+        value = langs.get_trads(value, trad=trad)
+
+    return value
+
+    
+
 
 def get_attr_if_exists(node,column, map_array):
     if column in map_array:
@@ -149,7 +165,7 @@ def generate_xls_form_export(node, processed_nodes, stashed_nodes, df_survey, df
                 if isinstance(node, TriccNodeSelectOption):
                     values = []
                     for column in CHOICE_MAP:
-                        values.append(get_attr_if_exists(node,column,CHOICE_MAP))
+                        values.append(get_xfrom_trad(node, column, CHOICE_MAP, True ))
                     # add only if not existing
                     if len(df_choice[(df_choice['list_name'] == node.list_name) & (df_choice['value'] == node.name)])  == 0:
                         df_choice.loc[len(df_choice)] = values
@@ -160,7 +176,7 @@ def generate_xls_form_export(node, processed_nodes, stashed_nodes, df_survey, df
                             if column == 'default' and issubclass(node.__class__, TriccNodeDisplayCalculateBase):
                                 values.append(0)
                             else:
-                                values.append(get_attr_if_exists(node,column,SURVEY_MAP))
+                                values.append(get_xfrom_trad(node, column, SURVEY_MAP ))
                         if len(df_calculate[df_calculate.name == node.name])==0:
                             df_calculate.loc[len(df_calculate)] = values
                         else:
@@ -169,7 +185,7 @@ def generate_xls_form_export(node, processed_nodes, stashed_nodes, df_survey, df
                     elif  ODK_TRICC_TYPE_MAP[node.odk_type] !='':
                         values = []
                         for column in SURVEY_MAP:
-                            values.append(get_attr_if_exists(node,column,SURVEY_MAP))
+                            values.append(get_xfrom_trad(node,column,SURVEY_MAP))
                         df_survey.loc[len(df_survey)] = values
                     else:
                         logger.warning("node {} have an unmapped type {}".format(node.get_name(),node.odk_type))
@@ -181,8 +197,8 @@ def generate_xls_form_export(node, processed_nodes, stashed_nodes, df_survey, df
 
 
 def get_diagnostic_line(node):
-    label = langs.get_trads(node.label, True)
-    empty = langs.get_trads(' ', True)
+    label = langs.get_trads(node.label, force_dict =True)
+    empty = langs.get_trads('', force_dict =True)
     return [
         'select_one yes_no',
         "cond_"+node.name,
@@ -195,7 +211,7 @@ def get_diagnostic_line(node):
         *list(empty.values()) ,#'constraint_message'
         TRICC_CALC_EXPRESSION.format(node.name),#'relevance'
         '',#'disabled'
-        '',#'required'
+        '1',#'required'
         *list(empty.values()) ,#'required message'
         '',#'read only'
         '',#'expression'
@@ -204,8 +220,8 @@ def get_diagnostic_line(node):
     ]
 
 def get_diagnostic_start_group_line():
-    label = langs.get_trads('List of diagnostics', True)
-    empty = langs.get_trads(' ', True)
+    label = langs.get_trads('List of diagnostics', force_dict =True)
+    empty = langs.get_trads('', force_dict =True)
     return [
         'begin group',
         "l_diag_list25",
@@ -231,10 +247,10 @@ def get_diagnostic_add_line(diags, df_choice):
         df_choice.loc[len(df_choice)] =  [
             "tricc_diag_add",
             diag.name,
-            diag.label
+            *list(langs.get_trads(diag.label, True).values())
         ]
-    label = langs.get_trads('Add a missing diagnostic', True)
-    empty = langs.get_trads(' ', True)
+    label = langs.get_trads('Add a missing diagnostic', force_dict =True)
+    empty = langs.get_trads('', force_dict =True)
     return [
         'select_multiple tricc_diag_add',
         "new_diag",
@@ -259,8 +275,8 @@ def get_diagnostic_none_line(diags):
     relevance = ''
     for diag in diags:
         relevance += TRICC_CALC_EXPRESSION.format(diag.name) + " or "
-    label = langs.get_trads('Aucun diagnostic trouvé par l\'outil mais cela ne veut pas dire que le patient est en bonne santé', True)
-    empty = langs.get_trads(' ', True)
+    label = langs.get_trads('Aucun diagnostic trouvé par l\'outil mais cela ne veut pas dire que le patient est en bonne santé', force_dict =True)
+    empty = langs.get_trads('', force_dict =True)
     return [
         'note',
         "l_diag_none25",
@@ -282,7 +298,7 @@ def get_diagnostic_none_line(diags):
     ]
     
 def  get_diagnostic_stop_group_line():
-        label = langs.get_trads(' ', True)
+        label = langs.get_trads('', force_dict =True)
         return [
         'end group',
         "l_diag_list25",

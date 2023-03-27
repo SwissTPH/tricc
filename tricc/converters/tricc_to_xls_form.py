@@ -1,7 +1,6 @@
 import re
 
-from tricc.converters.utils import (OPERATION_LIST, clean_str)
-from tricc.models.lang import SingletonLangClass
+from tricc.converters.utils import OPERATION_LIST, clean_str
 from tricc.models.tricc import *
 
 # from babel import _
@@ -24,7 +23,6 @@ import logging
 logger = logging.getLogger("default")
 
 # gettext language dict {'code':gettext}
-langs = SingletonLangClass()
 
 def generate_xls_form_condition(node, processed_nodes, **kwargs):
     node.name = get_printed_name(node)
@@ -39,20 +37,20 @@ def generate_xls_form_condition(node, processed_nodes, **kwargs):
                 if node.constraint is None:
                     if isinstance(node, TriccNodeSelectMultiple):
                         node.constraint = '.=\'opt_none\' or not(selected(.,\'opt_none\'))'
-                        node.constraint_message = langs.get_trads('**None** cannot be selected together with choice.')
+                        node.constraint_message = '**None** cannot be selected together with choice.'
                 elif node.odk_type in (TriccNodeType.integer, TriccNodeType.decimal):
                     constraints = []
                     constraints_min = None
                     constraints_max = None
                     if node.min is not None:
                         constraints.append('.>=' + node.min) 
-                        constraints_min= langs.get_trads("The minimun value is {0}.").format(node.min)
+                        constraints_min= "The minimun value is {0}.".format(node.min)
                     if node.max is not None:
                         constraints.append('.>=' + node.max)
-                        constraints_max=langs.get_trads("The maximum value is {0}.").format(node.max)
+                        constraints_max="The maximum value is {0}.".format(node.max)
                     if len(constraints) > 0:
                         node.constraint = ' and '.join(constraints)
-                        node.constraint_message = langs.join_trads(constraints_min, constraints_max)
+                        node.constraint_message = (constraints_min + " "  + constraints_max).strip()
             # continue walk
             return True
     return False
@@ -77,7 +75,7 @@ def generate_xls_form_relevance(node, processed_nodes, stashed_nodes, **kwargs):
                             node.relevance = parent_empty
                         node.required = parent_empty
                         node.constraint = parent_empty
-                        node.constraint_message = langs.get_trads("Cannot be selected with a value entered above")
+                        node.constraint_message = "Cannot be selected with a value entered above"
                         # update the check box parent : create loop error
                         parent_node.required = None  # "${{{0}}}=''".format(node.name)
                     else:
