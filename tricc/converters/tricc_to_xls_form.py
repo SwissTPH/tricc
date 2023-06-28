@@ -1,3 +1,4 @@
+from operator import attrgetter
 import re
 
 from tricc.converters.utils import OPERATION_LIST, clean_str
@@ -8,6 +9,7 @@ from tricc.models.tricc import *
 TRICC_SELECT_MULTIPLE_CALC_EXPRESSION = "count-selected(${{{0}}}) - number(selected(${{{0}}},'opt_none'))"
 TRICC_SELECT_MULTIPLE_CALC_NONE_EXPRESSION = "selected(${{{0}}},'opt_none')"
 TRICC_CALC_EXPRESSION = "${{{0}}}>0"
+TRICC_CALC_NOT_EXPRESSION = "${{{0}}}=0"
 TRICC_EMPTY_EXPRESSION = "coalesce(${{{0}}},'') != ''"
 TRICC_SELECTED_EXPRESSION = 'selected(${{{0}}}, "{1}")'
 TRICC_REF_EXPRESSION = "${{{0}}}"
@@ -212,6 +214,10 @@ def get_node_expression(in_node, processed_nodes, is_calculate=False, is_prev=Fa
             expression = node.relevance
     if expression is None:
             expression = get_prev_node_expression(node, processed_nodes, is_calculate)
+    if isinstance(node, TriccNodeActivity) and any(isinstance(x, TriccNodeEnd) for x in processed_nodes):
+        ends = filter(lambda x: isinstance(x, TriccNodeEnd), processed_nodes)
+        end_exp = TRICC_CALC_NOT_EXPRESSION.format(max(ends, key=attrgetter('version')).name)
+        expression = TRICC_AND_EXPRESSION.format(expression, end_exp )
     if negate:
         if negate_expression is not None:
             return negate_expression
@@ -222,6 +228,7 @@ def get_node_expression(in_node, processed_nodes, is_calculate=False, is_prev=Fa
             # exit()
     else:
         return expression
+    
 
 
 def get_activity_end_terms(node, processed_nodes):
@@ -361,7 +368,7 @@ def get_printed_name(node):
         return "id_" + node.id
     elif INSTANCE_SEPARATOR  in node.name or  VERSION_SEPARATOR in node.name:
         return node.name 
-    elif issubclass(node.__class__, (TriccNodeDiplayModel)):
+    elif issubclass(node.__class__, (TriccNodeDisplayModel)):
         node.gen_name()
         if not isinstance(node, TriccNodeSelectOption):
             return node.name +  INSTANCE_SEPARATOR + str(node.instance)
