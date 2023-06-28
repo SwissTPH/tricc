@@ -161,7 +161,7 @@ def generate_xls_form_export(node, processed_nodes, stashed_nodes, df_survey, df
             if node in stashed_nodes:
                 stashed_nodes.remove(node)
                 logger.debug("generate_xls_form_export: unstashing processed node{} ".format(node.get_name()))
-            if issubclass(node.__class__, ( TriccNodeDisplayCalculateBase,TriccNodeDiplayModel)):
+            if issubclass(node.__class__, ( TriccNodeDisplayCalculateBase,TriccNodeDisplayModel)):
                 if isinstance(node, TriccNodeSelectOption):
                     values = []
                     for column in CHOICE_MAP:

@@ -161,7 +161,7 @@ class TriccNodeBaseModel(TriccBaseModel):
     label: Optional[Union[str, Dict[str,str]]]
     next_nodes: List[TriccNodeBaseModel] = []
     prev_nodes: List[TriccNodeBaseModel] = []
-
+    expression: Optional[Expression]  # will be generated based on the input
     expression_inputs: List[Expression] = []
     activity: Optional[TriccNodeActivity]
 
@@ -321,7 +321,7 @@ class TriccNodeActivity(TriccNodeBaseModel):
         return end_node + activity_end_node
 
 
-class TriccNodeDiplayModel(TriccNodeBaseModel):
+class TriccNodeDisplayModel(TriccNodeBaseModel):
     name: str
     image: Optional[b64]
     hint: Optional[Union[str, Dict[str,str]]]
@@ -337,13 +337,13 @@ class TriccNodeDiplayModel(TriccNodeBaseModel):
     # to use the enum value of the TriccNodeType
 
 
-class TriccNodeNote(TriccNodeDiplayModel):
+class TriccNodeNote(TriccNodeDisplayModel):
     odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccNodeType.note
 
-class TriccNodeDate(TriccNodeDiplayModel):
+class TriccNodeDate(TriccNodeDisplayModel):
     odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccNodeType.date
 
-class TriccNodeInputModel(TriccNodeDiplayModel):
+class TriccNodeInputModel(TriccNodeDisplayModel):
     required: Optional[Expression]
     constraint_message: Optional[Union[str, Dict[str,str]]]
     constraint: Optional[Expression]
@@ -378,12 +378,13 @@ class TriccNodeGoTo(TriccNodeBaseModel):
         return instance
 
 
-class TriccNodeSelectOption(TriccNodeDiplayModel):
+class TriccNodeSelectOption(TriccNodeDisplayModel):
     odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccExtendedNodeType.select_option
     label: Union[str, Dict[str,str]]
     save: Optional[str]
     select: TriccNodeInputModel
     list_name: str
+
 
     def make_instance(self, instance_nb, activity, select, **kwargs):
         # shallow copy
@@ -449,7 +450,7 @@ class TriccNodeText(TriccNodeInputModel):
 
 class TriccNodeCalculateBase(TriccNodeBaseModel):
     input: Dict[TriccOperation, TriccNodeBaseModel] = {}
-    expression: Optional[Expression]  # will be generated based on the input
+
     version: int = 1
     last: bool = True
 
