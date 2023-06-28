@@ -786,7 +786,7 @@ def set_mandatory_attribute(elm, mandatory_attributes, groupname = None):
         elif attributes in ('parent','id', 'source', 'target'):
             param[attributes]=attribute_value
         elif attribute_value is not None:
-            param[attributes]=remove_html(attribute_value)
+            param[attributes]=remove_html(attribute_value.strip())
     return param
 
 def clean_link(link):
