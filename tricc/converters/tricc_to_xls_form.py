@@ -33,7 +33,7 @@ def generate_xls_form_condition(node, processed_nodes, **kwargs):
             if hasattr(node, 'name') and node.name is not None:
                 node.name = clean_str(node.name)
             if isinstance(node, TriccNodeRhombus) and isinstance(node.reference, str):
-                logger.warning("noif languages is None:de {} still using the reference string".format(node.get_name()))
+                logger.warning("node {} still using the reference string".format(node.get_name()))
             if issubclass(node.__class__, TriccNodeInputModel):
                 # we don't overright if define in the diagram
                 if node.constraint is None:
@@ -91,7 +91,9 @@ def generate_xls_form_calculate(node, processed_nodes, stashed_nodes, **kwargs):
     if is_ready_to_process(node, processed_nodes):
         if node not in processed_nodes:
             logger.debug("generation of calculate for node {}".format(node.get_name()))
-            if hasattr(node, 'expression') and (node.expression is None):
+            if hasattr(node, 'expression') and (node.expression is None) and issubclass(node.__class__,TriccNodeCalculateBase):
+                if  issubclass(node.__class__,TriccNodeDisplayCalculateBase) and node.hint is None and node.help is None and len(node.next_nodes) < 2 and not node.name.startswith(('diag','obs')):
+                    node = node.to_fake()
                 node.expression = get_node_expressions(node, processed_nodes)
                 # continue walk
             return True
@@ -194,7 +196,10 @@ def get_node_expression(in_node, processed_nodes, is_calculate=False, is_prev=Fa
     elif is_prev and isinstance(in_node, TriccNodeSelectNotAvailable):
         expression =  TRICC_SELECTED_EXPRESSION.format(node.name, '1')
     elif is_prev and isinstance(node, TriccNodeRhombus):
-        right = get_node_expression(node.path, processed_nodes, is_calculate, is_prev)
+        if node.path is not None: 
+            right = get_node_expression(node.path, processed_nodes, is_calculate, is_prev)
+        else:
+            right = '1'
         if right != '1':
             expression = TRICC_AND_EXPRESSION.format(right, get_rhombus_terms(node, processed_nodes))
             negate_expression = TRICC_NAND_EXPRESSION.format(right,get_rhombus_terms(node, processed_nodes))
@@ -270,6 +275,13 @@ def get_calculation_terms(node, processed_nodes, is_calculate=False, negate=Fals
             logger.error("exclusive node {} has no ou too much parent".format(node.get_name()))
     elif negate:
         return TRICC_NEGATE.format(get_prev_node_expression(node, processed_nodes, is_calculate))
+    elif node.reference is not None and node.expression_reference is not None :
+        expression = get_prev_node_expression(node, processed_nodes, is_calculate)
+        ref_expression = node.expression_reference.format(*[ref.name for ref in node.reference])
+        if expression is not None and expression != '':
+            return TRICC_AND_EXPRESSION.format(expression,ref_expression)
+        else:
+            return ref_expression
     else:
         return get_prev_node_expression(node, processed_nodes, is_calculate)
 

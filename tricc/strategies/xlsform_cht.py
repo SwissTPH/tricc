@@ -5,9 +5,9 @@ import shutil
 
 import pandas as pd
 
+from tricc.models.lang import SingletonLangClass
 from tricc.serializers.xls_form import SURVEY_MAP
 from tricc.strategies.xlsform_cdss import XLSFormCDSSStrategy
-from tricc.models.lang import SingletonLangClass
 
 langs = SingletonLangClass()
 

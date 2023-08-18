@@ -13,15 +13,15 @@ from tricc.converters.tricc_to_xls_form import (generate_xls_form_calculate,
                                                 generate_xls_form_condition,
                                                 generate_xls_form_relevance)
 from tricc.models.tricc import (TriccNodeActivity, check_stashed_loop,
-                          walktrhough_tricc_node_processed_stached)
+                          walktrhough_tricc_node_processed_stached, TriccGroup)
 from tricc.serializers.xls_form import (CHOICE_MAP, SURVEY_MAP, end_group,
                                         generate_xls_form_export, start_group)
-from tricc.strategies.base_strategy import BaseStrategy
+from tricc.strategies.base_output_strategy import BaseOutPutStrategy
 
 logger = logging.getLogger('default')
 
 
-class XLSFormStrategy(BaseStrategy):
+class XLSFormStrategy(BaseOutPutStrategy):
 
     df_survey = pd.DataFrame(columns=SURVEY_MAP.keys())
     df_calculate = pd.DataFrame(columns=SURVEY_MAP.keys())
@@ -113,6 +113,8 @@ class XLSFormStrategy(BaseStrategy):
             len_prev_processed_nodes = len(processed_nodes)   
             if len(stashed_nodes)>0:
                 s_node = stashed_nodes.pop()
+                #while len(stashed_nodes)>0 and isinstance(s_node,TriccGroup):
+                #    s_node = stashed_nodes.pop()
                 if len(s_node.prev_nodes)>0:
                     path_len = sorted(s_node.prev_nodes, key=lambda p_node:p_node.path_len, reverse=True )[0].path_len+1
                 if s_node.group is None:

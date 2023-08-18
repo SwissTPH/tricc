@@ -3,20 +3,28 @@ import gettext
 import logging
 import os
 import sys
+import gc
 
 # set up logging to file
 from tricc.models.lang import SingletonLangClass
+
 #gettext.bindtextdomain('tricc', './locale/')
 #gettext.textdomain('tricc')
 langs = SingletonLangClass()
 
 fr =  gettext.translation('tricc', './locales' , languages=['fr'])
 fr.install()
+en =  gettext.translation('tricc', './locales' , languages=['en'])
+en.install()
+
 
 langs.add_trad('fr', fr)
+#langs.add_trad('en', en)
 
+from tricc.strategies.drawio import DrawioStrategy
+from tricc.strategies.medalcreator import MedalCStrategy
+#from tricc.serializers.medalcreator import build_tricc_graph
 
-from tricc.serializers.drawio import build_tricc_graph
 from tricc.strategies.xls_form import XLSFormStrategy
 from tricc.strategies.xlsform_cdss import XLSFormCDSSStrategy
 from tricc.strategies.xlsform_cht import XLSFormCHTStrategy
@@ -59,13 +67,18 @@ def print_help():
 
     
 if __name__ == "__main__":
+    gc.disable()
+
     system='odk'
     in_filepath= None
     out_path=None
     formid=None
     trad = False
+    
+    input_strategy = 'DrawioStrategy'
+    output_strategy= 'XLSFormStrategy'
     try:
-      opts, args = getopt.getopt(sys.argv[1:],"hti:o:s:",["input=","output=","help","trads"])
+      opts, args = getopt.getopt(sys.argv[1:],"hti:o:s:I:O:",["input=","output=","help","trads"])
     except getopt.GetoptError:
         print_help()
         sys.exit(2)
@@ -77,8 +90,10 @@ if __name__ == "__main__":
             in_filepath = arg
         elif opt == "-o":
             out_path = arg
-        elif opt == "-s":
-            strategy = arg
+        elif opt == "-I":
+            input_strategy = arg
+        elif opt == "-O":
+            output_strategy = arg
         elif opt == "-d":
             formid = arg
         elif opt in ("-t", "--trads"):
@@ -86,16 +101,20 @@ if __name__ == "__main__":
     if in_filepath is None:
         print_help()
         sys.exit(2)
+    
+    
+
     pre, ext = os.path.splitext(in_filepath)
     if out_path is None:
         # if output file path not specified, just chagne the extension
         out_path= os.path.dirname(pre) 
-   
-    logger.info("build the graph from XML")
+    strategy = globals()[input_strategy](in_filepath)
+    logger.info(f"build the graph from strategy {input_strategy}")
     media_path = os.path.join(out_path, "media-tmp")
-    start_page, pages= build_tricc_graph(in_filepath,media_path)
+    start_page, pages= strategy.build_tricc_graph(in_filepath,media_path)
     
-    strategy = XLSFormCHTStrategy(out_path)
+    strategy = globals()[output_strategy](out_path)
+
     logger.info("Using strategy {}".format(strategy.__class__))
     logger.info("update the node with basic information")
     # create constraints, clean name
@@ -112,7 +131,7 @@ if __name__ == "__main__":
     strategy.process_export(start_page, pages=pages)
     logger.info("print the export")
     if start_page.root.form_id is not None:
-        formid= start_page.root.form_id 
+        formid= str(start_page.root.form_id )
     strategy.do_export(start_page.root.label, formid + ".xlsx", formid)
 
     if trad:

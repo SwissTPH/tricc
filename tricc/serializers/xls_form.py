@@ -139,13 +139,14 @@ def get_attr_if_exists(node,column, map_array):
             if issubclass(value.__class__, TriccNodeBaseModel):
                 return value.name
             elif value is not None:
-                return str(value)
+                return str(value) if not isinstance(value,dict) else value
             else:
                 return ''
         else:
             return ''
     elif hasattr(node, column) and getattr(node, column) is not None:
-       return str(getattr(node, column))
+        value = getattr(node, column)
+        return str(value) if not isinstance(value,dict) else value
     else:
         return ''
 
@@ -154,7 +155,7 @@ def generate_xls_form_export(node, processed_nodes, stashed_nodes, df_survey, df
     # check that all prev nodes were processed
     if is_ready_to_process(node,processed_nodes):
         if node not in processed_nodes :
-            if node.group != cur_group :
+            if node.group != cur_group and not isinstance(node,TriccNodeSelectOption) : 
                 return False
             logger.debug("printing node {}".format(node.get_name()))
             # clean stashed node when processed

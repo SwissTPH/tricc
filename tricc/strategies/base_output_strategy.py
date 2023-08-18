@@ -3,7 +3,7 @@ import abc
 from tricc.models.tricc import stashed_node_func
 
 
-class BaseStrategy:
+class BaseOutPutStrategy:
 
     output_path = None
     def __init__(self, output_path):
@@ -12,7 +12,7 @@ class BaseStrategy:
 
     ### walking function
     def process_base(self, activity, **kwargs):
-        # for each node, check if condition is required issubclass(TriccNodeDiplayModel)
+        # for each node, check if condition is required issubclass(TriccNodeDisplayModel)
         # process name
         stashed_node_func(activity.root, self.generate_base, **{**self.get_kwargs(),**kwargs} )
         self.do_clean( **{**self.get_kwargs(),**kwargs})

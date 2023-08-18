@@ -24,7 +24,7 @@ class XLSFormCDSSStrategy(XLSFormStrategy):
                 
 
     def export_diag(self, activity, diags = [], **kwargs):
-        for node in activity.nodes.values():
+        for node in activity.nodes:
             if isinstance(node, TriccNodeActivity):
                 diags = self.export_diag(node, diags, **kwargs)
             if hasattr(node, 'name') and node.name is not None:

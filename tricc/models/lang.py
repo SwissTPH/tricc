@@ -20,6 +20,12 @@ class SingletonLangClass(object):
         self.languages[code] = lang
     
     def get_trads(self, message,  force_dict = False,trad=None):
+        if isinstance(message, dict):
+            if force_dict:
+                return message
+            elif trad is not None and trad in message:
+                return message[trad]
+            return list(message.values())[0]
         message = message.strip()
         if message == '' and (self.languages is None or trad is not None):
             if force_dict:
