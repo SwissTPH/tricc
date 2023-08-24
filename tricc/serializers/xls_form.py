@@ -3,7 +3,7 @@
 import logging
 
 from tricc.converters.tricc_to_xls_form import (TRICC_CALC_EXPRESSION,
-                                                TRICC_NEGATE)
+                                                TRICC_NEGATE, VERSION_SEPARATOR,INSTANCE_SEPARATOR,  get_export_name)
 from tricc.converters.utils import clean_name, remove_html
 from tricc.models.lang import SingletonLangClass
 from tricc.models.tricc import *
@@ -13,37 +13,77 @@ logger = logging.getLogger('default')
 langs = SingletonLangClass()
 
 
-def start_group( cur_group, groups, df_survey, relevance = False, **kargs):
+def start_group( cur_group, groups, df_survey, df_calculate, relevance = False, **kargs):
+    name = get_export_name(cur_group)
+    
+    if name in groups:
+        groups[name] += 1
+        name = (name + "_" + str(groups[name]))
+        
+    else:
+        groups[name] = 0
+    is_activity = isinstance(cur_group,TriccNodeActivity)
+    relevance = relevance and  cur_group.relevance is not None and cur_group.relevance != '' 
+    group_calc_required = False and relevance and not is_activity and len(relevance)> 100
+    
+    
+    
+    relevance_expression = cur_group.relevance
+    if not relevance:
+        relevance_expression = ''
+    elif is_activity:
+        relevance_expression = TRICC_CALC_EXPRESSION.format(get_export_name(cur_group.root))
+    elif group_calc_required:
+        relevance_expression = TRICC_CALC_EXPRESSION.format("gcalc_" + name)
+        
+## group
     values = []
     for column in SURVEY_MAP:
         if column == 'type':
             values.append('begin group')
         elif column == 'name':
-            value = clean_name(get_attr_if_exists(cur_group,column,SURVEY_MAP))
-            if cur_group.name in groups:
-                groups[cur_group.name] += 1
-                value = value + "_" + str(groups[cur_group.name])
-            else:
-                groups[cur_group.name] = 0
-            values.append(value)   
+            values.append(name)   
         elif  column == 'appearance':
             values.append('field-list')
-        elif relevance and column == 'relevance':
-            values.append(get_attr_if_exists(cur_group,column,SURVEY_MAP))
+        elif column == 'relevance':
+            values.append(relevance_expression)
         else:
             values.append(get_xfrom_trad(cur_group,column,SURVEY_MAP))
     df_survey.loc[len(df_survey)] = values
+
+    ### calc
+    if  group_calc_required and len(df_calculate[df_calculate['name'] == "gcalc_" + name]) == 0:
+        calc_values =[]
+        for column in SURVEY_MAP:
+            if column == 'type':
+                calc_values.append('calculate')
+            elif column == 'name':
+                value =  "gcalc_" + name
+                calc_values.append(value)   
+            elif column == 'calculation':
+                calc_values.append(get_attr_if_exists(cur_group,'relevance',SURVEY_MAP))
+            elif column == 'relevance':
+                calc_values.append('')
+            else:
+                calc_values.append(get_xfrom_trad(cur_group,column,SURVEY_MAP))
+
+        df_calculate.loc[len(df_calculate)] = calc_values
+    
     
 
 def end_group( cur_group, groups, df_survey, **kargs):
+    
     values = []
     for column in SURVEY_MAP:
         if column == 'type':
             values.append('end group')
+        elif column == 'relevance':
+             values.append('')
         elif column in ('name'):
-            value = get_attr_if_exists(cur_group,column,SURVEY_MAP)
-            if cur_group.name in groups:
-                value = value + "_" + str(groups[cur_group.name])
+            value = (get_attr_if_exists(cur_group,column,SURVEY_MAP))
+            
+            if get_export_name(cur_group) in groups:
+                value = (value + "_" + str(groups[get_export_name(cur_group)]))
             values.append(value)
         else:
             values.append(get_xfrom_trad(cur_group,column,SURVEY_MAP))
@@ -136,8 +176,11 @@ def get_attr_if_exists(node,column, map_array):
                 return odk_type
         elif hasattr(node, map_array[column]):
             value =  getattr(node, map_array[column])
-            if issubclass(value.__class__, TriccNodeBaseModel):
-                return value.name
+            if column == 'name':
+                if issubclass(value.__class__, (TriccNodeBaseModel)):
+                    return get_export_name(value)
+                else:
+                    return get_export_name(node)
             elif value is not None:
                 return str(value) if not isinstance(value,dict) else value
             else:
@@ -150,7 +193,7 @@ def get_attr_if_exists(node,column, map_array):
     else:
         return ''
 
-
+ 
 def generate_xls_form_export(node, processed_nodes, stashed_nodes, df_survey, df_choice,df_calculate, cur_group, **kargs):
     # check that all prev nodes were processed
     if is_ready_to_process(node,processed_nodes):
@@ -202,15 +245,15 @@ def get_diagnostic_line(node):
     empty = langs.get_trads('', force_dict =True)
     return [
         'select_one yes_no',
-        "cond_"+node.name,
+        "cond_"+get_export_name(node),
         *list(label.values()) ,
         *list(empty.values()) ,#hint
         *list(empty.values()) ,#help
         '',#default
-        '',#'appearance', 
+        '',#'appearance', clean_name
         '',#'constraint', 
         *list(empty.values()) ,#'constraint_message'
-        TRICC_CALC_EXPRESSION.format(node.name),#'relevance'
+        TRICC_CALC_EXPRESSION.format(get_export_name(node)),#'relevance'
         '',#'disabled'
         '1',#'required'
         *list(empty.values()) ,#'required message'
@@ -275,7 +318,7 @@ def get_diagnostic_add_line(diags, df_choice):
 def get_diagnostic_none_line(diags):
     relevance = ''
     for diag in diags:
-        relevance += TRICC_CALC_EXPRESSION.format(diag.name) + " or "
+        relevance += TRICC_CALC_EXPRESSION.format(get_export_name(diag)) + " or "
     label = langs.get_trads('Aucun diagnostic trouvé par l\'outil mais cela ne veut pas dire que le patient est en bonne santé', force_dict =True)
     empty = langs.get_trads('', force_dict =True)
     return [

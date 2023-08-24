@@ -1,7 +1,7 @@
 from operator import attrgetter
 import re
 
-from tricc.converters.utils import OPERATION_LIST, clean_str
+from tricc.converters.utils import OPERATION_LIST, clean_str,clean_name
 from tricc.models.tricc import *
 
 # from babel import _
@@ -27,11 +27,8 @@ logger = logging.getLogger("default")
 # gettext language dict {'code':gettext}
 
 def generate_xls_form_condition(node, processed_nodes, **kwargs):
-    node.name = get_printed_name(node)
     if is_ready_to_process(node, processed_nodes, strict=False):
         if node not in processed_nodes:
-            if hasattr(node, 'name') and node.name is not None:
-                node.name = clean_str(node.name)
             if isinstance(node, TriccNodeRhombus) and isinstance(node.reference, str):
                 logger.warning("node {} still using the reference string".format(node.get_name()))
             if issubclass(node.__class__, TriccNodeInputModel):
@@ -70,7 +67,7 @@ def generate_xls_form_relevance(node, processed_nodes, stashed_nodes, **kwargs):
                     # update the checkbox
                     if len(node.prev_nodes) == 1:
                         parent_node = node.prev_nodes[0]
-                        parent_empty = "${{{0}}}=''".format(parent_node.name)
+                        parent_empty = "${{{0}}}=''".format(get_export_name(parent_node))
                         if node.relevance is not None:
                             TRICC_AND_EXPRESSION.format(node.relevance, parent_empty)
                         else:
@@ -92,8 +89,6 @@ def generate_xls_form_calculate(node, processed_nodes, stashed_nodes, **kwargs):
         if node not in processed_nodes:
             logger.debug("generation of calculate for node {}".format(node.get_name()))
             if hasattr(node, 'expression') and (node.expression is None) and issubclass(node.__class__,TriccNodeCalculateBase):
-                if  issubclass(node.__class__,TriccNodeDisplayCalculateBase) and node.hint is None and node.help is None and len(node.next_nodes) < 2 and not node.name.startswith(('diag','obs')):
-                    node = node.to_fake()
                 node.expression = get_node_expressions(node, processed_nodes)
                 # continue walk
             return True
@@ -102,12 +97,12 @@ def generate_xls_form_calculate(node, processed_nodes, stashed_nodes, **kwargs):
 
 # if the node is "required" then we can take the fact that it has value for the next elements
 def get_required_node_expression(node):
-    return TRICC_EMPTY_EXPRESSION.format(node.name)
+    return TRICC_EMPTY_EXPRESSION.format(get_export_name(node))
 
 
 # Get a selected option
 def get_selected_option_expression(option_node):
-    return TRICC_SELECTED_EXPRESSION.format(option_node.select.name, option_node.name)
+    return TRICC_SELECTED_EXPRESSION.format(get_export_name(option_node.select), get_export_name(option_node))
 
 
 # Function that add element to array is not None or ''
@@ -194,7 +189,7 @@ def get_node_expression(in_node, processed_nodes, is_calculate=False, is_prev=Fa
         expression = get_selected_option_expression(node)
         #TODO remove that and manage it on the "Save" part
     elif is_prev and isinstance(in_node, TriccNodeSelectNotAvailable):
-        expression =  TRICC_SELECTED_EXPRESSION.format(node.name, '1')
+        expression =  TRICC_SELECTED_EXPRESSION.format(get_export_name(node), '1')
     elif is_prev and isinstance(node, TriccNodeRhombus):
         if node.path is not None: 
             right = get_node_expression(node.path, processed_nodes, is_calculate, is_prev)
@@ -206,7 +201,7 @@ def get_node_expression(in_node, processed_nodes, is_calculate=False, is_prev=Fa
         else:
             expression = get_rhombus_terms(node, processed_nodes)
     elif is_prev and issubclass(node.__class__, TriccNodeDisplayCalculateBase):
-        expression = TRICC_CALC_EXPRESSION.format(node.name)
+        expression = TRICC_CALC_EXPRESSION.format(get_export_name(node))
     elif issubclass(node.__class__, TriccNodeCalculateBase):
         if negate:
             negate_expression = get_calculation_terms(node, processed_nodes, is_calculate, negate=True)
@@ -221,7 +216,7 @@ def get_node_expression(in_node, processed_nodes, is_calculate=False, is_prev=Fa
             expression = get_prev_node_expression(node, processed_nodes, is_calculate)
     if isinstance(node, TriccNodeActivity) and any(isinstance(x, TriccNodeEnd) for x in processed_nodes):
         ends = filter(lambda x: isinstance(x, TriccNodeEnd), processed_nodes)
-        end_exp = TRICC_CALC_NOT_EXPRESSION.format(max(ends, key=attrgetter('version')).name)
+        end_exp = TRICC_CALC_NOT_EXPRESSION.format(get_export_name(max(ends, key=attrgetter('version'))))
         expression = TRICC_AND_EXPRESSION.format(expression, end_exp )
     if negate:
         if negate_expression is not None:
@@ -277,7 +272,7 @@ def get_calculation_terms(node, processed_nodes, is_calculate=False, negate=Fals
         return TRICC_NEGATE.format(get_prev_node_expression(node, processed_nodes, is_calculate))
     elif node.reference is not None and node.expression_reference is not None :
         expression = get_prev_node_expression(node, processed_nodes, is_calculate)
-        ref_expression = node.expression_reference.format(*[ref.name for ref in node.reference])
+        ref_expression = node.expression_reference.format(*[get_export_name(ref) for ref in node.reference])
         if expression is not None and expression != '':
             return TRICC_AND_EXPRESSION.format(expression,ref_expression)
         else:
@@ -316,7 +311,7 @@ def get_rhombus_terms(node, processed_nodes, is_calculate=False, negate=False):
                 elif issubclass(ref.__class__, TriccNodeFakeCalculateBase):
                     expression = get_node_expression(ref, processed_nodes, is_calculate=True, is_prev=True)
                 else:
-                    expression = TRICC_REF_EXPRESSION.format(ref.name)
+                    expression = TRICC_REF_EXPRESSION.format(get_export_name(ref))
             else:
                 # expression = TRICC_REF_EXPRES
                 # SION.format(node.reference)
@@ -374,24 +369,24 @@ def clean_list_or(list_or, elm_and=None):
                     list_or = []
     return list_or
 
+def get_export_name(node):
+    if node.export_name is None:
+        node.export_name = (node.name)
+        if node.name is None:
+            node.export_name= ("id_" + node.id)
+        elif not ( INSTANCE_SEPARATOR  in node.name or  VERSION_SEPARATOR in node.name):
+            if issubclass(node.__class__, (TriccNodeDisplayModel)):
+                node.gen_name()
+                if not isinstance(node, TriccNodeSelectOption):
+                    node.export_name = (node.name +  INSTANCE_SEPARATOR + str(node.instance))
+            elif isinstance(node, (TriccNodeActivityEnd, TriccNodeActivityStart)):
+                node.export_name =  (node.name +  INSTANCE_SEPARATOR + str(node.instance))
+            elif issubclass(node.__class__, TriccNodeCalculateBase):
+                node.gen_name()
+                if node.last == False:
+                    node.export_name = (node.name + VERSION_SEPARATOR + str(node.path_len))
 
-def get_printed_name(node):
-    if node.name is None:
-        return "id_" + node.id
-    elif INSTANCE_SEPARATOR  in node.name or  VERSION_SEPARATOR in node.name:
-        return node.name 
-    elif issubclass(node.__class__, (TriccNodeDisplayModel)):
-        node.gen_name()
-        if not isinstance(node, TriccNodeSelectOption):
-            return node.name +  INSTANCE_SEPARATOR + str(node.instance)
-    elif isinstance(node, (TriccNodeActivityEnd, TriccNodeActivityStart)):
-        return  node.name +  INSTANCE_SEPARATOR + str(node.instance)
-
-    elif issubclass(node.__class__, TriccNodeCalculateBase):
-        node.gen_name()
-        if node.last == False:
-            return node.name + VERSION_SEPARATOR + str(node.path_len)
-    return node.name 
+    return clean_name(node.export_name )
 
 
 def get_add_terms(node, processed_nodes, is_calculate=False, negate=False):
@@ -400,7 +395,7 @@ def get_add_terms(node, processed_nodes, is_calculate=False, negate=False):
     terms = []
     for prev_node in node.prev_nodes:
         if issubclass(prev_node, TriccNodeNumber) or isinstance(node, TriccNodeCount):
-            terms.append("coalesce(${{{0}}},0)".format(prev_node.name))
+            terms.append("coalesce(${{{0}}},0)".format(get_export_name(prev_node)))
         else:
             terms.append(
                 "number({0})".format(get_node_expression(prev_node, processed_nodes, is_calculate=False, is_prev=True)))
@@ -413,11 +408,11 @@ def get_count_terms(node, processed_nodes, is_calculate, negate=False):
     for prev_node in node.prev_nodes:
         if isinstance(prev_node, TriccNodeSelectMultiple):
             if negate:
-                terms.append(TRICC_SELECT_MULTIPLE_CALC_NONE_EXPRESSION.format(prev_node.name))
+                terms.append(TRICC_SELECT_MULTIPLE_CALC_NONE_EXPRESSION.format(get_export_name(prev_node)))
             else:
-                terms.append(TRICC_SELECT_MULTIPLE_CALC_EXPRESSION.format(prev_node.name))
+                terms.append(TRICC_SELECT_MULTIPLE_CALC_EXPRESSION.format(get_export_name(prev_node)))
         elif isinstance(prev_node, (TriccNodeSelectYesNo, TriccNodeSelectNotAvailable)):
-            terms.append(TRICC_SELECTED_EXPRESSION.format(prev_node.name, '1'))
+            terms.append(TRICC_SELECTED_EXPRESSION.format(get_export_name(prev_node), '1'))
         elif isinstance(prev_node, TriccNodeSelectOption):
             terms.append(get_selected_option_expression(prev_node))
         else:
@@ -435,7 +430,7 @@ def get_list_names(list):
     names = []
     for elm in list:
         if issubclass(elm.__class__, TriccNodeBaseModel):
-            names.append(elm.name)
+            names.append(get_export_name(elm))
         elif isinstance(elm, str):
             names.append(elm)
     return names

@@ -99,7 +99,6 @@ class XLSFormStrategy(BaseOutPutStrategy):
         end_group( cur_group =activity, groups=groups, **self.get_kwargs())
         # we save the survey data frame
         df_survey_final =   pd.DataFrame(columns=SURVEY_MAP.keys())
-        self.df_calculate=   pd.DataFrame(columns=SURVEY_MAP.keys())
         if len(self.df_survey)>(2+skip_header):
             df_survey_final = self.df_survey
         ## MANAGE STASHED NODES
@@ -138,21 +137,41 @@ class XLSFormStrategy(BaseOutPutStrategy):
                         df_survey_final =pd.concat([df_survey_final, self.df_survey], ignore_index=True)
                     cur_group = s_node.group
                     
-                    
-        # add the calulate
-        self.df_survey = pd.concat([df_survey_final,self.df_calculate], ignore_index=True)
-        
-        # remove duplicate calculate
-        
-        df_calculate = self.df_survey[self.df_survey.type == 'calculate']
-        
-        for index, calc_row in df_calculate.iterrows():
-            df_calculate_duplicate = df_calculate[(df_calculate.calculation == calc_row.calculation) & (df_calculate.name != calc_row.name)]
-            if len(df_calculate_duplicate)>0:
-                for id_d, calc_row_d in df_calculate_duplicate.iterrows():
-                    logger.debug('duplicate found and removed for %s: %s', calc_row.name, calc_row.calculation)
-                    self.df_survey.drop(id_d)
-                    self.df_survey.replace(calc_row_d.name, calc_row.name)
-                    
-            
 
+        # add the calulate
+        
+        self.df_calculate=self.df_calculate.dropna(axis=0, subset=['calculation'])
+        df_empty_calc  = self.df_calculate[self.df_calculate['calculation'] == '']
+        self.df_calculate=self.df_calculate.drop(df_empty_calc.index)
+        self.df_survey = pd.concat([df_survey_final,self.df_calculate], ignore_index=True)
+        df_duplicate = self.df_calculate[self.df_calculate.duplicated(subset=['calculation'], keep='first')]
+        #self.df_survey=self.df_survey.drop_duplicates(subset=['name'])
+        for index, drop_calc in df_duplicate.iterrows():
+            #remove the duplicate
+            replace_name = False
+            #find the actual calcualte 
+            similar_calc =  self.df_survey[(drop_calc['calculation'] == self.df_survey['calculation']) & (self.df_survey['type'] == 'calculate')]
+            same_calc = self.df_survey[self.df_survey['name'] == drop_calc['name']]
+            if len(same_calc) > 1:
+                # check if all calc have the same name
+                if len(same_calc) == len(similar_calc):
+                    # drop all but one
+                    self.df_survey.drop(same_calc.index[1:])
+                elif len(same_calc) < len(similar_calc):
+                    self.df_survey.drop(same_calc.index)
+                    replace_name = True
+            elif len(same_calc) == 1:
+                self.df_survey.drop(similar_calc.index)
+                replace_name = True
+                
+
+            if replace_name:
+                save_calc =  self.df_survey[(drop_calc['calculation'] == self.df_survey['calculation']) & (self.df_survey['type'] == 'calculate')     ]
+                if len(save_calc) >= 1:
+                    save_calc = save_calc.iloc[0]
+                    if save_calc['name']!= drop_calc['name']:
+                        self.df_survey.replace('\$\{'+drop_calc['name']+'\}', '\$\{'+save_calc['name']+'\}', regex=True)
+                else:
+                    logger.error("duplicate reference not found for calculation: {}".format(drop_calc['calculation']))
+        for index, empty_calc in df_empty_calc.iterrows():
+                 self.df_survey.replace('\$\{'+empty_calc['name']+'\}', '1', regex=True)

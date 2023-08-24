@@ -4,6 +4,7 @@ from tricc.serializers.xls_form import (get_diagnostic_add_line,
                                         get_diagnostic_none_line,
                                         get_diagnostic_start_group_line,
                                         get_diagnostic_stop_group_line)
+from tricc.converters.tricc_to_xls_form import get_export_name
 from tricc.strategies.xls_form import XLSFormStrategy
 
 
@@ -14,24 +15,26 @@ class XLSFormCDSSStrategy(XLSFormStrategy):
         self.df_survey.loc[len(self.df_survey)] = get_diagnostic_start_group_line()
         # TODO inject flow driven diag list, the folowing fonction will fill the missing ones
         diags = self.export_diag( activity,  **kwargs)
-        self.df_survey.loc[len(self.df_survey)] = get_diagnostic_none_line(diags)
-        self.df_survey.loc[len(self.df_survey)] = get_diagnostic_add_line(diags, self.df_choice)
-        
-        self.df_survey.loc[len(self.df_survey)] = get_diagnostic_stop_group_line()
+        if len(diags)>0:
+            for diag in diags:
+                self.df_survey.loc[len(self.df_survey)] = get_diagnostic_line(diag)
+            self.df_survey.loc[len(self.df_survey)] = get_diagnostic_none_line(diags)
+            self.df_survey.loc[len(self.df_survey)] = get_diagnostic_add_line(diags, self.df_choice)
+            
+            self.df_survey.loc[len(self.df_survey)] = get_diagnostic_stop_group_line()
         #TODO inject the TT flow
         
         
                 
 
     def export_diag(self, activity, diags = [], **kwargs):
-        for node in activity.nodes:
+        for node in activity.nodes.values():
             if isinstance(node, TriccNodeActivity):
                 diags = self.export_diag(node, diags, **kwargs)
             if hasattr(node, 'name') and node.name is not None:
-                if node.name.startswith('diag_'):
-                    nb_found = len(self.df_survey[self.df_survey.name == "cond_"+node.name])
-                    if node.last == True and nb_found == 0:
-                        self.df_survey.loc[len(self.df_survey)] = get_diagnostic_line(node)
+                
+                if node.name.startswith('diag'):
+                    if not any([get_export_name(diag)  == get_export_name(node) for diag in diags]):
                         diags.append(node)
         return diags
             

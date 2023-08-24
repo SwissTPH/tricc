@@ -135,6 +135,7 @@ class TriccGroup(TriccBaseModel):
     odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccExtendedNodeType.page
     group: Optional[TriccBaseModel]
     name: Optional[str]
+    export_name:Optional[str]
     label: Optional[Union[str, Dict[str,str]]]
     relevance: Optional[Expression]
     path_len: int = 0
@@ -160,6 +161,7 @@ class TriccNodeBaseModel(TriccBaseModel):
     path_len: int = 0
     group: Optional[Union[TriccGroup, TriccNodeActivity]]
     name: Optional[str]
+    export_name:Optional[str]
     label: Optional[Union[str, Dict[str,str]]]
     next_nodes: List[TriccNodeBaseModel] = []
     prev_nodes: List[TriccNodeBaseModel] = []
