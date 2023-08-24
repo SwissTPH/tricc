@@ -126,7 +126,8 @@ def process_factor_edge(edge,nodes):
     if factor != 1:
         return TriccNodeCalculate(
             id = edge.id,
-            reference = "number(${{{}}}) * {}".format(nodes[edge.source].name, factor),
+            expression_reference = "number(${{{}}}) * {}".format('', factor),
+            reference = [nodes[edge.source]],
             activity = nodes[edge.source].activity,
             group = nodes[edge.source].group, 
             label= "factor {}".format(factor)
@@ -188,7 +189,7 @@ def get_nodes(diagram, activity):
     get_hybride_node(nodes, diagram, activity)
     for node in nodes.values():
         # clean name
-        if hasattr(node, 'name') and node.name is not None and (node.name.endswith('_') or node.name.endswith('.')):
+        if hasattr(node, 'name') and node.name is not None and (node.name.endswith(('_','.'))):
             node.name = node.name + node.id
         
     return nodes
@@ -428,14 +429,18 @@ def get_count_node(node):
 def get_rhombus_path(node):
     calc_id  = generate_id()
     calc_name = "path_"+calc_id
-    return TriccNodeBridge(
-        id =calc_id,
-        group = node.group,
-        activity = node.activity,
-        label = "path: " + node.get_name(),
-        name = calc_name,
-        path_len = node.path_len
-    )
+    data = {
+        'id': calc_id,
+        'group': node.group,
+        'activity': node.activity,
+        'label': "path: " + node.get_name(),
+        'name': calc_name,
+        'path_len': node.path_len
+    }
+    if len(node.prev_nodes)>1:
+        return TriccNodeDisplayBridge( **data)
+    else:
+        return TriccNodeBridge( **data)
     
 def generate_calculates(node,calculates, used_calculates,processed_nodes):
     list_calc = []
@@ -460,6 +465,7 @@ def generate_calculates(node,calculates, used_calculates,processed_nodes):
                 list_nodes.append(prev)
             for prev in list_nodes:
                 set_prev_next_node(prev,calc_node, node)
+            node.prev_nodes = []
             set_prev_next_node(calc_node, node)
             # move to folow node on the path
             if isinstance(node, TriccNodeRhombus) and len(node.folow)>0:
@@ -802,12 +808,11 @@ def get_groups(diagram, nodes, parent_group):
         add_group(elm, diagram, nodes, groups,parent_group)
     return groups
 
-        
 def add_group(elm, diagram, nodes, groups, parent_group):
     id = elm.attrib.get('id')
     if id not in groups:
         group = TriccGroup(
-            name = clean_name(elm.attrib.get('name')),
+            name = elm.attrib.get('name'),
             label = elm.attrib.get('label'),
             id = id,
             group = parent_group

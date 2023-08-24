@@ -83,7 +83,7 @@ media_nodes = [
 class TriccBaseModel(BaseModel):
     id: triccId
     odk_type: Union[TriccNodeType, TriccExtendedNodeType]
-    parent: Optional[triccId]
+    #parent: Optional[triccId]#TODO: used ?
     instance: int = 1
     base_instance: Optional[TriccBaseModel]
 
@@ -125,7 +125,7 @@ class TriccEdge(TriccBaseModel):
     def make_instance(self, instance_nb, activity=None):
         instance = super().make_instance(instance_nb, activity=activity)
         if issubclass(self.source.__class__, TriccNodeBaseModel):
-            instance.source = self.source.copy()
+            instance.source = self.source.copy() #TODO should we copy  the nodes ?  
         if issubclass(self.target.__class__, TriccNodeBaseModel):
             instance.target = self.target.copy()
         return instance
@@ -345,14 +345,15 @@ class TriccNodeDisplayModel(TriccNodeBaseModel):
 class TriccNodeNote(TriccNodeDisplayModel):
     odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccNodeType.note
 
-class TriccNodeDate(TriccNodeDisplayModel):
-    odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccNodeType.date
-
 class TriccNodeInputModel(TriccNodeDisplayModel):
     required: Optional[Expression]
     constraint_message: Optional[Union[str, Dict[str,str]]]
     constraint: Optional[Expression]
     save: Optional[str]  # contribute to another calculate
+
+
+class TriccNodeDate(TriccNodeInputModel):
+    odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccNodeType.date
 
 
 class TriccNodeMainStart(TriccNodeBaseModel):
@@ -494,9 +495,6 @@ class TriccNodeDisplayCalculateBase(TriccNodeCalculateBase):
         replace_node(self,fake)
         return fake
 
-class TriccNodeBridge(TriccNodeDisplayCalculateBase):
-    odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccExtendedNodeType.bridge
-
 
 # qualculate that saves quantity, or we may merge integer/decimals
 class TriccNodeQuantity(TriccNodeDisplayCalculateBase):
@@ -518,7 +516,12 @@ class TriccNodeCount(TriccNodeDisplayCalculateBase):
 class TriccNodeFakeCalculateBase(TriccNodeCalculateBase):
     pass
 
+class TriccNodeDisplayBridge(TriccNodeDisplayCalculateBase):
+    odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccExtendedNodeType.bridge
         
+
+class TriccNodeBridge(TriccNodeFakeCalculateBase):
+    odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccExtendedNodeType.bridge
         
 
 
@@ -578,6 +581,8 @@ class TriccNodeExclusive(TriccNodeFakeCalculateBase):
 def set_prev_next_node(source_node, target_node, replaced_node=None):
     # if it is end node, attached it to the activity/page
     set_prev_node(source_node, target_node, replaced_node)
+    if replaced_node is not None and hasattr(source_node, 'path') and replaced_node == source_node.path:
+        source_node.path = target_node
     if replaced_node is not None and hasattr(source_node, 'next_nodes') and replaced_node in source_node.next_nodes:
         source_node.next_nodes.remove(replaced_node)
     if replaced_node is not None and hasattr(target_node, 'next_nodes') and replaced_node in target_node.next_nodes:
@@ -598,7 +603,8 @@ def set_prev_next_node(source_node, target_node, replaced_node=None):
 def set_prev_node(source_node, target_node, replaced_node=None):
     # update the prev node of the target not if not an end node
     # update directly the prev node of the target
-
+    if replaced_node is not None and hasattr(target_node, 'path') and replaced_node == target_node.path:
+        target_node.path = source_node
     if replaced_node is not None and hasattr(target_node, 'prev_nodes') and replaced_node in target_node.prev_nodes:
         target_node.prev_nodes.remove(replaced_node)
     if replaced_node is not None and hasattr(source_node, 'prev_nodes') and replaced_node in source_node.prev_nodes:
@@ -950,7 +956,7 @@ def check_stashed_loop(stashed_nodes, prev_stashed_nodes, processed_nodes, len_p
                                                                    es_node.group.instance if es_node.group is not None else es_node.activityinstance ,
                                                                    es_node.__class__, 
                                                                 es_node.get_name(), es_node.instance))
-                    reverse_walkthrough(es_node, es_node, print_trace, processed_nodes, stashed_nodes)
+                    #reverse_walkthrough(es_node, es_node, print_trace, processed_nodes, stashed_nodes)
                 if len(stashed_nodes) == len(prev_stashed_nodes):
                     exit()
         else:
@@ -984,17 +990,8 @@ class TriccNodeEnd(TriccNodeCalculate):
         self.name = END_NODE_FORMAT.format(self.activity.id)
 
 
-class TriccNodeActivityStart(TriccNodeCalculate):
+class TriccNodeActivityStart(TriccNodeDisplayCalculateBase):
     odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccExtendedNodeType.activity_start
-
-
-class TriccExpression(BaseModel):
-    list_or: List[Union[TriccExpression, TriccExpressionNot, str]]
-    next_and: Optional[Union[TriccExpression, TriccExpressionNot, str]]
-
-
-class TriccExpressionNot(BaseModel):
-    exp = TriccExpression
 
 
 def get_node_from_list(in_nodes, node_id):

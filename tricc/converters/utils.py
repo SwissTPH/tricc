@@ -22,6 +22,8 @@ def clean_name( name, prefix='' ):
     name = clean_str(name)
     if name[0].isdigit():
         name = 'id_' + name
+    elif  name[0].isdigit() == '_':
+         name =  name[1:]
     return name
 
 def generate_id():
