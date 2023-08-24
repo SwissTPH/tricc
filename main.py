@@ -45,7 +45,7 @@ def setup_logger(logger_name,
     l.setLevel(level)
     l.addHandler(file_handler)
 
-setup_logger('default', "debug.log", logging.DEBUG)
+
 
 logger = logging.getLogger('default')
 
@@ -57,6 +57,14 @@ formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
 console.setFormatter(formatter)
 # add the handler to the root logger
 logging.getLogger('').addHandler(console)
+
+LEVELS = {
+    'd':logging.DEBUG,
+    'w':logging.WARNING,
+    'i':logging.INFO,
+
+}
+
 
 def print_help():
     print('-i / --input draw.io filepath (MANDATORY)')
@@ -73,12 +81,13 @@ if __name__ == "__main__":
     in_filepath= None
     out_path=None
     formid=None
+    debug_level=None
     trad = False
     
     input_strategy = 'DrawioStrategy'
     output_strategy= 'XLSFormStrategy'
     try:
-      opts, args = getopt.getopt(sys.argv[1:],"hti:o:s:I:O:",["input=","output=","help","trads"])
+      opts, args = getopt.getopt(sys.argv[1:],"hti:o:s:I:O:l:",["input=","output=","help","trads"])
     except getopt.GetoptError:
         print_help()
         sys.exit(2)
@@ -96,6 +105,8 @@ if __name__ == "__main__":
             output_strategy = arg
         elif opt == "-d":
             formid = arg
+        elif opt == "-l":
+            debug_level = arg
         elif opt in ("-t", "--trads"):
             trad = True
     if in_filepath is None:
@@ -103,6 +114,8 @@ if __name__ == "__main__":
         sys.exit(2)
     
     
+    if debug_level is not None:
+        setup_logger('default', "debug.log", LEVELS[debug_level])
 
     pre, ext = os.path.splitext(in_filepath)
     if out_path is None:
