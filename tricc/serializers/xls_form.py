@@ -290,7 +290,7 @@ def get_diagnostic_add_line(diags, df_choice):
     for diag in diags:
         df_choice.loc[len(df_choice)] =  [
             "tricc_diag_add",
-            diag.name,
+            get_export_name(diag),
             *list(langs.get_trads(diag.label, True).values())
         ]
     label = langs.get_trads('Add a missing diagnostic', force_dict =True)

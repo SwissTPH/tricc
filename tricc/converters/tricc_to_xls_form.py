@@ -15,8 +15,8 @@ TRICC_SELECTED_EXPRESSION = 'selected(${{{0}}}, "{1}")'
 TRICC_REF_EXPRESSION = "${{{0}}}"
 TRICC_NEGATE = "not({})"
 TRICC_NUMBER = "number({})"
-TRICC_NAND_EXPRESSION = '(({0}) and not({1}))'
-TRICC_AND_EXPRESSION = '(({0}) and ({1}))'
+TRICC_NAND_EXPRESSION = '({0}) and not({1})'
+TRICC_AND_EXPRESSION = '({0}) and ({1})'
 VERSION_SEPARATOR = '_Vv_'
 INSTANCE_SEPARATOR = "_Ii_"
 
@@ -102,7 +102,7 @@ def get_required_node_expression(node):
 
 # Get a selected option
 def get_selected_option_expression(option_node):
-    return TRICC_SELECTED_EXPRESSION.format(get_export_name(option_node.select), get_export_name(option_node))
+    return TRICC_SELECTED_EXPRESSION.format(get_export_name(option_node.select), option_node.name)
 
 
 # Function that add element to array is not None or ''
@@ -112,8 +112,11 @@ def add_sub_expression(array, sub):
         if not_sub in array:
             # avoid having 2 conditions that are complete opposites
             array.remove(not_sub)
+            array.append('1')
         else:
             array.append(sub)
+    elif sub is None:
+        array.append('1')
 
 
 # main function to retrieve the expression from the tree
@@ -144,18 +147,19 @@ def get_prev_node_expression(node, processed_nodes, is_calculate=False, excluded
     # when getting the prev node, we calculate the
     if hasattr(node, 'expression_inputs') and len(node.expression_inputs) > 0:
         expression_inputs = node.expression_inputs
-        clean_list_or(expression_inputs)
+        expression_inputs = clean_list_or(expression_inputs)
     else:
         expression_inputs = []
+    if isinstance(node, TriccNodeBridge):
+        logger.debug('hre')
     for prev_node in node.prev_nodes:
-
         if excluded_name is None or prev_node != excluded_name or (
                 isinstance(excluded_name, str) and hasattr(prev_node, 'name') and prev_node.name != excluded_name) or isinstance(prev_node, TriccNodeActivityEnd):
             # the rhombus should calculate only reference
             add_sub_expression(expression_inputs, get_node_expression(prev_node, processed_nodes, is_calculate, True))
             # avoid void is there is not conditions to avoid looping too much itme
+    expression_inputs = clean_list_or(expression_inputs)
     if len(expression_inputs) > 0:
-        clean_list_or(expression_inputs)
         expression = ' or '.join(expression_inputs)
         expression_inputs = None
         # if isinstance(node,  TriccNodeExclusive):
@@ -171,10 +175,11 @@ def get_prev_node_expression(node, processed_nodes, is_calculate=False, excluded
         for past_instance in activity.base_instance.instances.values():
             if int(past_instance.root.path_len) < int(activity.root.path_len) and past_instance in processed_nodes:
                 add_sub_expression(expression_inputs, get_node_expression(past_instance, processed_nodes, False, True))
-        clean_list_or(expression_inputs)
-        expression_activity = ' or '.join(expression_inputs)
-        if expression_activity is not None and expression_activity != ''  :
-            expression = TRICC_NAND_EXPRESSION.format(expression, expression_activity)
+        expression_inputs = clean_list_or(expression_inputs)
+        if len(expression_inputs)>0:         
+            expression_activity = ' or '.join(expression_inputs)
+            if expression_activity is not None and expression_activity != ''  :
+                expression = TRICC_NAND_EXPRESSION.format(expression, expression_activity)
     return expression
 
 
@@ -195,7 +200,7 @@ def get_node_expression(in_node, processed_nodes, is_calculate=False, is_prev=Fa
             right = get_node_expression(node.path, processed_nodes, is_calculate, is_prev)
         else:
             right = '1'
-        if right != '1':
+        if right != '1' and right !=1 and right is not None:
             expression = TRICC_AND_EXPRESSION.format(right, get_rhombus_terms(node, processed_nodes))
             negate_expression = TRICC_NAND_EXPRESSION.format(right,get_rhombus_terms(node, processed_nodes))
         else:
@@ -238,7 +243,8 @@ def get_activity_end_terms(node, processed_nodes):
         add_sub_expression(expression_inputs,
                            get_node_expression(end_node, processed_nodes, is_calculate=False, is_prev=True))
     expression_inputs = clean_list_or(expression_inputs)
-    return ' or '.join(expression_inputs)
+    if len(expression_inputs)>0:
+        return ' or '.join(expression_inputs)
 
 
 def get_calculation_terms(node, processed_nodes, is_calculate=False, negate=False):
@@ -345,8 +351,13 @@ def get_rhombus_terms(node, processed_nodes, is_calculate=False, negate=False):
 
 
 def clean_list_or(list_or, elm_and=None):
+    if len(list_or) == 0:
+        return []
     if 'false()' in list_or:
         list_or.remove('false()')
+    if '1' in list_or or 1 in list_or:
+        list_or = []
+        return list_or
     if elm_and is not None:
         if TRICC_NEGATE.format(elm_and) in list_or:
             # we remove x and not X
@@ -371,22 +382,24 @@ def clean_list_or(list_or, elm_and=None):
 
 def get_export_name(node):
     if node.export_name is None:
-        node.export_name = (node.name)
+        node.export_name = clean_name(node.name)
         if node.name is None:
-            node.export_name= ("id_" + node.id)
+            node.export_name= clean_name("id_" + node.id)
         elif not ( INSTANCE_SEPARATOR  in node.name or  VERSION_SEPARATOR in node.name):
-            if issubclass(node.__class__, (TriccNodeDisplayModel)):
-                node.gen_name()
-                if not isinstance(node, TriccNodeSelectOption):
-                    node.export_name = (node.name +  INSTANCE_SEPARATOR + str(node.instance))
-            elif isinstance(node, (TriccNodeActivityEnd, TriccNodeActivityStart)):
-                node.export_name =  (node.name +  INSTANCE_SEPARATOR + str(node.instance))
-            elif issubclass(node.__class__, TriccNodeCalculateBase):
+            if issubclass(node.__class__, TriccNodeCalculateBase):
                 node.gen_name()
                 if node.last == False:
-                    node.export_name = (node.name + VERSION_SEPARATOR + str(node.path_len))
-
-    return clean_name(node.export_name )
+                    node.export_name = clean_name(node.name + VERSION_SEPARATOR + str(node.path_len))
+                else:
+                    node.export_name = clean_name(node.name)
+            elif issubclass(node.__class__, (TriccNodeDisplayModel)):
+                node.gen_name()
+                if not isinstance(node, TriccNodeSelectOption) and node.activity.instance!=1:
+                    node.export_name = clean_name(node.name +  INSTANCE_SEPARATOR + str(node.instance))
+            elif isinstance(node, (TriccNodeActivityEnd, TriccNodeActivityStart)):
+                node.export_name =  clean_name(node.name +  INSTANCE_SEPARATOR + str(node.instance))
+            
+    return (node.export_name )
 
 
 def get_add_terms(node, processed_nodes, is_calculate=False, negate=False):

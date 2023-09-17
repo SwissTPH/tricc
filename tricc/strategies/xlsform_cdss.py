@@ -32,9 +32,7 @@ class XLSFormCDSSStrategy(XLSFormStrategy):
             if isinstance(node, TriccNodeActivity):
                 diags = self.export_diag(node, diags, **kwargs)
             if hasattr(node, 'name') and node.name is not None:
-                
-                if node.name.startswith('diag'):
-                    if not any([get_export_name(diag)  == get_export_name(node) for diag in diags]):
+                if node.name.startswith('diag') and node.last\
+                    and not any([get_export_name(diag)  == get_export_name(node) for diag in diags]):
                         diags.append(node)
         return diags
-            

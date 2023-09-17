@@ -175,3 +175,9 @@ class XLSFormStrategy(BaseOutPutStrategy):
                     logger.error("duplicate reference not found for calculation: {}".format(drop_calc['calculation']))
         for index, empty_calc in df_empty_calc.iterrows():
                  self.df_survey.replace('\$\{'+empty_calc['name']+'\}', '1', regex=True)
+    
+        #TODO try to reinject calc to reduce complexity
+        for i,c in self.df_calculate[~self.df_calculate['name'].isin(self.df_survey['name'])].iterrows():
+            real_calc = re.find(r'^number\((.+)\)$',c['calculation'])
+            if real_calc is not None and real_calc != '':
+                self.df_survey[~self.df_survey['name']==c['name']].replace(real_calc, '\$\{'+c['name']+'\}')

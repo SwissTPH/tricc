@@ -291,6 +291,7 @@ class TriccNodeActivity(TriccNodeBaseModel):
             if isinstance(node_origin, TriccNodeActivityStart) and node_origin == node_origin.activity.root:
                 self.root = node_instance
 
+             
             # generate options
             elif issubclass(node_instance.__class__, TriccNodeSelect):
                 for key, option_instance in node_instance.options.items():
@@ -305,7 +306,7 @@ class TriccNodeActivity(TriccNodeBaseModel):
 
     def update_edges(self, node_origin, node_instance):
         updates = 0
-        for edge in self.edges:
+        for edge in self.edges: 
             if edge.source == node_origin.id or edge.source == node_origin:
                 edge.source = node_instance.id
                 updates += 1
@@ -528,17 +529,13 @@ class TriccNodeBridge(TriccNodeFakeCalculateBase):
 class TriccNodeRhombus(TriccNodeCalculateBase):
     odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccExtendedNodeType.rhombus
     path: Optional[TriccNodeBaseModel] = None
-    folow: Optional[TriccNodeBaseModel] = []
     reference: Union[List[TriccNodeBaseModel], Expression]
     
     def make_instance(self, instance_nb, activity, **kwargs):
         # shallow copy
         reference = []
         instance = super().make_instance(instance_nb, activity=activity)
-        path = []
-        instance.path = path
-        folow = []
-        instance.folow = folow
+        instance.path = None
         if isinstance(self.reference, str):
             reference = self.reference
         elif isinstance(self.reference, list):
@@ -646,6 +643,8 @@ def reorder_node_list(list_node, group):
         list_out = []
         list_out_group = []
         list_out_other = []
+        
+        
         for l_node in list_node:
             group_id = l_node.group.id if hasattr(l_node, 'group') and l_node.group is not None else None
             if group is not None and group.id == group_id:
@@ -676,8 +675,7 @@ def walktrhough_tricc_node_processed_stached(node, callback, processed_nodes, st
                                              **kwargs):
     # logger.debug("walkthrough::{}::{}".format(callback.__name__, node.get_name()))
     if hasattr(node, 'prev_nodes') and len(node.prev_nodes) > 0:
-        sorted_list = sorted(node.prev_nodes, key=lambda p_node: p_node.path_len, reverse=True)
-        path_len = max(path_len, sorted_list[0].path_len + 1, len(processed_nodes)+1)
+        path_len = max(path_len, *[n.path_len + 1 for n in node.prev_nodes], len(processed_nodes)+1)
     node.path_len = max(node.path_len, path_len)
     if (callback(node, processed_nodes=processed_nodes, stashed_nodes=stashed_nodes, warn = warn,**kwargs)):
         # node processing succeed 
@@ -703,15 +701,17 @@ def walktrhough_tricc_node_processed_stached(node, callback, processed_nodes, st
                         walktrhough_tricc_node_processed_stached(gp, callback, processed_nodes, stashed_nodes, path_len,
                                                          recursive, warn = warn,**kwargs)
                 elif node.root not in stashed_nodes:
-                    stashed_nodes.insert(0,node.root)
+                    #stashed_nodes.insert(0,node.root)
+                    stashed_nodes.append(node.root)
                     for gp in node.groups:
-                        stashed_nodes.insert(0,gp)
+                        stashed_nodes.append(gp)
+                    #    stashed_nodes.insert(0,gp)
                 return
         elif isinstance(node, TriccNodeActivityEnd):
             for next_node in node.activity.next_nodes:
                 if next_node not in stashed_nodes:
-                    stashed_nodes.insert(0,next_node)
-
+                    #stashed_nodes.insert(0,next_node)
+                    stashed_nodes.append(next_node)
         elif issubclass(node.__class__, TriccNodeSelect):
             for option in node.options.values():
                 option.path_len = max(path_len,  option.path_len)
@@ -759,6 +759,7 @@ def walkthrough_tricc_option(node, callback, processed_nodes, stashed_nodes, pat
                 for next_node in option.next_nodes:
                     if next_node not in stashed_nodes:
                         stashed_nodes.append(next_node)
+                        #stashed_nodes.insert(0,next_node)
     else:
         list_option = []
         while not all(elem in list_option for elem in list(node.options.values())):
@@ -936,29 +937,37 @@ def get_prev_node_by_name(processed_nodes, name, node):
     if len(filtered) > 0:
         return sorted(filtered, key=lambda x: x.path_len, reverse=False)[0]
 
+MIN_LOOP_COUNT = 10
 
 def check_stashed_loop(stashed_nodes, prev_stashed_nodes, processed_nodes, len_prev_processed_nodes, loop_count):
     loop_out = {}
+    
     if len(stashed_nodes) == len(prev_stashed_nodes):
+        # to avoid checking the details 
+        if loop_count<=0:
+            if loop_count < -MIN_LOOP_COUNT:
+                loop_count = MIN_LOOP_COUNT+1
+            else:
+                loop_count -= 1
+        if loop_count>MIN_LOOP_COUNT:
+            # copy to sort
+            cur_stashed_nodes = sorted(stashed_nodes, key=lambda x: x.id, reverse=True)
 
-        # copy to sort
-        cur_stashed_nodes = sorted(stashed_nodes, key=lambda x: x.id, reverse=True)
+            prev_stashed_nodes = sorted(prev_stashed_nodes, key=lambda x: x.id, reverse=True)
 
-        prev_stashed_nodes = sorted(prev_stashed_nodes, key=lambda x: x.id, reverse=True)
-
-        if cur_stashed_nodes == prev_stashed_nodes and len(processed_nodes) == len_prev_processed_nodes:
-            loop_count += 1
-            if loop_count > 10 * len(prev_stashed_nodes) + 1:
-                logger.error("Stashed node list was unchanged: loop likely or a cyclic redundancy")
-                for es_node in cur_stashed_nodes:
-                    logger.error("Stashed node {}:{}|{} {}:{}".format(
-                                                                   es_node.group.get_name() if es_node.group is not None else es_node.activity.get_name() ,
-                                                                   es_node.group.instance if es_node.group is not None else es_node.activityinstance ,
-                                                                   es_node.__class__, 
-                                                                es_node.get_name(), es_node.instance))
-                    #reverse_walkthrough(es_node, es_node, print_trace, processed_nodes, stashed_nodes)
-                if len(stashed_nodes) == len(prev_stashed_nodes):
-                    exit()
+            if cur_stashed_nodes == prev_stashed_nodes and len(processed_nodes) == len_prev_processed_nodes:
+                loop_count += 1
+                if loop_count > max(MIN_LOOP_COUNT, 10 * len(prev_stashed_nodes) + 1):
+                    logger.error("Stashed node list was unchanged: loop likely or a cyclic redundancy")
+                    for es_node in cur_stashed_nodes:
+                        logger.error("Stashed node {}:{}|{} {}:{}".format(
+                                                                    es_node.group.get_name() if es_node.group is not None else es_node.activity.get_name() ,
+                                                                    es_node.group.instance if es_node.group is not None else es_node.activityinstance ,
+                                                                    es_node.__class__, 
+                                                                    es_node.get_name(), es_node.instance))
+                        #reverse_walkthrough(es_node, es_node, print_trace, processed_nodes, stashed_nodes)
+                    if len(stashed_nodes) == len(prev_stashed_nodes):
+                        exit()
         else:
             loop_count = 0
     else:
