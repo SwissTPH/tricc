@@ -359,25 +359,30 @@ def clean_list_or(list_or, elm_and=None):
         list_or = []
         return list_or
     if elm_and is not None:
-        if TRICC_NEGATE.format(elm_and) in list_or:
-            # we remove x and not X
-            list_or.remove(TRICC_NEGATE.format(elm_and))
-        elif elm_and in list_or:
-            # we remove  x and x
-            list_or.remove(elm_and)
-        else:
-            for exp_prev in list_or:
-                if re.search(exp_prev, ' and ') and exp_prev.replace('and ', 'and not') in list_or:
-                    right = exp_prev.split(' and ')[0]
-                    list_or.remove(exp_prev)
-                    list_or.remove(exp_prev.replace('and ', 'and not'))
-                    list_or.append(right)
+            if TRICC_NEGATE.format(elm_and) in list_or:
+                # we remove x and not X
+                list_or.remove(TRICC_NEGATE.format(elm_and))
+            if elm_and in list_or:
+                # we remove  x and x
+                list_or.remove(elm_and)
+    for exp_prev in list_or:
+        if TRICC_NEGATE.format(exp_prev) in list_or:
+            # if there is x and not(X) in an OR list them the list is always true
+            list_or = []
+        if elm_and is not None:
+            if TRICC_NEGATE.format(elm_and) in list_or:
+                # we remove x and not X
+                list_or.remove(TRICC_NEGATE.format(elm_and))
+            else:
+                    if re.search(exp_prev, ' and ')  in list_or and exp_prev.replace('and ', 'and not') in list_or:
+                        right = exp_prev.split(' and ')[0]
+                        list_or.remove(exp_prev)
+                        list_or.remove(exp_prev.replace('and ', 'and not'))
+                        list_or.append(right)
 
-                if TRICC_NEGATE.format(exp_prev) == elm_and or exp_prev == elm_and:
-                    list_or.remove(exp_prev)
-                if TRICC_NEGATE.format(exp_prev) in list_or:
-                    # if there is x and not(X) in an OR list them the list is always true
-                    list_or = []
+                    if TRICC_NEGATE.format(exp_prev) == elm_and or exp_prev == elm_and:
+                        list_or.remove(exp_prev)
+
     return list_or
 
 def get_export_name(node):

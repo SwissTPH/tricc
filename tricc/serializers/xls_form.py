@@ -221,7 +221,7 @@ def generate_xls_form_export(node, processed_nodes, stashed_nodes, df_survey, df
                                 values.append(0)
                             else:
                                 values.append(get_xfrom_trad(node, column, SURVEY_MAP ))
-                        if len(df_calculate[df_calculate.name == node.name])==0:
+                        if len(df_calculate[df_calculate.name == get_export_name(node)])==0:
                             df_calculate.loc[len(df_calculate)] = values
                         else:
                             logger.error("name {} found twice".format(node.name))

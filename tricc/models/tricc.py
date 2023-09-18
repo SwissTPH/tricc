@@ -124,10 +124,10 @@ class TriccEdge(TriccBaseModel):
 
     def make_instance(self, instance_nb, activity=None):
         instance = super().make_instance(instance_nb, activity=activity)
-        if issubclass(self.source.__class__, TriccNodeBaseModel):
-            instance.source = self.source.copy() #TODO should we copy  the nodes ?  
-        if issubclass(self.target.__class__, TriccNodeBaseModel):
-            instance.target = self.target.copy()
+        #if issubclass(self.source.__class__, TriccBaseModel):
+        instance.source = self.source if isinstance(self.source, str) else self.source.copy() #TODO should we copy  the nodes ?  
+        #if issubclass(self.target.__class__, TriccBaseModel):
+        instance.target = self.target if isinstance(self.target, str) else self.target.copy()
         return instance
 
 
@@ -250,7 +250,9 @@ class TriccNodeActivity(TriccNodeBaseModel):
                 instance.edges.append(edge.make_instance(instance_nb, activity=instance))
             instance.update_nodes(self.root)
             # we walk throught the nodes and replace them when ready
-            for node in list(self.nodes.values()):
+            for node in list(filter(lambda p_node: isinstance(p_node, (TriccNodeDisplayBridge,TriccNodeBridge)),list(self.nodes.values()) )):
+                instance.update_nodes(node)
+            for node in list(filter(lambda p_node: not isinstance(p_node, (TriccNodeDisplayBridge,TriccNodeBridge)),list(self.nodes.values()) )):
                 instance.update_nodes(node)
             for group in self.groups:
                 instance.update_groups(group)
@@ -290,8 +292,17 @@ class TriccNodeActivity(TriccNodeBaseModel):
             # update root
             if isinstance(node_origin, TriccNodeActivityStart) and node_origin == node_origin.activity.root:
                 self.root = node_instance
-
-             
+            if isinstance(node_instance,TriccNodeRhombus):
+                old_path = node_origin.path
+                if old_path is not None:
+                    for n in node_instance.activity.nodes.values():
+                        if n.base_instance.id == old_path.id:
+                            node_instance.path = n
+                    if node_instance.path is None:
+                        logger.error("new path not found")
+                elif not (len(node_instance.reference)== 1  and issubclass(node_instance.reference[0].__class__, TriccNodeInputModel)):
+                    logger.warning("Rhombus without a path")
+                
             # generate options
             elif issubclass(node_instance.__class__, TriccNodeSelect):
                 for key, option_instance in node_instance.options.items():
@@ -306,6 +317,7 @@ class TriccNodeActivity(TriccNodeBaseModel):
 
     def update_edges(self, node_origin, node_instance):
         updates = 0
+        
         for edge in self.edges: 
             if edge.source == node_origin.id or edge.source == node_origin:
                 edge.source = node_instance.id

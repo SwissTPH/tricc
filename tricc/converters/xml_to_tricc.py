@@ -49,7 +49,6 @@ def create_activity(diagram, media_path):
             activity.groups = groups        
         if nodes and len(nodes)>0:
             activity.nodes = nodes
-            
         
         process_edges(diagram, media_path, activity, nodes)
 
@@ -71,12 +70,12 @@ def process_edges(diagram, media_path, activity, nodes):
                 activity.unused_edges.append(edge)
         elif isinstance(nodes[edge.target], (TriccNodeActivityEnd, TriccNodeEnd)):
             end_found = True
-                
+        if edge.target in nodes and isinstance(nodes[edge.target], TriccNodeRhombus) and edge.source != nodes[edge.target].path.id :
+             edge.target = nodes[edge.target].path.id
         # modify edge for selectyesNo
         if edge.source in nodes and isinstance(nodes[edge.source], TriccNodeSelectYesNo):
             process_yesno_edge(edge, nodes)
-        elif edge.target in nodes and isinstance(nodes[edge.target], TriccNodeRhombus) and edge.source != nodes[edge.target].path.id :
-             edge.target = nodes[edge.target].path.id
+        
         # create calculate based on edges label
         elif edge.value is not None:
             label  = edge.value.strip()
@@ -464,7 +463,7 @@ def get_rhombus_path(node):
         'path_len': node.path_len
     }
     #FIXME: TriccNodeBridge calculation is not taken into acooun
-    if sum([0 if issubclass(n.__class__, TriccNodeDisplayModel) else 1 for n in node.prev_nodes])>1:
+    if True or sum([0 if issubclass(n.__class__, TriccNodeDisplayModel) else 1 for n in node.prev_nodes])>1:
         return TriccNodeDisplayBridge( **data)
     else:
         return TriccNodeBridge( **data)
