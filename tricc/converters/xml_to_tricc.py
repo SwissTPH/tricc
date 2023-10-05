@@ -207,15 +207,16 @@ def get_nodes(diagram, activity):
             node.name = node.name + node.id
         if  isinstance(node, TriccNodeRhombus):
                 # generate rhombuse path
-                calc = get_rhombus_path(node)
+                calc = get_bridge_path(node)
                 node.path = calc
                 new_nodes[calc.id] = calc
                 # add the edge between trhombus and its path
-                activity.edges.append(TriccEdge(
-                    id = generate_id(),
-                    source = calc.id,
-                    target = node.id
-                ))
+        if isinstance(node, TriccNodeActivity):
+            #find if the node has next nodes, if yes, add a bridge + Rhoimbus
+            if any([e.source == node.id for e in activity.edges]):
+                calc = get_activity_rhombus(node)
+                new_nodes[calc.id] = calc
+                
     nodes.update(new_nodes)
     return nodes
 
@@ -450,8 +451,39 @@ def get_count_node(node):
         name = count_name,
         path_len=node.path_len
     )
+def get_activity_rhombus(node):
+    path = get_bridge_path(node)
+    rhombus_id  = generate_id()
+    rhombus_name = "ar_"+rhombus_id
+    data = {
+        'id': rhombus_id,
+        'group': node.group,
+        'activity': node.activity,
+        'label': "rhombus: " + node.get_name(),
+        'name': rhombus_name,
+        'path_len': node.path_len,
+        'reference':node.name,
+        'path': path,
+    }
     
-def get_rhombus_path(node):
+    rhombus = TriccNodeRhombus(
+        **data
+    )
+    
+    for e in node.activity.edges:
+        if e.source == node.id:
+            e.source = rhombus.id
+    # add edge between rhombus and node
+    node.activity.edges.append(TriccEdge(
+        id = generate_id(),
+        source = path.id,
+        target = rhombus.id
+    ))
+    node.path_len += 1
+    return rhombus
+
+    
+def get_bridge_path(node):
     calc_id  = generate_id()
     calc_name = "path_"+calc_id
     data = {
@@ -464,9 +496,22 @@ def get_rhombus_path(node):
     }
     #FIXME: TriccNodeBridge calculation is not taken into acooun
     if True or sum([0 if issubclass(n.__class__, TriccNodeDisplayModel) else 1 for n in node.prev_nodes])>1:
-        return TriccNodeDisplayBridge( **data)
+        calc= TriccNodeDisplayBridge( **data)
     else:
-        return TriccNodeBridge( **data)
+        calc =  TriccNodeBridge( **data)
+
+    for e in node.activity.edges:
+        if e.target == node.id:
+            e.target = calc.id
+   
+    # add edge between bridge and node
+    node.activity.edges.append(TriccEdge(
+        id = generate_id(),
+        source = calc.id,
+        target = node.id
+    ))
+    node.path_len += 1
+    return calc
     
 def generate_calculates(node,calculates, used_calculates,processed_nodes):
     list_calc = []
@@ -867,10 +912,11 @@ def add_image_from_style(style,path, image_name):
         image_parts = image_attrib[1].split(',')
         if len(image_parts) == 2:
             payload = image_parts[1][:-1]
-            file_name = os.path.join(path, image_name+ '.' + image_parts[0])
+            path = os.path.join(path, 'images')
+            file_name = os.path.join(path , image_name+ '.' + image_parts[0])
             if not(os.path.isdir(path)): # check if it exists, because if it does, error will be raised 
                 # (later change to make folder complaint to CHT)
-                os.mkdir(path)
+                os.makedirs(path, exist_ok = True)
             with open(file_name , "wb") as fh:
                 fh.write(base64.decodebytes(payload.encode('ascii'))) 
                 return os.path.basename(file_name)
