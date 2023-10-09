@@ -31,8 +31,8 @@ def start_group( cur_group, groups, df_survey, df_calculate, relevance = False, 
     relevance_expression = cur_group.relevance
     if not relevance:
         relevance_expression = ''
-    elif is_activity:
-        relevance_expression = TRICC_CALC_EXPRESSION.format(get_export_name(cur_group.root))
+    #elif is_activity:
+    #    relevance_expression = TRICC_CALC_EXPRESSION.format(get_export_name(cur_group.root))
     elif group_calc_required:
         relevance_expression = TRICC_CALC_EXPRESSION.format("gcalc_" + name)
         

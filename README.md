@@ -150,7 +150,7 @@ Not a real property to add, it is simply the text display in the boxes
 
 advanced interpretation of the edges:
 
-Activity instances: if there is more that 1 instance of a single actity then the 1+ activity will be displayed only if the previous one were not
+Activity instances: if there is more that 1 instance of a single actity then the 1+ activity will be displayed only if the previous one were not, to do that the GoTO node are replaced by a path and a rombhus, the path got to the activitvy and rhombus and the next node (if any) are attached to the rhombus that is use to wait that the activity
 
 the node folowing an 1+ activity will be display after the activy OR instead of the activity
 

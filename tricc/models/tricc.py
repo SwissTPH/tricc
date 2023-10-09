@@ -328,15 +328,7 @@ class TriccNodeActivity(TriccNodeBaseModel):
         return updates
 
     def get_end_nodes(self):
-        end_node = []
-        activity_end_node = []
-        for node in self.nodes.values():
-            if isinstance(node, TriccNodeActivityEnd):
-                activity_end_node.append(node)
-            elif isinstance(node, TriccNodeEnd):
-                end_node.append(node)
-
-        return end_node + activity_end_node
+        return  list(filter(lambda x:  issubclass(x.__class__, (TriccNodeEnd,TriccNodeActivityEnd)), self.nodes.values()))
 
 
 class TriccNodeDisplayModel(TriccNodeBaseModel):
@@ -1011,7 +1003,7 @@ class TriccNodeEnd(TriccNodeCalculate):
         self.name = END_NODE_FORMAT.format(self.activity.id)
 
 
-class TriccNodeActivityStart(TriccNodeDisplayCalculateBase):
+class TriccNodeActivityStart(TriccNodeFakeCalculateBase):
     odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccExtendedNodeType.activity_start
 
 

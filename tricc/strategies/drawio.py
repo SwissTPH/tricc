@@ -95,6 +95,13 @@ class DrawioStrategy(BaseInputStrategy):
                 if target_node  not in processed_nodes:
                     if target_node.odk_type == TriccExtendedNodeType.goto:
                         next_page = self.walkthrough_goto_node(target_node, page, pages, processed_nodes, current_path)
+                        #update reference
+                        #FIXME support reference str
+                        for n in page.nodes:
+                            sn = page.nodes[n]
+                            if isinstance(sn, TriccNodeRhombus) and isinstance(sn.reference,list) and target_node in sn.reference:
+                                sn.reference.remove(target_node)
+                                sn.reference.append(next_page)
                     # set next page as node to link the next_node of the activity
                         if next_page is not None:
                             target_node = next_page

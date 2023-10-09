@@ -161,6 +161,7 @@ def process_condition_edge(edge,nodes):
             return TriccNodeRhombus(
                 id = edge.id,
                 reference = [nodes[edge.source]],
+                path = nodes[edge.source],
                 activity = nodes[edge.source].activity,
                 group = nodes[edge.source].group,
                 label= label
@@ -201,27 +202,54 @@ def get_nodes(diagram, activity):
     add_link_nodes(nodes, diagram, activity)
     get_hybride_node(nodes, diagram, activity)
     new_nodes={}
+    node_to_remove=[]
+    activity_end_node = None
+    end_node = None
     for node in nodes.values():
         # clean name
         if hasattr(node, 'name') and node.name is not None and (node.name.endswith(('_','.'))):
             node.name = node.name + node.id
         if  isinstance(node, TriccNodeRhombus):
                 # generate rhombuse path
-                calc = get_bridge_path(node)
+                calc = get_bridge_path(node,nodes)
                 node.path = calc
                 new_nodes[calc.id] = calc
                 # add the edge between trhombus and its path
-        if isinstance(node, TriccNodeActivity):
+        elif isinstance(node, TriccNodeGoTo):
             #find if the node has next nodes, if yes, add a bridge + Rhoimbus
+            path = get_bridge_path(node,nodes)
+            new_nodes[path.id] = path
             if any([e.source == node.id for e in activity.edges]):
-                calc = get_activity_rhombus(node)
+                calc = get_activity_rhombus(node, path)
                 new_nodes[calc.id] = calc
+        elif isinstance(node, TriccNodeEnd):
+            if not end_node:
+                end_node = node
+            else:
+                merge_node(node,end_node)
+                node_to_remove.append(node.id)
+        elif isinstance(node, TriccNodeActivityEnd):
+            if not activity_end_node:
+                activity_end_node = node
+            else:
+                merge_node(node,activity_end_node)
+                node_to_remove.append(node.id)
                 
     nodes.update(new_nodes)
+                
+    for key in node_to_remove:
+        del nodes[key]
     return nodes
 
-
-    
+def merge_node(from_node,to_node):
+    if from_node.activity != to_node.activity:
+        logger.error("Cannot merge nodes from different activities")
+    elif issubclass(from_node.__class__, TriccNodeCalculateBase) and issubclass(to_node.__class__, TriccNodeCalculateBase):
+        for e in to_node.activity.edges:
+            if e.target == from_node.id:
+                e.target = to_node.id
+    else:
+        logger.error("Cannot merge not calculate nodes ")
     
 def create_root_node(diagram):
     node = None
@@ -451,8 +479,7 @@ def get_count_node(node):
         name = count_name,
         path_len=node.path_len
     )
-def get_activity_rhombus(node):
-    path = get_bridge_path(node)
+def get_activity_rhombus(node,path):
     rhombus_id  = generate_id()
     rhombus_name = "ar_"+rhombus_id
     data = {
@@ -462,7 +489,7 @@ def get_activity_rhombus(node):
         'label': "rhombus: " + node.get_name(),
         'name': rhombus_name,
         'path_len': node.path_len,
-        'reference':node.name,
+        'reference':[node],
         'path': path,
     }
     
@@ -479,11 +506,18 @@ def get_activity_rhombus(node):
         source = path.id,
         target = rhombus.id
     ))
+    
+    #node.activity.edges.append(TriccEdge(
+    #    id = generate_id(),
+    #    source = node.id,
+    #    target = rhombus.id
+    #))
+    
     node.path_len += 1
     return rhombus
 
     
-def get_bridge_path(node):
+def get_bridge_path(node, nodes):
     calc_id  = generate_id()
     calc_name = "path_"+calc_id
     data = {
@@ -494,8 +528,8 @@ def get_bridge_path(node):
         'name': calc_name,
         'path_len': node.path_len
     }
-    #FIXME: TriccNodeBridge calculation is not taken into acooun
-    if True or sum([0 if issubclass(n.__class__, TriccNodeDisplayModel) else 1 for n in node.prev_nodes])>1:
+    prev_nodes = [nodes[n.source] for n in list(filter(lambda x: (x.target == node.id or x.target == node) and x.source in nodes ,node.activity.edges ))] 
+    if sum([0 if issubclass(n.__class__, (TriccNodeDisplayCalculateBase, TriccNodeRhombus)) else 1 for n in prev_nodes])>0 : #and len(node.prev_nodes)>1:
         calc= TriccNodeDisplayBridge( **data)
     else:
         calc =  TriccNodeBridge( **data)
