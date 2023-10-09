@@ -1,4 +1,12 @@
 # TRICC
+
+## Edges
+
+    the edge are in general labeless unless for :
+    - after a select multiple: can setup quick rhombus for the number of choice selected, an opperator is required (<>=)
+    - after a yes/no quesiton:  'Yes', 'No', 'Follow' (translation can be added in the code )
+    - before a calculate to put weight: integer only
+
 ## Shape
 
     odk_type:
@@ -142,7 +150,7 @@ Not a real property to add, it is simply the text display in the boxes
 
 advanced interpretation of the edges:
 
-Activity instances: if there is more that 1 instance of a single actity then the 1+ activity will be displayed only if the previous one were not
+Activity instances: if there is more that 1 instance of a single actity then the 1+ activity will be displayed only if the previous one were not, to do that the GoTO node are replaced by a path and a rombhus, the path got to the activitvy and rhombus and the next node (if any) are attached to the rhombus that is use to wait that the activity
 
 the node folowing an 1+ activity will be display after the activy OR instead of the activity
 
@@ -181,3 +189,4 @@ option can have only incoming edge from images to be placed as option$
 
 ### if the node is NOT a calculate [get_node_expression, calculate = false]
 
+ 

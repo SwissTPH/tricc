@@ -1,12 +1,12 @@
 import base64
 import os
 import re
-from gettext import gettext as _
+from curses.ascii import isalnum, isalpha, isdigit
 
-import html2text
+from numpy import isnan
 
-from tricc.converters.utils import OPERATION_LIST, clean_name
-from tricc.models import *
+from tricc.converters.utils import OPERATION_LIST, clean_name, remove_html
+from tricc.models.tricc import *
 from tricc.parsers.xml import (get_edges_list, get_mxcell,
                                get_mxcell_parent_list, get_odk_type,
                                get_odk_type_list)
@@ -20,7 +20,8 @@ import logging
 
 logger = logging.getLogger("default")
 
-def create_activity(diagram):
+
+def create_activity(diagram, media_path):
     id = diagram.attrib.get('id')    
     root = create_root_node(diagram)
     name = diagram.attrib.get('name')
@@ -40,16 +41,16 @@ def create_activity(diagram):
         root.group = activity
         activity.group = activity
         edges = get_edges(diagram)
+        if edges and len(edges)>0:
+            activity.edges = edges
         nodes = get_nodes(diagram, activity)
         groups  = get_groups(diagram, nodes, activity)
         if groups and len(groups)>0:
             activity.groups = groups        
         if nodes and len(nodes)>0:
             activity.nodes = nodes
-            
-        if edges and len(edges)>0:
-            activity.edges = edges
-        process_edges(diagram, activity, nodes)
+        
+        process_edges(diagram, media_path, activity, nodes)
 
         # link back the activity
         activity.root.activity = activity
@@ -57,30 +58,45 @@ def create_activity(diagram):
     else:
         logger.warning("root not found for page {0}".format(name))
             
-def process_edges(diagram, activity, nodes):
+def process_edges(diagram, media_path, activity, nodes):
     end_found = False
     for edge in activity.edges:
         # enrich nodes
         if edge.target not in nodes :
             activity.unused_edges.append(edge)
         elif edge.source not in nodes and edge.target in nodes:
-            enriched = enrich_node(diagram, edge, nodes[edge.target])
+            enriched = enrich_node(diagram, media_path, edge, nodes[edge.target])
             if enriched is None:
                 activity.unused_edges.append(edge)
         elif isinstance(nodes[edge.target], (TriccNodeActivityEnd, TriccNodeEnd)):
             end_found = True
-                
+        if edge.target in nodes and isinstance(nodes[edge.target], TriccNodeRhombus) and edge.source != nodes[edge.target].path.id :
+             edge.target = nodes[edge.target].path.id
         # modify edge for selectyesNo
         if edge.source in nodes and isinstance(nodes[edge.source], TriccNodeSelectYesNo):
             process_yesno_edge(edge, nodes)
+        
         # create calculate based on edges label
         elif edge.value is not None:
+            label  = edge.value.strip()
+            processed = False
             calc = None
-            # manage comment
-            calc = process_condition_edge(edge,nodes) 
-            if calc is None:
+            if isinstance(nodes[edge.source], TriccNodeRhombus) and label.lower() in  TRICC_FOLOW_LABEL:
+                edge.source = nodes[edge.source].path.id
+                processed = True
+            elif label.lower() in (TRICC_YES_LABEL )or label == '':
+                # do nothinbg for yes
+                processed = True
+            elif re.search(r'^\-?[0-9]+([.,][0-9]+)?$', edge.value.strip() ):
+                calc = process_factor_edge(edge,nodes)
+            elif label.lower() in TRICC_NO_LABEL:
                 calc = process_exclusive_edge(edge, nodes)
+            else:
+                # manage comment
+                calc = process_condition_edge(edge,nodes) 
+                    
             if calc is not None:
+                processed = True
                 nodes[calc.id] = calc
                 # add edge between calc and 
                 activity.edges.append(TriccEdge(
@@ -89,10 +105,17 @@ def process_edges(diagram, activity, nodes):
                     target = edge.target
                 ))
                 edge.target = calc.id
-                
+            if not processed:
+                logger.warning("Edge between {0} and {1} with label '{2}' could not be interpreted: {3}".format(
+                    nodes[edge.source].get_name(),
+                    nodes[edge.target].get_name(),
+                    edge.value.strip(),
+                    "not management found"))       
     if not  end_found:
         logger.error("the activity {} has no end node".format(activity.get_name()))
         exit()
+        
+
 
     
 def process_yesno_edge(edge, nodes):
@@ -107,14 +130,28 @@ def process_yesno_edge(edge, nodes):
             yes_option = option
         else:
             no_option = option
-    if label in TRICC_FOLOW_LABEL:
+    if label.lower() in TRICC_FOLOW_LABEL:
         pass
-    elif label in TRICC_YES_LABEL:
+    elif label.lower() in TRICC_YES_LABEL:
         edge.source = yes_option.id
-    elif label in TRICC_NO_LABEL:
+    elif label.lower() in TRICC_NO_LABEL:
         edge.source = no_option.id
     else:
         logger.warning("edge {0} is coming from select {1}".format(edge.id, nodes[edge.source].get_name()))
+
+def process_factor_edge(edge,nodes):
+    factor  = edge.value.strip()
+    if factor != 1:
+        return TriccNodeCalculate(
+            id = edge.id,
+            expression_reference = "number(${{{}}}) * {}".format('', factor),
+            reference = [nodes[edge.source]],
+            activity = nodes[edge.source].activity,
+            group = nodes[edge.source].group, 
+            label= "factor {}".format(factor)
+        )
+    return None
+
                          
 def process_condition_edge(edge,nodes):
     label  = edge.value.strip()
@@ -124,17 +161,14 @@ def process_condition_edge(edge,nodes):
             return TriccNodeRhombus(
                 id = edge.id,
                 reference = [nodes[edge.source]],
+                path = nodes[edge.source],
                 activity = nodes[edge.source].activity,
                 group = nodes[edge.source].group,
                 label= label
             )
 def process_exclusive_edge(edge, nodes):
     error = None
-    label  = edge.value.strip()
-    if label == '':
-        return
     if issubclass(nodes[edge.source].__class__, TriccNodeCalculateBase):
-        if label.lower() in TRICC_NO_LABEL:
             # insert Negate
             if  not isinstance(nodes[edge.target], TriccNodeExclusive) or not isinstance(nodes[edge.source], TriccNodeExclusive):
                 return TriccNodeExclusive(
@@ -144,8 +178,6 @@ def process_exclusive_edge(edge, nodes):
                 )
             else:
                 error = "No after or before a exclusice/negate node"
-        elif not (label.lower() in TRICC_YES_LABEL):
-            error = " label not reconized after a calculate"
     else:        
         error = "label not after a yesno nor a calculate"
     if error is not None:
@@ -154,17 +186,12 @@ def process_exclusive_edge(edge, nodes):
             nodes[edge.target].get_name(),
             edge.value.strip(),
             error
-        ))     
+        ))
+    return None
+   
     
 
-# the soup.text strips off the html formatting also
-def remove_html(string):
-    text = html2text.html2text(string) # retrive pure text from html
-    text = text.strip('\n') # get rid of empty lines at the end (and beginning)
-    text = text.split('\n') # split string into a list at new lines
-    text = '\n'.join([i.strip(' ') for i in text if i]) # in each element in that list strip empty space (at the end of line) 
-    # and delete empty lines
-    return text
+
 
 def get_nodes(diagram, activity):
     nodes = {}
@@ -174,15 +201,55 @@ def get_nodes(diagram, activity):
     add_input_nodes(nodes, diagram, activity)
     add_link_nodes(nodes, diagram, activity)
     get_hybride_node(nodes, diagram, activity)
+    new_nodes={}
+    node_to_remove=[]
+    activity_end_node = None
+    end_node = None
     for node in nodes.values():
         # clean name
-        if hasattr(node, 'name') and node.name is not None and (node.name.endswith('_') or node.name.endswith('.')):
+        if hasattr(node, 'name') and node.name is not None and (node.name.endswith(('_','.'))):
             node.name = node.name + node.id
-        
+        if  isinstance(node, TriccNodeRhombus):
+                # generate rhombuse path
+                calc = get_bridge_path(node,nodes)
+                node.path = calc
+                new_nodes[calc.id] = calc
+                # add the edge between trhombus and its path
+        elif isinstance(node, TriccNodeGoTo):
+            #find if the node has next nodes, if yes, add a bridge + Rhoimbus
+            path = get_bridge_path(node,nodes)
+            new_nodes[path.id] = path
+            if any([e.source == node.id for e in activity.edges]):
+                calc = get_activity_rhombus(node, path)
+                new_nodes[calc.id] = calc
+        elif isinstance(node, TriccNodeEnd):
+            if not end_node:
+                end_node = node
+            else:
+                merge_node(node,end_node)
+                node_to_remove.append(node.id)
+        elif isinstance(node, TriccNodeActivityEnd):
+            if not activity_end_node:
+                activity_end_node = node
+            else:
+                merge_node(node,activity_end_node)
+                node_to_remove.append(node.id)
+                
+    nodes.update(new_nodes)
+                
+    for key in node_to_remove:
+        del nodes[key]
     return nodes
 
-
-    
+def merge_node(from_node,to_node):
+    if from_node.activity != to_node.activity:
+        logger.error("Cannot merge nodes from different activities")
+    elif issubclass(from_node.__class__, TriccNodeCalculateBase) and issubclass(to_node.__class__, TriccNodeCalculateBase):
+        for e in to_node.activity.edges:
+            if e.target == from_node.id:
+                e.target = to_node.id
+    else:
+        logger.error("Cannot merge not calculate nodes ")
     
 def create_root_node(diagram):
     node = None
@@ -249,6 +316,8 @@ def add_input_nodes(nodes, diagram, group= None):
     add_tricc_nodes(nodes, TriccNodeInteger, list, group, ['min','max', 'constraint','save','constraint_message','required'])
     list = get_odk_type_list(diagram, ['object','UserObject'], TriccNodeType.text)
     add_tricc_nodes(nodes, TriccNodeText, list, group, ['constraint','save','constraint_message','required'])
+    list = get_odk_type_list(diagram, ['object','UserObject'], TriccNodeType.date)
+    add_tricc_nodes(nodes, TriccNodeDate, list, group, ['constraint','save','constraint_message','required'])
 
 def add_calculate_nodes(nodes, diagram, group=None):
     list = get_odk_type_list(diagram, ['UserObject','object'], TriccNodeType.calculate)
@@ -331,13 +400,13 @@ def get_last_version(dict, name):
                 max_version = sim_node
     return max_version
 
-def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calculates,  **kwargs ):
+def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calculates, warn = False, **kwargs ):
      # used_calculates dict[name, Dict[id, node]]
      # processed_nodes Dict[id, node]
      # calculates  dict[name, Dict[id, node]]
     if node not in processed_nodes:
         # generate condition
-        if is_ready_to_process(node, processed_nodes,False) and process_reference(node, calculates,used_calculates,processed_nodes):
+        if is_ready_to_process(node, processed_nodes,False) and process_reference(node, calculates,used_calculates,processed_nodes,warn = warn):
             if is_rhombus_ready_to_process(node,processed_nodes):
                 generate_calculates(node,calculates, used_calculates,processed_nodes)
                 if issubclass(node.__class__, (TriccNodeDisplayCalculateBase )) and node.name is not None:
@@ -410,18 +479,73 @@ def get_count_node(node):
         name = count_name,
         path_len=node.path_len
     )
+def get_activity_rhombus(node,path):
+    rhombus_id  = generate_id()
+    rhombus_name = "ar_"+rhombus_id
+    data = {
+        'id': rhombus_id,
+        'group': node.group,
+        'activity': node.activity,
+        'label': "rhombus: " + node.get_name(),
+        'name': rhombus_name,
+        'path_len': node.path_len,
+        'reference':[node],
+        'path': path,
+    }
     
-def get_rhombus_path(node):
+    rhombus = TriccNodeRhombus(
+        **data
+    )
+    
+    for e in node.activity.edges:
+        if e.source == node.id:
+            e.source = rhombus.id
+    # add edge between rhombus and node
+    node.activity.edges.append(TriccEdge(
+        id = generate_id(),
+        source = path.id,
+        target = rhombus.id
+    ))
+    
+    #node.activity.edges.append(TriccEdge(
+    #    id = generate_id(),
+    #    source = node.id,
+    #    target = rhombus.id
+    #))
+    
+    node.path_len += 1
+    return rhombus
+
+    
+def get_bridge_path(node, nodes):
     calc_id  = generate_id()
     calc_name = "path_"+calc_id
-    return TriccNodeCalculate(
-        id =calc_id,
-        group = node.group,
-        activity = node.activity,
-        label = "path: " + node.get_name(),
-        name = calc_name,
-        path_len = node.path_len
-    )
+    data = {
+        'id': calc_id,
+        'group': node.group,
+        'activity': node.activity,
+        'label': "path: " + node.get_name(),
+        'name': calc_name,
+        'path_len': node.path_len
+    }
+    prev_nodes = [nodes[n.source] for n in list(filter(lambda x: (x.target == node.id or x.target == node) and x.source in nodes ,node.activity.edges ))] 
+    if sum([0 if issubclass(n.__class__, (TriccNodeDisplayCalculateBase, TriccNodeRhombus)) else 1 for n in prev_nodes])>0 : #and len(node.prev_nodes)>1:
+        calc= TriccNodeDisplayBridge( **data)
+    else:
+        calc =  TriccNodeBridge( **data)
+
+    for e in node.activity.edges:
+        if e.target == node.id:
+            e.target = calc.id
+   
+    # add edge between bridge and node
+    node.activity.edges.append(TriccEdge(
+        id = generate_id(),
+        source = calc.id,
+        target = node.id
+    ))
+    node.path_len += 1
+    return calc
     
 def generate_calculates(node,calculates, used_calculates,processed_nodes):
     list_calc = []
@@ -438,19 +562,6 @@ def generate_calculates(node,calculates, used_calculates,processed_nodes):
                 add_calculate(calculates, count_node)
                 add_used_calculate(node, count_node, calculates, used_calculates, processed_nodes)
             
-            # generate rhombuse path
-            calc_node = get_rhombus_path(node)
-            node.path = calc_node
-            list_nodes = []
-            for prev in node.prev_nodes:
-                list_nodes.append(prev)
-            for prev in list_nodes:
-                set_prev_next_node(prev,calc_node, node)
-            set_prev_next_node(calc_node, node)
-            node.path_len += 1
-            list_calc.append(calc_node)
-            processed_nodes.append(calc_node)
-            add_calculate(calculates, calc_node)
     # if a prev node is a calculate then it must be added in used_calc
     for prev in node.prev_nodes:
         add_used_calculate(node, prev, calculates, used_calculates, processed_nodes)
@@ -507,7 +618,7 @@ def add_calculate(calculates, calc_node):
             calculates[calc_node.name]= {}
         calculates[calc_node.name][calc_node.id] = calc_node
 
-def process_reference(node,  calculates ,used_calculates,processed_nodes):
+def process_reference(node,  calculates ,used_calculates,processed_nodes, warn = False ):
     #global last_unfound_ref
     reference = []
     expression_reference = None
@@ -530,7 +641,10 @@ def process_reference(node,  calculates ,used_calculates,processed_nodes):
                         # issue is that it can be further in another path
                         last_found = get_last_version(calculates, ref)
                 if last_found is None:
-                    logger.debug("reference {} not found for a calculate {}".format(ref, node.get_name()))
+                    if warn:
+                        logger.warning("reference {} not found for a calculate {}".format(ref, node.get_name()))
+                    else:
+                        logger.debug("reference {} not found for a calculate {}".format(ref, node.get_name()))
                     #if last_unfound_ref == node:
                     #    logger.warning("reference not found for a calculate twice in a row {}".format(node.get_name()))
                     #last_unfound_ref = node
@@ -563,7 +677,7 @@ def process_reference(node,  calculates ,used_calculates,processed_nodes):
                     group = node.group                   
                 )
                 set_prev_next_node(new_node,node,prev_node)
-                if process_reference(new_node,  calculates ,used_calculates,processed_nodes):
+                if process_reference(new_node,  calculates ,used_calculates,processed_nodes, warn = warn):
                     processed_nodes.append(new_node)
                     return True
 
@@ -624,7 +738,7 @@ def merge_calculate(node, calculates, last_used_calc):
     return node_to_delete
     
 
-def enrich_node(diagram, edge, node):
+def enrich_node(diagram, media_path, edge, node):
     if edge.target == node.id:
         # get node and process type
         type, message = get_message(diagram, edge.source)
@@ -638,7 +752,7 @@ def enrich_node(diagram, edge, node):
             else:
                 logger.warning("A attribute box of type {0} and value {1} is attached to an object not compatible {2}".format(type, message, node.get_name()))
         else:
-            image = get_image(diagram, edge.source ) 
+            image = get_image(diagram, media_path, edge.source ) 
             if image is not None :
                 if hasattr(node, 'image'):
                     node.image = image
@@ -686,14 +800,14 @@ def get_select_yes_no_options(node, group):
     return {0:TriccNodeSelectOption(
                 id = generate_id(),
                 name="1",
-                label=_("Yes"),
+                label="Yes",
                 select = node,
                 group = group,
                 list_name =  node.list_name
             ), 1:TriccNodeSelectOption(
                 id = generate_id(),
                 name="-1",
-                label=_("No"),
+                label="No",
                 select = node,
                 group = group,
                 list_name =  node.list_name
@@ -763,7 +877,7 @@ def set_mandatory_attribute(elm, mandatory_attributes, groupname = None):
         elif attributes in ('parent','id', 'source', 'target'):
             param[attributes]=attribute_value
         elif attribute_value is not None:
-            param[attributes]=remove_html(attribute_value)
+            param[attributes]=remove_html(attribute_value.strip())
     return param
 
 def clean_link(link):
@@ -779,12 +893,11 @@ def get_groups(diagram, nodes, parent_group):
         add_group(elm, diagram, nodes, groups,parent_group)
     return groups
 
-        
 def add_group(elm, diagram, nodes, groups, parent_group):
     id = elm.attrib.get('id')
     if id not in groups:
         group = TriccGroup(
-            name = clean_name(elm.attrib.get('name')),
+            name = elm.attrib.get('name'),
             label = elm.attrib.get('label'),
             id = id,
             group = parent_group
@@ -814,18 +927,18 @@ def add_group_to_child(group, diagram,list_child, nodes, groups, parent_group):
                 nodes[child_id].group = group
         
 
-def get_image(diagram, id, image_name = None ):
+def get_image(diagram,  path, id, image_name = None ):
     elm = get_mxcell(diagram, id)
     if elm is not None:
         style=elm.attrib.get('style')
         if image_name is None:
             image_name = id
-        file_name = add_image_from_style(style, image_name)
+        file_name = add_image_from_style(style, path, image_name)
         if file_name is not None:
             return file_name
 
         
-def add_image_from_style(style,image_name):
+def add_image_from_style(style,path, image_name):
     image_attrib = None
     if style is not None and 'image=data:image/' in style:
         image_attrib = style.split('image=data:image/')
@@ -833,13 +946,14 @@ def add_image_from_style(style,image_name):
         image_parts = image_attrib[1].split(',')
         if len(image_parts) == 2:
             payload = image_parts[1][:-1]
-            file_name = "media/"+image_name+ '.' + image_parts[0]
-            if not(os.path.isdir('media')): # check if it exists, because if it does, error will be raised 
+            path = os.path.join(path, 'images')
+            file_name = os.path.join(path , image_name+ '.' + image_parts[0])
+            if not(os.path.isdir(path)): # check if it exists, because if it does, error will be raised 
                 # (later change to make folder complaint to CHT)
-                os.mkdir('media')
+                os.makedirs(path, exist_ok = True)
             with open(file_name , "wb") as fh:
                 fh.write(base64.decodebytes(payload.encode('ascii'))) 
-                return file_name
+                return os.path.basename(file_name)
 
 def get_contained_main_node(diagram, id):
     list = get_mxcell_parent_list(diagram, id, media_nodes)

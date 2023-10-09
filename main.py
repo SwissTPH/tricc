@@ -3,18 +3,31 @@ import gettext
 import logging
 import os
 import sys
+import gc
 
 # set up logging to file
-from babel import Locale
-
-from tricc.services.process_diagram import build_tricc_graph
-from tricc.strategies.xls_form import XLSFormStrategy
+from tricc.models.lang import SingletonLangClass
 
 #gettext.bindtextdomain('tricc', './locale/')
 #gettext.textdomain('tricc')
-language =   Locale('Fr')
+langs = SingletonLangClass()
+
 fr =  gettext.translation('tricc', './locales' , languages=['fr'])
 fr.install()
+en =  gettext.translation('tricc', './locales' , languages=['en'])
+en.install()
+
+
+langs.add_trad('fr', fr)
+#langs.add_trad('en', en)
+
+from tricc.strategies.drawio import DrawioStrategy
+from tricc.strategies.medalcreator import MedalCStrategy
+#from tricc.serializers.medalcreator import build_tricc_graph
+
+from tricc.strategies.xls_form import XLSFormStrategy
+from tricc.strategies.xlsform_cdss import XLSFormCDSSStrategy
+from tricc.strategies.xlsform_cht import XLSFormCHTStrategy
 
 
 def setup_logger(logger_name,
@@ -32,7 +45,7 @@ def setup_logger(logger_name,
     l.setLevel(level)
     l.addHandler(file_handler)
 
-setup_logger('default', "debug.log", logging.DEBUG)
+
 
 logger = logging.getLogger('default')
 
@@ -45,6 +58,14 @@ console.setFormatter(formatter)
 # add the handler to the root logger
 logging.getLogger('').addHandler(console)
 
+LEVELS = {
+    'd':logging.DEBUG,
+    'w':logging.WARNING,
+    'i':logging.INFO,
+
+}
+
+
 def print_help():
     print('-i / --input draw.io filepath (MANDATORY)')
     print('-o / --output xls file ')
@@ -54,12 +75,19 @@ def print_help():
 
     
 if __name__ == "__main__":
+    gc.disable()
+
     system='odk'
     in_filepath= None
-    out_filepath=None
+    out_path=None
     formid=None
+    debug_level=None
+    trad = False
+    
+    input_strategy = 'DrawioStrategy'
+    output_strategy= 'XLSFormStrategy'
     try:
-      opts, args = getopt.getopt(sys.argv[1:],"hi:o:s:",["input=","output=","help"])
+      opts, args = getopt.getopt(sys.argv[1:],"hti:o:s:I:O:l:",["input=","output=","help","trads"])
     except getopt.GetoptError:
         print_help()
         sys.exit(2)
@@ -70,43 +98,55 @@ if __name__ == "__main__":
         elif opt in ("-i", "--input"):
             in_filepath = arg
         elif opt == "-o":
-            out_filepath = arg
-        elif opt == "-s":
-            strategy = arg
+            out_path = arg
+        elif opt == "-I":
+            input_strategy = arg
+        elif opt == "-O":
+            output_strategy = arg
         elif opt == "-d":
             formid = arg
+        elif opt == "-l":
+            debug_level = arg
+        elif opt in ("-t", "--trads"):
+            trad = True
     if in_filepath is None:
         print_help()
         sys.exit(2)
-    pre, ext = os.path.splitext(in_filepath)
-    if out_filepath is None:
-        # if output file path not specified, just chagne the extension
-        out_filepath= pre + '.xlsx'
-    if out_filepath is None:
-        # if output file path not specified, just take the name without extension
-        formid= pre
-    logger.info("build the graph from XML")
-    start_page = build_tricc_graph(in_filepath)
     
-    strategy = XLSFormStrategy()
+    
+    if debug_level is not None:
+        setup_logger('default', "debug.log", LEVELS[debug_level])
+
+    pre, ext = os.path.splitext(in_filepath)
+    if out_path is None:
+        # if output file path not specified, just chagne the extension
+        out_path= os.path.dirname(pre) 
+    strategy = globals()[input_strategy](in_filepath)
+    logger.info(f"build the graph from strategy {input_strategy}")
+    media_path = os.path.join(out_path, "media-tmp")
+    start_page, pages= strategy.build_tricc_graph(in_filepath,media_path)
+    
+    strategy = globals()[output_strategy](out_path)
+
     logger.info("Using strategy {}".format(strategy.__class__))
     logger.info("update the node with basic information")
     # create constraints, clean name
-    strategy.process_base(start_page)
+    strategy.process_base(start_page, pages=pages)
     logger.info("generate the relevance based on edges")
     # create relevance Expression
-    strategy.process_relevance(start_page)
+    strategy.process_relevance(start_page, pages=pages)
     logger.info("generate the calculate based on edges")
     
     # create calculate Expression
-    strategy.process_calculate(start_page)
+    strategy.process_calculate(start_page, pages=pages)
     logger.info("generate the export format")
     
-    strategy.process_export(start_page)
+    strategy.process_export(start_page, pages=pages)
     logger.info("print the export")
     if start_page.root.form_id is not None:
-        formid= start_page.root.form_id 
-    strategy.do_export(start_page.root.label,out_filepath, formid)
+        formid= str(start_page.root.form_id )
+    strategy.do_export(start_page.root.label, formid + ".xlsx", formid)
 
-
+    if trad:
+        langs.to_po_file('./trad.po')
      
