@@ -12,13 +12,13 @@ from tricc.models.lang import SingletonLangClass
 #gettext.textdomain('tricc')
 langs = SingletonLangClass()
 
-fr =  gettext.translation('tricc', './locales' , languages=['fr'])
-fr.install()
-en =  gettext.translation('tricc', './locales' , languages=['en'])
-en.install()
+#fr =  gettext.translation('tricc', './locales' , languages=['fr'])
+#fr.install()
+#en =  gettext.translation('tricc', './locales' , languages=['en'])
+#en.install()
 
 
-langs.add_trad('fr', fr)
+#langs.add_trad('fr', fr)
 #langs.add_trad('en', en)
 
 from tricc.strategies.drawio import DrawioStrategy
