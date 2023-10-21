@@ -8,8 +8,8 @@ from numpy import isnan
 from tricc.converters.utils import OPERATION_LIST, clean_name, remove_html
 from tricc.models.tricc import *
 from tricc.parsers.xml import (get_edges_list, get_mxcell,
-                               get_mxcell_parent_list, get_odk_type,
-                               get_odk_type_list)
+                               get_mxcell_parent_list, get_tricc_type,
+                               get_tricc_type_list)
 
 TRICC_YES_LABEL = ['yes', "oui"]
 TRICC_NO_LABEL = ['no', "non"]
@@ -32,7 +32,7 @@ def create_activity(diagram, media_path):
             name=id,
             id=id,       
             label=name,
-            form_id=form_id
+            form_id=form_id,
         )
         # activity definition is never instanciated
         if isinstance(root, TriccNodeActivityStart):
@@ -194,7 +194,7 @@ def process_exclusive_edge(edge, nodes):
 
 
 def get_nodes(diagram, activity):
-    nodes = {}
+    nodes = {activity.root.id: activity.root}
     add_note_nodes(nodes, diagram, activity)  
     add_calculate_nodes(nodes, diagram, activity)
     add_select_nodes(nodes, diagram, activity)
@@ -254,7 +254,7 @@ def merge_node(from_node,to_node):
     
 def create_root_node(diagram):
     node = None
-    elm = get_odk_type(diagram, 'object', TriccExtendedNodeType.start)
+    elm = get_tricc_type(diagram, 'object', TriccNodeType.start)
     if elm is not None:
         node=  TriccNodeMainStart(
             id = elm.attrib.get('id'),
@@ -264,7 +264,7 @@ def create_root_node(diagram):
             form_id= elm.attrib.get('form_id')
         )
     else:    
-        elm = get_odk_type(diagram, 'object', TriccExtendedNodeType.activity_start)
+        elm = get_tricc_type(diagram, 'object', TriccNodeType.activity_start)
         if elm is not None:
             node = TriccNodeActivityStart(
                 id = elm.attrib.get('id'),
@@ -298,59 +298,59 @@ def set_additional_attributes(attribute_names, elm, node):
             setattr(node, attributename, attribute)        
 
 def add_note_nodes(nodes, diagram, group):
-    list = get_odk_type_list(diagram, ['UserObject','object'], TriccNodeType.note)
+    list = get_tricc_type_list(diagram, ['UserObject','object'], TriccNodeType.note)
     add_tricc_nodes(nodes, TriccNodeNote, list, group, ['relevance'])
     
 
 def add_select_nodes(nodes, diagram, group=None):
-    list = get_odk_type_list(diagram, ['UserObject','object'], TriccNodeType.select_one)
+    list = get_tricc_type_list(diagram, ['UserObject','object'], TriccNodeType.select_one)
     add_tricc_select_nodes(diagram, nodes, TriccNodeSelectOne, list, group, ['required','save','filter','constraint','constraint_message'])
-    #list = get_odk_type_list(diagram, 'UserObject', TriccExtendedNodeType.select_yesno)
+    #list = get_tricc_type_list(diagram, 'UserObject', TriccNodeType.select_yesno)
     #add_tricc_nodes(nodes, TriccNodeSelectYesNo, list, ['constraint','save','constraint_message','required'])
-    list = get_odk_type_list(diagram, ['UserObject','object'], TriccNodeType.select_multiple)
+    list = get_tricc_type_list(diagram, ['UserObject','object'], TriccNodeType.select_multiple)
     add_tricc_select_nodes(diagram, nodes, TriccNodeSelectMultiple, list, group, ['required','save','filter','constraint','constraint_message'])
 
 def add_input_nodes(nodes, diagram, group= None):
-    list = get_odk_type_list(diagram, ['object','UserObject'], TriccNodeType.decimal)
+    list = get_tricc_type_list(diagram, ['object','UserObject'], TriccNodeType.decimal)
     add_tricc_nodes(nodes, TriccNodeDecimal, list, group, ['min','max', 'constraint','save','constraint_message','required'])
-    list = get_odk_type_list(diagram, ['object','UserObject'], TriccNodeType.integer)
+    list = get_tricc_type_list(diagram, ['object','UserObject'], TriccNodeType.integer)
     add_tricc_nodes(nodes, TriccNodeInteger, list, group, ['min','max', 'constraint','save','constraint_message','required'])
-    list = get_odk_type_list(diagram, ['object','UserObject'], TriccNodeType.text)
+    list = get_tricc_type_list(diagram, ['object','UserObject'], TriccNodeType.text)
     add_tricc_nodes(nodes, TriccNodeText, list, group, ['constraint','save','constraint_message','required'])
-    list = get_odk_type_list(diagram, ['object','UserObject'], TriccNodeType.date)
+    list = get_tricc_type_list(diagram, ['object','UserObject'], TriccNodeType.date)
     add_tricc_nodes(nodes, TriccNodeDate, list, group, ['constraint','save','constraint_message','required'])
 
 def add_calculate_nodes(nodes, diagram, group=None):
-    list = get_odk_type_list(diagram, ['UserObject','object'], TriccNodeType.calculate)
+    list = get_tricc_type_list(diagram, ['UserObject','object'], TriccNodeType.calculate)
     add_tricc_nodes(nodes, TriccNodeCalculate, list, group, ['save','expression','help', 'hint'])
-    list = get_odk_type_list(diagram, ['UserObject','object'], TriccExtendedNodeType.add)
+    list = get_tricc_type_list(diagram, ['UserObject','object'], TriccNodeType.add)
     add_tricc_nodes(nodes, TriccNodeAdd, list, group, ['save','expression'])
-    list = get_odk_type_list(diagram, ['UserObject','object'], TriccExtendedNodeType.count)
+    list = get_tricc_type_list(diagram, ['UserObject','object'], TriccNodeType.count)
     add_tricc_nodes(nodes, TriccNodeCount, list, group, ['save','expression'])
-    list = get_odk_type_list(diagram, ['UserObject','object'], TriccExtendedNodeType.rhombus)
+    list = get_tricc_type_list(diagram, ['UserObject','object'], TriccNodeType.rhombus)
     add_tricc_nodes(nodes, TriccNodeRhombus, list, group, ['save','expression'],['reference'])
-    list = get_odk_type_list(diagram, ['UserObject','object'], TriccExtendedNodeType.exclusive)
+    list = get_tricc_type_list(diagram, ['UserObject','object'], TriccNodeType.exclusive)
     add_tricc_base_node(nodes, TriccNodeExclusive, list, group)
  
 def get_hybride_node(nodes, diagram, group=None):
-    list = get_odk_type_list(diagram, ['UserObject','object'], TriccExtendedNodeType.not_available)
+    list = get_tricc_type_list(diagram, ['UserObject','object'], TriccNodeType.not_available)
     add_tricc_hybrid_select_nodes(nodes, TriccNodeSelectNotAvailable, list, group, [])
-    list = get_odk_type_list(diagram, ['UserObject','object'], TriccExtendedNodeType.select_yesno)
+    list = get_tricc_type_list(diagram, ['UserObject','object'], TriccNodeType.select_yesno)
     add_tricc_hybrid_select_nodes(nodes, TriccNodeSelectYesNo, list, group, ['required','save','filter','constraint','constraint_message'])
     #to do generate option
    
 def add_link_nodes(nodes, diagram, group=None):
-    list = get_odk_type_list(diagram, ['UserObject','object'], TriccExtendedNodeType.link_out)
+    list = get_tricc_type_list(diagram, ['UserObject','object'], TriccNodeType.link_out)
     add_tricc_nodes(nodes, TriccNodeLinkOut, list, group, [], ['reference'])
-    list = get_odk_type_list(diagram, ['UserObject','object'], TriccExtendedNodeType.link_in)
+    list = get_tricc_type_list(diagram, ['UserObject','object'], TriccNodeType.link_in)
     add_tricc_nodes(nodes, TriccNodeLinkIn, list, group)
-    list = get_odk_type_list(diagram, ['UserObject','object'], TriccExtendedNodeType.goto)
+    list = get_tricc_type_list(diagram, ['UserObject','object'], TriccNodeType.goto)
     add_tricc_nodes(nodes, TriccNodeGoTo, list, group,['instance'],['link'])
-    list = get_odk_type_list(diagram, ['UserObject','object'], TriccExtendedNodeType.activity_end)
+    list = get_tricc_type_list(diagram, ['UserObject','object'], TriccNodeType.activity_end)
     add_tricc_base_node(nodes, TriccNodeActivityEnd, list, group)
-    list = get_odk_type_list(diagram, ['UserObject','object'], TriccExtendedNodeType.end)
+    list = get_tricc_type_list(diagram, ['UserObject','object'], TriccNodeType.end)
     add_tricc_base_node(nodes, TriccNodeEnd, list, group)
-    list = get_odk_type_list(diagram, ['UserObject','object'], TriccExtendedNodeType.bridge)
+    list = get_tricc_type_list(diagram, ['UserObject','object'], TriccNodeType.bridge)
     add_tricc_base_node(nodes, TriccNodeBridge, list, group)
 
  
@@ -358,7 +358,7 @@ def add_link_nodes(nodes, diagram, group=None):
 def get_select_options(diagram, select_node, nodes):
     options = {}
     i = 0
-    list = get_mxcell_parent_list(diagram, select_node.id, TriccExtendedNodeType.select_option)
+    list = get_mxcell_parent_list(diagram, select_node.id, TriccNodeType.select_option)
     options_name_list = []
     for elm in list:
         name = elm.attrib.get('name')
@@ -593,7 +593,7 @@ def generate_calculates(node,calculates, used_calculates,processed_nodes):
                 label =  "save: " +node.get_name(),
                 path_len=node.path_len+ 1
             )
-        logger.debug("generate_save_calculate:{}:{} as {}".format(calc_node.odk_type, node.name if hasattr(node,'name') else node.id, calculate_name))
+        logger.debug("generate_save_calculate:{}:{} as {}".format(calc_node.tricc_type, node.name if hasattr(node,'name') else node.id, calculate_name))
         if isinstance(node, TriccNodeSelectYesNo):
             yesNode =  node.options[0]
             set_prev_next_node(yesNode,calc_node)
@@ -710,7 +710,7 @@ def merge_calculate(node, calculates, last_used_calc):
     node_to_delete = []
     for calc_node in calculates.values():
         # merge only if same name, version >= fromm version but < node version   and we don't merge the end node from differentes instance 
-        if  calc_node!=node and node.odk_type == calc_node.odk_type:
+        if  calc_node!=node and node.tricc_type == calc_node.tricc_type:
             # if there is a calculate and a count, merge on the count
             remaining = node
             to_remove = calc_node
@@ -734,8 +734,8 @@ def merge_calculate(node, calculates, last_used_calc):
                     node_to_delete.append(to_remove)
             else:
                 logger.info("activity {} instance {} and {} might be merged (end node mergables)".format(remaining.activity.get_name(), remaining.activity.instance, to_remove.activity.instance))
-        elif node.odk_type != calc_node.odk_type:
-            logger.warning("two different type of calculate node share the same name {}::{}::{}".format(node.name,node.odk_type, calc_node.odk_type))
+        elif node.tricc_type != calc_node.tricc_type:
+            logger.warning("two different type of calculate node share the same name {}::{}::{}".format(node.name,node.tricc_type, calc_node.tricc_type))
     return node_to_delete
     
 
@@ -744,7 +744,7 @@ def enrich_node(diagram, media_path, edge, node):
         # get node and process type
         type, message = get_message(diagram, edge.source)
         if type is not None:
-            if type in (TriccExtendedNodeType.start, TriccExtendedNodeType.activity_start):
+            if type in (TriccNodeType.start, TriccNodeType.activity_start):
                 return True   
             elif hasattr(node, type):
                 if message is not None:
@@ -889,7 +889,7 @@ def clean_link(link):
     
 def get_groups(diagram, nodes, parent_group):
     groups = {}
-    list=get_odk_type_list(diagram, 'object', TriccExtendedNodeType.page )
+    list=get_tricc_type_list(diagram, 'object', TriccNodeType.page )
     for elm in list:
         add_group(elm, diagram, nodes, groups,parent_group)
     return groups
@@ -903,8 +903,8 @@ def add_group(elm, diagram, nodes, groups, parent_group):
             id = id,
             group = parent_group
         )
-        # get elememt witn parent = id and odk_type defiend
-        list_child = get_odk_type_list(diagram, ['object','UserObject'], odk_type=None, parent_id = id)
+        # get elememt witn parent = id and tricc_type defiend
+        list_child = get_tricc_type_list(diagram, ['object','UserObject'], tricc_type=None, parent_id = id)
         add_group_to_child(group, diagram,list_child, nodes, groups, parent_group)
         if group is not None:
             groups[group.id] = group
@@ -912,10 +912,10 @@ def add_group(elm, diagram, nodes, groups, parent_group):
         
 def add_group_to_child(group, diagram,list_child, nodes, groups, parent_group):
     for child_elm in list_child:
-        if child_elm.attrib.get('odk_type') == TriccExtendedNodeType.container_hint_media:
-            list_sub_child = get_odk_type_list(diagram, ['object','UserObject'], odk_type=None, parent_id =child_elm.attrib.get('id') )
+        if child_elm.attrib.get('tricc_type') == TriccNodeType.container_hint_media:
+            list_sub_child = get_tricc_type_list(diagram, ['object','UserObject'], tricc_type=None, parent_id =child_elm.attrib.get('id') )
             add_group_to_child(group, diagram,list_sub_child, nodes, groups, parent_group )
-        elif child_elm.attrib.get('odk_type') == TriccExtendedNodeType.page:
+        elif child_elm.attrib.get('tricc_type') == TriccNodeType.page:
             child_group_id = child_elm.attrib.get('id')
             if not child_group_id  in groups:
                 child_group = add_group(child_elm, diagram, nodes, groups, group)
@@ -965,7 +965,7 @@ def get_contained_main_node(diagram, id):
 def get_message(diagram, id):
     elm = get_mxcell(diagram, id)
     if elm is not None:
-        type = elm.attrib.get('odk_type')
+        type = elm.attrib.get('tricc_type')
         if type is not None:
             if type.endswith("-message"):
                 type = type[:-8]

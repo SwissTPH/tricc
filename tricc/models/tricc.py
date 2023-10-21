@@ -36,10 +36,6 @@ class TriccNodeType(str, Enum):
     integer = 'integer'
     text = 'text'
     date = 'date'
-    
-
-
-class TriccExtendedNodeType(str, Enum):
     rhombus = 'rhombus'  # fetch data
     goto = 'goto'  #: start the linked activity within the target activity
     start = 'start'  #: main start of the algo
@@ -62,6 +58,7 @@ class TriccExtendedNodeType(str, Enum):
     not_available = 'not_available'
     quantity = 'quantity'
     bridge = 'bridge'
+    wait = 'wait'
 
 
 class TriccOperation(str, Enum):
@@ -82,7 +79,7 @@ media_nodes = [
 
 class TriccBaseModel(BaseModel):
     id: triccId
-    odk_type: Union[TriccNodeType, TriccExtendedNodeType]
+    tricc_type: TriccNodeType
     #parent: Optional[triccId]#TODO: used ?
     instance: int = 1
     base_instance: Optional[TriccBaseModel]
@@ -117,7 +114,7 @@ class TriccBaseModel(BaseModel):
 
 
 class TriccEdge(TriccBaseModel):
-    odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccExtendedNodeType.edge
+    tricc_type: TriccNodeType = TriccNodeType.edge
     source: Union[triccId, TriccNodeBaseModel]
     target: Union[triccId, TriccNodeBaseModel]
     value: Optional[str]
@@ -132,7 +129,7 @@ class TriccEdge(TriccBaseModel):
 
 
 class TriccGroup(TriccBaseModel):
-    odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccExtendedNodeType.page
+    tricc_type: TriccNodeType = TriccNodeType.page
     group: Optional[TriccBaseModel]
     name: Optional[str]
     export_name:Optional[str]
@@ -209,7 +206,7 @@ class TriccNodeBaseModel(TriccBaseModel):
 
 
 class TriccNodeActivity(TriccNodeBaseModel):
-    odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccExtendedNodeType.activity
+    tricc_type: TriccNodeType = TriccNodeType.activity
     # starting point of the activity
     root: TriccNodeBaseModel
     # edge list
@@ -248,7 +245,7 @@ class TriccNodeActivity(TriccNodeBaseModel):
             instance.activity = instance
             for edge in self.edges:
                 instance.edges.append(edge.make_instance(instance_nb, activity=instance))
-            instance.update_nodes(self.root)
+            #instance.update_nodes(self.root)
             # we walk throught the nodes and replace them when ready
             for node in list(filter(lambda p_node: isinstance(p_node, (TriccNodeDisplayBridge,TriccNodeBridge)),list(self.nodes.values()) )):
                 instance.update_nodes(node)
@@ -348,7 +345,7 @@ class TriccNodeDisplayModel(TriccNodeBaseModel):
 
 
 class TriccNodeNote(TriccNodeDisplayModel):
-    odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccNodeType.note
+    tricc_type: TriccNodeType = TriccNodeType.note
 
 class TriccNodeInputModel(TriccNodeDisplayModel):
     required: Optional[Expression]
@@ -358,26 +355,26 @@ class TriccNodeInputModel(TriccNodeDisplayModel):
 
 
 class TriccNodeDate(TriccNodeInputModel):
-    odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccNodeType.date
+    tricc_type: TriccNodeType = TriccNodeType.date
 
 
 class TriccNodeMainStart(TriccNodeBaseModel):
-    odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccExtendedNodeType.start
+    tricc_type: TriccNodeType = TriccNodeType.start
     form_id: Optional[str]
 
 
 class TriccNodeLinkIn(TriccNodeBaseModel):
-    odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccExtendedNodeType.link_in
+    tricc_type: TriccNodeType = TriccNodeType.link_in
 
 
 class TriccNodeLinkOut(TriccNodeBaseModel):
-    odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccExtendedNodeType.link_out
+    tricc_type: TriccNodeType = TriccNodeType.link_out
     reference: Optional[Union[TriccNodeLinkIn, triccId]]
     # no need to copy
 
 
 class TriccNodeGoTo(TriccNodeBaseModel):
-    odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccExtendedNodeType.goto
+    tricc_type: TriccNodeType = TriccNodeType.goto
     link: Union[TriccNodeActivity, triccId]
 
     # no need ot copy
@@ -390,7 +387,7 @@ class TriccNodeGoTo(TriccNodeBaseModel):
 
 
 class TriccNodeSelectOption(TriccNodeDisplayModel):
-    odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccExtendedNodeType.select_option
+    tricc_type: TriccNodeType = TriccNodeType.select_option
     label: Union[str, Dict[str,str]]
     save: Optional[str]
     select: TriccNodeInputModel
@@ -424,7 +421,7 @@ class TriccNodeSelect(TriccNodeInputModel):
 
 
 class TriccNodeSelectOne(TriccNodeSelect):
-    odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccNodeType.select_one
+    tricc_type: TriccNodeType = TriccNodeType.select_one
 
 
 class TriccNodeSelectYesNo(TriccNodeSelectOne):
@@ -438,7 +435,7 @@ class TriccNodeSelectNotAvailable(TriccNodeSelectOne):
 
 
 class TriccNodeSelectMultiple(TriccNodeSelect):
-    odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccNodeType.select_multiple
+    tricc_type: TriccNodeType = TriccNodeType.select_multiple
 
 
 class TriccNodeNumber(TriccNodeInputModel):
@@ -448,15 +445,15 @@ class TriccNodeNumber(TriccNodeInputModel):
 
 
 class TriccNodeDecimal(TriccNodeNumber):
-    odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccNodeType.decimal
+    tricc_type: TriccNodeType = TriccNodeType.decimal
 
 
 class TriccNodeInteger(TriccNodeNumber):
-    odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccNodeType.integer
+    tricc_type: TriccNodeType = TriccNodeType.integer
 
 
 class TriccNodeText(TriccNodeInputModel):
-    odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccNodeType.text
+    tricc_type: TriccNodeType = TriccNodeType.text
 
 
 class TriccNodeCalculateBase(TriccNodeBaseModel):
@@ -503,30 +500,30 @@ class TriccNodeDisplayCalculateBase(TriccNodeCalculateBase):
 
 # qualculate that saves quantity, or we may merge integer/decimals
 class TriccNodeQuantity(TriccNodeDisplayCalculateBase):
-    odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccExtendedNodeType.quantity
+    tricc_type: TriccNodeType = TriccNodeType.quantity
 
 
 class TriccNodeCalculate(TriccNodeDisplayCalculateBase):
-    odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccNodeType.calculate
+    tricc_type: TriccNodeType = TriccNodeType.calculate
 
 
 class TriccNodeAdd(TriccNodeDisplayCalculateBase):
-    odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccExtendedNodeType.add
+    tricc_type: TriccNodeType = TriccNodeType.add
 
 
 class TriccNodeCount(TriccNodeDisplayCalculateBase):
-    odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccExtendedNodeType.count
+    tricc_type: TriccNodeType = TriccNodeType.count
 
 
 class TriccNodeFakeCalculateBase(TriccNodeCalculateBase):
     pass
 
 class TriccNodeDisplayBridge(TriccNodeDisplayCalculateBase):
-    odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccExtendedNodeType.bridge
+    tricc_type: TriccNodeType = TriccNodeType.bridge
         
 
 class TriccNodeBridge(TriccNodeFakeCalculateBase):
-    odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccExtendedNodeType.bridge
+    tricc_type: TriccNodeType = TriccNodeType.bridge
         
 class TriccRhombusMixIn():
     def make_instance(self, instance_nb, activity, **kwargs):
@@ -576,7 +573,7 @@ def get_rand_name(k):
 
 
 class TriccNodeExclusive(TriccNodeFakeCalculateBase):
-    odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccExtendedNodeType.exclusive
+    tricc_type: TriccNodeType = TriccNodeType.exclusive
 
 
 # Set the source next node to target and clean  next nodes of replace node
@@ -986,7 +983,7 @@ class TriccNodeWait(TriccNodeFakeCalculateBase, TriccRhombusMixIn):
 
 
 class TriccNodeActivityEnd(TriccNodeCalculateBase):
-    odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccExtendedNodeType.activity_end
+    tricc_type: TriccNodeType = TriccNodeType.activity_end
 
     def __init__(self, **data):
         super().__init__(**data)
@@ -998,7 +995,7 @@ class TriccNodeActivityEnd(TriccNodeCalculateBase):
 
 
 class TriccNodeEnd(TriccNodeCalculate):
-    odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccExtendedNodeType.end
+    tricc_type: TriccNodeType = TriccNodeType.end
 
     def __init__(self, **data):
         super().__init__(**data)
@@ -1010,7 +1007,7 @@ class TriccNodeEnd(TriccNodeCalculate):
 
 
 class TriccNodeActivityStart(TriccNodeFakeCalculateBase):
-    odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccExtendedNodeType.activity_start
+    tricc_type: TriccNodeType = TriccNodeType.activity_start
 
 
 def get_node_from_list(in_nodes, node_id):
