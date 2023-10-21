@@ -29,7 +29,7 @@ logger = logging.getLogger("default")
 def generate_xls_form_condition(node, processed_nodes, **kwargs):
     if is_ready_to_process(node, processed_nodes, strict=False):
         if node not in processed_nodes:
-            if isinstance(node, TriccNodeRhombus) and isinstance(node.reference, str):
+            if issubclass(node.__class__, TriccRhombusMixIn) and isinstance(node.reference, str):
                 logger.warning("node {} still using the reference string".format(node.get_name()))
             if issubclass(node.__class__, TriccNodeInputModel):
                 # we don't overright if define in the diagram
@@ -37,7 +37,7 @@ def generate_xls_form_condition(node, processed_nodes, **kwargs):
                     if isinstance(node, TriccNodeSelectMultiple):
                         node.constraint = '.=\'opt_none\' or not(selected(.,\'opt_none\'))'
                         node.constraint_message = '**None** cannot be selected together with choice.'
-                elif node.odk_type in (TriccNodeType.integer, TriccNodeType.decimal):
+                elif node.tricc_type in (TriccNodeType.integer, TriccNodeType.decimal):
                     constraints = []
                     constraints_min = None
                     constraints_max = None
@@ -197,7 +197,13 @@ def get_node_expression(in_node, processed_nodes, is_calculate=False, is_prev=Fa
             left = '1'
         expression = and_join(left, get_rhombus_terms(node, processed_nodes))
         negate_expression = nand_join(left,get_rhombus_terms(node, processed_nodes))
-
+    elif isinstance(node, TriccNodeWait):
+        if is_prev:
+            # the wait don't do any calculation with the reference it is only use to wait until the reference are valid
+            return get_node_expression(node.path, processed_nodes, is_calculate, is_prev)
+        else:
+            #it is a empty calculate
+            return ''
     elif is_prev and issubclass(node.__class__, TriccNodeDisplayCalculateBase):
         expression = TRICC_CALC_EXPRESSION.format(get_export_name(node))
     elif issubclass(node.__class__, TriccNodeCalculateBase):
@@ -314,8 +320,12 @@ def get_calculation_terms(node, processed_nodes, is_calculate=False, negate=Fals
         return get_count_terms(node, False, negate)
     elif isinstance(node, TriccNodeRhombus):
         return get_rhombus_terms(node, processed_nodes, False, negate)
-    elif isinstance(node, TriccNodeActivityStart):
-        return get_prev_node_expression(node.activity, processed_nodes, is_calculate=False, excluded_name=None)
+    elif isinstance(node, ( TriccNodeWait)):
+        # just use to force order of question
+        return ''
+    elif isinstance(node, (TriccNodeActivityStart, TriccNodeWait)):
+        # the group have the relevance for the activity, not needed to replicate it
+        return ''#return get_prev_node_expression(node.activity, processed_nodes, is_calculate=False, excluded_name=None)
     elif isinstance(node, TriccNodeExclusive):
         if len(node.prev_nodes) == 1:
             if isinstance(node.prev_nodes[0], TriccNodeExclusive):

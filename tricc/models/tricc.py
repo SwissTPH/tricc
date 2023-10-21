@@ -292,7 +292,7 @@ class TriccNodeActivity(TriccNodeBaseModel):
             # update root
             if isinstance(node_origin, TriccNodeActivityStart) and node_origin == node_origin.activity.root:
                 self.root = node_instance
-            if isinstance(node_instance,TriccNodeRhombus):
+            if issubclass(node_origin.__class__, TriccRhombusMixIn):
                 old_path = node_origin.path
                 if old_path is not None:
                     for n in node_instance.activity.nodes.values():
@@ -528,13 +528,7 @@ class TriccNodeDisplayBridge(TriccNodeDisplayCalculateBase):
 class TriccNodeBridge(TriccNodeFakeCalculateBase):
     odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccExtendedNodeType.bridge
         
-
-
-class TriccNodeRhombus(TriccNodeCalculateBase):
-    odk_type: Union[TriccNodeType, TriccExtendedNodeType] = TriccExtendedNodeType.rhombus
-    path: Optional[TriccNodeBaseModel] = None
-    reference: Union[List[TriccNodeBaseModel], Expression]
-    
+class TriccRhombusMixIn():
     def make_instance(self, instance_nb, activity, **kwargs):
         # shallow copy
         reference = []
@@ -564,6 +558,13 @@ class TriccNodeRhombus(TriccNodeCalculateBase):
         instance.name = get_rand_name(8)
         return instance
 
+class TriccNodeRhombus(TriccNodeCalculateBase,TriccRhombusMixIn):
+    tricc_type: TriccNodeType = TriccNodeType.rhombus
+    path: Optional[TriccNodeBaseModel] = None
+    reference: Union[List[TriccNodeBaseModel], Expression]
+    
+    
+
     def __init__(self, **data):
         super().__init__(**data)
         # rename rhombus
@@ -592,7 +593,7 @@ def set_prev_next_node(source_node, target_node, replaced_node=None):
         source_node.next_nodes.append(target_node)
     # if rhombus in next_node of prev node and next node as ref
     if replaced_node is not None:
-        rhombus_list = list(filter(lambda x: isinstance(x, TriccNodeRhombus), source_node.next_nodes))
+        rhombus_list = list(filter(lambda x: issubclass(x.__class__, TriccRhombusMixIn), source_node.next_nodes))
         for rhm in rhombus_list:
             if isinstance(rhm.reference, list):
                 if replaced_node in rhm.reference:
@@ -922,7 +923,7 @@ def reverse_walkthrough(in_node, next_node, callback, processed_nodes, stashed_n
 
 
 def is_rhombus_ready_to_process(node, processed_nodes, local = False):
-    if isinstance(node, TriccNodeRhombus):
+    if issubclass(node.__class__, TriccRhombusMixIn):
         if isinstance(node.reference, str):
             return False  # calculate not yet processed
         elif isinstance(node.reference, list):
@@ -977,6 +978,11 @@ def check_stashed_loop(stashed_nodes, prev_stashed_nodes, processed_nodes, len_p
     else:
         loop_count = 0
     return loop_count
+
+class TriccNodeWait(TriccNodeFakeCalculateBase, TriccRhombusMixIn):
+    tricc_type: TriccNodeType = TriccNodeType.wait
+    path: Optional[TriccNodeBaseModel] = None
+    reference: Union[List[TriccNodeBaseModel], Expression]
 
 
 class TriccNodeActivityEnd(TriccNodeCalculateBase):

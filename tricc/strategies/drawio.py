@@ -99,7 +99,7 @@ class DrawioStrategy(BaseInputStrategy):
                         #FIXME support reference str
                         for n in page.nodes:
                             sn = page.nodes[n]
-                            if isinstance(sn, TriccNodeRhombus) and isinstance(sn.reference,list) and target_node in sn.reference:
+                            if issubclass(sn.__class__, TriccRhombusMixIn) and isinstance(sn.reference,list) and target_node in sn.reference:
                                 sn.reference.remove(target_node)
                                 sn.reference.append(next_page)
                     # set next page as node to link the next_node of the activity
@@ -156,7 +156,7 @@ class DrawioStrategy(BaseInputStrategy):
             # create a path logic for the nodes following
             # next node AND former path
             if node.next_nodes is not None and len(node.next_nodes)>0:
-                calc_node = TriccNodeRhombus(
+                calc_node = TriccNodeWait(
                     id = "aj_"+generate_id(),
                     reference = [next_page],
                     activity = page,

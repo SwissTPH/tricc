@@ -70,7 +70,7 @@ def process_edges(diagram, media_path, activity, nodes):
                 activity.unused_edges.append(edge)
         elif isinstance(nodes[edge.target], (TriccNodeActivityEnd, TriccNodeEnd)):
             end_found = True
-        if edge.target in nodes and isinstance(nodes[edge.target], TriccNodeRhombus) and edge.source != nodes[edge.target].path.id :
+        if edge.target in nodes and issubclass(nodes[edge.target].__class__, TriccRhombusMixIn) and edge.source != nodes[edge.target].path.id :
              edge.target = nodes[edge.target].path.id
         # modify edge for selectyesNo
         if edge.source in nodes and isinstance(nodes[edge.source], TriccNodeSelectYesNo):
@@ -219,8 +219,9 @@ def get_nodes(diagram, activity):
             #find if the node has next nodes, if yes, add a bridge + Rhoimbus
             path = get_bridge_path(node,nodes)
             new_nodes[path.id] = path
+            # action after the activity
             if any([e.source == node.id for e in activity.edges]):
-                calc = get_activity_rhombus(node, path)
+                calc = get_activity_wait(node, path)
                 new_nodes[calc.id] = calc
         elif isinstance(node, TriccNodeEnd):
             if not end_node:
@@ -479,21 +480,21 @@ def get_count_node(node):
         name = count_name,
         path_len=node.path_len
     )
-def get_activity_rhombus(node,path):
+def get_activity_wait(node,path):
     rhombus_id  = generate_id()
     rhombus_name = "ar_"+rhombus_id
     data = {
         'id': rhombus_id,
         'group': node.group,
         'activity': node.activity,
-        'label': "rhombus: " + node.get_name(),
+        'label': "wait: " + node.get_name(),
         'name': rhombus_name,
         'path_len': node.path_len,
         'reference':[node],
         'path': path,
     }
     
-    rhombus = TriccNodeRhombus(
+    rhombus = TriccNodeWait(
         **data
     )
     
@@ -551,7 +552,7 @@ def generate_calculates(node,calculates, used_calculates,processed_nodes):
     list_calc = []
     ## add select calcualte
     if issubclass(node.__class__, TriccNodeCalculateBase):
-        if  isinstance(node,TriccNodeRhombus):
+        if issubclass(node.__class__, TriccRhombusMixIn):
             if node.expression_reference is None and len(node.reference)==1 and issubclass(node.reference[0].__class__, TriccNodeSelect):
                 count_node = get_count_node(node)
                 list_calc.append(count_node)
@@ -668,7 +669,7 @@ def process_reference(node,  calculates ,used_calculates,processed_nodes, warn =
         for prev_node in node.prev_nodes: 
             # find the dandling calculate
             if  not isinstance(prev_node, TriccNodeActivityStart) and issubclass(prev_node.__class__, TriccNodeDisplayCalculateBase) and  len(prev_node.prev_nodes) ==0:
-                new_node = TriccNodeRhombus(
+                new_node = TriccNodeWait(
                     id = "r_" + generate_id(),
                     prev_nodes = [node.activity.root],
                     reference = prev_node.name,
