@@ -132,7 +132,7 @@ def get_node_expressions(node, processed_nodes):
             expression = TRICC_NUMBER.format(expression)
         else:
             expression = ''
-    if issubclass(node.__class__, TriccNodeCalculateBase) and expression == '':
+    if issubclass(node.__class__, TriccNodeCalculateBase) and expression == '' and not isinstance(node, TriccNodeWait):
         logger.warning("Calculate {0} returning no calculations".format(node.get_name()))
         expression = '1'
     return expression
@@ -152,7 +152,7 @@ def get_prev_node_expression(node, processed_nodes, is_calculate=False, excluded
         logger.debug('hre')
     for prev_node in node.prev_nodes:
         if excluded_name is None or prev_node != excluded_name or (
-                isinstance(excluded_name, str) and hasattr(prev_node, 'name') and prev_node.name != excluded_name) or isinstance(prev_node, TriccNodeActivityEnd):
+                isinstance(excluded_name, str) and hasattr(prev_node, 'name') and prev_node.name != excluded_name): # or isinstance(prev_node, TriccNodeActivityEnd):
             # the rhombus should calculate only reference
             add_sub_expression(expression_inputs, get_node_expression(prev_node, processed_nodes, is_calculate, True))
             # avoid void is there is not conditions to avoid looping too much itme
@@ -471,8 +471,8 @@ def get_export_name(node):
                 node.gen_name()
                 if not isinstance(node, TriccNodeSelectOption) and node.activity.instance!=1:
                     node.export_name = clean_name(node.name +  INSTANCE_SEPARATOR + str(node.instance))
-            elif isinstance(node, TriccNodeActivityEnd):
-                node.export_name =  clean_name(node.name +  INSTANCE_SEPARATOR + str(node.instance))
+            #elif isinstance(node, TriccNodeActivityEnd):
+            #    node.export_name =  clean_name(node.name +  INSTANCE_SEPARATOR + str(node.instance))
             elif isinstance(node,  TriccNodeActivityStart):
                 node.export_name =  clean_name(node.name +  INSTANCE_SEPARATOR + str(node.instance))
     return (node.export_name )

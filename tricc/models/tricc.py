@@ -245,11 +245,11 @@ class TriccNodeActivity(TriccNodeBaseModel):
             instance.activity = instance
             for edge in self.edges:
                 instance.edges.append(edge.make_instance(instance_nb, activity=instance))
-            #instance.update_nodes(self.root)
+            instance.update_nodes(self.root)
             # we walk throught the nodes and replace them when ready
             for node in list(filter(lambda p_node: isinstance(p_node, (TriccNodeDisplayBridge,TriccNodeBridge)),list(self.nodes.values()) )):
                 instance.update_nodes(node)
-            for node in list(filter(lambda p_node: not isinstance(p_node, (TriccNodeDisplayBridge,TriccNodeBridge)),list(self.nodes.values()) )):
+            for node in list(filter(lambda p_node: p_node != self.root and not isinstance(p_node, (TriccNodeDisplayBridge,TriccNodeBridge)),list(self.nodes.values()) )):
                 instance.update_nodes(node)
             for group in self.groups:
                 instance.update_groups(group)
@@ -982,7 +982,7 @@ class TriccNodeWait(TriccNodeFakeCalculateBase, TriccRhombusMixIn):
     reference: Union[List[TriccNodeBaseModel], Expression]
 
 
-class TriccNodeActivityEnd(TriccNodeCalculateBase):
+class TriccNodeActivityEnd(TriccNodeFakeCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.activity_end
 
     def __init__(self, **data):
