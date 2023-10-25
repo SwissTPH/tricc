@@ -209,7 +209,7 @@ def get_nodes(diagram, activity):
         # clean name
         if hasattr(node, 'name') and node.name is not None and (node.name.endswith(('_','.'))):
             node.name = node.name + node.id
-        if  isinstance(node, TriccNodeRhombus):
+        if  issubclass(node.__class__, TriccRhombusMixIn) and node.path is None:
                 # generate rhombuse path
                 calc = get_bridge_path(node,nodes)
                 node.path = calc
@@ -240,6 +240,11 @@ def get_nodes(diagram, activity):
                 
     for key in node_to_remove:
         del nodes[key]
+    edge_list = activity.edges.copy()
+    for edge in edge_list:
+        if edge.source in node_to_remove or edge.target in node_to_remove:
+            activity.edges.remove(edge)
+            
     return nodes
 
 def merge_node(from_node,to_node):
@@ -552,7 +557,7 @@ def generate_calculates(node,calculates, used_calculates,processed_nodes):
     list_calc = []
     ## add select calcualte
     if issubclass(node.__class__, TriccNodeCalculateBase):
-        if issubclass(node.__class__, TriccRhombusMixIn):
+        if isinstance(node, TriccNodeRhombus):
             if node.expression_reference is None and len(node.reference)==1 and issubclass(node.reference[0].__class__, TriccNodeSelect):
                 count_node = get_count_node(node)
                 list_calc.append(count_node)
@@ -623,7 +628,7 @@ def process_reference(node,  calculates ,used_calculates,processed_nodes, warn =
     #global last_unfound_ref
     reference = []
     expression_reference = None
-    if isinstance(node, (TriccNodeRhombus)):
+    if issubclass(node.__class__, TriccRhombusMixIn):
         if isinstance(node.reference, str) :
             logger.debug("process_reference:{}: {} ".format(node.get_name(), node.reference))
             ref_regex=r'(\$\{[^\}]+\})'
@@ -965,7 +970,7 @@ def get_contained_main_node(diagram, id):
 def get_message(diagram, id):
     elm = get_mxcell(diagram, id)
     if elm is not None:
-        type = elm.attrib.get('tricc_type')
+        type = elm.attrib.get('odk_type')
         if type is not None:
             if type.endswith("-message"):
                 type = type[:-8]

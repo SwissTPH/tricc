@@ -289,7 +289,7 @@ class TriccNodeActivity(TriccNodeBaseModel):
             # update root
             if isinstance(node_origin, TriccNodeActivityStart) and node_origin == node_origin.activity.root:
                 self.root = node_instance
-            if issubclass(node_origin.__class__, TriccRhombusMixIn):
+            if issubclass(node_instance.__class__, TriccRhombusMixIn):
                 old_path = node_origin.path
                 if old_path is not None:
                     for n in node_instance.activity.nodes.values():
@@ -526,10 +526,10 @@ class TriccNodeBridge(TriccNodeFakeCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.bridge
         
 class TriccRhombusMixIn():
-    def make_instance(self, instance_nb, activity, **kwargs):
+    
+    def make_mixin_instance(self, instance, instance_nb, activity, **kwargs):
         # shallow copy
         reference = []
-        instance = super().make_instance(instance_nb, activity=activity)
         instance.path = None
         if isinstance(self.reference, str):
             reference = self.reference
@@ -560,7 +560,11 @@ class TriccNodeRhombus(TriccNodeCalculateBase,TriccRhombusMixIn):
     path: Optional[TriccNodeBaseModel] = None
     reference: Union[List[TriccNodeBaseModel], Expression]
     
-    
+    def make_instance(self, instance_nb, activity, **kwargs):
+        instance = super(TriccNodeRhombus, self).make_instance(instance_nb, activity, **kwargs)
+        instance = self.make_mixin_instance(instance, instance_nb, activity, **kwargs)
+        return instance
+
 
     def __init__(self, **data):
         super().__init__(**data)
@@ -913,7 +917,7 @@ def reverse_walkthrough(in_node, next_node, callback, processed_nodes, stashed_n
         if hasattr(node, 'prev_nodes'):
             for prev in node.prev_nodes:
                 reverse_walkthrough(prev, node, callback, processed_nodes, stashed_nodes, history)
-        if isinstance(node, TriccNodeRhombus):
+        if issubclass(node.__class__, TriccRhombusMixIn):
             if isinstance(node.reference, list):
                 for ref in node.reference:
                     reverse_walkthrough(ref, node, callback, processed_nodes, stashed_nodes, history)
@@ -980,6 +984,11 @@ class TriccNodeWait(TriccNodeFakeCalculateBase, TriccRhombusMixIn):
     tricc_type: TriccNodeType = TriccNodeType.wait
     path: Optional[TriccNodeBaseModel] = None
     reference: Union[List[TriccNodeBaseModel], Expression]
+    
+    def make_instance(self, instance_nb, activity, **kwargs):
+        instance = super(TriccNodeWait, self).make_instance(instance_nb, activity, **kwargs)
+        instance = self.make_mixin_instance(instance, instance_nb, activity, **kwargs)
+        return instance
 
 
 class TriccNodeActivityEnd(TriccNodeFakeCalculateBase):

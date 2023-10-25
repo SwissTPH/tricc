@@ -3,7 +3,7 @@
 import logging
 
 from tricc.converters.tricc_to_xls_form import (TRICC_CALC_EXPRESSION,
-                                                TRICC_NEGATE, VERSION_SEPARATOR,INSTANCE_SEPARATOR,  get_export_name)
+                                                negate_term, VERSION_SEPARATOR,INSTANCE_SEPARATOR,  get_export_name)
 from tricc.converters.utils import clean_name, remove_html
 from tricc.models.lang import SingletonLangClass
 from tricc.models.tricc import *
@@ -132,18 +132,6 @@ ODK_TRICC_TYPE_MAP = { 'note':'note'
     ,'bridge':'calculate'
     ,'date':'date'
     }
-
-class TriccNodeWait(TriccNodeFakeCalculateBase, TriccRhombusMixIn):
-    tricc_type: TriccNodeType = TriccNodeType.wait
-    path: Optional[TriccNodeBaseModel] = None
-    reference: Union[List[TriccNodeBaseModel], Expression]
-
-
-class TriccNodeWait(TriccNodeFakeCalculateBase, TriccRhombusMixIn):
-    tricc_type: TriccNodeType = TriccNodeType.wait
-    path: Optional[TriccNodeBaseModel] = None
-    reference: Union[List[TriccNodeBaseModel], Expression]
-
 
 GROUP_TRICC_TYPE = [TriccNodeType.page,TriccNodeType.activity]
           
@@ -343,14 +331,14 @@ def get_diagnostic_none_line(diags):
         '',#'appearance', 
         '',#'constraint', 
         *list(empty.values()) ,
-        TRICC_NEGATE.format(relevance[:-4]),#'relevance'
+        negate_term(relevance[:-4]),#'relevance'
         '',#'disabled'
         '',#'required'
         *list(empty.values()) ,
         '',#'read only'
         '',#'expression'
         '',#'repeat_count'
-        ''#'image'  
+        ''#'image'  TRICC_NEGATE
     ]
     
 def  get_diagnostic_stop_group_line():
