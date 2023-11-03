@@ -4,11 +4,11 @@ from types import SimpleNamespace
 
 from tricc.converters.mc_to_tricc import create_activity,build_relevance,fetch_reference,fetch_condition
 from tricc.models.tricc import *
-from tricc.strategies.base_input_strategy import BaseInputStrategy
+from tricc.strategies.input.base_input_strategy import BaseInputStrategy
 
 media_path = "./"
 class MedalCStrategy(BaseInputStrategy):
-  def build_tricc_graph(self, in_filepath, media_path):
+  def execute(self, in_filepath, media_path):
       f = open(in_filepath)
       js_full = json.load(f)
       pages = {}

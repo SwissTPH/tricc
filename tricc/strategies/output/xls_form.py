@@ -16,7 +16,7 @@ from tricc.models.tricc import (TriccNodeActivity, check_stashed_loop,
                           walktrhough_tricc_node_processed_stached, TriccGroup)
 from tricc.serializers.xls_form import (CHOICE_MAP, SURVEY_MAP, end_group,
                                         generate_xls_form_export, start_group)
-from tricc.strategies.base_output_strategy import BaseOutPutStrategy
+from tricc.strategies.output.base_output_strategy import BaseOutPutStrategy
 
 logger = logging.getLogger('default')
 

@@ -1,6 +1,8 @@
 import abc
-
+import logging
 from tricc.models.tricc import stashed_node_func
+
+logger = logging.getLogger('default')
 
 
 class BaseOutPutStrategy:
@@ -10,6 +12,23 @@ class BaseOutPutStrategy:
         self.output_path = output_path
     
 
+    def execute(self, start_page, pages):
+        self.process_base(start_page, pages=pages)
+        logger.info("generate the relevance based on edges")
+        # create relevance Expression
+        self.process_relevance(start_page, pages=pages)
+        logger.info("generate the calculate based on edges")
+        
+        # create calculate Expression
+        self.process_calculate(start_page, pages=pages)
+        logger.info("generate the export format")
+        
+        self.process_export(start_page, pages=pages)
+        logger.info("print the export")
+        if start_page.root.form_id is not None:
+            formid= str(start_page.root.form_id )
+        self.do_export(start_page.root.label, formid + ".xlsx", formid)
+    
     ### walking function
     def process_base(self, activity, **kwargs):
         # for each node, check if condition is required issubclass(TriccNodeDisplayModel)

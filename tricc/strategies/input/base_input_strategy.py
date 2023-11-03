@@ -12,5 +12,5 @@ class BaseInputStrategy:
 
     ### walking function
     @abc.abstractmethod
-    def build_tricc_graph(in_filepath, media_path):
+    def execute(in_filepath, media_path):
         pass

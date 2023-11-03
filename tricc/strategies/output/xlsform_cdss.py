@@ -5,7 +5,7 @@ from tricc.serializers.xls_form import (get_diagnostic_add_line,
                                         get_diagnostic_start_group_line,
                                         get_diagnostic_stop_group_line)
 from tricc.converters.tricc_to_xls_form import get_export_name
-from tricc.strategies.xls_form import XLSFormStrategy
+from tricc.strategies.output.xls_form import XLSFormStrategy
 
 
 class XLSFormCDSSStrategy(XLSFormStrategy):

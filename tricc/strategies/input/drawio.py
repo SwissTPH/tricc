@@ -6,11 +6,11 @@ from copy import copy
 
 from tricc.converters.xml_to_tricc import create_activity, process_calculate
 from tricc.models.tricc import *
-from tricc.strategies.base_input_strategy import BaseInputStrategy
+from tricc.strategies.input.base_input_strategy import BaseInputStrategy
 from tricc.parsers.xml import read_drawio
 logger = logging.getLogger('default')
 class DrawioStrategy(BaseInputStrategy):
-    def build_tricc_graph(self,in_filepath, media_path):
+    def execute(self,in_filepath, media_path):
         pages = {}
         start_page=None
         # read all pages

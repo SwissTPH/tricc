@@ -21,13 +21,13 @@ langs = SingletonLangClass()
 #langs.add_trad('fr', fr)
 #langs.add_trad('en', en)
 
-from tricc.strategies.drawio import DrawioStrategy
-from tricc.strategies.medalcreator import MedalCStrategy
-#from tricc.serializers.medalcreator import build_tricc_graph
+from tricc.strategies.input.drawio import DrawioStrategy
+from tricc.strategies.input.medalcreator import MedalCStrategy
+#from tricc.serializers.medalcreator import execute
 
-from tricc.strategies.xls_form import XLSFormStrategy
-from tricc.strategies.xlsform_cdss import XLSFormCDSSStrategy
-from tricc.strategies.xlsform_cht import XLSFormCHTStrategy
+from tricc.strategies.output.xls_form import XLSFormStrategy
+from tricc.strategies.output.xlsform_cdss import XLSFormCDSSStrategy
+from tricc.strategies.output.xlsform_cht import XLSFormCHTStrategy
 
 
 def setup_logger(logger_name,
@@ -124,28 +124,16 @@ if __name__ == "__main__":
     strategy = globals()[input_strategy](in_filepath)
     logger.info(f"build the graph from strategy {input_strategy}")
     media_path = os.path.join(out_path, "media-tmp")
-    start_page, pages= strategy.build_tricc_graph(in_filepath,media_path)
+    start_page, pages= strategy.execute(in_filepath,media_path)
     
     strategy = globals()[output_strategy](out_path)
 
     logger.info("Using strategy {}".format(strategy.__class__))
     logger.info("update the node with basic information")
     # create constraints, clean name
-    strategy.process_base(start_page, pages=pages)
-    logger.info("generate the relevance based on edges")
-    # create relevance Expression
-    strategy.process_relevance(start_page, pages=pages)
-    logger.info("generate the calculate based on edges")
     
-    # create calculate Expression
-    strategy.process_calculate(start_page, pages=pages)
-    logger.info("generate the export format")
+    strategy.execute(start_page, pages=pages)
     
-    strategy.process_export(start_page, pages=pages)
-    logger.info("print the export")
-    if start_page.root.form_id is not None:
-        formid= str(start_page.root.form_id )
-    strategy.do_export(start_page.root.label, formid + ".xlsx", formid)
 
     if trad:
         langs.to_po_file('./trad.po')
