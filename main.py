@@ -67,7 +67,7 @@ LEVELS = {
 
 
 def print_help():
-    print('-i / --input draw.io filepath (MANDATORY)')
+    print('-i / --input draw.io filepath (MANDATORY) or directory containing drawio files')
     print('-o / --output xls file ')
     print('-d formid ')
     print('-s L4 system/strategy (odk, cht, cc)')

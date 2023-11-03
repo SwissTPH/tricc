@@ -10,12 +10,23 @@ from tricc.strategies.input.base_input_strategy import BaseInputStrategy
 from tricc.parsers.xml import read_drawio
 logger = logging.getLogger('default')
 class DrawioStrategy(BaseInputStrategy):
-    def execute(self,in_filepath, media_path):
+    def execute(self, in_filepath, media_path):
+        files = []
         pages = {}
+        diagrams = []
         start_page=None
         # read all pages
         logger.info("# Create the activities from diagram pages")
-        diagrams = read_drawio(in_filepath)
+        if os.path.isdir(in_filepath):
+            files = [f for f in os.listdir(in_filepath) if f.endswith('.drawio')]
+        elif os.path.isfile(in_filepath):
+            files = [in_filepath]
+        else:
+            logger.error(f"no input file found at {in_filepath}")
+            exit()
+        for file in files:
+            diagrams += read_drawio(file)
+
         for diagram in diagrams:
             logger.info("Create the activity {0}".format(diagram.attrib.get('name')))
             page = create_activity(diagram, media_path)
