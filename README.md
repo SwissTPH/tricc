@@ -9,30 +9,30 @@
 
 ## Shape
 
-    odk_type:
+    tricc_type:
 
 ### Rhombus
 
-    odk_type:
+    tricc_type:
 
 ### calculate
 
-    odk_type: calculate
+    tricc_type: calculate
 ### Negate/Exclusive
 
-    odk_type:not
+    tricc_type:not
 
 ### Select Multiple
 
-    odk_type:select_multiple
+    tricc_type:select_multiple
 
 #### options
 
-    odk_type:select_option
+    tricc_type:select_option
 
 ### Select one
 
-    odk_type:select_one
+    tricc_type:select_one
 
 
 #### Select YesNo
@@ -40,18 +40,18 @@
 Not yet supported
 #### options
 
-    odk_type:select_option
+    tricc_type:select_option
 ### Text
 
-    odk_type:text
+    tricc_type:text
 
 ### Note
 
-    odk_type:note
+    tricc_type:note
 
 ### Decimal
 
-    odk_type:decimal
+    tricc_type:decimal
 
 ### Enrichment
 
@@ -61,19 +61,19 @@ node that target another node to enrich it
 
 #### Hint
 
-    odk_type:hint-message
+    tricc_type:hint-message
 
 #### Help
 
 Commcare only, not yet supported
 
-    odk_type:help-message
+    tricc_type:help-message
 
 #### Not available
 
 Diplay a checkbox to indicate that the data cannot be capture
 
-    odk_type:not_available
+    tricc_type:not_available
 
 
 ### Links
@@ -93,7 +93,7 @@ Node that are made to link page of jump witnin a page
 
 ## properties
 
-### odk_type
+### tricc_type
 
     rhombus: fetch data
     goto: start the linked activity within the target activity

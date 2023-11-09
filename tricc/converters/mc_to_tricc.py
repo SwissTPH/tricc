@@ -8,8 +8,8 @@ from numpy import isnan
 from tricc.converters.utils import OPERATION_LIST, clean_name, remove_html
 from tricc.models.tricc import *
 from tricc.parsers.xml import (get_edges_list, get_mxcell,
-                               get_mxcell_parent_list, get_odk_type,
-                               get_odk_type_list)
+                               get_mxcell_parent_list, get_tricc_type,
+                               get_tricc_type_list)
 
 
 import logging

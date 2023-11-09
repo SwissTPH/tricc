@@ -22,7 +22,7 @@ class DrawioStrategy(BaseInputStrategy):
             if page is not None:
                 if page.root is not None:
                     pages[page.id] = page
-                    if page.root.odk_type == TriccExtendedNodeType.start:
+                    if page.root.tricc_type == TriccNodeType.start:
                         if start_page is None:
                             start_page = page
                         else:
@@ -93,19 +93,19 @@ class DrawioStrategy(BaseInputStrategy):
                                 # link perv / next nodes
                 # walk only if the target node was not processed already
                 if target_node  not in processed_nodes:
-                    if target_node.odk_type == TriccExtendedNodeType.goto:
+                    if target_node.tricc_type == TriccNodeType.goto:
                         next_page = self.walkthrough_goto_node(target_node, page, pages, processed_nodes, current_path)
                         #update reference
                         #FIXME support reference str
                         for n in page.nodes:
                             sn = page.nodes[n]
-                            if isinstance(sn, TriccNodeRhombus) and isinstance(sn.reference,list) and target_node in sn.reference:
+                            if issubclass(sn.__class__, TriccRhombusMixIn) and isinstance(sn.reference,list) and target_node in sn.reference:
                                 sn.reference.remove(target_node)
                                 sn.reference.append(next_page)
                     # set next page as node to link the next_node of the activity
                         if next_page is not None:
                             target_node = next_page
-                    elif target_node.odk_type == TriccExtendedNodeType.link_out:
+                    elif target_node.tricc_type == TriccNodeType.link_out:
                         link_out = self.walkthrough_link_out_node( target_node, page, pages, processed_nodes, current_path)
                         if link_out is not None:
                             target_node = link_out
@@ -156,7 +156,7 @@ class DrawioStrategy(BaseInputStrategy):
             # create a path logic for the nodes following
             # next node AND former path
             if node.next_nodes is not None and len(node.next_nodes)>0:
-                calc_node = TriccNodeRhombus(
+                calc_node = TriccNodeWait(
                     id = "aj_"+generate_id(),
                     reference = [next_page],
                     activity = page,

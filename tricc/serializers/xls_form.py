@@ -3,7 +3,7 @@
 import logging
 
 from tricc.converters.tricc_to_xls_form import (TRICC_CALC_EXPRESSION,
-                                                TRICC_NEGATE, VERSION_SEPARATOR,INSTANCE_SEPARATOR,  get_export_name)
+                                                negate_term, VERSION_SEPARATOR,INSTANCE_SEPARATOR,  get_export_name)
 from tricc.converters.utils import clean_name, remove_html
 from tricc.models.lang import SingletonLangClass
 from tricc.models.tricc import *
@@ -133,7 +133,7 @@ ODK_TRICC_TYPE_MAP = { 'note':'note'
     ,'date':'date'
     }
 
-GROUP_ODK_TYPE = [TriccExtendedNodeType.page,TriccExtendedNodeType.activity]
+GROUP_TRICC_TYPE = [TriccNodeType.page,TriccNodeType.activity]
           
 SURVEY_MAP = {
     'type':ODK_TRICC_TYPE_MAP, 'name':'name',
@@ -168,12 +168,12 @@ def get_xfrom_trad(node, column, maping, clean_html = False ):
 def get_attr_if_exists(node,column, map_array):
     if column in map_array:
         mapping = map_array[column]
-        if isinstance(mapping, Dict) and node.odk_type in map_array[column]:
-            odk_type =  map_array[column][node.odk_type]
-            if odk_type[:6] == "select":
-                return odk_type + " " + node.list_name
+        if isinstance(mapping, Dict) and node.tricc_type in map_array[column]:
+            tricc_type =  map_array[column][node.tricc_type]
+            if tricc_type[:6] == "select":
+                return tricc_type + " " + node.list_name
             else:
-                return odk_type
+                return tricc_type
         elif hasattr(node, map_array[column]):
             value =  getattr(node, map_array[column])
             if column == 'name':
@@ -213,8 +213,8 @@ def generate_xls_form_export(node, processed_nodes, stashed_nodes, df_survey, df
                     # add only if not existing
                     if len(df_choice[(df_choice['list_name'] == node.list_name) & (df_choice['value'] == node.name)])  == 0:
                         df_choice.loc[len(df_choice)] = values
-                elif node.odk_type in ODK_TRICC_TYPE_MAP and ODK_TRICC_TYPE_MAP[node.odk_type] is not None:
-                    if ODK_TRICC_TYPE_MAP[node.odk_type] =='calculate':
+                elif node.tricc_type in ODK_TRICC_TYPE_MAP and ODK_TRICC_TYPE_MAP[node.tricc_type] is not None:
+                    if ODK_TRICC_TYPE_MAP[node.tricc_type] =='calculate':
                         values = []
                         for column in SURVEY_MAP:
                             if column == 'default' and issubclass(node.__class__, TriccNodeDisplayCalculateBase):
@@ -226,15 +226,15 @@ def generate_xls_form_export(node, processed_nodes, stashed_nodes, df_survey, df
                         else:
                             logger.error("name {} found twice".format(node.name))
                         
-                    elif  ODK_TRICC_TYPE_MAP[node.odk_type] !='':
+                    elif  ODK_TRICC_TYPE_MAP[node.tricc_type] !='':
                         values = []
                         for column in SURVEY_MAP:
                             values.append(get_xfrom_trad(node,column,SURVEY_MAP))
                         df_survey.loc[len(df_survey)] = values
                     else:
-                        logger.warning("node {} have an unmapped type {}".format(node.get_name(),node.odk_type))
+                        logger.warning("node {} have an unmapped type {}".format(node.get_name(),node.tricc_type))
                 else:
-                    logger.warning("node {} have an unsupported type {}".format(node.get_name(),node.odk_type))
+                    logger.warning("node {} have an unsupported type {}".format(node.get_name(),node.tricc_type))
             #continue walk °
             return True
     return False
@@ -331,14 +331,14 @@ def get_diagnostic_none_line(diags):
         '',#'appearance', 
         '',#'constraint', 
         *list(empty.values()) ,
-        TRICC_NEGATE.format(relevance[:-4]),#'relevance'
+        negate_term(relevance[:-4]),#'relevance'
         '',#'disabled'
         '',#'required'
         *list(empty.values()) ,
         '',#'read only'
         '',#'expression'
         '',#'repeat_count'
-        ''#'image'  
+        ''#'image'  TRICC_NEGATE
     ]
     
 def  get_diagnostic_stop_group_line():
