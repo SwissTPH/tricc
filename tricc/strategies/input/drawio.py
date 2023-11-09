@@ -4,17 +4,60 @@ import logging
 import os
 from copy import copy
 
-from tricc.converters.xml_to_tricc import create_activity, process_calculate
+from tricc.converters.xml_to_tricc import create_activity
+from tricc.visitors.tricc import process_calculate
 from tricc.models.tricc import *
 from tricc.strategies.input.base_input_strategy import BaseInputStrategy
 from tricc.parsers.xml import read_drawio
 logger = logging.getLogger('default')
 class DrawioStrategy(BaseInputStrategy):
+    processes = [
+        'triage',
+        'registration',
+        'emergency-care',
+        'local-urgent-care',
+        'actue-tertiary-care',
+        'history-and-physical',
+        'diagnostic-testing',
+        'determine-diagnosis',
+        'provide-counseling',
+        'dispense-medications',
+        'monitor-and-follow-up-of-patient',
+        'alerts-reminders-education',
+        'discharge-referral-of-patient',
+        'charge-for-service',
+        'record-and-report'    
+    ]
+    def process_pages(self, start_page, pages):
+        # create the graph
+        self.linking_nodes(start_page.root, start_page, pages )
+        # Save the calculate list [node]
+        calculates = {}
+        # save when a calcualte is used dict[name, Dict[id, node]]
+        used_calculates = {}
+        
+        # save the node that are processed dict[id, node]
+        
+        # add save nodes and merge nodes
+        stashed_node_func( start_page.root, process_calculate, used_calculates=used_calculates, calculates =calculates, recusive=False )
+        
+            
+        logger.info("# check if all edges (arrow) where used")
+        for key, page in pages.items():
+            if page.unused_edges is not None and len(page.unused_edges)>0:
+                logger.warning(
+                    "Page {0} has still {1}/{2} edges that were not used:"\
+                    .format(page.label, len(page.unused_edges) ,len(page.edges)))
+        # refresh the edges (were remove by previous code)
+        return pages
+        
+    
+    
     def execute(self, in_filepath, media_path):
         files = []
         pages = {}
         diagrams = []
-        start_page=None
+        start_pages= {}
         # read all pages
         logger.info("# Create the activities from diagram pages")
         if os.path.isdir(in_filepath):
@@ -34,35 +77,28 @@ class DrawioStrategy(BaseInputStrategy):
                 if page.root is not None:
                     pages[page.id] = page
                     if page.root.tricc_type == TriccNodeType.start:
-                        if start_page is None:
-                            start_page = page
+                        if 'main' not in start_pages and (page.root.process == 'main' or page.root.process is None):
+                            start_pages['main'] = page
+                        elif page.root.process is not None:
+                            if page.root.process not in start_pages:
+                                start_pages[page.root.process] = []
+                            start_pages[page.root.process].append(page)
                         else:
                             logger.warning(
                                 "Page {0} has a start node but there is already a start node in page  {1}"\
                                     .format(page.label, start_page.label))
         logger.info("# Create the graph from the start node")
-        if start_page is not None:
-            # create the graph
-            self.linking_nodes(start_page.root, start_page, pages )
-            # Save the calculate list [node]
-            calculates = {}
-            # save when a calcualte is used dict[name, Dict[id, node]]
-            used_calculates = {}
-            
-            # save the node that are processed dict[id, node]
-            
-            # add save nodes and merge nodes
-            stashed_node_func( start_page.root, process_calculate, used_calculates=used_calculates, calculates =calculates, recusive=False )
-            
-                
-            logger.info("# check if all edges (arrow where used)")
-            for key, page in pages.items():
-                if page.unused_edges is not None and len(page.unused_edges)>0:
-                    logger.warning(
-                        "Page {0} has still {1}/{2} edges that were not used:"\
-                        .format(page.label, len(page.unused_edges) ,len(page.edges)))
-            # refresh the edges (were remove by previous code)
-            return start_page, pages
+        
+        self.execute_linked_process(start_pages,pages)
+        
+        if start_pages:
+            for process in start_pages:
+                if isinstance(start_pages[process], list):
+                    for page_to_process in start_pages[process]:
+                        pages = self.process_pages(page_to_process, pages)
+                else:
+                    pages = self.process_pages(start_pages[process], pages)
+            return start_pages, pages
             
         else:
             logger.warning("start page not found")
@@ -75,7 +111,6 @@ class DrawioStrategy(BaseInputStrategy):
         # do the calculation, expression ...
 
 
-        
         
     def linking_nodes(self,node, page, pages, processed_nodes = [], path = []):
         # get the edges that have that node as source

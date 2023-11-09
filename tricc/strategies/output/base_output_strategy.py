@@ -2,52 +2,64 @@ import abc
 import logging
 from tricc.models.tricc import stashed_node_func
 
+
 logger = logging.getLogger('default')
 
 
 class BaseOutPutStrategy:
+    processes = ['main']
 
     output_path = None
+    # list of supported processes for the strategy, 
+    # the order of the list will be apply
+    
     def __init__(self, output_path):
         self.output_path = output_path
     
+    
+    def execute(self, start_pages, pages):
+        if 'main' in start_pages:
+            self.process_base(start_pages, pages=pages)
+        else:
+            logger.error("Main process required")
 
-    def execute(self, start_page, pages):
-        self.process_base(start_page, pages=pages)
+        
         logger.info("generate the relevance based on edges")
+
+        
+        
         # create relevance Expression
-        self.process_relevance(start_page, pages=pages)
+        self.process_relevance(start_pages, pages=pages)
         logger.info("generate the calculate based on edges")
         
         # create calculate Expression
-        self.process_calculate(start_page, pages=pages)
+        self.process_calculate(start_pages, pages=pages)
         logger.info("generate the export format")
-        
-        self.process_export(start_page, pages=pages)
+         # create calculate Expression
+        self.process_export(start_pages, pages=pages)
+             
         logger.info("print the export")
-        if start_page.root.form_id is not None:
-            formid= str(start_page.root.form_id )
-        self.do_export(start_page.root.label, formid + ".xlsx", formid)
+        self.export(start_pages)
     
     ### walking function
-    def process_base(self, activity, **kwargs):
+    def process_base(self, start_pages, **kwargs):
         # for each node, check if condition is required issubclass(TriccNodeDisplayModel)
         # process name
-        stashed_node_func(activity.root, self.generate_base, **{**self.get_kwargs(),**kwargs} )
+        stashed_node_func(start_pages[self.processes[0]].root, self.generate_base, **{**self.get_kwargs(),**kwargs} )
         self.do_clean( **{**self.get_kwargs(),**kwargs})
         
-    def process_relevance(self, activity, **kwargs):
+    def process_relevance(self, start_pages, **kwargs):
         
-        stashed_node_func(activity.root, self.generate_relevance, **{**self.get_kwargs(),**kwargs} )
+        stashed_node_func(start_pages[self.processes[0]].root, self.generate_relevance, **{**self.get_kwargs(),**kwargs} )
         self.do_clean( **{**self.get_kwargs(),**kwargs})
         
-    def process_calculate(self, activity, **kwargs):
+    def process_calculate(self, start_pages, **kwargs):
         # call the strategy specific code
-        stashed_node_func(activity.root, self.generate_calculate, **{**self.get_kwargs(),**kwargs} )
+        stashed_node_func(start_pages[self.processes[0]].root, self.generate_calculate, **{**self.get_kwargs(),**kwargs} )
         self.do_clean(**{**self.get_kwargs(),**kwargs})
         
-    def process_export(self, activity, **kwargs):
-        stashed_node_func(activity.root, self.generate_export, **{**self.get_kwargs(),**kwargs} )
+    def process_export(self, start_pages, **kwargs):
+        stashed_node_func(start_pages[self.processes[0]].root, self.generate_export, **{**self.get_kwargs(),**kwargs} )
         self.do_clean(**{**self.get_kwargs(),**kwargs})
         
  
@@ -68,8 +80,9 @@ class BaseOutPutStrategy:
     @abc.abstractmethod
     def generate_export(self, node, **kwargs):
         pass
+
     @abc.abstractmethod
-    def do_export(self, **kwargs):
+    def export(self, **kwargs):
         pass
 
 ## Utils

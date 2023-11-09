@@ -6,10 +6,18 @@
             "type": "python",
             "request": "launch",
             "program": "main.py",
-            "args":["-i","/home/delcpa/Development/cht-chad/forms/app/adult_v30.drawio","-l","i", "-o", "/home/delcpa/Development/cht-chad/forms/app", "-t","-O", "XLSFormCHTStrategy"],
+            "args":["-i","/home/delcpa/Development/cht-chad/forms/app/adult_v30.drawio","-l","d", "-o", "/home/delcpa/Development/cht-chad/forms/app", "-t","-O", "XLSFormCHTStrategy"],
             "console": "integratedTerminal",
             "justMyCode": true      
-        },        {
+        },          {
+            "name": "TEST",
+            "type": "python",
+            "request": "launch",
+            "program": "main.py",
+            "args":["-i","/home/delcpa/Documents/adult_v30.drawio","-l","d", "-o", "/home/delcpa/Development/cht-chad/forms/app", "-t","-O", "XLSFormCHTStrategy"],
+            "console": "integratedTerminal",
+            "justMyCode": true      
+        },      {
             "name": "Medal creator",
             "type": "python",
             "request": "launch",

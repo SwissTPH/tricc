@@ -12,9 +12,9 @@ from tricc.strategies.output.xlsform_cdss import XLSFormCDSSStrategy
 langs = SingletonLangClass()
 
 class XLSFormCHTStrategy(XLSFormCDSSStrategy):
-    def process_export(self, activity,  **kwargs):
+    def process_export(self, start_pages,  **kwargs):
         
-        super().process_export( activity,  **kwargs)
+        super().process_export( start_pages,  **kwargs)
         cht_header = pd.DataFrame(columns=SURVEY_MAP.keys())
         
         
@@ -59,7 +59,15 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
         #df_summary.loc[len(df_summary)] = [  'end group', '' ,'', '', '', '',  '',  '', '', '', '', '', '', '', '','', '' ]
         return df_summary
     
-    def do_export(self, title , file_name, form_id):
+    def export(self, start_pages):
+        form_id = None
+        if start_pages[self.processes[0]].root.form_id is not None:
+            form_id= str(start_pages[self.processes[0]].root.form_id )
+        else:
+            logger.error("form id required in the first start node")
+            exit()
+        title = start_pages[self.processes[0]].root.label
+        file_name = form_id + ".xlsx"
         # make a 'settings' tab
         now = datetime.datetime.now()
         version=now.strftime('%Y%m%d%H%M')

@@ -262,7 +262,7 @@ def get_expression(node, json_node,all_nodes, prefix = ''):
                     expression = formula
                     reference = [*reference,ref]
                 if reference is None or len(reference) == 0:
-                    logger.warning('emptsy reference')   
+                    logger.warning('empty reference')   
                 if node.reference is None:
 
                     node.reference =  reference

@@ -69,7 +69,7 @@ LEVELS = {
 def print_help():
     print('-i / --input draw.io filepath (MANDATORY) or directory containing drawio files')
     print('-o / --output xls file ')
-    print('-d formid ')
+    print('-d form_id ')
     print('-s L4 system/strategy (odk, cht, cc)')
     print('-h / --help print that menu')
 
@@ -80,7 +80,7 @@ if __name__ == "__main__":
     system='odk'
     in_filepath= None
     out_path=None
-    formid=None
+    form_id=None
     debug_level=None
     trad = False
     
@@ -104,7 +104,7 @@ if __name__ == "__main__":
         elif opt == "-O":
             output_strategy = arg
         elif opt == "-d":
-            formid = arg
+            form_id = arg
         elif opt == "-l":
             debug_level = arg
         elif opt in ("-t", "--trads"):

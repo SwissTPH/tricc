@@ -59,7 +59,15 @@ class XLSFormStrategy(BaseOutPutStrategy):
     def generate_export(self, node, **kwargs):
         return generate_xls_form_export(node, **kwargs)
 
-    def do_export(self, title , file_name, form_id):
+    def export(self,start_pages ):
+                
+        if start_pages['registration'].root.form_id is not None:
+            form_id= str(start_pages['registration'].root.form_id )
+        else:
+            logger.error("form id required in the first start node")
+            exit()
+        title = start_pages['registration'].root.label
+        file_name = form_id + ".xlsx"
         # make a 'settings' tab
         now = datetime.datetime.now()
         version=now.strftime('%Y%m%d%H%M')
@@ -83,14 +91,16 @@ class XLSFormStrategy(BaseOutPutStrategy):
         writer.close()
         #writer.handles = None
     
-    def process_export(self, activity,  **kwargs):
+    def process_export(self, start_pages,  **kwargs):
+        self.activity_export(start_pages['registration'], **kwargs)
+    
+    def activity_export(self, activity, processed_nodes = [], **kwargs):
+        stashed_nodes =  []
         # The stashed node are all the node that have all their prevnode processed but not from the same group
         # This logic works only because the prev node are ordered by group/parent .. 
-        processed_nodes = []
-        stashed_nodes =  []
         skip_header = 0
         groups= {}
-        cur_group=activity
+        cur_group = activity
         groups[activity.id] = 0
         path_len = 0
         # keep the vesrions on the group id, max version
@@ -181,3 +191,4 @@ class XLSFormStrategy(BaseOutPutStrategy):
             real_calc = re.find(r'^number\((.+)\)$',c['calculation'])
             if real_calc is not None and real_calc != '':
                 self.df_survey[~self.df_survey['name']==c['name']].replace(real_calc, '\$\{'+c['name']+'\}')
+        return processed_nodes

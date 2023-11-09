@@ -8,13 +8,21 @@ from tricc.converters.tricc_to_xls_form import get_export_name
 from tricc.strategies.output.xls_form import XLSFormStrategy
 
 
+
 class XLSFormCDSSStrategy(XLSFormStrategy):
-    def process_export(self, activity,  **kwargs):
-        super().process_export( activity,  **kwargs)
+
+            
+    
+    def process_export(self, start_pages,  **kwargs):
+        diags = []
+        self.activity_export(start_pages[self.processes[0]], **kwargs)
+
+        diags += self.export_diag( start_pages[self.processes[0]],  **kwargs)
+
         # add the diag
         self.df_survey.loc[len(self.df_survey)] = get_diagnostic_start_group_line()
         # TODO inject flow driven diag list, the folowing fonction will fill the missing ones
-        diags = self.export_diag( activity,  **kwargs)
+        
         if len(diags)>0:
             for diag in diags:
                 self.df_survey.loc[len(self.df_survey)] = get_diagnostic_line(diag)

@@ -361,6 +361,7 @@ class TriccNodeDate(TriccNodeInputModel):
 class TriccNodeMainStart(TriccNodeBaseModel):
     tricc_type: TriccNodeType = TriccNodeType.start
     form_id: Optional[str]
+    process: Optional[str]
 
 
 class TriccNodeLinkIn(TriccNodeBaseModel):
@@ -974,8 +975,8 @@ def check_stashed_loop(stashed_nodes, prev_stashed_nodes, processed_nodes, len_p
                         #reverse_walkthrough(es_node, es_node, print_trace, processed_nodes, stashed_nodes)
                     if len(stashed_nodes) == len(prev_stashed_nodes):
                         exit()
-        else:
-            loop_count = 0
+        #else:
+        #    loop_count += 1
     else:
         loop_count = 0
     return loop_count
