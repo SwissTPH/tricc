@@ -585,6 +585,10 @@ class TriccNodeExclusive(TriccNodeFakeCalculateBase):
 def set_prev_next_node(source_node, target_node, replaced_node=None):
     # if it is end node, attached it to the activity/page
     set_prev_node(source_node, target_node, replaced_node)
+    set_next_node(source_node, target_node, replaced_node)
+    
+    
+def set_next_node(source_node, target_node, replaced_node=None):
     if replaced_node is not None and hasattr(source_node, 'path') and replaced_node == source_node.path:
         source_node.path = target_node
     if replaced_node is not None and hasattr(source_node, 'next_nodes') and replaced_node in source_node.next_nodes:

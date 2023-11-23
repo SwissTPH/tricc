@@ -47,6 +47,8 @@ class BaseInputStrategy:
                     wait = link_with_wait(app.root, prev_process, start_pages[process])
                     prev_process = start_pages[process]
                     app.nodes[wait.id] = wait
+            
+            return app
     
     def __init__(self, input_path):
         self.input_path = input_path

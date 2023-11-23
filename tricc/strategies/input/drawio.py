@@ -89,9 +89,14 @@ class DrawioStrategy(BaseInputStrategy):
                                     .format(page.label, start_page.label))
         logger.info("# Create the graph from the start node")
         
-        self.execute_linked_process(start_pages,pages)
-        
-        if start_pages:
+        app = self.execute_linked_process(start_pages,pages)
+        if app:
+            start_pages['main'] = app
+            pages[app.id]= app
+            pages = self.process_pages(app, pages)
+            
+            return start_pages, pages
+        elif start_pages:
             for process in start_pages:
                 if isinstance(start_pages[process], list):
                     for page_to_process in start_pages[process]:

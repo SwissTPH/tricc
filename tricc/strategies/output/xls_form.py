@@ -61,12 +61,12 @@ class XLSFormStrategy(BaseOutPutStrategy):
 
     def export(self,start_pages ):
                 
-        if start_pages['registration'].root.form_id is not None:
-            form_id= str(start_pages['registration'].root.form_id )
+        if start_pages['main'].root.form_id is not None:
+            form_id= str(start_pages['main'].root.form_id )
         else:
             logger.error("form id required in the first start node")
             exit()
-        title = start_pages['registration'].root.label
+        title = start_pages['main'].root.label
         file_name = form_id + ".xlsx"
         # make a 'settings' tab
         now = datetime.datetime.now()
@@ -92,7 +92,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
         #writer.handles = None
     
     def process_export(self, start_pages,  **kwargs):
-        self.activity_export(start_pages['registration'], **kwargs)
+        self.activity_export(start_pages['main'], **kwargs)
     
     def activity_export(self, activity, processed_nodes = [], **kwargs):
         stashed_nodes =  []

@@ -117,7 +117,7 @@ def get_count_node(node):
         activity = node.activity,
         label = "count: "+node.get_name(),
         name = count_name,
-        path_len=node.path_len
+        path_len=node.path_lenset_prev_next_node
     )
     
 def get_activity_wait(nodes, path):
@@ -134,6 +134,7 @@ def get_activity_wait(nodes, path):
         'path_len': nodes[0].path_len,
         'reference':nodes,
         'path': path,
+        'prev_nodes':[path]
     }
     
     rhombus = TriccNodeWait(
@@ -151,6 +152,9 @@ def get_activity_wait(nodes, path):
     ))
     for node in nodes:    
         node.path_len += 1
+    set_next_node(path, rhombus)
+    for n in nodes:
+        set_next_node(n, rhombus)
     return rhombus
 
     
