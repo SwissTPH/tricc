@@ -68,7 +68,7 @@ def manage_dandling_calculate(activity):
         if len(prev_nodes) == 0 and issubclass(node.__class__, TriccNodeCalculate):
             dandling[node.id] = node
     if len(dandling)>0:
-        wait = get_activity_wait([activity.root], [activity.root], dandling.values())
+        wait = get_activity_wait([activity.root], [activity.root], dandling.values(), edge_only=True)
         activity.nodes.update(dandling)
             
             
@@ -113,11 +113,7 @@ def process_edges(diagram, media_path, activity, nodes):
                 processed = True
                 nodes[calc.id] = calc
                 # add edge between calc and 
-                activity.edges.append(TriccEdge(
-                    id = generate_id(),
-                    source = calc.id,
-                    target = edge.target
-                ))
+                set_prev_next_node(calc,nodes[edge.target], edge_only=True)
                 edge.target = calc.id
             if not processed:
                 logger.warning("Edge between {0} and {1} with label '{2}' could not be interpreted: {3}".format(
@@ -157,7 +153,7 @@ def get_nodes(diagram, activity):
             new_nodes[path.id] = path
             # action after the activity
             if any([e.source == node.id for e in activity.edges]):
-                calc = get_activity_wait([path], [node], node.next_nodes, node) 
+                calc = get_activity_wait([path], [node], node.next_nodes, node, edge_only=True) 
                 new_nodes[calc.id] = calc
         elif isinstance(node, TriccNodeEnd):
             if not end_node:
@@ -436,11 +432,8 @@ def inject_bridge_path(node, nodes):
             e.target = calc.id
    
     # add edge between bridge and node
-    node.activity.edges.append(TriccEdge(
-        id = generate_id(),
-        source = calc.id,
-        target = node.id
-    ))
+    set_prev_next_node(calc,node,edge_only=True)
+
     node.path_len += 1
     return calc
   

@@ -585,43 +585,46 @@ class TriccNodeExclusive(TriccNodeFakeCalculateBase):
 
 
 # Set the source next node to target and clean  next nodes of replace node
-def set_prev_next_node(source_node, target_node, replaced_node=None):
+def set_prev_next_node(source_node, target_node, replaced_node=None, edge_only = False, activity=None):
+    activity = activity or source_node.activity
     # if it is end node, attached it to the activity/page
-    set_prev_node(source_node, target_node, replaced_node)
-    set_next_node(source_node, target_node, replaced_node)
+    if not edge_only:
+        set_prev_node(source_node, target_node, replaced_node, edge_only)
+        set_next_node(source_node, target_node, replaced_node,edge_only)
+         
+    if not any([(e.source == source_node.id or e.source == source_node) and (e.target == target_node.id or e.target == target_node) for e in activity.edges]):
+        activity.edges.append(TriccEdge(id = generate_id(), source = source_node.id, target = target_node.id))
+
+
     
     
-def set_next_node(source_node, target_node, replaced_node=None):
-    if replaced_node is not None and hasattr(source_node, 'path') and replaced_node == source_node.path:
-        source_node.path = target_node
-    if replaced_node is not None and hasattr(source_node, 'next_nodes') and replaced_node in source_node.next_nodes:
-        source_node.next_nodes.remove(replaced_node)
-    if replaced_node is not None and hasattr(target_node, 'next_nodes') and replaced_node in target_node.next_nodes:
-        target_node.next_nodes.remove(replaced_node)
-    if target_node not in source_node.next_nodes:
-        source_node.next_nodes.append(target_node)
-    # if rhombus in next_node of prev node and next node as ref
-    if replaced_node is not None:
-        rhombus_list = list(filter(lambda x: issubclass(x.__class__, TriccRhombusMixIn), source_node.next_nodes))
-        for rhm in rhombus_list:
-            if isinstance(rhm.reference, list):
-                if replaced_node in rhm.reference:
-                    rhm.reference.remove(replaced_node)
-                    rhm.reference.append(target_node)
-    next_edges = [ e for e in source_node.activity.edges if replaced_node and (e.target == replaced_node.id or e.target == replaced_node)]
-    not_found = not any([(e.source == source_node.id or e.source == source_node) and (e.target == target_node.id or e.target == target_node) for e in source_node.activity.edges])
+def set_next_node(source_node, target_node, replaced_node=None, edge_only = False, activity=None):
+    activity = activity or source_node.activity
+    if not edge_only:  
+        if replaced_node is not None and hasattr(source_node, 'path') and replaced_node == source_node.path:
+            source_node.path = target_node
+        if replaced_node is not None and hasattr(source_node, 'next_nodes') and replaced_node in source_node.next_nodes:
+            source_node.next_nodes.remove(replaced_node)
+        if replaced_node is not None and hasattr(target_node, 'next_nodes') and replaced_node in target_node.next_nodes:
+            target_node.next_nodes.remove(replaced_node)
+        if target_node not in source_node.next_nodes:
+            source_node.next_nodes.append(target_node)
+        # if rhombus in next_node of prev node and next node as ref
+        if replaced_node is not None:
+            rhombus_list = list(filter(lambda x: issubclass(x.__class__, TriccRhombusMixIn), source_node.next_nodes))
+            for rhm in rhombus_list:
+                if isinstance(rhm.reference, list):
+                    if replaced_node in rhm.reference:
+                        rhm.reference.remove(replaced_node)
+                        rhm.reference.append(target_node)
+    next_edges = [ e for e in activity.edges if replaced_node and (e.target == replaced_node.id or e.target == replaced_node)]
     if len(next_edges)==0:
         for e  in next_edges:
             e.target = target_node.id
-            if source == source_node.id or source == source_node:
-                not_found = False
-    if not_found:
-        source_node.activity.edges.append(TriccEdge(id = generate_id(), source = source_node.id, target = target_node.id))
-
-
 
 # Set the target_node prev node to source and clean prev nodes of replace_node
-def set_prev_node(source_node, target_node, replaced_node=None):
+def set_prev_node(source_node, target_node, replaced_node=None, edge_only = False, activity=None):
+    activity = activity or source_node.activity
     # update the prev node of the target not if not an end node
     # update directly the prev node of the target
     if replaced_node is not None and hasattr(target_node, 'path') and replaced_node == target_node.path:
@@ -633,15 +636,10 @@ def set_prev_node(source_node, target_node, replaced_node=None):
     if source_node not in target_node.prev_nodes:
         target_node.prev_nodes.append(source_node)
         
-    prev_edges = [ e for e in source_node.activity.edges if replaced_node and (e.source == replaced_node.id or e.source == replaced_node)]
-    not_found = not any([(e.source == source_node.id or e.source == source_node) and (e.target == target_node.id or e.target == target_node) for e in source_node.activity.edges])
+    prev_edges = [ e for e in activity.edges if replaced_node and (e.source == replaced_node.id or e.source == replaced_node)]
     if len(prev_edges)==0:
         for e  in prev_edges:
             e.source = source_node.id
-            if target == target_node.id or target == target_node:
-                not_found = False
-    if not_found:
-        source_node.activity.edges.append(TriccEdge(id = generate_id(), source = source_node.id, target = target_node.id))
 
 def replace_node(old, new, page = None):
     if page is None:

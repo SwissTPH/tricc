@@ -115,12 +115,12 @@ def get_count_node(node):
     )
     
 ### Function that inject a wait after path that will wait for the nodes
-def get_activity_wait(prev_nodes, nodes_to_wait, next_nodes, replaced_node = None):
+def get_activity_wait(prev_nodes, nodes_to_wait, next_nodes, replaced_node = None, edge_only = False, activity = None):
     
     if not isinstance(nodes_to_wait, list):
         nodes_to_wait = [nodes_to_wait]
     path = prev_nodes[0] if len(prev_nodes) == 1 else get_bridge_path(prev_nodes)
-    activity = prev_nodes[0].activity
+    activity = activity or prev_nodes[0].activity
     calc_node = TriccNodeWait(
             id = "ar_"+generate_id(),
             reference = nodes_to_wait,
@@ -128,30 +128,22 @@ def get_activity_wait(prev_nodes, nodes_to_wait, next_nodes, replaced_node = Non
             group = activity,
             path = path
         )
-    path.activity.edges.append(
-        TriccEdge(
-            id = generate_id(),
-            source = path.id,
-            target = calc_node.id
-        )
-    )
 
     #start the wait and the next_nodes from the prev_nodes
     #add the wait as dependency of the next_nodes
-    for prev in prev_nodes:
-        first = True
+
         # add edge between rhombus and node
-        set_prev_next_node(prev,calc_node)
-        for next_node in next_nodes:
-            if prev != replaced_node and next_node != replaced_node :
-                set_prev_next_node(prev,next_node,replaced_node)
-            if first:
-                first = False 
-                set_prev_next_node(calc_node,next_node)
-    
+
+    set_prev_next_node(path,calc_node, edge_only=edge_only, activity=activity )
+    for next_node in next_nodes:
+            #if prev != replaced_node and next_node != replaced_node :
+            #    set_prev_next_node(prev,next_node,replaced_node)
+                #if first:
+                #first = False 
+        set_prev_next_node(calc_node,next_node, edge_only=edge_only,activity=activity)
     return calc_node
     
-def get_bridge_path(prev_nodes, node=None):
+def get_bridge_path(prev_nodes, node=None,edge_only=False):
     if node is None:
         node = prev_nodes[0]
     calc_id  = generate_id()
@@ -170,23 +162,19 @@ def get_bridge_path(prev_nodes, node=None):
     else:
         calc =  TriccNodeBridge( **data)
     for prev in prev_nodes:
-        set_prev_next_node(prev, calc )
+        set_prev_next_node(prev, calc, activity=node.activity, edge_only=edge_only )
     
 def inject_bridge_path(node, nodes):
 
     prev_nodes = [nodes[n.source] for n in list(filter(lambda x: (x.target == node.id or x.target == node) and x.source in nodes ,node.activity.edges ))] 
-    calc = get_bridge_path(prev_nodes, node)
+    calc = get_bridge_path(prev_nodes, node,edge_only=True)
 
     for e in node.activity.edges:
         if e.target == node.id:
             e.target = calc.id
    
     # add edge between bridge and node
-    node.activity.edges.append(TriccEdge(
-        id = generate_id(),
-        source = calc.id,
-        target = node.id
-    ))
+    set_prev_next_node(calc,node,edge_only=True, activity=node.activity)
     node.path_len += 1
     return calc
     

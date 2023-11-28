@@ -45,14 +45,14 @@ class BaseInputStrategy:
             #put a wait between group pf activities
             prev_process = start_pages[self.processes[0]]
             for p in prev_process:
-                set_prev_next_node(root,p)
+                set_prev_next_node(root,p, edge_only=True)
             for process in self.processes[1:]:
                 if process in start_pages:
-                    wait = get_activity_wait([app.root], prev_process, start_pages[process])
+                    wait = get_activity_wait([app.root], prev_process, start_pages[process], edge_only=True, activity = app)
                     app.nodes[wait.id] = wait
                     prev_process = start_pages[process]
-                    for p in prev_process:
-                        set_prev_next_node(root,p)
+                    #for p in prev_process:
+                    #    set_prev_next_node(root,p)
             
             return app
         else:

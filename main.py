@@ -116,7 +116,11 @@ if __name__ == "__main__":
     
     if debug_level is not None:
         setup_logger('default', "debug.log", LEVELS[debug_level])
-
+    elif "pydevd" in sys.modules:
+        setup_logger('default', "debug.log", logging.DEBUG)
+    else:
+        setup_logger('default', "debug.log", logging.INFO)
+        
     pre, ext = os.path.splitext(in_filepath)
     if out_path is None:
         # if output file path not specified, just chagne the extension

@@ -195,8 +195,9 @@ def get_node_expression(in_node, processed_nodes, is_calculate=False, is_prev=Fa
             left = get_node_expression(node.path, processed_nodes, is_calculate, is_prev)
         else:
             left = 'true()'
-        expression = and_join(left, get_rhombus_terms(node, processed_nodes))
-        negate_expression = nand_join(left,get_rhombus_terms(node, processed_nodes))
+        r_ref=get_rhombus_terms(node, processed_nodes)  # if issubclass(node.__class__, TricNodeDisplayCalulate) else TRICC_CALC_EXPRESSION.format(get_export_name(node)) #
+        expression = and_join(left, r_ref)
+        negate_expression = nand_join(left, r_ref)        
     elif isinstance(node, TriccNodeWait):
         if is_prev:
             # the wait don't do any calculation with the reference it is only use to wait until the reference are valid
