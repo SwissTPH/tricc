@@ -144,7 +144,9 @@ class DrawioStrategy(BaseInputStrategy):
                                 # link perv / next nodes
                 # walk only if the target node was not processed already
                 if target_node  not in processed_nodes:
-                    if target_node.tricc_type == TriccNodeType.goto:
+                    if isinstance(target_node, TriccNodeActivity):
+                        self.linking_nodes(target_node.root, target_node, pages, processed_nodes, current_path)
+                    elif isinstance(target_node, TriccNodeGoTo):
                         next_page = self.walkthrough_goto_node(target_node, page, pages, processed_nodes, current_path)
                         #update reference
                         #FIXME support reference str
@@ -156,7 +158,7 @@ class DrawioStrategy(BaseInputStrategy):
                     # set next page as node to link the next_node of the activity
                         if next_page is not None:
                             target_node = next_page
-                    elif target_node.tricc_type == TriccNodeType.link_out:
+                    elif isinstance(target_node, TriccNodeLinkOut):
                         link_out = self.walkthrough_link_out_node( target_node, page, pages, processed_nodes, current_path)
                         if link_out is not None:
                             target_node = link_out

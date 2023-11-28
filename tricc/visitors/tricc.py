@@ -128,7 +128,13 @@ def get_activity_wait(prev_nodes, nodes_to_wait, next_nodes, replaced_node = Non
             group = activity,
             path = path
         )
-
+    path.activity.edges.append(
+        TriccEdge(
+            id = generate_id(),
+            source = path.id,
+            target = calc_node.id
+        )
+    )
 
     #start the wait and the next_nodes from the prev_nodes
     #add the wait as dependency of the next_nodes
@@ -158,10 +164,13 @@ def get_bridge_path(prev_nodes, node=None):
         'name': calc_name,
         'path_len': node.path_len + 1 * (node == prev_nodes[0])
     }
+    
     if sum([0 if issubclass(n.__class__, (TriccNodeDisplayCalculateBase, TriccNodeRhombus)) else 1 for n in prev_nodes])>0 : #and len(node.prev_nodes)>1:
         calc= TriccNodeDisplayBridge( **data)
     else:
         calc =  TriccNodeBridge( **data)
+    for prev in prev_nodes:
+        set_prev_next_node(prev, calc )
     
 def inject_bridge_path(node, nodes):
 

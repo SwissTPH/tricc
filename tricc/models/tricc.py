@@ -306,7 +306,10 @@ class TriccNodeActivity(TriccNodeBaseModel):
                     updated_edges += self.update_edges(node_origin.options[key], option_instance)
             updated_edges += self.update_edges(node_origin, node_instance)
             if updated_edges == 0:
-                logger.error("no edge was updated for node {}::{}::{}::{}".format(node_instance.activity.get_name(),
+                node_edge = list(filter(lambda x: (x.source == node_instance.id or x.source == node_instance) , node_instance.activity.edges))
+                node_edge_origin = list(filter(lambda x: (x.source == node_origin.id or x.source == node_origin) , node_origin.activity.edges))
+                if len(node_edge) == 0:
+                    logger.error("no edge was updated for node {}::{}::{}::{}".format(node_instance.activity.get_name(),
                                                                                   node_instance.__class__,
                                                                                   node_instance.get_name(),
                                                                                   node_instance.instance))
@@ -606,14 +609,14 @@ def set_next_node(source_node, target_node, replaced_node=None):
                     rhm.reference.remove(replaced_node)
                     rhm.reference.append(target_node)
     next_edges = [ e for e in source_node.activity.edges if replaced_node and (e.target == replaced_node.id or e.target == replaced_node)]
-    not_found = True
+    not_found = not any([(e.source == source_node.id or e.source == source_node) and (e.target == target_node.id or e.target == target_node) for e in source_node.activity.edges])
     if len(next_edges)==0:
         for e  in next_edges:
             e.target = target_node.id
             if source == source_node.id or source == source_node:
                 not_found = False
     if not_found:
-        TriccEdge(id = generate_id(), source = source_node.id, target = target_node.id)
+        source_node.activity.edges.append(TriccEdge(id = generate_id(), source = source_node.id, target = target_node.id))
 
 
 
@@ -631,14 +634,14 @@ def set_prev_node(source_node, target_node, replaced_node=None):
         target_node.prev_nodes.append(source_node)
         
     prev_edges = [ e for e in source_node.activity.edges if replaced_node and (e.source == replaced_node.id or e.source == replaced_node)]
-    not_found = True
+    not_found = not any([(e.source == source_node.id or e.source == source_node) and (e.target == target_node.id or e.target == target_node) for e in source_node.activity.edges])
     if len(prev_edges)==0:
         for e  in prev_edges:
             e.source = source_node.id
             if target == target_node.id or target == target_node:
                 not_found = False
     if not_found:
-        TriccEdge(id = generate_id(), source = source_node.id, target = target_node.id)
+        source_node.activity.edges.append(TriccEdge(id = generate_id(), source = source_node.id, target = target_node.id))
 
 def replace_node(old, new, page = None):
     if page is None:

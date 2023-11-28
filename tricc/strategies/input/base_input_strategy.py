@@ -3,6 +3,7 @@ import abc
 from tricc.models.tricc import stashed_node_func, TriccNodeMainStart, TriccNodeActivity, TriccEdge
 from tricc.converters.utils import generate_id
 from tricc.visitors.tricc import get_activity_wait
+from tricc.models.tricc import set_prev_next_node
 from itertools import chain
 class BaseInputStrategy:
 
@@ -31,8 +32,7 @@ class BaseInputStrategy:
                 id = generate_id(),
                 name = root_process.name,
                 root = root,
-                nodes = nodes,
-                edges = [TriccEdge(id = generate_id(), source = root.id, target = x.id) for x in start_pages[self.processes[0]]]
+                nodes = nodes
             )
             root.activity = app
             # loop back to app to avoid None
@@ -44,13 +44,19 @@ class BaseInputStrategy:
                 n.group = app
             #put a wait between group pf activities
             prev_process = start_pages[self.processes[0]]
+            for p in prev_process:
+                set_prev_next_node(root,p)
             for process in self.processes[1:]:
                 if process in start_pages:
                     wait = get_activity_wait([app.root], prev_process, start_pages[process])
-                    prev_process = start_pages[process]
                     app.nodes[wait.id] = wait
+                    prev_process = start_pages[process]
+                    for p in prev_process:
+                        set_prev_next_node(root,p)
             
             return app
+        else:
+            return start_pages['main']
     
     def __init__(self, input_path):
         self.input_path = input_path
