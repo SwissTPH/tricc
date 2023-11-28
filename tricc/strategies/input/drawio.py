@@ -120,7 +120,7 @@ class DrawioStrategy(BaseInputStrategy):
     def linking_nodes(self,node, page, pages, processed_nodes = [], path = []):
         # get the edges that have that node as source
         
-        node_edge = list(filter(lambda x: (x.source == node.id) , page.edges))
+        node_edge = list(filter(lambda x: (x.source == node.id or x.source == node) , page.edges))
         node.activity = page
         #build current path
         current_path = path + [node.id]
@@ -207,21 +207,8 @@ class DrawioStrategy(BaseInputStrategy):
             # create a path logic for the nodes following
             # next node AND former path
             if node.next_nodes is not None and len(node.next_nodes)>0:
-                calc_node = TriccNodeWait(
-                    id = "aj_"+generate_id(),
-                    reference = [next_page],
-                    activity = page,
-                    group = page,
-                )
-                page.nodes[calc_node.id]=calc_node
-                # triggering the page from the path
-                for prev in node.prev_node:
-                    set_prev_next_node(prev,next_page)
-                replace_node(node, calc_node, page)
                 
-                # linking the next page a 
-                #set_prev_next_node(next_page, calc_node)
-                return calc_node
+                calc_node = get_activity_wait(node.prev_nodes,[next_page], node.next_nodes, node)
             else:   
                 # attach the page
                 #for got_to_prev_nodes in node.prev_nodes:

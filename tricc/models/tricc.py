@@ -605,6 +605,16 @@ def set_next_node(source_node, target_node, replaced_node=None):
                 if replaced_node in rhm.reference:
                     rhm.reference.remove(replaced_node)
                     rhm.reference.append(target_node)
+    next_edges = [ e for e in source_node.activity.edges if replaced_node and (e.target == replaced_node.id or e.target == replaced_node)]
+    not_found = True
+    if len(next_edges)==0:
+        for e  in next_edges:
+            e.target = target_node.id
+            if source == source_node.id or source == source_node:
+                not_found = False
+    if not_found:
+        TriccEdge(id = generate_id(), source = source_node.id, target = target_node.id)
+
 
 
 # Set the target_node prev node to source and clean prev nodes of replace_node
@@ -619,7 +629,16 @@ def set_prev_node(source_node, target_node, replaced_node=None):
         source_node.prev_nodes.remove(replaced_node)
     if source_node not in target_node.prev_nodes:
         target_node.prev_nodes.append(source_node)
-
+        
+    prev_edges = [ e for e in source_node.activity.edges if replaced_node and (e.source == replaced_node.id or e.source == replaced_node)]
+    not_found = True
+    if len(prev_edges)==0:
+        for e  in prev_edges:
+            e.source = source_node.id
+            if target == target_node.id or target == target_node:
+                not_found = False
+    if not_found:
+        TriccEdge(id = generate_id(), source = source_node.id, target = target_node.id)
 
 def replace_node(old, new, page = None):
     if page is None:

@@ -4,12 +4,6 @@ from tricc.converters.utils import *
 from tricc.models.tricc import *
 
 
-def link_with_wait(path, wait_nodes, next_nodes):
-    wait = get_activity_wait(wait_nodes, path)
-    for node in next_nodes:
-        set_prev_next_node(wait,node)
-    return wait
-    
 
 def merge_node(from_node,to_node):
     if from_node.activity != to_node.activity:
@@ -117,63 +111,62 @@ def get_count_node(node):
         activity = node.activity,
         label = "count: "+node.get_name(),
         name = count_name,
-        path_len=node.path_lenset_prev_next_node
+        path_len=node.path_len
     )
     
-def get_activity_wait(nodes, path):
-    if nodes and not isinstance(nodes, list):
-        nodes = [nodes]
-    rhombus_id  = generate_id()
-    rhombus_name = "ar_"+rhombus_id
-    data = {
-        'id': rhombus_id,
-        'group': nodes[0].group,
-        'activity': nodes[0].activity,
-        'label': "wait: " + nodes[0].get_name(),
-        'name': rhombus_name,
-        'path_len': nodes[0].path_len,
-        'reference':nodes,
-        'path': path,
-        'prev_nodes':[path]
-    }
+### Function that inject a wait after path that will wait for the nodes
+def get_activity_wait(prev_nodes, nodes_to_wait, next_nodes, replaced_node = None):
     
-    rhombus = TriccNodeWait(
-        **data
-    )
-    
-    for e in nodes[0].activity.edges:
-        if e.source == nodes[0].id:
-            e.source = rhombus.id
-    # add edge between rhombus and node
-    nodes[0].activity.edges.append(TriccEdge(
-        id = generate_id(),
-        source = path.id,
-        target = rhombus.id
-    ))
-    for node in nodes:    
-        node.path_len += 1
-    set_next_node(path, rhombus)
-    for n in nodes:
-        set_next_node(n, rhombus)
-    return rhombus
+    if not isinstance(nodes_to_wait, list):
+        nodes_to_wait = [nodes_to_wait]
+    path = prev_nodes[0] if len(prev_nodes) == 1 else get_bridge_path(prev_nodes)
+    activity = prev_nodes[0].activity
+    calc_node = TriccNodeWait(
+            id = "ar_"+generate_id(),
+            reference = nodes_to_wait,
+            activity = activity,
+            group = activity,
+            path = path
+        )
 
+
+    #start the wait and the next_nodes from the prev_nodes
+    #add the wait as dependency of the next_nodes
+    for prev in prev_nodes:
+        first = True
+        # add edge between rhombus and node
+        set_prev_next_node(prev,calc_node)
+        for next_node in next_nodes:
+            if prev != replaced_node and next_node != replaced_node :
+                set_prev_next_node(prev,next_node,replaced_node)
+            if first:
+                first = False 
+                set_prev_next_node(calc_node,next_node)
     
-def get_bridge_path(node, nodes):
+    return calc_node
+    
+def get_bridge_path(prev_nodes, node=None):
+    if node is None:
+        node = prev_nodes[0]
     calc_id  = generate_id()
     calc_name = "path_"+calc_id
     data = {
         'id': calc_id,
-        'group': node.group,
+        'group':  node.group,
         'activity': node.activity,
-        'label': "path: " + node.get_name(),
+        'label': "path: " + ( node.get_name()),
         'name': calc_name,
-        'path_len': node.path_len
+        'path_len': node.path_len + 1 * (node == prev_nodes[0])
     }
-    prev_nodes = [nodes[n.source] for n in list(filter(lambda x: (x.target == node.id or x.target == node) and x.source in nodes ,node.activity.edges ))] 
     if sum([0 if issubclass(n.__class__, (TriccNodeDisplayCalculateBase, TriccNodeRhombus)) else 1 for n in prev_nodes])>0 : #and len(node.prev_nodes)>1:
         calc= TriccNodeDisplayBridge( **data)
     else:
         calc =  TriccNodeBridge( **data)
+    
+def inject_bridge_path(node, nodes):
+
+    prev_nodes = [nodes[n.source] for n in list(filter(lambda x: (x.target == node.id or x.target == node) and x.source in nodes ,node.activity.edges ))] 
+    calc = get_bridge_path(prev_nodes, node)
 
     for e in node.activity.edges:
         if e.target == node.id:
@@ -296,25 +289,7 @@ def process_reference(node,  calculates ,used_calculates,processed_nodes, warn =
                 add_used_calculate(ref, node,calculates, used_calculates, processed_nodes)
         elif node.reference is None:
             logger.error("process_calculate_version_requirement:reference is None for {0} ".format(node.get_name()))
-            exit()
-    else:
-        for prev_node in node.prev_nodes: 
-            # find the dandling calculate
-            if  not isinstance(prev_node, TriccNodeActivityStart) and issubclass(prev_node.__class__, TriccNodeDisplayCalculateBase) and  len(prev_node.prev_nodes) ==0:
-                new_node = TriccNodeWait(
-                    id = "r_" + generate_id(),
-                    prev_nodes = [node.activity.root],
-                    reference = prev_node.name,
-                    instance = node.instance,
-                    activity = node.activity,
-                    group = node.group                   
-                )
-                set_prev_next_node(new_node,node,prev_node)
-                if process_reference(new_node,  calculates ,used_calculates,processed_nodes, warn = warn):
-                    processed_nodes.append(new_node)
-                    return True
-
-                
+            exit()             
             
     return True
 
@@ -384,14 +359,15 @@ def get_select_not_available_options(node,group,label):
             )}
         
 def get_select_yes_no_options(node, group):
-    return {0:TriccNodeSelectOption(
+    yes = TriccNodeSelectOption(
                 id = generate_id(),
                 name="1",
                 label="Yes",
                 select = node,
                 group = group,
                 list_name =  node.list_name
-            ), 1:TriccNodeSelectOption(
+            )
+    no = TriccNodeSelectOption(
                 id = generate_id(),
                 name="-1",
                 label="No",
@@ -399,4 +375,4 @@ def get_select_yes_no_options(node, group):
                 group = group,
                 list_name =  node.list_name
             )
-    }
+    return {0:yes, 1:no }

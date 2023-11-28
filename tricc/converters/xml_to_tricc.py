@@ -53,12 +53,24 @@ def create_activity(diagram, media_path):
             activity.nodes = nodes
         
         process_edges(diagram, media_path, activity, nodes)
-
         # link back the activity
         activity.root.activity = activity
+        manage_dandling_calculate(activity)
+        
         return activity
     else:
         logger.warning("root not found for page {0}".format(name))
+
+def manage_dandling_calculate(activity):
+    dandling = {}
+    for node in activity.nodes.values():
+        prev_nodes = [activity.nodes[n.source] for n in list(filter(lambda x: (x.target == node.id or x.target == node) and (x.source in activity.nodes or x.source in activity.nodes.values()), activity.edges ))]
+        if len(prev_nodes) == 0 and issubclass(node.__class__, TriccNodeCalculate):
+            dandling[node.id] = node
+    if len(dandling)>0:
+        wait = get_activity_wait([activity.root], [activity.root], dandling.values())
+        activity.nodes.update(dandling)
+            
             
 def process_edges(diagram, media_path, activity, nodes):
     end_found = False
@@ -135,17 +147,17 @@ def get_nodes(diagram, activity):
             node.name = node.name + node.id
         if  issubclass(node.__class__, TriccRhombusMixIn) and node.path is None:
                 # generate rhombuse path
-                calc = get_bridge_path(node,nodes)
+                calc = inject_bridge_path(node,nodes)
                 node.path = calc
                 new_nodes[calc.id] = calc
                 # add the edge between trhombus and its path
         elif isinstance(node, TriccNodeGoTo):
             #find if the node has next nodes, if yes, add a bridge + Rhoimbus
-            path = get_bridge_path(node,nodes)
+            path = inject_bridge_path(node,nodes)
             new_nodes[path.id] = path
             # action after the activity
             if any([e.source == node.id for e in activity.edges]):
-                calc = get_activity_wait(node, path)
+                calc = get_activity_wait([path], [node], node.next_nodes, node) 
                 new_nodes[calc.id] = calc
         elif isinstance(node, TriccNodeEnd):
             if not end_node:
@@ -249,7 +261,8 @@ def add_calculate_nodes(nodes, diagram, group=None):
     add_tricc_nodes(nodes, TriccNodeRhombus, list, group, ['save','expression'],['reference'])
     list = get_tricc_type_list(diagram, ['UserObject','object'], TriccNodeType.exclusive)
     add_tricc_base_node(nodes, TriccNodeExclusive, list, group)
- 
+    list = get_tricc_type_list(diagram, ['UserObject','object'], TriccNodeType.wait)
+    add_tricc_nodes(nodes, TriccNodeWait, list, group, ['save','expression'],['reference'])
 def get_hybride_node(nodes, diagram, group=None):
     list = get_tricc_type_list(diagram, ['UserObject','object'], TriccNodeType.not_available)
     add_tricc_hybrid_select_nodes(nodes, TriccNodeSelectNotAvailable, list, group, [])
@@ -401,7 +414,7 @@ def get_count_node(node):
     )
 
     
-def get_bridge_path(node, nodes):
+def inject_bridge_path(node, nodes):
     calc_id  = generate_id()
     calc_name = "path_"+calc_id
     data = {
@@ -474,9 +487,11 @@ def add_tricc_hybrid_select_nodes(nodes, type, list, group, attributes):
         )
         if type == TriccNodeSelectNotAvailable:
             node.options =   get_select_not_available_options(node, group, label)
+            nodes[node.options[0].id]=node.options[0]
         elif type == TriccNodeSelectYesNo:
             node.options =   get_select_yes_no_options(node, group)
-            
+            nodes[node.options[0].id]=node.options[0]
+            nodes[node.options[1].id]=node.options[1]
         set_additional_attributes(attributes, elm, node)
         nodes[id]=node
         
