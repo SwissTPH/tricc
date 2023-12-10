@@ -583,17 +583,32 @@ def get_rand_name(k):
 class TriccNodeExclusive(TriccNodeFakeCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.exclusive
 
+def get_node_from_id(activity, node, edge_only):
+    node_id = getattr(node,'id',node)
+    if not isinstance(node_id, str):
+        logger.error("can set prev_next only with string or node")
+        exit()
+    if issubclass(node.__class__, TriccBaseModel):
+        return node_id, node
+    elif node_id in activity.nodes:
+        node = activity.nodes[node_id]
+    elif not edge_only:
+        logger.error(f"cannot find {node_id} in  {activiy.get_name()}")
+        exit()
+    return node_id, node
 
 # Set the source next node to target and clean  next nodes of replace node
 def set_prev_next_node(source_node, target_node, replaced_node=None, edge_only = False, activity=None):
     activity = activity or source_node.activity
+    source_id, source_node = get_node_from_id(activity, source_node, edge_only)
+    target_id, target_node = get_node_from_id(activity, target_node, edge_only)
     # if it is end node, attached it to the activity/page
     if not edge_only:
         set_prev_node(source_node, target_node, replaced_node, edge_only)
         set_next_node(source_node, target_node, replaced_node,edge_only)
          
-    if not any([(e.source == source_node.id or e.source == source_node) and (e.target == target_node.id or e.target == target_node) for e in activity.edges]):
-        activity.edges.append(TriccEdge(id = generate_id(), source = source_node.id, target = target_node.id))
+    if not any([(e.source == source_id) and ( e.target == target_id) for e in activity.edges]):
+        activity.edges.append(TriccEdge(id = generate_id(), source = source_id, target = target_id))
 
 
     

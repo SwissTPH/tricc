@@ -206,20 +206,10 @@ class DrawioStrategy(BaseInputStrategy):
             if next_page not in processed_nodes:
                 self.linking_nodes(next_page.root, next_page, pages, processed_nodes, current_path)
             
-            # create a path logic for the nodes following
-            # next node AND former path
-            if node.next_nodes is not None and len(node.next_nodes)>0:
-                
-                calc_node = get_activity_wait(node.prev_nodes,[next_page], node.next_nodes, node)
-            else:   
-                # attach the page
-                #for got_to_prev_nodes in node.prev_nodes:
-                #    set_prev_next_node(got_to_prev_nodes, next_page, node )
-                # steal the edges
-                replace_node(node, next_page, page)   
+            replace_node(node, next_page, page)   
                     
             # continue on the initial page
-                return next_page
+            return next_page
         else:
             logger.warning("node {0} from page {1} doesnot have a valid link".format(node.label, page.label))
 
