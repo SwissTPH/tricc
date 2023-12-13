@@ -152,8 +152,10 @@ def get_nodes(diagram, activity):
             path = inject_bridge_path(node,nodes)
             new_nodes[path.id] = path
             # action after the activity
-            if any([e.source == node.id for e in activity.edges]):
-                calc = get_activity_wait([path], [node], node.next_nodes, node, edge_only=True) 
+            next_nodes_id = [ e.target for e in activity.edges if e.source == node.id] 
+            if len(next_nodes_id)>0:
+                
+                calc = get_activity_wait([path], [node], next_nodes_id, node, edge_only=True) 
                 new_nodes[calc.id] = calc
         elif isinstance(node, TriccNodeEnd):
             if not end_node:

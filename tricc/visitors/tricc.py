@@ -119,7 +119,7 @@ def get_activity_wait(prev_nodes, nodes_to_wait, next_nodes, replaced_node = Non
     
     if not isinstance(nodes_to_wait, list):
         nodes_to_wait = [nodes_to_wait]
-    path = prev_nodes[0] if len(prev_nodes) == 1 else get_bridge_path(prev_nodes)
+    path = prev_nodes[0] if len(prev_nodes) == 1 else get_bridge_path(prev_nodes, activity)
     activity = activity or prev_nodes[0].activity
     calc_node = TriccNodeWait(
             id = "ar_"+generate_id(),
