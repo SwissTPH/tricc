@@ -5,6 +5,9 @@ from tricc.converters.utils import generate_id
 from tricc.visitors.tricc import get_activity_wait
 from tricc.models.tricc import set_prev_next_node
 from itertools import chain
+import logging
+logger = logging.getLogger('default')
+
 class BaseInputStrategy:
 
     input_path = None

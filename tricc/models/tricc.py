@@ -3,10 +3,11 @@ from __future__ import annotations
 import logging
 import random
 import string
-from enum import Enum
+from enum import Enum, auto
 from typing import Dict, ForwardRef, List, Optional, Union
 
 from pydantic import BaseModel, constr
+from strenum import StrEnum
 
 from tricc.converters.utils import generate_id
 
@@ -27,7 +28,8 @@ ACTIVITY_END_NODE_FORMAT = "aend_{}"
 END_NODE_FORMAT = "end_{}"
 
 
-class TriccNodeType(str, Enum):
+class TriccNodeType(StrEnum):
+    #replace with auto ? 
     note = 'note'
     calculate = 'calculate'
     select_multiple = 'select_multiple'

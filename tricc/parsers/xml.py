@@ -26,10 +26,11 @@ def get_container_media(diagram, container_id):
     #get the image node 
 
 def get_tricc_type(diagram, node_type, tricc_type):
-    return diagram.find(f'.//{node_type}[@{type_name}="{tricc_type}"]')
+    return diagram.find(f'.//{node_type}[@{type_name}="{str(tricc_type)}"]')
 
 
 def get_tricc_type_list(diagram, node_type, tricc_type=None, parent_id = None):
+    tricc_type = str(tricc_type)
    
     parent_suffix = f"[@parent='{parent_id}']"  if parent_id is not None else ''
     if isinstance(tricc_type, list):
