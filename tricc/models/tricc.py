@@ -3,10 +3,11 @@ from __future__ import annotations
 import logging
 import random
 import string
-from enum import Enum
+from enum import Enum, auto
 from typing import Dict, ForwardRef, List, Optional, Union
 
 from pydantic import BaseModel, constr
+from strenum import StrEnum
 
 from tricc.converters.utils import generate_id
 
@@ -27,7 +28,8 @@ ACTIVITY_END_NODE_FORMAT = "aend_{}"
 END_NODE_FORMAT = "end_{}"
 
 
-class TriccNodeType(str, Enum):
+class TriccNodeType(StrEnum):
+    #replace with auto ? 
     note = 'note'
     calculate = 'calculate'
     select_multiple = 'select_multiple'
@@ -306,7 +308,10 @@ class TriccNodeActivity(TriccNodeBaseModel):
                     updated_edges += self.update_edges(node_origin.options[key], option_instance)
             updated_edges += self.update_edges(node_origin, node_instance)
             if updated_edges == 0:
-                logger.error("no edge was updated for node {}::{}::{}::{}".format(node_instance.activity.get_name(),
+                node_edge = list(filter(lambda x: (x.source == node_instance.id or x.source == node_instance) , node_instance.activity.edges))
+                node_edge_origin = list(filter(lambda x: (x.source == node_origin.id or x.source == node_origin) , node_origin.activity.edges))
+                if len(node_edge) == 0:
+                    logger.error("no edge was updated for node {}::{}::{}::{}".format(node_instance.activity.get_name(),
                                                                                   node_instance.__class__,
                                                                                   node_instance.get_name(),
                                                                                   node_instance.instance))
@@ -361,6 +366,7 @@ class TriccNodeDate(TriccNodeInputModel):
 class TriccNodeMainStart(TriccNodeBaseModel):
     tricc_type: TriccNodeType = TriccNodeType.start
     form_id: Optional[str]
+    process: Optional[str]
 
 
 class TriccNodeLinkIn(TriccNodeBaseModel):
@@ -579,31 +585,63 @@ def get_rand_name(k):
 class TriccNodeExclusive(TriccNodeFakeCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.exclusive
 
+def get_node_from_id(activity, node, edge_only):
+    node_id = getattr(node,'id',node)
+    if not isinstance(node_id, str):
+        logger.error("can set prev_next only with string or node")
+        exit()
+    if issubclass(node.__class__, TriccBaseModel):
+        return node_id, node
+    elif node_id in activity.nodes:
+        node = activity.nodes[node_id]
+    elif not edge_only:
+        logger.error(f"cannot find {node_id} in  {activiy.get_name()}")
+        exit()
+    return node_id, node
 
 # Set the source next node to target and clean  next nodes of replace node
-def set_prev_next_node(source_node, target_node, replaced_node=None):
+def set_prev_next_node(source_node, target_node, replaced_node=None, edge_only = False, activity=None):
+    activity = activity or source_node.activity
+    source_id, source_node = get_node_from_id(activity, source_node, edge_only)
+    target_id, target_node = get_node_from_id(activity, target_node, edge_only)
     # if it is end node, attached it to the activity/page
-    set_prev_node(source_node, target_node, replaced_node)
-    if replaced_node is not None and hasattr(source_node, 'path') and replaced_node == source_node.path:
-        source_node.path = target_node
-    if replaced_node is not None and hasattr(source_node, 'next_nodes') and replaced_node in source_node.next_nodes:
-        source_node.next_nodes.remove(replaced_node)
-    if replaced_node is not None and hasattr(target_node, 'next_nodes') and replaced_node in target_node.next_nodes:
-        target_node.next_nodes.remove(replaced_node)
-    if target_node not in source_node.next_nodes:
-        source_node.next_nodes.append(target_node)
-    # if rhombus in next_node of prev node and next node as ref
-    if replaced_node is not None:
-        rhombus_list = list(filter(lambda x: issubclass(x.__class__, TriccRhombusMixIn), source_node.next_nodes))
-        for rhm in rhombus_list:
-            if isinstance(rhm.reference, list):
-                if replaced_node in rhm.reference:
-                    rhm.reference.remove(replaced_node)
-                    rhm.reference.append(target_node)
+    if not edge_only:
+        set_prev_node(source_node, target_node, replaced_node, edge_only)
+        set_next_node(source_node, target_node, replaced_node,edge_only)
+         
+    if not any([(e.source == source_id) and ( e.target == target_id) for e in activity.edges]):
+        activity.edges.append(TriccEdge(id = generate_id(), source = source_id, target = target_id))
 
+
+    
+    
+def set_next_node(source_node, target_node, replaced_node=None, edge_only = False, activity=None):
+    activity = activity or source_node.activity
+    if not edge_only:  
+        if replaced_node is not None and hasattr(source_node, 'path') and replaced_node == source_node.path:
+            source_node.path = target_node
+        if replaced_node is not None and hasattr(source_node, 'next_nodes') and replaced_node in source_node.next_nodes:
+            source_node.next_nodes.remove(replaced_node)
+        if replaced_node is not None and hasattr(target_node, 'next_nodes') and replaced_node in target_node.next_nodes:
+            target_node.next_nodes.remove(replaced_node)
+        if target_node not in source_node.next_nodes:
+            source_node.next_nodes.append(target_node)
+        # if rhombus in next_node of prev node and next node as ref
+        if replaced_node is not None:
+            rhombus_list = list(filter(lambda x: issubclass(x.__class__, TriccRhombusMixIn), source_node.next_nodes))
+            for rhm in rhombus_list:
+                if isinstance(rhm.reference, list):
+                    if replaced_node in rhm.reference:
+                        rhm.reference.remove(replaced_node)
+                        rhm.reference.append(target_node)
+    next_edges = [ e for e in activity.edges if replaced_node and (e.target == replaced_node.id or e.target == replaced_node)]
+    if len(next_edges)==0:
+        for e  in next_edges:
+            e.target = target_node.id
 
 # Set the target_node prev node to source and clean prev nodes of replace_node
-def set_prev_node(source_node, target_node, replaced_node=None):
+def set_prev_node(source_node, target_node, replaced_node=None, edge_only = False, activity=None):
+    activity = activity or source_node.activity
     # update the prev node of the target not if not an end node
     # update directly the prev node of the target
     if replaced_node is not None and hasattr(target_node, 'path') and replaced_node == target_node.path:
@@ -614,7 +652,11 @@ def set_prev_node(source_node, target_node, replaced_node=None):
         source_node.prev_nodes.remove(replaced_node)
     if source_node not in target_node.prev_nodes:
         target_node.prev_nodes.append(source_node)
-
+        
+    prev_edges = [ e for e in activity.edges if replaced_node and (e.source == replaced_node.id or e.source == replaced_node)]
+    if len(prev_edges)==0:
+        for e  in prev_edges:
+            e.source = source_node.id
 
 def replace_node(old, new, page = None):
     if page is None:
@@ -974,8 +1016,8 @@ def check_stashed_loop(stashed_nodes, prev_stashed_nodes, processed_nodes, len_p
                         #reverse_walkthrough(es_node, es_node, print_trace, processed_nodes, stashed_nodes)
                     if len(stashed_nodes) == len(prev_stashed_nodes):
                         exit()
-        else:
-            loop_count = 0
+        #else:
+        #    loop_count += 1
     else:
         loop_count = 0
     return loop_count

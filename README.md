@@ -148,7 +148,7 @@ Not a real property to add, it is simply the text display in the boxes
 
 # notes
 
-advanced interpretation of the edges:
+## advanced interpretation of the edges:
 
 Activity instances: if there is more that 1 instance of a single actity then the 1+ activity will be displayed only if the previous one were not, to do that the GoTO node are replaced by a path and a rombhus, the path got to the activitvy and rhombus and the next node (if any) are attached to the rhombus that is use to wait that the activity
 
@@ -160,6 +160,29 @@ if not a calculate then relevance will be used unless it is "required" then cond
 the Rhombus act as an AND between its imputs and its reference BUT it is an OR beween the inputs
 (input1 OR input2 OR input3) AND reference
 
+## start nodes
+
+### Main start
+
+    the flow required at least 1 main start node, but in case of cdss output strategy , several could be used given that they have a 'process' atrribute
+
+    here is the list of the CPG process, this will be the execution oder too:
+
+        - 'registration',
+        - 'triage',
+        - 'emergency-care',
+        - 'local-urgent-care',
+        - 'actue-tertiary-care',
+        - 'history-and-physical',
+        - 'diagnostic-testing',
+        - 'determine-diagnosis',
+        - 'provide-counseling',
+        - 'dispense-medications',
+        - 'monitor-and-follow-up-of-patient',
+        - 'alerts-reminders-education',
+        - 'discharge-referral-of-patient',
+        - 'charge-for-service',
+        - 'record-and-report' 
 
 
 # READ Xressource
