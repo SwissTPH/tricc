@@ -18,5 +18,6 @@ dependencies = [
     "polib",
     "numpy",
     "pandas",
-    "StrEnum"
+    "StrEnum",
+    "pyyaml"
 ]
