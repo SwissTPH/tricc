@@ -113,11 +113,6 @@ class XLSFormStrategy(BaseOutPutStrategy):
             os.path.join(self.output_path, conversion_id),
         )
 
-        shutil.move(
-            os.path.join(self.output_path, conversion_id, conversion_id + ".zip"),
-            os.path.join(self.output_path, "../downloads", conversion_id + ".zip"),
-        )
-
     def process_export(self, start_pages, **kwargs):
         self.activity_export(start_pages["main"], **kwargs)
 
