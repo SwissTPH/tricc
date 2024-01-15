@@ -67,7 +67,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
     def generate_export(self, node, **kwargs):
         return generate_xls_form_export(node, **kwargs)
 
-    def export(self, start_pages, conversion_id):
+    def export(self, start_pages, conversion_id, download_dir):
         if start_pages["main"].root.form_id is not None:
             form_id = str(start_pages["main"].root.form_id)
         else:
@@ -108,7 +108,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
         logger.info("generating archieve...")
 
         shutil.make_archive(
-            os.path.join(self.output_path, conversion_id, conversion_id + "zip"),
+            os.path.join(download_dir, conversion_id),
             "zip",
             os.path.join(self.output_path, conversion_id),
         )

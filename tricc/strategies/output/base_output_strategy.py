@@ -16,7 +16,7 @@ class BaseOutPutStrategy:
     def __init__(self, output_path):
         self.output_path = output_path
 
-    def execute(self, start_pages, pages, conversion_id):
+    def execute(self, start_pages, pages, conversion_id, download_dir):
         if "main" in start_pages:
             self.process_base(start_pages, pages=pages)
         else:
@@ -35,7 +35,7 @@ class BaseOutPutStrategy:
         self.process_export(start_pages, pages=pages)
 
         logger.info("print the export")
-        self.export(start_pages, conversion_id=conversion_id)
+        self.export(start_pages, conversion_id=conversion_id, download_dir=download_dir)
 
     ### walking function
     def process_base(self, start_pages, **kwargs):

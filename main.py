@@ -123,6 +123,8 @@ if __name__ == "__main__":
     output_strategy = params["output_strategy"]
     # conversion_ID
     conversion_id = str(params["conversion_ID"])
+    # download_dir
+    download_dir = params["download_dir"]
 
     if in_filepath is None:
         print_help()
@@ -177,7 +179,9 @@ if __name__ == "__main__":
     logger.info("update the node with basic information")
     # create constraints, clean name
 
-    strategy.execute(start_page, pages=pages, conversion_id=conversion_id)
+    strategy.execute(
+        start_page, pages=pages, conversion_id=conversion_id, download_dir=download_dir
+    )
 
     if trad:
         langs.to_po_file("./trad.po")
