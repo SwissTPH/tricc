@@ -157,12 +157,21 @@ if __name__ == "__main__":
     #     print_help()
     #     sys.exit(2)
 
+    debug_path = os.fspath(out_path + conversion_id + "/debug.log")
+    debug_path = os.path.abspath(debug_path)
+
+    debug_file = Path(debug_path)
+    debug_file.parent.mkdir(exist_ok=True, parents=True)
+    logfile = open(debug_path, "w")
+
     if debug_level is not None:
-        setup_logger("default", "debug.log", LEVELS[debug_level])
+        setup_logger(
+            "default", out_path + conversion_id + "/debug.log", LEVELS[debug_level]
+        )
     elif "pydevd" in sys.modules:
-        setup_logger("default", "debug.log", logging.DEBUG)
+        setup_logger("default", out_path + conversion_id + "/debug.log", logging.DEBUG)
     else:
-        setup_logger("default", "debug.log", logging.INFO)
+        setup_logger("default", out_path + conversion_id + "/debug.log", logging.INFO)
 
     pre, ext = os.path.splitext(in_filepath)
     if out_path is None:
@@ -185,3 +194,6 @@ if __name__ == "__main__":
 
     if trad:
         langs.to_po_file("./trad.po")
+
+    logfile = open(debug_path, "r")
+    print(logfile.read())
