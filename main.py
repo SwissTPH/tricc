@@ -13,6 +13,7 @@ from tricc.models.lang import SingletonLangClass
 
 # gettext.bindtextdomain('tricc', './locale/')
 # gettext.textdomain('tricc')
+
 langs = SingletonLangClass()
 
 # fr =  gettext.translation('tricc', './locales' , languages=['fr'])
@@ -42,7 +43,9 @@ def setup_logger(
 ):
     l = logging.getLogger(logger_name)
     formatter = logging.Formatter(formatting)
-    file_handler = logging.FileHandler(log_file, mode="w")
+    file_handler = logging.FileHandler(
+        log_file, mode="w", encoding="utf-8"
+    )  # Set the encoding to utf-8
     file_handler.setFormatter(formatter)
     stream_handler = logging.StreamHandler()
     stream_handler.setFormatter(formatter)
@@ -102,7 +105,6 @@ if __name__ == "__main__":
                 params = tomllib.load(f)
         else:
             yaml_config_path = Path(upload_path + config[1] + ".yaml")
-            print(yaml_config_path)
             with open(yaml_config_path, "rb") as f:
                 params = yaml.load(f, Loader=yaml.SafeLoader)
 

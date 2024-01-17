@@ -1,7 +1,6 @@
 import base64
 import os
 import re
-from curses.ascii import isalnum, isalpha, isdigit
 
 from numpy import isnan
 
