@@ -91,6 +91,10 @@ class XLSFormStrategy(BaseOutPutStrategy):
         df_settings.head()
 
         newpath = os.path.join(self.output_path, conversion_id, file_name)
+        # create the output path if it doesn't exist
+        if not os.path.exists(os.path.join(self.output_path, conversion_id)):
+            os.makedirs(os.path.join(self.output_path, conversion_id))
+
         # create a Pandas Excel writer using XlsxWriter as the engine
         writer = pd.ExcelWriter(newpath, engine="xlsxwriter")
         self.df_survey.to_excel(writer, sheet_name="survey", index=False)
