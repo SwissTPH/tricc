@@ -222,6 +222,11 @@ class TriccNodeActivity(TriccNodeBaseModel):
     # save the instance on the base activity     
     instances: Dict[int, TriccNodeBaseModel] = {}
     relevance: Optional[Expression]
+    #caclulate that are not part of the any skip logic:
+    # - inputs
+    # - dandling calculate
+    # - case definition
+    calculates: List[TriccNodeCalculateBase] = []
 
     # redefine 
     def make_instance(self, instance_nb, **kwargs):
@@ -239,6 +244,8 @@ class TriccNodeActivity(TriccNodeBaseModel):
             instance.edges = edges
             unused_edges = []
             instance.edges = unused_edges
+            calculates = []
+            instance.calculates = calculates
             relevance = None
             instance.relevance = relevance
             groups = {}
@@ -252,7 +259,10 @@ class TriccNodeActivity(TriccNodeBaseModel):
             for node in list(filter(lambda p_node: isinstance(p_node, (TriccNodeDisplayBridge,TriccNodeBridge)),list(self.nodes.values()) )):
                 instance.update_nodes(node)
             for node in list(filter(lambda p_node: p_node != self.root and not isinstance(p_node, (TriccNodeDisplayBridge,TriccNodeBridge)),list(self.nodes.values()) )):
-                instance.update_nodes(node)
+                instance_node = instance.update_nodes(node)
+                if node in self.calculates and instance_node:
+                    instance.calulates.append(instance_node)
+
             for group in self.groups:
                 instance.update_groups(group)
                 # update parent group
@@ -279,6 +289,7 @@ class TriccNodeActivity(TriccNodeBaseModel):
 
     def update_nodes(self, node_origin):
         updated_edges = 0
+        node_instance = None
         if not isinstance(node_origin, TriccNodeSelectOption):
             # do not perpetuate the instance number in the underlying activities
             if isinstance(node_origin, TriccNodeActivity):
@@ -315,7 +326,7 @@ class TriccNodeActivity(TriccNodeBaseModel):
                                                                                   node_instance.__class__,
                                                                                   node_instance.get_name(),
                                                                                   node_instance.instance))
-
+        return node_instance
 
     def update_edges(self, node_origin, node_instance):
         updates = 0
@@ -748,9 +759,15 @@ def walktrhough_tricc_node_processed_stached(node, callback, processed_nodes, st
                     for gp in node.groups:
                         walktrhough_tricc_node_processed_stached(gp, callback, processed_nodes, stashed_nodes, path_len,
                                                          recursive, warn = warn,**kwargs)
+                    if node.calculates:
+                        for c in node.calculates:
+                            walktrhough_tricc_node_processed_stached(c, callback, processed_nodes, stashed_nodes, path_len,
+                                                         recursive, warn = warn,**kwargs)
                 elif node.root not in stashed_nodes:
                     #stashed_nodes.insert(0,node.root)
                     stashed_nodes.append(node.root)
+                    if node.calculates:
+                        stashed_nodes += node.calculates
                     for gp in node.groups:
                         stashed_nodes.append(gp)
                     #    stashed_nodes.insert(0,gp)
@@ -957,8 +974,12 @@ def reverse_walkthrough(in_node, next_node, callback, processed_nodes, stashed_n
             for prev in prev_nodes:
                 reverse_walkthrough(prev, next_node, callback, processed_nodes, stashed_nodes, history)
         if hasattr(node, 'prev_nodes'):
-            for prev in node.prev_nodes:
-                reverse_walkthrough(prev, node, callback, processed_nodes, stashed_nodes, history)
+            if node.prev_nodes:
+                for prev in node.prev_nodes:
+                    reverse_walkthrough(prev, node, callback, processed_nodes, stashed_nodes, history)
+            elif node in node.activity.calculates:
+                reverse_walkthrough(prev, node.activity.root, callback, processed_nodes, stashed_nodes, history)
+
         if issubclass(node.__class__, TriccRhombusMixIn):
             if isinstance(node.reference, list):
                 for ref in node.reference:
