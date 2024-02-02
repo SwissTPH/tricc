@@ -68,8 +68,9 @@ def manage_dandling_calculate(activity):
         if len(prev_nodes) == 0 and issubclass(node.__class__, TriccNodeCalculate):
             dandling[node.id] = node
     if len(dandling)>0:
-        wait = get_activity_wait([activity.root], [activity.root], dandling.values(), edge_only=True)
-        activity.nodes.update(dandling)
+        activity.calculates+=list(dandling.values())
+        #wait = get_activity_wait([activity.root], [activity.root], dandling.values(), edge_only=True)
+        #activity.nodes.update(dandling)
             
             
 def process_edges(diagram, media_path, activity, nodes):
