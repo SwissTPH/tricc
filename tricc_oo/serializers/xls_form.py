@@ -2,11 +2,11 @@
 
 import logging
 
-from tricc.converters.tricc_to_xls_form import (TRICC_CALC_EXPRESSION,
+from tricc_oo.converters.tricc_to_xls_form import (TRICC_CALC_EXPRESSION,
                                                 negate_term, VERSION_SEPARATOR,INSTANCE_SEPARATOR,  get_export_name)
-from tricc.converters.utils import clean_name, remove_html
-from tricc.models.lang import SingletonLangClass
-from tricc.models.tricc import *
+from tricc_oo.converters.utils import clean_name, remove_html
+from tricc_oo.models.lang import SingletonLangClass
+from tricc_oo.models.tricc import *
 
 logger = logging.getLogger('default')
 

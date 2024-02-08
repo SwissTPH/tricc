@@ -9,7 +9,7 @@ from typing import Dict, ForwardRef, List, Optional, Union
 from pydantic import BaseModel, constr
 from strenum import StrEnum
 
-from tricc.converters.utils import generate_id
+from tricc_oo.converters.utils import generate_id
 
 logger = logging.getLogger("default")
 

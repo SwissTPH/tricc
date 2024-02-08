@@ -9,25 +9,25 @@ import os
 
 import pandas as pd
 
-from tricc.converters.tricc_to_xls_form import (
+from tricc_oo.converters.tricc_to_xls_form import (
     generate_xls_form_calculate,
     generate_xls_form_condition,
     generate_xls_form_relevance,
 )
-from tricc.models.tricc import (
+from tricc_oo.models.tricc import (
     TriccNodeActivity,
     check_stashed_loop,
     walktrhough_tricc_node_processed_stached,
     TriccGroup,
 )
-from tricc.serializers.xls_form import (
+from tricc_oo.serializers.xls_form import (
     CHOICE_MAP,
     SURVEY_MAP,
     end_group,
     generate_xls_form_export,
     start_group,
 )
-from tricc.strategies.output.base_output_strategy import BaseOutPutStrategy
+from tricc_oo.strategies.output.base_output_strategy import BaseOutPutStrategy
 
 logger = logging.getLogger("default")
 

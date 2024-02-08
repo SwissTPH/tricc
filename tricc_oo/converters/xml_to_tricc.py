@@ -5,13 +5,13 @@ from curses.ascii import isalnum, isalpha, isdigit
 
 from numpy import isnan
 
-from tricc.converters.utils import OPERATION_LIST, clean_name, remove_html
-from tricc.models.tricc import *
-from tricc.parsers.xml import (get_edges_list, get_mxcell,
+from tricc_oo.converters.utils import OPERATION_LIST, clean_name, remove_html
+from tricc_oo.models.tricc import *
+from tricc_oo.parsers.xml import (get_edges_list, get_mxcell,
                                get_mxcell_parent_list, get_tricc_type,
                                get_tricc_type_list)
 
-from tricc.visitors.tricc import *
+from tricc_oo.visitors.tricc import *
 
 TRICC_YES_LABEL = ['yes', "oui"]
 TRICC_NO_LABEL = ['no', "non"]

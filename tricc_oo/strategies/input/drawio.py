@@ -4,11 +4,11 @@ import logging
 import os
 from copy import copy
 
-from tricc.converters.xml_to_tricc import create_activity
-from tricc.visitors.tricc import process_calculate
-from tricc.models.tricc import *
-from tricc.strategies.input.base_input_strategy import BaseInputStrategy
-from tricc.parsers.xml import read_drawio
+from tricc_oo.converters.xml_to_tricc import create_activity
+from tricc_oo.visitors.tricc import process_calculate
+from tricc_oo.models.tricc import *
+from tricc_oo.strategies.input.base_input_strategy import BaseInputStrategy
+from tricc_oo.parsers.xml import read_drawio
 logger = logging.getLogger('default')
 class DrawioStrategy(BaseInputStrategy):
     processes = [

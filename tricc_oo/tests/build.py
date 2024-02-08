@@ -6,7 +6,7 @@ import sys
 import gc
 
 # set up logging to file
-from tricc.models.lang import SingletonLangClass
+from tricc_oo.models.lang import SingletonLangClass
 
 # gettext.bindtextdomain('tricc', './locale/')
 # gettext.textdomain('tricc')
@@ -21,14 +21,14 @@ langs = SingletonLangClass()
 # langs.add_trad('fr', fr)
 # langs.add_trad('en', en)
 
-from tricc.strategies.input.drawio import DrawioStrategy
-from tricc.strategies.input.medalcreator import MedalCStrategy
+from tricc_oo.strategies.input.drawio import DrawioStrategy
+from tricc_oo.strategies.input.medalcreator import MedalCStrategy
 
-# from tricc.serializers.medalcreator import execute
+# from tricc_oo.serializers.medalcreator import execute
 
-from tricc.strategies.output.xls_form import XLSFormStrategy
-from tricc.strategies.output.xlsform_cdss import XLSFormCDSSStrategy
-from tricc.strategies.output.xlsform_cht import XLSFormCHTStrategy
+from tricc_oo.strategies.output.xls_form import XLSFormStrategy
+from tricc_oo.strategies.output.xlsform_cdss import XLSFormCDSSStrategy
+from tricc_oo.strategies.output.xlsform_cht import XLSFormCHTStrategy
 
 
 def setup_logger(

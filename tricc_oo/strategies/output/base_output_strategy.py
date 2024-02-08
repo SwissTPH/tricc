@@ -1,6 +1,6 @@
 import abc
 import logging
-from tricc.models.tricc import stashed_node_func
+from tricc_oo.models.tricc import stashed_node_func
 
 
 logger = logging.getLogger('default')

@@ -5,9 +5,9 @@ from curses.ascii import isalnum, isalpha, isdigit
 
 from numpy import isnan
 
-from tricc.converters.utils import OPERATION_LIST, clean_name, remove_html
-from tricc.models.tricc import *
-from tricc.parsers.xml import (get_edges_list, get_mxcell,
+from tricc_oo.converters.utils import OPERATION_LIST, clean_name, remove_html
+from tricc_oo.models.tricc import *
+from tricc_oo.parsers.xml import (get_edges_list, get_mxcell,
                                get_mxcell_parent_list, get_tricc_type,
                                get_tricc_type_list)
 
@@ -17,11 +17,46 @@ import logging
 logger = logging.getLogger("default")
 MC_NODE_NAME = "id_{}"
 
+def get_registration_nodes():
+    js_nodes={}
+    js_nodes['first_name'] = {
+          "id":'first_name' ,
+          "label": {
+            "en": "First Name",
+            "fr": "Prénom"
+          },
+          "type": "Question",
+          "category": "patient_data",
+          "value_format": "String"
+    }
+    js_nodes['last_name'] = {
+        "id":'last_name' ,
+        "label": {
+        "en": "Last Name",
+        "fr": "Nom de famille"
+        },
+        "type": "Question",
+        "category": "patient_data",
+        "value_format": "String"
+    }
+    js_nodes['birth_date'] = {
+        "id":'birth_date' ,
+        "label": {
+        "en": "Date of birth",
+        "fr": "Date de naissance"
+        },
+        "type": "Question",
+        "category": "patient_data",
+        "value_format": "Date"
+    }
+    return js_nodes
+
+
 def create_activity(full_order, name, media_path, json_nodes, last_page):
-    # step can be
-    # - list of id
-    # - list of group
-    # - older/neonat group
+    
+    #get CC
+    
+    
     groups = []
     nodes = []
     if last_page is None:
@@ -37,6 +72,7 @@ def create_activity(full_order, name, media_path, json_nodes, last_page):
                 id=get_mc_name(name),       
                 label=name
     )
+    
     prev.activity = activity
     prev.group = activity
     activity.group = activity

@@ -1,7 +1,7 @@
 import re
 
-from tricc.converters.utils import *
-from tricc.models.tricc import *
+from tricc_oo.converters.utils import *
+from tricc_oo.models.tricc import *
 
 
 

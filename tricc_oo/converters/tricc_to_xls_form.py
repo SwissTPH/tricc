@@ -1,8 +1,8 @@
 from operator import attrgetter
 import re
 
-from tricc.converters.utils import OPERATION_LIST, clean_str,clean_name
-from tricc.models.tricc import *
+from tricc_oo.converters.utils import OPERATION_LIST, clean_str,clean_name
+from tricc_oo.models.tricc import *
 
 # from babel import _
 

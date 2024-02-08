@@ -2,13 +2,17 @@
 import json
 from types import SimpleNamespace
 
-from tricc.converters.mc_to_tricc import create_activity,build_relevance,fetch_reference,fetch_condition
-from tricc.models.tricc import *
-from tricc.strategies.input.base_input_strategy import BaseInputStrategy
+from tricc_oo.converters.mc_to_tricc import create_activity,build_relevance,fetch_reference,fetch_condition, get_registration_nodes
+from tricc_oo.models.tricc import *
+from tricc_oo.strategies.input.base_input_strategy import BaseInputStrategy
 
 media_path = "./"
 class MedalCStrategy(BaseInputStrategy):
   def execute(self, in_filepath, media_path):
+    
+
+      
+      #load all
       f = open(in_filepath)
       js_full = json.load(f)
       pages = {}
@@ -18,44 +22,26 @@ class MedalCStrategy(BaseInputStrategy):
       js_final_diagnoses = js_full['medal_r_json']['final_diagnoses']
       js_diagnoses = js_full['medal_r_json']['diagnoses']
       js_diagrams = js_full['medal_r_json']['diagram']
+      js_qs_id = [ id for id ,node in js_nodes.items() if node['type'] == "QuestionsSequence" ]
+      # get complaints
+      # complains"category": "complaint_category",
+      js_complaints = [ node for id ,node in js_nodes.items() if node['category'] == "complaint_category" ]
+      # create complain page
+      # add registration
+      js_registration_nodes = get_registration_nodes()
       
+      #TODO create page
+      registration_activity = create_activity(
+              stage, 
+              key, 
+              media_path, 
+              js_nodes = {**js_registration_nodes, **js_complaints,**js_final_diagnoses } , 
+              last_page= None)
+      # create diagnose pages
+      # that are all merged and splitted in stages
       js_all = {**js_nodes, **js_diagnoses,**js_final_diagnoses }
-      js_nodes['first_name'] = {
-          "id":'first_name' ,
-          "label": {
-            "en": "First Name",
-            "fr": "Prénom"
-          },
-          "type": "Question",
-          "category": "patient_data",
-          "value_format": "String"
-      }
-      js_nodes['last_name'] = {
-          "id":'last_name' ,
-          "label": {
-            "en": "Last Name",
-            "fr": "Nom de famille"
-          },
-          "type": "Question",
-          "category": "patient_data",
-          "value_format": "String"
-      }
-      
-
-      js_nodes['birth_date'] = {
-          "id":'birth_date' ,
-          "label": {
-            "en": "Date of birth",
-            "fr": "Date de naissance"
-          },
-          "type": "Question",
-          "category": "patient_data",
-          "value_format": "Date"
-      }
-
-      
       is_first=True
-      last_page = None
+      last_page = registration_activity
       for key, stage in js_fullorder.items():
           page = create_activity(stage, key, media_path, js_nodes, last_page)
           last_page = page  
@@ -66,6 +52,15 @@ class MedalCStrategy(BaseInputStrategy):
               page.root.label=js_full['name']
           is_first = False 
       all_nodes = [node for page in list(pages.values()) for node in page.nodes ]
+      #TODO
+      # create diagnose page
+      #TODO
+      # crete treatment page
+      #TODO
+      
+      
+      
+     
       # add p_age
       brith_date_node = list(filter(lambda gp: gp.id == 'birth_date', all_nodes))[0]
       age_node = TriccNodeCalculate(
