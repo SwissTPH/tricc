@@ -1,14 +1,12 @@
 import abc
 
-from tricc_oo.models.tricc import (
-    stashed_node_func,
+from tricc_oo.models import (
     TriccNodeMainStart,
     TriccNodeActivity,
     TriccEdge,
 )
 from tricc_oo.converters.utils import generate_id
-from tricc_oo.visitors.tricc import get_activity_wait
-from tricc_oo.models.tricc import set_prev_next_node
+from tricc_oo.visitors.tricc import get_activity_wait, stashed_node_func, set_prev_next_node
 from itertools import chain
 import logging
 

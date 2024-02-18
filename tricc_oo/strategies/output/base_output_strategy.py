@@ -1,6 +1,6 @@
 import abc
 import logging
-from tricc_oo.models.tricc import stashed_node_func
+from tricc_oo.visitors.tricc import stashed_node_func
 
 
 logger = logging.getLogger('default')
@@ -84,6 +84,56 @@ class BaseOutPutStrategy:
     @abc.abstractmethod
     def export(self, **kwargs):
         pass
+    def tricc_operation_equal(self, ref_expressions):
+        raise NotImplemented(f"This type of opreation '{operation.operation}' is not supported in this strategy")
+    def tricc_operation_not_equal(self, ref_expressions):
+        raise NotImplemented(f"This type of opreation '{operation.operation}' is not supported in this strategy")
+    def tricc_operation_not(self, ref_expressions):
+        raise NotImplemented(f"This type of opreation '{operation.operation}' is not supported in this strategy")
+    def tricc_operation_and(self, ref_expressions):
+        raise NotImplemented(f"This type of opreation '{operation.operation}' is not supported in this strategy")
+    def tricc_operation_or(self, ref_expressions):
+        raise NotImplemented(f"This type of opreation '{operation.operation}' is not supported in this strategy")
+    def tricc_operation_or_and(self, ref_expressions):
+        raise NotImplemented(f"This type of opreation '{operation.operation}' is not supported in this strategy")
+    def tricc_operation_native(self, ref_expressions):
+        raise NotImplemented(f"This type of opreation '{operation.operation}' is not supported in this strategy")
+    def tricc_operation_istrue(self, ref_expressions):
+        raise NotImplemented(f"This type of opreation '{operation.operation}' is not supported in this strategy")
+    def tricc_operation_isfalse(self, ref_expressions):
+        raise NotImplemented(f"This type of opreation '{operation.operation}' is not supported in this strategy")
+    def tricc_operation_selected(self, ref_expressions):
+        raise NotImplemented(f"This type of opreation '{operation.operation}' is not supported in this strategy")
+    def tricc_operation_more_or_equal(self, ref_expressions):
+        raise NotImplemented(f"This type of opreation '{operation.operation}' is not supported in this strategy")
+    def tricc_operation_less_or_equal(self, ref_expressions):
+        raise NotImplemented(f"This type of opreation '{operation.operation}' is not supported in this strategy")
+    def tricc_operation_more(self, ref_expressions):
+        raise NotImplemented(f"This type of opreation '{operation.operation}' is not supported in this strategy")
+    def tricc_operation_less(self, ref_expressions):
+        raise NotImplemented(f"This type of opreation '{operation.operation}' is not supported in this strategy")
+    def tricc_operation_between(self, ref_expressions):
+        raise NotImplemented(f"This type of opreation '{operation.operation}' is not supported in this strategy")
+    def tricc_operation_case(self, ref_expressions):
+        raise NotImplemented(f"This type of opreation '{operation.operation}' is not supported in this strategy")
+    def tricc_operation_if(self, ref_expressions):
+        raise NotImplemented(f"This type of opreation '{operation.operation}' is not supported in this strategy")
+    def tricc_operation_contains(self, ref_expressions):
+        raise NotImplemented(f"This type of opreation '{operation.operation}' is not supported in this strategy")
+    def tricc_operation_exists(self, ref_expressions):
+        raise NotImplemented(f"This type of opreation '{operation.operation}' is not supported in this strategy")
+    def tricc_operation_has_qualifier(self, ref_expressions):
+        raise NotImplemented(f"This type of opreation '{operation.operation}' is not supported in this strategy")
+    def tricc_operation_zscore(self, ref_expressions):
+        raise NotImplemented(f"This type of opreation '{operation.operation}' is not supported in this strategy")
+    def tricc_operation_izscore(self, ref_expressions):
+        raise NotImplemented(f"This type of opreation '{operation.operation}' is not supported in this strategy")
+    def tricc_operation_age_day(self, ref_expressions):
+        raise NotImplemented(f"This type of opreation '{operation.operation}' is not supported in this strategy")
+    def tricc_operation_age_month(self, ref_expressions):
+        raise NotImplemented(f"This type of opreation '{operation.operation}' is not supported in this strategy")
+    def tricc_operation_age_year(self, ref_expressions):
+        raise NotImplemented(f"This type of opreation '{operation.operation}' is not supported in this strategy")
 
 ## Utils
     def do_clean(self, **kwargs):

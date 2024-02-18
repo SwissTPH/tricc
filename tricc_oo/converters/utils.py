@@ -1,7 +1,7 @@
 import logging
 import random
 import string
-
+import hashlib
 import html2text
 
 
@@ -26,8 +26,11 @@ def clean_name( name, prefix='' ):
          name =  name[1:]
     return name
 
-def generate_id():
-    return ''.join(random.choices(string.ascii_lowercase, k=8))
+def generate_id(name=None):
+    if name:
+        return hashlib.md5(name)
+    else:
+        return ''.join(random.choices(string.ascii_lowercase, k=8))
 
 # the soup.text strips off the html formatting also
 def remove_html(string):

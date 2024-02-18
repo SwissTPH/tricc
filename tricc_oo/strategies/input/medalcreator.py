@@ -2,134 +2,101 @@
 import json
 from types import SimpleNamespace
 
-from tricc_oo.converters.mc_to_tricc import create_activity,build_relevance,fetch_reference,fetch_condition, get_registration_nodes
-from tricc_oo.models.tricc import *
+from tricc_oo.converters.mc_to_tricc import (
+  create_activity,build_relevance,
+  get_registration_nodes,
+  add_age_calcualte_nodes,
+  add_diag_silo,
+  add_background_calculations,
+  add_qs_expression,
+  )
+from tricc_oo.models import *
+from tricc_oo.visitors.tricc import set_prev_next_node
 from tricc_oo.strategies.input.base_input_strategy import BaseInputStrategy
 
 media_path = "./"
 class MedalCStrategy(BaseInputStrategy):
   def execute(self, in_filepath, media_path):
-    
-
-      
       #load all
       f = open(in_filepath)
       js_full = json.load(f)
       pages = {}
-      start_page=None
+      start_page= {}
+      # Get the order
       js_fullorder =  js_full['medal_r_json']['config']['full_order']
+      # get the nodes
       js_nodes = js_full['medal_r_json']['nodes']
+      
       js_final_diagnoses = js_full['medal_r_json']['final_diagnoses']
       js_diagnoses = js_full['medal_r_json']['diagnoses']
-      js_diagrams = js_full['medal_r_json']['diagram']
+      #js_diagrams = js_full['medal_r_json']['diagram']
       js_qs_id = [ id for id ,node in js_nodes.items() if node['type'] == "QuestionsSequence" ]
-      # get complaints
-      # complains"category": "complaint_category",
-      js_complaints = [ node for id ,node in js_nodes.items() if node['category'] == "complaint_category" ]
-      # create complain page
-      # add registration
-      js_registration_nodes = get_registration_nodes()
+      #get the special question
+      weight_id = js_full['medal_r_json']['config']['basic_questions']['weight_question_id']
+      gender_id = js_full['medal_r_json']['config']['basic_questions']['gender_question_id']
       
-      #TODO create page
-      registration_activity = create_activity(
-              stage, 
-              key, 
-              media_path, 
-              js_nodes = {**js_registration_nodes, **js_complaints,**js_final_diagnoses } , 
-              last_page= None)
+      yi_cc_id = js_full['medal_r_json']['config']['basic_questions']['general_cc_id']
+      child_cc_id = js_full['medal_r_json']['config']['basic_questions']['yi_general_cc_id']
+      js_trad = js_full['medal_r_json']['config']['systems_translations']
+      #TODO manage village list for village questions
+      # add patietn nodes
+      js_registration_nodes = get_registration_nodes()   
       # create diagnose pages
       # that are all merged and splitted in stages
-      js_all = {**js_nodes, **js_diagnoses,**js_final_diagnoses }
+      js_questions = {**js_registration_nodes, **js_nodes}
       is_first=True
-      last_page = registration_activity
+      last_page = None
       for key, stage in js_fullorder.items():
-          page = create_activity(stage, key, media_path, js_nodes, last_page)
-          last_page = page  
-          pages[key]=page
+          page = create_activity(stage, key, media_path, js_questions, last_page, js_trad)
           if is_first :
-              start_page = page
+              start_page['main'] = page
               page.root.form_id=js_full['id']
               page.root.label=js_full['name']
-          is_first = False 
-      all_nodes = [node for page in list(pages.values()) for node in page.nodes ]
-      #TODO
-      # create diagnose page
-      #TODO
-      # crete treatment page
-      #TODO
+          else:
+              set_prev_next_node(last_page, page)
+          is_first = False
+          last_page = page  
+          pages[key]=page
+          
       
+      all_nodes = update_all_nodes(pages)
+      add_diag_silo(start_page['main'], js_diagnoses, all_nodes)
+      age = add_age_calcualte_nodes(all_nodes)
+      add_background_calculations(start_page['main'], pages, js_nodes, all_nodes)
+      add_qs_expression(start_page['main'], pages, age, js_nodes, all_nodes)
       
-      
-     
-      # add p_age
-      brith_date_node = list(filter(lambda gp: gp.id == 'birth_date', all_nodes))[0]
-      age_node = TriccNodeCalculate(
-        name = 'p_age_day',
-        reference = [brith_date_node],
-        expression_reference = 'int((today()-date(${{{}}})))',
-        id = 'p_age_day',
-        activity = brith_date_node.activity,
-        group = brith_date_node.activity
-      )
-      set_prev_next_node(brith_date_node,age_node)
-      brith_date_node.activity.nodes.append(age_node)
-      yi_node = TriccNodeRhombus(
-        name = 'yi',
-        reference = [age_node],
-        expression_reference = '${{{}}}< 62',
-        id = 'yi',
-        activity = brith_date_node.activity,
-        group = brith_date_node.activity
-      )
-      set_prev_next_node(age_node,yi_node)
-      brith_date_node.activity.nodes.append(yi_node)
-      
-      child_node = TriccNodeExclusive(
-        id = generate_id(),
-        activity = brith_date_node.activity,
-        group = brith_date_node.activity
-      )
-      set_prev_next_node(yi_node,child_node)
-      brith_date_node.activity.nodes.append(child_node)
-      
-      # add the missing nodes
-      all_nodes = [node for page in list(pages.values()) for node in page.nodes ]
-      node_id_covered = [node.id for node in all_nodes ]
-      mode_id_missing= list(filter(lambda key: key not in node_id_covered ,js_nodes))
-      page = create_activity(mode_id_missing, "other_nodes", media_path, js_nodes, last_page)
-      last_page = page  
-      pages["other_nodes"]=page
-      # add the interogation logic
-      all_nodes = [node for page in list(pages.values()) for node in page.nodes ]
-      #fetch_reference(all_nodes)  
-      build_relevance(all_nodes, age_node, js_nodes) 
-      
-      #fetch_condition(all_nodes,js_nodes)
-      ## add the diagnostics
-      
-      page = create_activity(list(js_diagnoses.keys()), "diagnoses", media_path, js_diagnoses, last_page)    
-      last_page = page  
-      pages["diagnoses"]=page
-      prefix = 'qual'
-      #all_nodes = [*page.nodes, age_node, brith_date_node]
-      all_nodes = [node for page in list(pages.values()) for node in page.nodes ]
+      all_nodes = update_all_nodes(pages)
+      #add age related nodes
 
-      #fetch_reference(all_nodes,prefix=prefix)
-      build_relevance(all_nodes, age_node, js_nodes,prefix=prefix) 
-      #fetch_condition(all_nodes,js_nodes,prefix=prefix)
-      ## add the diagnostics
-      
-      prefix = 'diag'
-      page = create_activity(list(js_final_diagnoses.keys()), "final_diagnoses", media_path, js_final_diagnoses, last_page)    
+      all_nodes = update_all_nodes(pages)
+
+      #add trigger for the CC questions
+      js_nodes[str(yi_cc_id)]["cut_off_end"] = 62
+      js_nodes[str(child_cc_id)]["cut_off_start"] = 62
+   
+      # 
+      #add diagnostic calculate nodes
+            
       last_page = page  
-      pages["final_diagnoses"]=page
+      pages["final_diagnoses"]=page     
+  
+      # add the final diagnostics
+      # TODO
 
-      #all_nodes = [*page.nodes, age_node, brith_date_node]
-      all_nodes = [node for page in list(pages.values()) for node in page.nodes ]
+      # add the missing nodes FIXME: check if needed
+      all_nodes = update_all_nodes(pages)
+      # node_id_covered = all_nodes.keys()
+      # mode_id_missing= list(filter(lambda key: key not in node_id_covered ,js_nodes))
+      # page = create_activity(mode_id_missing, "other_nodes", media_path, js_nodes, last_page, js_trad)
+      # set_prev_next_node(last_page, page)
+      # last_page = page  
+      # pages["other_nodes"]=page
+      
+      # # refresh all nodes to inject the logic
+      # all_nodes = update_all_nodes(pages)
 
-      #fetch_reference(all_nodes,prefix=prefix)
-      build_relevance(all_nodes, age_node, js_diagnoses,prefix=prefix) 
-      #fetch_condition(all_nodes,js_diagnoses,prefix=prefix)
+      build_relevance(all_nodes, age, js_questions, js_diagnoses, js_final_diagnoses) 
+      
 
 
 
@@ -148,16 +115,18 @@ class MedalCStrategy(BaseInputStrategy):
       yi_groups =  list(filter(lambda gp: gp.name == 'neonat', all_group))
 
 
-      for gp in older_groups:
-          set_prev_next_node(child_node,gp)
-      for gp in yi_groups:
-          set_prev_next_node(yi_node,gp)
-          
+
+        
+      #cleaning
       for page in pages.values():
-        for node in page.nodes:
+        to_del=[]
+        for node in page.nodes.values():
           if len(node.prev_nodes)==0 and len(node.next_nodes)==0:
-            page.nodes.remove(node)
+            to_del.append(node.id) 
+        for id in to_del:
+              del page.nodes[id]
           
       return start_page, pages     
           
-      
+def update_all_nodes(pages):
+  return {node.id: node for page in list(pages.values()) for node in page.nodes.values() }

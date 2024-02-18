@@ -44,3 +44,19 @@ class XLSFormCDSSStrategy(XLSFormStrategy):
                     and not any([get_export_name(diag)  == get_export_name(node) for diag in diags]):
                         diags.append(node)
         return diags
+    
+    def tricc_operation_has_qualifier(self, ref_expressions):
+        raise NotImplemented(f"This type of opreation '{operation.operation}' is not supported in this strategy")
+    def tricc_operation_zscore(self, ref_expressions):
+        raise NotImplemented(f"This type of opreation '{operation.operation}' is not supported in this strategy")
+    def tricc_operation_izscore(self, ref_expressions):
+        raise NotImplemented(f"This type of opreation '{operation.operation}' is not supported in this strategy")
+    def tricc_operation_age_day(self, ref_expressions):
+        dob_node_name=  operation.reference[0].value if not operation.reference else 'birthday'
+        return f'int((today()-date(${{{dob_node_name}}})))'
+    def tricc_operation_age_month(self, ref_expressions):
+        dob_node_name=  operation.reference[0].value if not operation.reference else 'birthday'
+        return f'int((today()-date(${{{dob_node_name}}})) div 30.25)'
+    def tricc_operation_age_year(self, ref_expressions):
+        dob_node_name=  operation.reference[0].value if not operation.reference else 'birthday'
+        return f'int((today()-date(${{{dob_node_name}}})) div 365.25)'

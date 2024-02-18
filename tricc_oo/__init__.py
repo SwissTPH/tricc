@@ -6,6 +6,8 @@ Collect easy.
 
 __version__ = "1.0.2"
 
+from .models.base import *
+from .models.calculate import *
 from .models.tricc import *
 from .serializers import *
 

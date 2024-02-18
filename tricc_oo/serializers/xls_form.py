@@ -6,8 +6,8 @@ from tricc_oo.converters.tricc_to_xls_form import (TRICC_CALC_EXPRESSION,
                                                 negate_term, VERSION_SEPARATOR,INSTANCE_SEPARATOR,  get_export_name)
 from tricc_oo.converters.utils import clean_name, remove_html
 from tricc_oo.models.lang import SingletonLangClass
-from tricc_oo.models.tricc import *
-
+from tricc_oo.models import *
+from tricc_oo.visitors.tricc import is_ready_to_process
 logger = logging.getLogger('default')
 
 langs = SingletonLangClass()
