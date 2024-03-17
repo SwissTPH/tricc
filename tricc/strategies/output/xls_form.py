@@ -110,11 +110,16 @@ class XLSFormStrategy(BaseOutPutStrategy):
         df_settings = pd.DataFrame(settings, index=indx)
         df_settings.head()
 
-        newpath = os.path.join(self.output_path, file_name)
+        # newpath = os.path.join(self.output_path, file_name)
         # create newpath if it not exists
-        if not os.path.exists(self.output_path):
-            os.makedirs(self.output_path)
+        # if not os.path.exists(self.output_path):
+        #    os.makedirs(self.output_path)
 
+        return {
+            "survey": self.df_survey.to_json(orient="records"),
+            "choices": self.df_choice.to_json(orient="records"),
+            "settings": df_settings.to_json(orient="records"),
+        }
         # create a Pandas Excel writer using XlsxWriter as the engine
         writer = pd.ExcelWriter(newpath, engine="xlsxwriter")
         self.df_survey.to_excel(writer, sheet_name="survey", index=False)
@@ -149,7 +154,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
             stashed_nodes,
             path_len,
             cur_group=activity.root.group,
-            **self.get_kwargs()
+            **self.get_kwargs(),
         )
         end_group(cur_group=activity, groups=groups, **self.get_kwargs())
         # we save the survey data frame
@@ -192,7 +197,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
                     cur_group=s_node.group,
                     groups=groups,
                     relevance=True,
-                    **self.get_kwargs()
+                    **self.get_kwargs(),
                 )
                 # arrange empty group
                 walktrhough_tricc_node_processed_stached(
@@ -203,7 +208,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
                     path_len,
                     groups=groups,
                     cur_group=s_node.group,
-                    **self.get_kwargs()
+                    **self.get_kwargs(),
                 )
                 # add end group if new node where added OR if the previous end group was removed
                 end_group(cur_group=s_node.group, groups=groups, **self.get_kwargs())

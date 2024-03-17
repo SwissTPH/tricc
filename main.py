@@ -4,6 +4,8 @@ import logging
 import os
 import sys
 import gc
+import shutil
+from pathlib import Path
 
 # set up logging to file
 from tricc.models.lang import SingletonLangClass
@@ -39,7 +41,7 @@ def setup_logger(
 ):
     l = logging.getLogger(logger_name)
     formatter = logging.Formatter(formatting)
-    file_handler = logging.FileHandler(log_file, mode="w")
+    file_handler = logging.FileHandler(log_file, mode="w+")
     file_handler.setFormatter(formatter)
     stream_handler = logging.StreamHandler()
     stream_handler.setFormatter(formatter)
@@ -90,7 +92,7 @@ if __name__ == "__main__":
     output_strategy = "XLSFormStrategy"
     try:
         opts, args = getopt.getopt(
-            sys.argv[1:], "hti:o:s:I:O:l:d:", ["input=", "output=", "help", "trads"]
+            sys.argv[1:], "hti:o:s:I:O:l:d:D:", ["input=", "output=", "help", "trads"]
         )
     except getopt.GetoptError:
         print_help()
@@ -113,25 +115,50 @@ if __name__ == "__main__":
             debug_level = arg
         elif opt in ("-t", "--trads"):
             trad = True
+        elif opt == "-D":
+            download_dir = arg
     if in_filepath is None:
         print_help()
         sys.exit(2)
 
+    debug_path = os.fspath(out_path + "/debug.log")
+    debug_path = os.path.abspath(debug_path)
+
+    debug_file = Path(debug_path)
+    debug_file.parent.mkdir(exist_ok=True, parents=True)
+    logfile = open(debug_path, "w")
+
+    debug_file_path = os.path.join(out_path, "debug.log")
+
     if debug_level is not None:
-        setup_logger("default", "debug.log", LEVELS[debug_level])
+        setup_logger("default", debug_file_path, LEVELS[debug_level])
     elif "pydevd" in sys.modules:
-        setup_logger("default", "debug.log", logging.DEBUG)
+        setup_logger("default", debug_file_path, logging.DEBUG)
     else:
-        setup_logger("default", "debug.log", logging.INFO)
+        setup_logger("default", debug_file_path, logging.INFO)
 
     pre, ext = os.path.splitext(in_filepath)
+
     if out_path is None:
         # if output file path not specified, just chagne the extension
         out_path = os.path.dirname(pre)
-    strategy = globals()[input_strategy](in_filepath)
+
+    file_content = []
+    if os.path.isdir(in_filepath):
+        files = [f for f in os.listdir(in_filepath) if f.endswith(".drawio")]
+    elif os.path.isfile(in_filepath):
+        with open(in_filepath, "r") as f:
+            file_content = f.read()
+            file_content = [file_content]
+
+    if file_content.__len__ == 0:  # if the file is not a directory
+        print("File cannot be read")
+
+    strategy = globals()[input_strategy](file_content)
     logger.info(f"build the graph from strategy {input_strategy}")
     media_path = os.path.join(out_path, "media-tmp")
-    start_page, pages = strategy.execute(in_filepath, media_path)
+    start_page, pages, images = strategy.execute(file_content, media_path)
+    print(len(images))
 
     strategy = globals()[output_strategy](out_path)
 
@@ -139,7 +166,14 @@ if __name__ == "__main__":
     logger.info("update the node with basic information")
     # create constraints, clean name
 
-    strategy.execute(start_page, pages=pages)
+    output = strategy.execute(start_page, pages=pages)
 
-    if trad:
-        langs.to_po_file("./trad.po")
+    # compress the output folder to a zip archieve and place it in the download directory
+    shutil.make_archive(os.path.join(download_dir), "zip", os.path.join(out_path))
+
+    # print the content of debug.log
+    with open(debug_file_path, "r") as f:
+        print(f.read())
+
+    # if trad:
+    # langs.to_po_file("./trad.po")
