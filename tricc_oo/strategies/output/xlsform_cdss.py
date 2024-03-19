@@ -46,17 +46,22 @@ class XLSFormCDSSStrategy(XLSFormStrategy):
         return diags
     
     def tricc_operation_has_qualifier(self, ref_expressions):
-        raise NotImplemented(f"This type of opreation '{operation.operation}' is not supported in this strategy")
+        raise NotImplementedError(f"This type of opreration  is not supported in this strategy")
     def tricc_operation_zscore(self, ref_expressions):
-        raise NotImplemented(f"This type of opreation '{operation.operation}' is not supported in this strategy")
+        l = "instance('z_score')/root/item[gender=${gender} and x_max>"+ ref_expressions[0]+" and x_min<="+ ref_expressions[0]+"]/l" 
+        m = "instance('z_score')/root/item[gender=${gender} and x_max>"+ ref_expressions[0]+" and x_min<="+ ref_expressions[0]+"]/m"
+        s = "instance('z_score')/root/item[gender=${gender} and x_max>"+ ref_expressions[0]+" and x_min<="+ ref_expressions[0]+"]/s"
+        #  return ((Math.pow((y / m), l) - 1) / (s * l));
+        return f"(pow({ref_expressions[1]} div ({m}), {l}) -1) div (({s}) div ({l}))"
+    
     def tricc_operation_izscore(self, ref_expressions):
-        raise NotImplemented(f"This type of opreation '{operation.operation}' is not supported in this strategy")
+        raise NotImplementedError(f"This type of opreration  is not supported in this strategy")
     def tricc_operation_age_day(self, ref_expressions):
-        dob_node_name=  operation.reference[0].value if not operation.reference else 'birthday'
+        dob_node_name=  ref_expressions[0].value if not ref_expressions else 'birthday'
         return f'int((today()-date(${{{dob_node_name}}})))'
     def tricc_operation_age_month(self, ref_expressions):
-        dob_node_name=  operation.reference[0].value if not operation.reference else 'birthday'
+        dob_node_name=  ref_expressions[0].value if not ref_expressions else 'birthday'
         return f'int((today()-date(${{{dob_node_name}}})) div 30.25)'
     def tricc_operation_age_year(self, ref_expressions):
-        dob_node_name=  operation.reference[0].value if not operation.reference else 'birthday'
+        dob_node_name=  ref_expressions[0].value if not ref_expressions else 'birthday'
         return f'int((today()-date(${{{dob_node_name}}})) div 365.25)'

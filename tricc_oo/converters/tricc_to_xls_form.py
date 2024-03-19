@@ -34,7 +34,7 @@ def get_required_node_expression(node):
 
 # Get a selected option
 def get_selected_option_expression(option_node):
-    return TRICC_SELECTED_EXPRESSION.format(get_export_name(option_node.select), option_node.name)
+    return TRICC_SELECTED_EXPRESSION.format(get_export_name(option_node.select), get_export_name(option_node))
 
 
 # Function that add element to array is not None or ''
@@ -95,7 +95,7 @@ def simple_and_join(left, right):
     elif right == '1' or right == 1 or right == 'true()':
         return  left
     else:
-        return     TRICC_AND_EXPRESSION.format(left, right)
+        return     TRICC_AND_EXPRESSION.format((left), (right))
 
 def or_join(list_or, elm_and=None):
     cleaned_list  = clean_list_or(list_or, elm_and)
@@ -146,7 +146,7 @@ def negate_term(expression):
     elif is_single_fct('not', expression):
         return expression[4:-1]
     else:
-        return TRICC_NEGATE.format(expression)
+        return TRICC_NEGATE.format((expression))
     
 def is_single_fct(name,expression):
     if len(expression)>len(name)+2:
@@ -217,6 +217,8 @@ def clean_list_or(list_or, elm_and=None):
     return list_or
 
 def get_export_name(node):
+    if isinstance(node, str):
+        return clean_name("id_" + node) 
     if node.export_name is None:
         node.export_name = clean_name(node.name)
         if node.name is None:

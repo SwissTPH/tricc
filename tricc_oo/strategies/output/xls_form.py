@@ -88,7 +88,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
     def generate_export(self, node, **kwargs):
         return generate_xls_form_export(node, **kwargs)
 
-    def export(self, start_pages):
+    def export(self, start_pages, version):
         if start_pages["main"].root.form_id is not None:
             form_id = str(start_pages["main"].root.form_id)
         else:
@@ -98,7 +98,6 @@ class XLSFormStrategy(BaseOutPutStrategy):
         file_name = form_id + ".xlsx"
         # make a 'settings' tab
         now = datetime.datetime.now()
-        version = now.strftime("%Y%m%d%H%M")
         indx = [[1]]
 
         settings = {
@@ -118,6 +117,8 @@ class XLSFormStrategy(BaseOutPutStrategy):
 
         # create a Pandas Excel writer using XlsxWriter as the engine
         writer = pd.ExcelWriter(newpath, engine="xlsxwriter")
+        if len(self.df_survey[self.df_survey['name'] == 'version'] ):
+            self.df_survey.loc[ self.df_survey['name'] == 'version', 'label'] = f"v{version}"
         self.df_survey.to_excel(writer, sheet_name="survey", index=False)
         self.df_choice.to_excel(writer, sheet_name="choices", index=False)
         df_settings.to_excel(writer, sheet_name="settings", index=False)
@@ -323,7 +324,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
             callable = getattr(self,f"tricc_operation_{operation.operator}")
             return callable(ref_expressions)   
         else:
-            raise NotImplemented(f"This type of opreation '{operation.operator}' is not supported in this strategy")
+            raise NotImplementedError(f"This type of opreation '{operation.operator}' is not supported in this strategy")
         
 
     def tricc_operation_not(self, ref_expressions):
@@ -362,7 +363,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
     def tricc_operation_case(self, ref_expressions):
         ifs = 0
         parts = []
-        for i in range(len(int(ref_expressions)/2)):
+        for i in range(int(len(ref_expressions)/2)):
             if i*2+1 <= len(ref_expressions):
                 parts.append(f"if({ref_expressions[i*2]},{ref_expressions[i*2+1]}")
                 ifs += 1
@@ -371,7 +372,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
         #join the if
         exp = ','.join(parts)
         # in case there is no default put ''
-        if i*2+1 > len(ref_expressions):
+        if len(ref_expressions)%2 == 0 :
             exp += ",''"
         #add the closing )
         for i in range(ifs):
@@ -382,8 +383,10 @@ class XLSFormStrategy(BaseOutPutStrategy):
     def tricc_operation_contains(self, ref_expressions):
         return f"contains({ref_expressions[0]}, {ref_expressions[1]})"
     def tricc_operation_exists(self, ref_expressions):
-        ref_expressions.append('')
-        return self.tricc_operation_not_equals(ref_expressions)
+        parts = []
+        for ref in ref_expressions:
+            parts.append(self.tricc_operation_not_equal([ref, "''"]))
+        return self.tricc_operation_and(parts)
     # calculate or retrieve a node expression
     def get_node_expression(self, in_node, processed_nodes, is_calculate=False, is_prev=False, negate=False, ):
         # in case of calculate we only use the select multiple if none is not selected
@@ -743,6 +746,6 @@ class XLSFormStrategy(BaseOutPutStrategy):
         elif isinstance(r, TriccNodeSelectOption):
             return r.name
         elif issubclass(r.__class__, TriccNodeBaseModel):
-            return f"${{{r.name}}}" 
+            return f"${{{get_export_name(r)}}}" 
         else:
-            raise NotImplemented(f"This type of node {r.__class__} is not supported within an operation")
+            raise NotImplementedError(f"This type of node {r.__class__} is not supported within an operation")

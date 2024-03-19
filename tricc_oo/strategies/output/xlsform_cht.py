@@ -59,7 +59,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
         #df_summary.loc[len(df_summary)] = [  'end group', '' ,'', '', '', '',  '',  '', '', '', '', '', '', '', '','', '' ]
         return df_summary
     
-    def export(self, start_pages):
+    def export(self, start_pages, version, **kwargs):
         form_id = None
         if start_pages[self.processes[0]].root.form_id is not None:
             form_id= str(start_pages[self.processes[0]].root.form_id )
@@ -81,7 +81,8 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
         settings={'form_title':title,'form_id':form_id,'version':version,'default_language':'English (en)','style':'pages'}
         df_settings=pd.DataFrame(settings,index=indx)
         df_settings.head()
-
+        if len(self.df_survey[self.df_survey['name'] == 'version'] ):
+            self.df_survey.loc[ self.df_survey['name'] == 'version', 'label'] = f"v{version}"
         #create a Pandas Excel writer using XlsxWriter as the engine
         writer = pd.ExcelWriter(newpath, engine='xlsxwriter')
         self.df_survey.to_excel(writer, sheet_name='survey',index=False)

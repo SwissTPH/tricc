@@ -250,7 +250,7 @@ class TriccOperation(BaseModel):
                 elif issubclass(reference.__class__, TriccNodeBaseModel):
                     predecessor.append(reference)
         else:
-            raise NotImplemented("cannot find predecessor of a str")
+            raise NotImplementedError("cannot find predecessor of a str")
         return predecessor
     def append(self, value):
         self.reference.append(value)

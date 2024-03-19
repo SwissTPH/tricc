@@ -6,9 +6,11 @@
             "type": "python",
             "request": "launch",
             "program": "tricc_oo/tests/build.py",
-            "args":["-i","/home/delcpa/Development/cht-chad/forms/app/adult_v30.drawio","-l","d", "-o", "/home/delcpa/Development/cht-chad/forms/app", "-t","-O", "XLSFormCHTStrategy"],
+            "args":["-i","/home/delcpa/Development/cht-chad/forms/app/adult_v31.drawio","-l","d", "-o", "/home/delcpa/Development/cht-chad/forms/app", "-t","-O", "XLSFormCHTStrategy"],
             "console": "integratedTerminal",
-            "justMyCode": true      
+            "justMyCode": true,
+            "env": {"PYTHONPATH": "${workspaceFolder}/"},
+
         },          {
             "name": "TEST",
             "type": "python",
@@ -22,17 +24,28 @@
             "type": "python",
             "request": "launch",
             "program": "tricc_oo/tests/build.py",
-            "args":["-i","./tricc_oo/tests/data/medlacreator.json","-l","w", "-o","/home/delcpa/Downloads", "-t", "-I","MedalCStrategy","-O", "XLSFormCDSSStrategy"],
+            "args":[
+                "-i","./tricc_oo/tests/data/medlacreator.json",
+                "-l","d","-t",
+                "-o","./tricc_oo/tests/data/", 
+                "-I","MedalCStrategy",
+                "-O","XLSFormCDSSStrategy"],
             "console": "integratedTerminal",
             "env": {"PYTHONPATH": "${workspaceFolder}/"},
         },        {
             "name": "Demo",
             "type": "python",
             "request": "launch",
-            "program": "tricc/tests/build.py",
-            "args":["-i","/home/delcpa/Documents/demo.drawio","-l","w", "-o","/home/delcpa/Downloads", "-t","-O", "XLSFormStrategy"],
+            "program": "tricc_oo/tests/build.py",
+            "args":[ 
+                "-i","./tricc_oo/tests/data/demo.drawio",
+                "-l","w", 
+                "-o","./tricc_oo/tests/data/", 
+                "-t",
+                "-O", "XLSFormStrategy"
+                ],
             "console": "integratedTerminal",
-            "justMyCode": true      
+            "env": {"PYTHONPATH": "${workspaceFolder}/"},   
         }
     ]
 }
