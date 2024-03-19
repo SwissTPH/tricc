@@ -6,9 +6,10 @@ from tricc_oo.converters.mc_to_tricc import (
   create_activity,build_relevance,
   get_registration_nodes,
   add_age_calcualte_nodes,
-  add_diag_silo,
   add_background_calculations,
-  add_qs_expression,
+  add_qd_dd_nodes,
+  build_calculations,
+  unloop_queston,
   )
 from tricc_oo.models import *
 from tricc_oo.visitors.tricc import set_prev_next_node
@@ -46,6 +47,7 @@ class MedalCStrategy(BaseInputStrategy):
       js_questions = {**js_registration_nodes, **js_nodes}
       is_first=True
       last_page = None
+      #TODO, dont male any link
       for key, stage in js_fullorder.items():
           page = create_activity(stage, key, media_path, js_questions, last_page, js_trad)
           if is_first :
@@ -53,69 +55,37 @@ class MedalCStrategy(BaseInputStrategy):
               page.root.form_id=js_full['id']
               page.root.label=js_full['name']
           else:
-              set_prev_next_node(last_page, page)
+              set_prev_next_node(start_page['main'].root, page)
           is_first = False
           last_page = page  
           pages[key]=page
-          
-      
       all_nodes = update_all_nodes(pages)
-      add_diag_silo(start_page['main'], js_diagnoses, all_nodes)
+      # enrich with other nodes
+      
       age = add_age_calcualte_nodes(all_nodes)
-      add_background_calculations(start_page['main'], pages, js_nodes, all_nodes)
-      add_qs_expression(start_page['main'], pages, age, js_nodes, all_nodes)
-      
-      all_nodes = update_all_nodes(pages)
-      #add age related nodes
 
+      add_background_calculations(start_page['main'], pages, js_nodes, all_nodes)
+      add_qd_dd_nodes(start_page['main'], pages, age, js_nodes,js_diagnoses, all_nodes)
+      #create the actual calculation (cannot be done in add_background_calculations because not all nodes are created)
+      build_calculations(start_page, pages, js_nodes, all_nodes)
+      
       all_nodes = update_all_nodes(pages)
 
       #add trigger for the CC questions
       js_nodes[str(yi_cc_id)]["cut_off_end"] = 62
       js_nodes[str(child_cc_id)]["cut_off_start"] = 62
-   
-      # 
-      #add diagnostic calculate nodes
+      # create relevance and prev/next based on relevance
+      build_relevance(all_nodes, age, js_questions, js_diagnoses, js_final_diagnoses)
+      
+
+      unloop_queston(start_page['main'], pages, age, js_nodes,js_diagnoses, all_nodes)
+
+
+      # all_nodes = [node for page in list(pages.values()) for node in page.nodes ]
+      # all_group = [group for page in list(pages.values()) for group in page.groups ]
             
-      last_page = page  
-      pages["final_diagnoses"]=page     
-  
-      # add the final diagnostics
-      # TODO
-
-      # add the missing nodes FIXME: check if needed
-      all_nodes = update_all_nodes(pages)
-      # node_id_covered = all_nodes.keys()
-      # mode_id_missing= list(filter(lambda key: key not in node_id_covered ,js_nodes))
-      # page = create_activity(mode_id_missing, "other_nodes", media_path, js_nodes, last_page, js_trad)
-      # set_prev_next_node(last_page, page)
-      # last_page = page  
-      # pages["other_nodes"]=page
-      
-      # # refresh all nodes to inject the logic
-      # all_nodes = update_all_nodes(pages)
-
-      build_relevance(all_nodes, age, js_questions, js_diagnoses, js_final_diagnoses) 
-      
-
-
-
-      all_nodes = [node for page in list(pages.values()) for node in page.nodes ]
-      all_group = [group for page in list(pages.values()) for group in page.groups ]
-      
-    
-
-
-                            
-
-      ## all logic
-  #   all_nodes.extend([age_node,yi_node,child_node])
-      
-      older_groups =  list(filter(lambda gp: gp.name == 'older', all_group))
-      yi_groups =  list(filter(lambda gp: gp.name == 'neonat', all_group))
-
-
-
+      # older_groups =  list(filter(lambda gp: gp.name == 'older', all_group))
+      # yi_groups =  list(filter(lambda gp: gp.name == 'neonat', all_group))
         
       #cleaning
       for page in pages.values():
@@ -129,4 +99,11 @@ class MedalCStrategy(BaseInputStrategy):
       return start_page, pages     
           
 def update_all_nodes(pages):
-  return {node.id: node for page in list(pages.values()) for node in page.nodes.values() }
+  all_nodes={}
+  for page in pages.values():
+    for node in page.nodes.values():
+      all_nodes[node.id] = node
+    for node in page.calculates:
+      all_nodes[node.id] = node
+  
+  return all_nodes
