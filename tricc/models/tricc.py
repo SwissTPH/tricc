@@ -424,8 +424,7 @@ class TriccNodeDisplayModel(TriccNodeBaseModel):
     hint: Optional[Union[str, Dict[str, str]]]
     help: Optional[Union[str, Dict[str, str]]]
     group: Optional[Union[TriccGroup, TriccNodeActivity]]
-    relevance: Optional[Annotated[str, StringConstaints(pattern=r"^[^\\/]+$")]
-
+    relevance: Optional[Annotated[str, StringConstraints(pattern=r"^[^\\/]+$")]]
     def make_instance(self, instance_nb, activity=None):
         instance = super().make_instance(instance_nb, activity=activity)
         instance.relevance = None
@@ -439,9 +438,9 @@ class TriccNodeNote(TriccNodeDisplayModel):
 
 
 class TriccNodeInputModel(TriccNodeDisplayModel):
-    required: Optional[Annotated[str, StringConstaints(pattern=r"^[^\\/]+$")]]
+    required: Optional[Annotated[str, StringConstraints(pattern=r"^[^\\/]+$")]]
     constraint_message: Optional[Union[str, Dict[str, str]]]
-    constraint: Optional[Annotated[str, StringConstaints(pattern=r"^[^\\/]+$")]]
+    constraint: Optional[Annotated[str, StringConstraints(pattern=r"^[^\\/]+$")]]
     save: Optional[str]  # contribute to another calculate
 
 
