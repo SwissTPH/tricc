@@ -15,7 +15,7 @@ logger = logging.getLogger("default")
 # Expression = constr(regex="^[^\\/]+$")
 # Expression = Pattern(regex=r"^[^\\/]+$")
 
-Expression = Annotated[str, StringConstraints(pattern=r"^[^\\/]+$")]
+Expression = Annotated[dict, StringConstraints(pattern=r"^[^\\/]+$")]
 triccId = Annotated[str, StringConstraints(pattern=r"^.+$")]
 b64 = Annotated[str, StringConstraints(pattern=r"[^-A-Za-z0-9+/=]|=[^=]|={3,}$")]
 triccIdList = Annotated[str, StringConstraints(pattern=r"^.+$")]
@@ -175,16 +175,16 @@ class TriccGroup(TriccBaseModel):
 
 class TriccNodeBaseModel(TriccBaseModel):
     path_len: int = 0
-    group: Optional[Union[TriccGroup, TriccNodeActivity]]
+    group: Optional[Union[TriccGroup, TriccNodeActivity]] = None
     name: Optional[str]
-    export_name: Optional[str]
+    export_name: Optional[str] = None
     label: Optional[Union[str, Dict[str, str]]]
     next_nodes: List[TriccNodeBaseModel] = []
     prev_nodes: List[TriccNodeBaseModel] = []
     expression: Optional[Expression]  # will be generated based on the input
-    expression_inputs: List[Expression] = []
-    activity: Optional[TriccNodeActivity]
-    ref_def: Optional[Union[int, str]]  # for medal creator
+    expression_inputs: Optional[List[Expression]] = []
+    activity: Optional[TriccNodeActivity] = None
+    ref_def: Optional[Union[int, str]] = None  # for medal creator
 
     class Config:
         use_enum_values = True  # <--
