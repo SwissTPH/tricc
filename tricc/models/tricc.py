@@ -149,7 +149,7 @@ class TriccGroup(TriccBaseModel):
     name: Optional[str]
     export_name: Optional[str]
     label: Optional[Union[str, Dict[str, str]]]
-    relevance: Optional[Annotated[str, StringConstraints(pattern=r"^[^\\/]+$")]
+    relevance: Optional[Annotated[str, StringConstraints(pattern=r"^[^\\/]+$")]]
     path_len: int = 0
     prev_nodes: List[TriccBaseModel] = []
 
