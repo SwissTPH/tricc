@@ -89,7 +89,7 @@ media_nodes = [
 
 
 class TriccBaseModel(BaseModel):
-    id: triccId
+    id: Annotated[str, Field(pattern=r"^.+$")]
     tricc_type: TriccNodeType
     # parent: Optional[triccId]#TODO: used ?
     instance: int = 1
