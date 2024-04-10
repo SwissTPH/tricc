@@ -5,7 +5,7 @@ import random
 import string
 from enum import Enum, auto
 from typing import Dict, Annotated, ForwardRef, List, Optional, Union
-from pydantic import BaseModel, StringConstraints
+from pydantic import BaseModel, StringConstraints, Field
 from strenum import StrEnum
 
 from tricc.converters.utils import generate_id
@@ -15,10 +15,10 @@ logger = logging.getLogger("default")
 # Expression = constr(regex="^[^\\/]+$")
 # Expression = Pattern(regex=r"^[^\\/]+$")
 
-Expression = Annotated[dict, StringConstraints(pattern=r"^[^\\/]+$")]
+Expression = Annotated[dict, Field(pattern=r"^[^\\/]+$")]
 triccId = Annotated[str, StringConstraints(pattern=r"^.+$")]
 b64 = Annotated[str, StringConstraints(pattern=r"[^-A-Za-z0-9+/=]|=[^=]|={3,}$")]
-triccIdList = Annotated[dict, StringConstraints(pattern=r"^.+$")]
+triccIdList = Annotated[str, StringConstraints(pattern=r"^.+$")]
 
 # triccId = constr(regex="^.+$")
 # triccId = Pattern(regex=r"^.+$")
