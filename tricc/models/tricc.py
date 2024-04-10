@@ -14,15 +14,15 @@ from tricc.converters.utils import generate_id
 logger = logging.getLogger("default")
 
 # Expression = constr(regex="^[^\\/]+$")
-Expression = Field(regex="^[^\\/]+$")
+Expression = Field(pattern=r"^[^\\/]+$")
 
 # triccId = constr(regex="^.+$")
-triccId = Field(regex="^.+$")
+triccId = Field(pattern=r"^.+$")
 # triccIdList = constr(regex="^.+$")
-triccIdList = Field(regex="^.+$")
+triccIdList = Field(pattern=r"^.+$")
 
 # b64 = constr(regex="[^-A-Za-z0-9+/=]|=[^=]|={3,}$")
-b64 = Field(regex="[^-A-Za-z0-9+/=]|=[^=]|={3,}$")
+b64 = Field(pattern=r"[^-A-Za-z0-9+/=]|=[^=]|={3,}$")
 
 TriccEdge = ForwardRef("TriccEdge")
 # data:page/id,UkO_xCL5ZjyshJO9Bexg
