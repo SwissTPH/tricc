@@ -126,8 +126,12 @@ class TriccBaseModel(BaseModel):
 
 class TriccEdge(TriccBaseModel):
     tricc_type: TriccNodeType = TriccNodeType.edge
-    source: Union[triccId, TriccNodeBaseModel]
-    target: Union[triccId, TriccNodeBaseModel]
+    source: Union[
+        Annotated[str, StringConstraints(pattern=r"^.+$")], TriccNodeBaseModel
+    ]
+    target: Union[
+        Annotated[str, StringConstraints(pattern=r"^.+$")], TriccNodeBaseModel
+    ]
     value: Optional[str]
 
     def make_instance(self, instance_nb, activity=None):
