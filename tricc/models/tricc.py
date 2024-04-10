@@ -89,7 +89,7 @@ media_nodes = [
 
 
 class TriccBaseModel(BaseModel):
-    id: Annotated[str, StringConstraints(pattern=r"^.+$")]
+    id: Annotated[str, StringConstraints(pattern=r"^.+$")] 
     tricc_type: TriccNodeType
     # parent: Optional[triccId]#TODO: used ?
     instance: int = 1
@@ -149,7 +149,7 @@ class TriccGroup(TriccBaseModel):
     name: Optional[str]
     export_name: Optional[str]
     label: Optional[Union[str, Dict[str, str]]]
-    relevance: Optional[Annotated[str, StringConstraints(pattern=r"^[^\\/]+$")]]
+    relevance: Optional[Annotated[str, StringConstraints(pattern=r"^[^\\/]+$")]
     path_len: int = 0
     prev_nodes: List[TriccBaseModel] = []
 
@@ -181,8 +181,8 @@ class TriccNodeBaseModel(TriccBaseModel):
     label: Optional[Union[str, Dict[str, str]]]
     next_nodes: List[TriccNodeBaseModel] = []
     prev_nodes: List[TriccNodeBaseModel] = []
-    expression: Optional[Expression]  # will be generated based on the input
-    expression_inputs: Optional[List[Expression]] = []
+    expression: Optional[Annotated[str, StringConstaints(pattern=r"^[^\\/]+$")]]  # will be generated based on the input
+    expression_inputs: Optional[List[Annotated[str, StringConstaints(pattern=r"^[^\\/]+$")]]] = []
     activity: Optional[TriccNodeActivity] = None
     ref_def: Optional[Union[int, str]] = None  # for medal creator
 
@@ -242,7 +242,7 @@ class TriccNodeActivity(TriccNodeBaseModel):
     groups: Dict[str, TriccGroup] = {}
     # save the instance on the base activity
     instances: Dict[int, TriccNodeBaseModel] = {}
-    relevance: Optional[Expression]
+    relevance: Optional[Annotated[str, StringConstaints(pattern=r"^[^\\/]+$")]]
     # caclulate that are not part of the any skip logic:
     # - inputs
     # - dandling calculate
@@ -420,11 +420,11 @@ class TriccNodeActivity(TriccNodeBaseModel):
 
 class TriccNodeDisplayModel(TriccNodeBaseModel):
     name: str
-    image: Optional[b64]
+    image: Optional[Annotated, StringConstaints(pattern=r"[^-A-Za-z0-9+/=]|=[^=]|={3,}$")]
     hint: Optional[Union[str, Dict[str, str]]]
     help: Optional[Union[str, Dict[str, str]]]
     group: Optional[Union[TriccGroup, TriccNodeActivity]]
-    relevance: Optional[Expression]
+    relevance: Optional[Annotated[str, StringConstaints(pattern=r"^[^\\/]+$")]
 
     def make_instance(self, instance_nb, activity=None):
         instance = super().make_instance(instance_nb, activity=activity)
@@ -439,9 +439,9 @@ class TriccNodeNote(TriccNodeDisplayModel):
 
 
 class TriccNodeInputModel(TriccNodeDisplayModel):
-    required: Optional[Expression]
+    required: Optional[Annotated[str, StringConstaints(pattern=r"^[^\\/]+$")]]
     constraint_message: Optional[Union[str, Dict[str, str]]]
-    constraint: Optional[Expression]
+    constraint: Optional[Annotated[str, StringConstaints(pattern=r"^[^\\/]+$")]]
     save: Optional[str]  # contribute to another calculate
 
 
@@ -551,7 +551,7 @@ class TriccNodeText(TriccNodeInputModel):
 
 class TriccNodeCalculateBase(TriccNodeBaseModel):
     input: Dict[TriccOperation, TriccNodeBaseModel] = {}
-    reference: Optional[Union[List[TriccNodeBaseModel], Expression]]
+    reference: Optional[Union[List[TriccNodeBaseModel], Annotated[str, StringConstaints(pattern=r"^[^\\/]+$")]]]
     expression_reference: Optional[str]
     version: int = 1
     last: bool = True
@@ -662,7 +662,7 @@ class TriccRhombusMixIn:
 class TriccNodeRhombus(TriccNodeCalculateBase, TriccRhombusMixIn):
     tricc_type: TriccNodeType = TriccNodeType.rhombus
     path: Optional[TriccNodeBaseModel] = None
-    reference: Union[List[TriccNodeBaseModel], Expression]
+    reference: Union[List[TriccNodeBaseModel], Annotated[str, StringConstaints(pattern=r"^[^\\/]+$")]]
 
     def make_instance(self, instance_nb, activity, **kwargs):
         instance = super(TriccNodeRhombus, self).make_instance(
@@ -1409,7 +1409,7 @@ def check_stashed_loop(
 class TriccNodeWait(TriccNodeFakeCalculateBase, TriccRhombusMixIn):
     tricc_type: TriccNodeType = TriccNodeType.wait
     path: Optional[TriccNodeBaseModel] = None
-    reference: Union[List[TriccNodeBaseModel], Expression]
+    reference: Union[List[TriccNodeBaseModel], Annotated[str, StringConstaints(pattern=r"^[^\\/]+$")
 
     def make_instance(self, instance_nb, activity, **kwargs):
         instance = super(TriccNodeWait, self).make_instance(
