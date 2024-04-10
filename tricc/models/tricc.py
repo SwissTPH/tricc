@@ -4,9 +4,8 @@ import logging
 import random
 import string
 from enum import Enum, auto
-from typing import Dict, ForwardRef, List, Optional, Union
-
-from pydantic import BaseModel, Field
+from typing import Dict, Annotated, ForwardRef, List, Optional, Union
+from pydantic import BaseModel, StringConstraints
 from strenum import StrEnum
 
 from tricc.converters.utils import generate_id
@@ -16,28 +15,19 @@ logger = logging.getLogger("default")
 # Expression = constr(regex="^[^\\/]+$")
 # Expression = Pattern(regex=r"^[^\\/]+$")
 
-
-class Expression(BaseModel):
-    regex: str = Field(pattern=r"^[^\\/]+$")
-
+Expression = Annotated[str, StringConstraints(pattern=r"^[^\\/]+$")]
+triccId = Annotated[str, StringConstraints(pattern=r"^.+$")]
+b64 = Annotated[str, StringConstraints(pattern=r"[^-A-Za-z0-9+/=]|=[^=]|={3,}$")]
+triccIdList = Annotated[str, StringConstraints(pattern=r"^.+$")]
 
 # triccId = constr(regex="^.+$")
 # triccId = Pattern(regex=r"^.+$")
-class triccId(BaseModel):
-    regex: str = Field(pattern=r"^.+$")
-
 
 # triccIdList = constr(regex="^.+$")
 # triccIdList = Pattern(regex=r"^.+$")
-class triccIdList(BaseModel):
-    regex: str = Field(pattern=r"^.+$")
-
 
 # b64 = constr(regex="[^-A-Za-z0-9+/=]|=[^=]|={3,}$")
 # b64 = Pattern(regex=r"[^-A-Za-z0-9+/=]|=[^=]|={3,}$")
-class b64(BaseModel):
-    regex: str = Field(pattern=r"[^-A-Za-z0-9+/=]|=[^=]|={3,}$")
-
 
 TriccEdge = ForwardRef("TriccEdge")
 # data:page/id,UkO_xCL5ZjyshJO9Bexg
