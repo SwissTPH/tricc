@@ -16,9 +16,9 @@ logger = logging.getLogger("default")
 # Expression = Pattern(regex=r"^[^\\/]+$")
 
 Expression = Annotated[dict, Field(pattern=r"^[^\\/]+$")]
-triccId = Annotated[str, StringConstraints(pattern=r"^.+$")]
+triccId = Annotated[dict, Field(pattern=r"^.+$")]
 b64 = Annotated[str, StringConstraints(pattern=r"[^-A-Za-z0-9+/=]|=[^=]|={3,}$")]
-triccIdList = Annotated[str, StringConstraints(pattern=r"^.+$")]
+triccIdList = Annotated[dict, Field(pattern=r"^.+$")]
 
 # triccId = constr(regex="^.+$")
 # triccId = Pattern(regex=r"^.+$")
