@@ -3,8 +3,8 @@ from __future__ import annotations
 import logging
 import random
 import string
-from enum import Enum, auto
-from typing import Dict, ForwardRef, List, Optional, Union
+from enum import Enum
+from typing import Dict, ForwardRef, List, Union
 
 from pydantic import StringConstraints, ConfigDict, BaseModel
 from strenum import StrEnum
@@ -85,13 +85,13 @@ class TriccBaseModel(BaseModel):
     tricc_type: TriccNodeType
     # parent: Optional[triccId]#TODO: used ?
     instance: int = 1
-    base_instance: Optional[TriccBaseModel] = None
+    base_instance: TriccBaseModel | None = None
 
-    def make_instance(self, nb_instance, **kwargs):
+    def make_instance(self, instance_nb, **kwargs):
         instance = self.copy()
         # change the id to avoid collision of name
         instance.id = generate_id()
-        instance.instance = int(nb_instance)
+        instance.instance = int(instance_nb)
         instance.base_instance = self
 
         # assign the defualt group
@@ -120,9 +120,9 @@ class TriccEdge(TriccBaseModel):
     tricc_type: TriccNodeType = TriccNodeType.edge
     source: Union[triccId, TriccNodeBaseModel]
     target: Union[triccId, TriccNodeBaseModel]
-    value: Optional[str] = None
+    value: str | None = None
 
-    def make_instance(self, instance_nb, activity=None):
+    def make_instance(self, instance_nb, activity=None, **kwargs):
         instance = super().make_instance(instance_nb, activity=activity)
         # if issubclass(self.source.__class__, TriccBaseModel):
         instance.source = (
@@ -137,11 +137,11 @@ class TriccEdge(TriccBaseModel):
 
 class TriccGroup(TriccBaseModel):
     tricc_type: TriccNodeType = TriccNodeType.page
-    group: Optional[TriccBaseModel] = None
-    name: Optional[str] = None
-    export_name: Optional[str] = None
-    label: Optional[Union[str, Dict[str, str]]] = None
-    relevance: Optional[Expression] = None
+    group: TriccBaseModel | None = None
+    name: str | None = None
+    export_name: str | None = None
+    label: Union[str, Dict[str, str]] | None = None
+    relevance: Expression | None = None
     path_len: int = 0
     prev_nodes: List[TriccBaseModel] = []
 
@@ -167,16 +167,16 @@ class TriccGroup(TriccBaseModel):
 
 class TriccNodeBaseModel(TriccBaseModel):
     path_len: int = 0
-    group: Optional[Union[TriccGroup, TriccNodeActivity]] = None
-    name: Optional[str] = None
-    export_name: Optional[str] = None
-    label: Optional[Union[str, Dict[str, str]]] = None
+    group: Union[TriccGroup, TriccNodeActivity] | None = None
+    name: str | None = None
+    export_name: str | None = None
+    label: Union[str, Dict[str, str]] | None = None
     next_nodes: List[TriccNodeBaseModel] = []
     prev_nodes: List[TriccNodeBaseModel] = []
-    expression: Optional[Expression] = None  # will be generated based on the input
+    expression: Expression | None = None  # will be generated based on the input
     expression_inputs: List[Expression] = []
-    activity: Optional[TriccNodeActivity] = None
-    ref_def: Optional[Union[int, str]] = None  # for medal creator
+    activity: TriccNodeActivity | None = None
+    ref_def: Union[int, str] | None = None  # for medal creator
     model_config = ConfigDict(use_enum_values=True)
 
     # to be updated while processing because final expression will be possible to build$
@@ -232,7 +232,7 @@ class TriccNodeActivity(TriccNodeBaseModel):
     groups: Dict[str, TriccGroup] = {}
     # save the instance on the base activity
     instances: Dict[int, TriccNodeBaseModel] = {}
-    relevance: Optional[Expression] = None
+    relevance: Expression | None = None
     # caclulate that are not part of the any skip logic:
     # - inputs
     # - dandling calculate
@@ -410,11 +410,11 @@ class TriccNodeActivity(TriccNodeBaseModel):
 
 class TriccNodeDisplayModel(TriccNodeBaseModel):
     name: str
-    image: Optional[b64] = None
-    hint: Optional[Union[str, Dict[str, str]]] = None
-    help: Optional[Union[str, Dict[str, str]]] = None
-    group: Optional[Union[TriccGroup, TriccNodeActivity]] = None
-    relevance: Optional[Expression] = None
+    image: b64 | None = None
+    hint: Union[str, Dict[str, str]] | None = None
+    help: Union[str, Dict[str, str]] | None = None
+    group: Union[TriccGroup, TriccNodeActivity] | None = None
+    relevance: Expression | None = None
 
     def make_instance(self, instance_nb, activity=None):
         instance = super().make_instance(instance_nb, activity=activity)
@@ -429,10 +429,10 @@ class TriccNodeNote(TriccNodeDisplayModel):
 
 
 class TriccNodeInputModel(TriccNodeDisplayModel):
-    required: Expression | bool = None
-    constraint_message: Optional[Union[str, Dict[str, str]]] = None
-    constraint: Optional[Expression] = None
-    save: Optional[str] = None  # contribute to another calculate
+    required: Expression | bool | None = None
+    constraint_message: Union[str, Dict[str, str]] | None = None
+    constraint: Expression | None = None
+    save: str | None = None  # contribute to another calculate
 
 
 class TriccNodeDate(TriccNodeInputModel):
@@ -441,8 +441,8 @@ class TriccNodeDate(TriccNodeInputModel):
 
 class TriccNodeMainStart(TriccNodeBaseModel):
     tricc_type: TriccNodeType = TriccNodeType.start
-    form_id: Optional[str] = None
-    process: Optional[str] = None
+    form_id: str | None = None
+    process: str | None = None
 
 
 class TriccNodeLinkIn(TriccNodeBaseModel):
@@ -451,7 +451,7 @@ class TriccNodeLinkIn(TriccNodeBaseModel):
 
 class TriccNodeLinkOut(TriccNodeBaseModel):
     tricc_type: TriccNodeType = TriccNodeType.link_out
-    reference: Optional[Union[TriccNodeLinkIn, triccId]] = None
+    reference: Union[TriccNodeLinkIn, triccId] | None = None
     # no need to copy
 
 
@@ -471,7 +471,7 @@ class TriccNodeGoTo(TriccNodeBaseModel):
 class TriccNodeSelectOption(TriccNodeDisplayModel):
     tricc_type: TriccNodeType = TriccNodeType.select_option
     label: Union[str, Dict[str, str]]
-    save: Optional[str] = None
+    save: str | None = None
     select: TriccNodeInputModel
     list_name: str
 
@@ -488,7 +488,7 @@ class TriccNodeSelectOption(TriccNodeDisplayModel):
 
 
 class TriccNodeSelect(TriccNodeInputModel):
-    filter: Optional[str] = None
+    filter: str | None = None
     options: Dict[int, TriccNodeSelectOption] = {}
     list_name: str
 
@@ -522,8 +522,8 @@ class TriccNodeSelectMultiple(TriccNodeSelect):
 
 
 class TriccNodeNumber(TriccNodeInputModel):
-    min: Optional[float] = None
-    max: Optional[float] = None
+    min: float | None = None
+    max: float | None = None
     # no need to copy min max in make isntance
 
 
@@ -541,8 +541,8 @@ class TriccNodeText(TriccNodeInputModel):
 
 class TriccNodeCalculateBase(TriccNodeBaseModel):
     input: Dict[TriccOperation, TriccNodeBaseModel] = {}
-    reference: Optional[Union[List[TriccNodeBaseModel], Expression]] = None
-    expression_reference: Optional[str] = None
+    reference: Union[List[TriccNodeBaseModel], Expression] | None = None
+    expression_reference: str | None = None
     version: int = 1
     last: bool = True
     model_config = ConfigDict(use_enum_values=True)
@@ -564,9 +564,9 @@ class TriccNodeCalculateBase(TriccNodeBaseModel):
 
 
 class TriccNodeDisplayCalculateBase(TriccNodeCalculateBase):
-    save: Optional[str] = None  # contribute to another calculate
-    hint: Optional[str] = None  # for diagnostic display
-    help: Optional[str] = None  # for diagnostic display
+    save: str | None = None  # contribute to another calculate
+    hint: str | None = None  # for diagnostic display
+    help: str | None = None  # for diagnostic display
 
     # no need to copy save
     def to_fake(self):
@@ -648,7 +648,7 @@ class TriccRhombusMixIn:
 
 class TriccNodeRhombus(TriccNodeCalculateBase, TriccRhombusMixIn):
     tricc_type: TriccNodeType = TriccNodeType.rhombus
-    path: Optional[TriccNodeBaseModel] = None
+    path: TriccNodeBaseModel | None = None
     reference: Union[List[TriccNodeBaseModel], Expression]
 
     def make_instance(self, instance_nb, activity, **kwargs):
@@ -682,7 +682,7 @@ def get_node_from_id(activity, node, edge_only):
     elif node_id in activity.nodes:
         node = activity.nodes[node_id]
     elif not edge_only:
-        logger.error(f"cannot find {node_id} in  {activiy.get_name()}")
+        logger.error(f"cannot find {node_id} in  {activity.get_name()}")
         exit()
     return node_id, node
 
@@ -1395,7 +1395,7 @@ def check_stashed_loop(
 
 class TriccNodeWait(TriccNodeFakeCalculateBase, TriccRhombusMixIn):
     tricc_type: TriccNodeType = TriccNodeType.wait
-    path: Optional[TriccNodeBaseModel] = None
+    path: TriccNodeBaseModel | None = None
     reference: Union[List[TriccNodeBaseModel], Expression]
 
     def make_instance(self, instance_nb, activity, **kwargs):
