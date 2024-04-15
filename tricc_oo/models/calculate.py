@@ -44,10 +44,11 @@ class TriccNodeCalculateBase(TriccNodeBaseModel):
         reference.append(elm)
     
     def get_references(self):
-        if isinstance(self.reference, list):
+        if isinstance(self.reference, set):
             return self.reference
+        elif isinstance(self.reference, list):
+            return set(self.reference)
         elif isinstance(self.expression_reference, TriccOperation):
-            
             self.reference =  self.expression_reference.get_references()
             return self.reference
         elif self.reference:

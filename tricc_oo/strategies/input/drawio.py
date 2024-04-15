@@ -122,7 +122,7 @@ class DrawioStrategy(BaseInputStrategy):
 
 
         
-    def linking_nodes(self,node, page, pages, processed_nodes = [], path = []):
+    def linking_nodes(self,node, page, pages, processed_nodes = set(), path = []):
         # get the edges that have that node as source
         
         node_edge = list(filter(lambda x: (x.source == node.id or x.source == node) , page.edges))
@@ -172,7 +172,7 @@ class DrawioStrategy(BaseInputStrategy):
                             self.linking_nodes(option, page, pages, processed_nodes, current_path)
                     if target_node  not in processed_nodes:
                     # don't save the link out because the real node is the page
-                        processed_nodes.append(target_node)
+                        processed_nodes.add(target_node)
                     self.linking_nodes(target_node, page, pages, processed_nodes, current_path)
                 elif edge.target in current_path:
                     logger.warning("possible loop detected for node {0} in page {1}; path:".format(node.get_name(), page.label))

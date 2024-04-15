@@ -133,8 +133,8 @@ class XLSFormStrategy(BaseOutPutStrategy):
     def process_export(self, start_pages, **kwargs):
         self.activity_export(start_pages["main"], **kwargs)
 
-    def activity_export(self, activity, processed_nodes=[], **kwargs):
-        stashed_nodes = []
+    def activity_export(self, activity, processed_nodes=set(), **kwargs):
+        stashed_nodes = OrderedSet()
         # The stashed node are all the node that have all their prevnode processed but not from the same group
         # This logic works only because the prev node are ordered by group/parent ..
         skip_header = 0
@@ -313,11 +313,8 @@ class XLSFormStrategy(BaseOutPutStrategy):
         ref_expressions = []
         for r in operation.reference:
             r_expr = self.get_tricc_operation_operand(r)
-            if isinstance(r_expr, str) and (' or ' in r_expr or ' and ' in r_expr or \
-                ' = ' in r_expr or ' < ' in r_expr or \
-                ' <= ' in r_expr or ' >= ' in r_expr or \
-                ' < ' in r_expr or ' != ' in r_expr):
-                    r_expr = "("+r_expr+')'
+            if isinstance(r_expr, str):
+                    r_expr = safe_to_bool_logic(r_expr)
             ref_expressions.append(r_expr)
         # build lower level
         if hasattr(self,f"tricc_operation_{operation.operator}"):
@@ -388,17 +385,22 @@ class XLSFormStrategy(BaseOutPutStrategy):
             parts.append(self.tricc_operation_not_equal([ref, "''"]))
         return self.tricc_operation_and(parts)
     # calculate or retrieve a node expression
-    def get_node_expression(self, in_node, processed_nodes, is_calculate=False, is_prev=False, negate=False, ):
+    def get_node_expression(self, in_node, processed_nodes, is_calculate=False, is_prev=False, negate=False):
         # in case of calculate we only use the select multiple if none is not selected
         expression = None
         negate_expression = None
         node = in_node
-        if hasattr(node, 'expression_reference') and isinstance(node.expression_reference, TriccOperation):
+        if is_prev and is_calculate and isinstance(node, TriccNodeActivityStart):
+            expression = self.get_node_expression(node.activity, processed_nodes, is_calculate, is_prev, negate )
+        elif hasattr(node, 'expression_reference') and isinstance(node.expression_reference, TriccOperation):
             expression = self.get_tricc_operation_expression(node.expression_reference)
         elif hasattr(node, 'relevance') and isinstance(node.relevance, TriccOperation):
             expression = self.get_tricc_operation_expression(node.relevance)   
         elif is_prev and isinstance(node, TriccNodeSelectOption):
-            expression = get_selected_option_expression(node)
+            if negate:
+                negate_expression = get_selected_option_expression(node, negate)
+            else:
+                expression = get_selected_option_expression(node, negate)
             #TODO remove that and manage it on the "Save" part
         elif is_prev and isinstance(in_node, TriccNodeSelectNotAvailable):
             expression =  TRICC_SELECTED_EXPRESSION.format(get_export_name(node), 'true()')
@@ -424,11 +426,10 @@ class XLSFormStrategy(BaseOutPutStrategy):
                 negate_expression = self.get_calculation_terms(node, processed_nodes, is_calculate, negate=True)
             else:
                 expression = self.get_calculation_terms(node, processed_nodes, is_calculate)
-        elif is_prev and hasattr(node, 'required') and node.required == True:
+        elif is_prev and hasattr(node, 'required') and node.required:
             expression = get_required_node_expression(node)
-
         elif is_prev and hasattr(node, 'relevance') and node.relevance is not None and node.relevance != '':
-                expression = node.relevance
+                expression = node.relevance     
         if expression is None:
                 expression = self.get_prev_node_expression(node, processed_nodes, is_calculate)
         if isinstance(node, TriccNodeActivity) and is_prev:
@@ -502,7 +503,10 @@ class XLSFormStrategy(BaseOutPutStrategy):
                 if int(past_instance.root.path_len) < int(activity.root.path_len) and past_instance in processed_nodes:
                     add_sub_expression(expression_inputs, self.get_node_expression(past_instance, processed_nodes, False))         
             expression_activity = or_join(expression_inputs)
-            expression = nand_join(expression, expression_activity or False)
+            if expression and expression_activity:
+                expression = nand_join(expression, expression_activity)
+            elif expression_activity:
+                expression = negate_term(expression_activity)
         return expression
 
     def get_activity_end_terms(self, node, processed_nodes):
@@ -525,7 +529,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
             elif isinstance(prev_node, (TriccNodeSelectYesNo, TriccNodeSelectNotAvailable)):
                 terms.append(TRICC_SELECTED_EXPRESSION.format(get_export_name(prev_node), '1'))
             elif isinstance(prev_node, TriccNodeSelectOption):
-                terms.append(get_selected_option_expression(prev_node))
+                terms.append(get_selected_option_expression(prev_node, negate))
             else:
                 if negate:
                     terms.append("number(number({0})=0)".format(
@@ -607,7 +611,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
     # @param negate use to retriece the negation of a calculation
     def get_calculation_terms(self, node, processed_nodes, is_calculate=False, negate=False):
         # returns something directly only if the negate is managed
-        expresison = None
+        expression = None
         if isinstance(node, TriccNodeAdd):
             return self.get_add_terms(node, False, negate)
         elif isinstance(node, TriccNodeCount):
@@ -620,24 +624,26 @@ class XLSFormStrategy(BaseOutPutStrategy):
         # in case of calulate expression evaluation, we need to get the relevance of the activity 
         # because calculate are not the the activity group
         elif isinstance(node, (TriccNodeActivityStart)) and is_calculate:
-            expresison =  self.get_prev_node_expression(node.activity, processed_nodes, is_calculate)
+            expression =  self.get_prev_node_expression(node.activity, processed_nodes, is_calculate)
         elif isinstance(node, (TriccNodeActivityStart, TriccNodeActivityEnd)):
             # the group have the relevance for the activity, not needed to replicate it
             expression = None#return get_prev_node_expression(node.activity, processed_nodes, is_calculate=False, excluded_name=None)
         elif isinstance(node, TriccNodeExclusive):
             if len(node.prev_nodes) == 1:
-                if isinstance(node.prev_nodes[0], TriccNodeExclusive):
+                iterator = iter(node.prev_nodes)
+                node_to_negate = next(iterator)
+                if isinstance(node_to_negate, TriccNodeExclusive):
                     logger.error("2 exclusives cannot be on a row")
                     exit()
-                elif issubclass(node.prev_nodes[0].__class__, TriccNodeCalculateBase):
-                    return self.get_node_expression(node.prev_nodes[0], processed_nodes, is_prev=True, negate=True)
-                elif isinstance(node.prev_nodes[0], TriccNodeActivity):
-                    return self.get_node_expression(node.prev_nodes[0], processed_nodes, is_calculate=False, is_prev=True,
+                elif issubclass(node_to_negate.__class__, TriccNodeCalculateBase):
+                    return self.get_node_expression(node_to_negate, processed_nodes, is_prev=True, negate=True)
+                elif isinstance(node_to_negate, TriccNodeActivity):
+                    return self.get_node_expression(node_to_negate, processed_nodes, is_calculate=False, is_prev=True,
                                             negate=True)
                 else:
                     logger.error(f"exclusive node {node.get_name()}\
                         does not depend of a calculate but on\
-                            {node.prev_nodes[0].__class__}::{node.prev_nodes[0].get_name()}")
+                            {node_to_negate.__class__}::{node_to_negate.get_name()}")
 
             else:
                 logger.error("exclusive node {} has no ou too much parent".format(node.get_name()))
@@ -657,7 +663,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
             
             return negate_term(expression)
         else:
-            return expresison
+            return expression
         
     # function update the calcualte in the XLSFORM format
     # @param left part
@@ -686,9 +692,10 @@ class XLSFormStrategy(BaseOutPutStrategy):
                     if isinstance(node, TriccNodeSelectNotAvailable):
                         # update the checkbox
                         if len(node.prev_nodes) == 1:
-                            parent_node = node.prev_nodes[0]
+                            iterator = iter(node.prev_nodes)
+                            parent_node = next(iterator)
                             parent_empty = "${{{0}}}=''".format(get_export_name(parent_node))
-                            node.relevance  = and_join([node.relevance, parent_empty])
+                            node.relevance  = and_join([parent_node.relevance, parent_empty])
 
                             node.required = parent_empty
                             node.constraint = parent_empty
@@ -726,6 +733,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
                             constraints.append('.>=' + node.max)
                             constraints_max="The maximum value is {0}.".format(node.max)
                         if len(constraints) > 0:
+                            constraints = add_bracket_to_list_elm(constraints)
                             node.constraint = ' and '.join(constraints)
                             node.constraint_message = (constraints_min + " "  + constraints_max).strip()
                 # continue walk

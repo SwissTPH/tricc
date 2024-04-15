@@ -4,7 +4,7 @@ import logging
 import random
 import string
 from enum import Enum, auto
-from typing import Dict, ForwardRef, List, Optional, Union
+from typing import Dict, ForwardRef, List, Optional, Union, Set
 
 from pydantic import BaseModel, constr
 from strenum import StrEnum
@@ -159,8 +159,8 @@ class TriccNodeBaseModel(TriccBaseModel):
     name: Optional[str] = None
     export_name:Optional[str] = None
     label: Optional[Union[str, Dict[str,str]]] = None
-    next_nodes: List[TriccNodeBaseModel] = []
-    prev_nodes: List[TriccNodeBaseModel] = []
+    next_nodes: Set[TriccNodeBaseModel] = set()
+    prev_nodes: Set[TriccNodeBaseModel] = set()
     expression: Optional[Union[Expression, TriccOperation]] = None  # will be generated based on the input
     expression_inputs: List[Expression] = []
     activity: Optional[TriccNodeActivity] = None
@@ -190,9 +190,9 @@ class TriccNodeBaseModel(TriccBaseModel):
         instance.group = activity
         if hasattr(self, 'activity') and activity is not None:
             instance.activity = activity
-        next_nodes = []
+        next_nodes = set()
         instance.next_nodes = next_nodes
-        prev_nodes = []
+        prev_nodes = set()
         instance.prev_nodes = prev_nodes
         expression_inputs = []
         instance.expression_inputs = expression_inputs
@@ -242,18 +242,30 @@ class TriccOperation(BaseModel):
         super().__init__(operator = tricc_operator)
         
     def get_references(self):
-        predecessor = []
+        predecessor = set()
         if isinstance(self.reference, list):
             for reference in self.reference:
                 if isinstance(reference, TriccOperation):
-                    predecessor += reference.get_references()
+                    predecessor = predecessor | reference.get_references()
                 elif issubclass(reference.__class__, TriccNodeBaseModel):
-                    predecessor.append(reference)
+                    predecessor.add(reference)
         else:
             raise NotImplementedError("cannot find predecessor of a str")
         return predecessor
     def append(self, value):
         self.reference.append(value)
+    def replace_node(self, old_node ,new_node):
+        if isinstance(self.reference, list):
+            for key in [i for i, x in enumerate(self.reference)]:
+                if isinstance(self.reference[key], TriccOperation):
+                    self.reference[key].replace_node(old_node ,new_node)
+                elif issubclass(self.reference[key].__class__, TriccNodeBaseModel )  and  self.reference[key] == old_node:
+                    self.reference[key] = new_node
+                    # to cover the options
+                    if hasattr(self.reference[key], 'select') and hasattr(new_node, 'select') and issubclass(self.reference[key].select.__class__, TriccNodeBaseModel ) :
+                        self.replace_node(self.reference[key].select ,new_node.select)
+        elif self.reference is not None:
+            raise NotImplementedError(f"cannot manage {self.reference.__class__}")
 
 TriccGroup.update_forward_refs()
 TriccEdge.update_forward_refs()

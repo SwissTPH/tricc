@@ -156,7 +156,7 @@ def get_nodes(diagram, activity):
             next_nodes_id = [ e.target for e in activity.edges if e.source == node.id] 
             if len(next_nodes_id)>0:
                 
-                calc = get_activity_wait([path], [node], next_nodes_id, node, edge_only=True) 
+                calc = get_activity_wait(path, [node], next_nodes_id, node, edge_only=True) 
                 new_nodes[calc.id] = calc
         elif isinstance(node, TriccNodeEnd):
             if not end_node:

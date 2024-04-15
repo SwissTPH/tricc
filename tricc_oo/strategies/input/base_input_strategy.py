@@ -32,7 +32,7 @@ class BaseInputStrategy:
                 id=generate_id(), form_id=root_process.form_id, label=root_process.label
             )
             # first sets of activities don't require wait node
-            root.next_nodes = start_pages[self.processes[0]]
+            root.next_nodes = set(start_pages[self.processes[0]])
 
             nodes = {page.id: page for x in start_pages for page in start_pages[x]}
             nodes[root.id] = root
@@ -54,7 +54,7 @@ class BaseInputStrategy:
             for process in self.processes[1:]:
                 if process in start_pages:
                     wait = get_activity_wait(
-                        [app.root],
+                        app.root,
                         prev_process,
                         start_pages[process],
                         edge_only=True,

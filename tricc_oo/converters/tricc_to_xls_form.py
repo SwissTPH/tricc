@@ -12,11 +12,11 @@ TRICC_CALC_EXPRESSION = "${{{0}}}>0"
 TRICC_CALC_NOT_EXPRESSION = "${{{0}}}=0"
 TRICC_EMPTY_EXPRESSION = "coalesce(${{{0}}},'') != ''"
 TRICC_SELECTED_EXPRESSION = 'selected(${{{0}}}, "{1}")'
+TRICC_SELECTED_NEGATE_EXPRESSION = 'count-selected(${{{0}}})>0 and not(selected(${{{0}}}, "{1}"))'
 TRICC_REF_EXPRESSION = "${{{0}}}"
 TRICC_NEGATE = "not({})"
 TRICC_NUMBER = "number({})"
-TRICC_NAND_EXPRESSION = '({0}) and not({1})'
-TRICC_AND_EXPRESSION = '({0}) and ({1})'
+TRICC_AND_EXPRESSION = '{0} and {1}'
 VERSION_SEPARATOR = '_Vv_'
 INSTANCE_SEPARATOR = "_Ii_"
 
@@ -33,8 +33,11 @@ def get_required_node_expression(node):
 
 
 # Get a selected option
-def get_selected_option_expression(option_node):
-    return TRICC_SELECTED_EXPRESSION.format(get_export_name(option_node.select), get_export_name(option_node))
+def get_selected_option_expression(option_node, negate):
+    if negate:
+        return TRICC_SELECTED_NEGATE_EXPRESSION.format(get_export_name(option_node.select), get_export_name(option_node))
+    else:
+        return TRICC_SELECTED_EXPRESSION.format(get_export_name(option_node.select), get_export_name(option_node))
 
 
 # Function that add element to array is not None or ''
@@ -55,6 +58,7 @@ def add_sub_expression(array, sub):
 # function that make multipat  and
 # @param argv list of expression to join with and
 def and_join(argv):
+    argv=add_bracket_to_list_elm(argv)
     if len(argv) == 0:
         return ''
     elif len(argv) == 1:
@@ -62,7 +66,7 @@ def and_join(argv):
     elif len(argv) == 2:
         return simple_and_join(argv[0], argv[1])
     else:
-        return '('+') and ('.join(argv)+')'
+        return ' and '.join(argv)
 
 # function that make a 2 part and
 # @param left part
@@ -95,12 +99,15 @@ def simple_and_join(left, right):
     elif right == '1' or right == 1 or right == 'true()':
         return  left
     else:
-        return     TRICC_AND_EXPRESSION.format((left), (right))
+        return    f"{left} and {right}"
 
 def or_join(list_or, elm_and=None):
     cleaned_list  = clean_list_or(list_or, elm_and)
-    if len(cleaned_list)>0:
-        return ' or '.join(cleaned_list)
+    if len(cleaned_list)==1:
+        return cleaned_list[0]
+    if len(cleaned_list)>1: 
+        return '(' + ' or '.join(cleaned_list) + ')'
+    
     
     
 # function that make a 2 part NAND
@@ -131,7 +138,7 @@ def nand_join(left, right):
     elif right_neg:
         return left
     else:
-        return  TRICC_AND_EXPRESSION.format(left, negate_term(right))
+        return  and_join([left, negate_term(right)])
 
 # function that negate terms
 # @param expression to negate
@@ -147,9 +154,36 @@ def negate_term(expression):
         return expression[4:-1]
     else:
         return TRICC_NEGATE.format((expression))
-    
+
+def safe_to_bool_logic(expression):
+    if ' or ' in expression or ' and ' in expression\
+        and not has_overall_brace(expression):
+        return f"({expression})"
+    return expression
+
+def has_overall_brace(expression):
+    expression=expression.strip()
+    if not expression[0]=='(':
+        return False
+    if not expression[-1]==')':
+        return False    
+    count_braces = 1
+    # ensure that the start brace don't close before the end
+    for c in expression[1:-1]:
+        if c == '(':
+            count_braces += 1
+        if c == ')':
+            count_braces -= 1
+        if count_braces == 0:
+            return False
+    return True
+        
+        
+        
+        
+
 def is_single_fct(name,expression):
-    if len(expression)>len(name)+2:
+    if len(expression)>(len(name)+2):
         return False
     if not expression.startswith(f"{name}("):
         return False
@@ -213,8 +247,15 @@ def clean_list_or(list_or, elm_and=None):
 
                     if negate_term(exp_prev) == elm_and or exp_prev == elm_and:
                         list_or.remove(exp_prev)
+   
+    return add_bracket_to_list_elm(list_or)
 
-    return list_or
+def add_bracket_to_list_elm(list_terms):
+    cleaned = [] 
+    for elm in list_terms:
+        cleaned.append(safe_to_bool_logic(elm)) 
+    return cleaned
+    
 
 def get_export_name(node):
     if isinstance(node, str):
@@ -232,12 +273,15 @@ def get_export_name(node):
                     node.export_name = clean_name(node.name)
             elif issubclass(node.__class__, (TriccNodeDisplayModel)):
                 node.gen_name()
-                if not isinstance(node, TriccNodeSelectOption) and node.activity.instance!=1:
+                if isinstance(node, TriccNodeSelectOption):
+                    node.export_name = node.name
+                elif not isinstance(node, TriccNodeSelectOption) and node.activity.instance!=1:
                     node.export_name = clean_name(node.name +  INSTANCE_SEPARATOR + str(node.instance))
             #elif isinstance(node, TriccNodeActivityEnd):
             #    node.export_name =  clean_name(node.name +  INSTANCE_SEPARATOR + str(node.instance))
             elif isinstance(node,  TriccNodeActivityStart):
                 node.export_name =  clean_name(node.name +  INSTANCE_SEPARATOR + str(node.instance))
+                
     return (node.export_name )
 
 

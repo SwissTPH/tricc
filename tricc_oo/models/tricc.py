@@ -187,7 +187,7 @@ class TriccNodeNote(TriccNodeDisplayModel):
     tricc_type: TriccNodeType = TriccNodeType.note
 
 class TriccNodeInputModel(TriccNodeDisplayModel):
-    required: Optional[Expression]
+    required: Optional[Union[Expression, TriccOperation]] = '1'
     constraint_message: Optional[Union[str, Dict[str,str]]]
     constraint: Optional[Expression]
     save: Optional[str]  # contribute to another calculate
