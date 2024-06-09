@@ -91,7 +91,7 @@ Node that are made to link page of jump witnin a page
 #### Page/Container
 
 
-## properties
+## attributes
 
 ### tricc_type
 

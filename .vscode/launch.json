@@ -6,7 +6,13 @@
             "type": "python",
             "request": "launch",
             "program": "tricc_oo/tests/build.py",
-            "args":["-i","/home/delcpa/Development/cht-chad/forms/app/adult_v31.drawio","-l","d", "-o", "/home/delcpa/Development/cht-chad/forms/app", "-t","-O", "XLSFormCHTStrategy"],
+            "args":[
+                "-i","/home/delcpa/Development/cht-chad/forms/app/adult_v31.drawio",
+                "-l","d", 
+                "-o", "/home/delcpa/Development/cht-chad/forms/app", 
+                "-t",
+                "-O", "XLSFormCHTStrategy",
+                "-L", "fr"],
             "console": "integratedTerminal",
             "justMyCode": true,
             "env": {"PYTHONPATH": "${workspaceFolder}/"},
@@ -16,14 +22,20 @@
             "type": "python",
             "request": "launch",
             "program": "tricc_oo/tests/build.py",
-            "args":["-i","/home/delcpa/Documents/adult_v30.drawio","-l","d", "-o", "/home/delcpa/Development/cht-chad/forms/app", "-t","-O", "XLSFormCHTStrategy"],
+            "args":[
+                "-i","/home/delcpa/Documents/adult_v30.drawio",
+                "-l","d", 
+                "-o","./tricc_oo/tests/data/",
+                "-t","-O", "XLSFormCHTStrategy"],
             "console": "integratedTerminal",
-            "justMyCode": true      
+            "justMyCode": true,
+            "env": {"PYTHONPATH": "${workspaceFolder}/"},  
+
         },      {
-            "name": "Medal creator",
+            "name": "Medal OG creator",
             "type": "python",
             "request": "launch",
-            "program": "tricc_oo/tests/build.py",
+            "program": "tricc_og/tests/build.py",
             "args":[
                 "-i","./tricc_oo/tests/data/medlacreator.json",
                 "-l","d","-t",
@@ -32,11 +44,11 @@
                 "-O","XLSFormCDSSStrategy"],
             "console": "integratedTerminal",
             "env": {"PYTHONPATH": "${workspaceFolder}/"},
-        },        {
-            "name": "Demo",
+        },{
+            "name": "tricc OG demo",
             "type": "python",
             "request": "launch",
-            "program": "tricc_oo/tests/build.py",
+            "program": "tricc_og/tests/build.py",
             "args":[ 
                 "-i","./tricc_oo/tests/data/demo.drawio",
                 "-l","w", 
