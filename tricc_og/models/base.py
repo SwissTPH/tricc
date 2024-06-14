@@ -167,8 +167,10 @@ class FlowType(StrEnum):
 
 
 class TriccActivity(TriccBaseModel):
-    inputs: Set[TriccDataInputModel] = set()
-    outputs: Set[TriccDataModel] = set()
+    # TODO: how to define the default/ main outputs
+    data_inputs: Set[TriccDataInputModel] = set()
+    process_output: TriccOperation = None
+    data_outputs: Set[TriccDataModel] = set()
     rules: Set[TriccOperation] = set()
     applicability: TriccOperation = None
     elements: Set[TriccBaseModel] = set()
@@ -201,7 +203,7 @@ class TriccProject(TriccBaseAbstractModel, TriccContext):
     # design level
     # authored_elements: Set[Union[TriccTask, TriccActivity]] = set()
     # actual element that might have several instance of the same authored elements to unloop
-    # impl_elements: Set[
+    # impl_elements: Set[333333333
     #     Union[
     #         TriccImplementationTask,
     #         TriccImplementationActivity
@@ -213,7 +215,7 @@ class TriccProject(TriccBaseAbstractModel, TriccContext):
     impl_graph: MultiDiGraph = MultiDiGraph()
     # authored graph
     graph: MultiDiGraph = MultiDiGraph()
-
+    
     # TODO manage trad properly
     def get_keyword_trad(keyword):
         return keyword
