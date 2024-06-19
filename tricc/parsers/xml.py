@@ -7,7 +7,7 @@ type_name = "odk_type"
 
 
 def read_drawio(filepath):
-    filepath = bytes(bytearray(filepath, encoding="utf-8"))
+    filepath = bytes(bytearray(filepath[0], encoding="utf-8"))
     root = etree.fromstring(filepath)
     # import xml.etree.cElementTree as ET
     # with open(filepath) as f:
