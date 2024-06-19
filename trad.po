@@ -1,0 +1,5638 @@
+#
+msgid ""
+msgstr ""
+
+msgid "psychose bipolaire"
+msgstr ""
+
+msgid "Dépendance à la consommation de substances psychoactives"
+msgstr ""
+
+msgid "antécedants d'épisodes dépressives"
+msgstr ""
+
+msgid "Discours et activités excessives"
+msgstr ""
+
+msgid "Comportement impulsif"
+msgstr ""
+
+msgid "Pas besoin de dormir"
+msgstr ""
+
+msgid "Humeur euforique"
+msgstr ""
+
+msgid "Demander"
+msgstr ""
+
+msgid ""
+"<div>Demander si épisodes sont recurrentes</div><div>et évaluez si les "
+"signes sont persisants au-delà d'une semaine</div>"
+msgstr ""
+
+msgid "Demander; S’agit dún premier épisode ( et non d’un etat chronique ?"
+msgstr ""
+
+msgid "Faire le suivi psychose"
+msgstr ""
+
+msgid "path: Seulement 1 signe de psychose sans dépression"
+msgstr ""
+
+msgid ""
+"<div>Observer:</div><div><br></div><div>le patient dans la salle "
+"d′observation et/ou avec sa famille pendant 12 heures</div><div>Observer: "
+"Est-ce que le comportement desorganisé persiste ?</div>"
+msgstr ""
+
+msgid ""
+"Demander Intoxication ou sevrage alcoolique ou aux drogues présentes, comme "
+"attesté par la communauté, la famille du patient(e) ou les tests de "
+"laboratoire"
+msgstr ""
+
+msgid "path: Signe de sédation"
+msgstr ""
+
+msgid ""
+"Expliquer sur les bénéfices, en termes de santé, de ne pas consommer de\n"
+"substances psychoactives."
+msgstr ""
+
+msgid "consommation de substances psychoactives pas-nocive"
+msgstr ""
+
+msgid "consommation de substances psychoactives nocive"
+msgstr ""
+
+msgid ""
+"Augmentation du niveau de tolérance et apparition d’un syndrome de sevrage en\n"
+"cas d’arrêt?"
+msgstr ""
+
+msgid ""
+"Difficulté à autoréguler la consommation malgré les risques encourus et les\n"
+"conséquences négatives associées?"
+msgstr ""
+
+msgid ""
+"Envie irrépressible ou compulsive de consommer la substance psychoactive?"
+msgstr ""
+
+msgid ""
+"Demander:\n"
+"au patient(e) et sa famille:"
+msgstr ""
+
+msgid ""
+"<div>Demander:</div><div>au patient(e) et sa famille:</div><div>Votre "
+"consommation vous cree-t-elle des problèmes ?</div><div><br></div><div>(Par "
+"example: blessures et accidents, violence envers les autres, problème "
+"relationnel ou de couple en raison de la consommation)</div>"
+msgstr ""
+
+msgid ""
+"<div>Demander:</div><div>au patient(e) et sa "
+"famille:</div><div><br></div><div>La personne consomme-t-elle des substances"
+" psychoactives ?</div><div>(Demander aussi la fréquence et les quantités "
+"consommées.)</div>"
+msgstr ""
+
+msgid "path: Dependance"
+msgstr ""
+
+msgid ""
+"<div>Demander en examiner:</div><div>ELIMINER LES AUTRES CAUSES MEDICALES "
+"POSSIBLES:</div><div><ul><li><span style=\"background-color: "
+"initial;\">maladie cardiovasculaire connu (hypertension, diabète, AVC "
+"antécédent)</span></li><li><span style=\"background-color: initial;\">VIH ou"
+" SIDA connu&nbsp;</span></li><li><span style=\"background-color: "
+"initial;\">maladie de sommeil (d'origine région endémique Sud Tchad, "
+"RCA)</span></li><li><span style=\"background-color: "
+"initial;\">démence</span></li><li><span style=\"background-color: "
+"initial;\">intoxication alimentaire&nbsp;</span></li></ul></div>"
+msgstr ""
+
+msgid "SYNDROME DE SEVRAGE AIGU AUX OPIACES"
+msgstr ""
+
+msgid ""
+"Examiner si la personme présente l’un des signes "
+"suivants<br><ul><li>pupilles dilatées</li><li>anxiété, "
+"agitation<br></li><li>hyperexcitabilité,&nbsp;accélération de la "
+"pensée<br></li><li>douleurs musculaires, crampes abdominales, "
+"céphalées<br></li><li>diarrhée</li><li>écoulements nasal ou "
+"oculaire</li><li>vomissements, nausées</li></ul>"
+msgstr ""
+
+msgid "La personne a récemment cessé de consommer des opiacés?"
+msgstr ""
+
+msgid "INTOXICATION AIGUË AUX STIMULANTS"
+msgstr ""
+
+msgid ""
+"<div>Examiner si la personme présente l’un des signes "
+"suivants<br></div><div><ul><li>pupilles "
+"dilatées</li><li>anxiété<br></li><li>hyperexcitabilité,&nbsp;accélération de"
+" la pensée<br></li><li>tension artérielle et fréquence cardiaque "
+"élevées</li><li>agitation</li></ul></div>"
+msgstr ""
+
+msgid ""
+"La personne a récemment utilisé des stimulants (cocaïne, stimulants tels\n"
+"qu’amphétamine ou autres)?"
+msgstr ""
+
+msgid ""
+"SYNDROME DE SEVRAGE A L’ALCOOL, AUX BENZODIAZEPINES, OU AUTRES SEDATIFS"
+msgstr ""
+
+msgid ""
+"Examiner si la personme présente l’un des signes suivants : "
+"<br><ul><li>tremblements</li><li>vomissements</li><li>sédation</li><li>tension"
+" artérielle et fréquence cardiaque élevées</li><li>agitation</li></ul>"
+msgstr ""
+
+msgid "La personne a récemment cessé sa consommation d’alcool ou de sédatifs?"
+msgstr ""
+
+msgid "Demander les suivants:"
+msgstr ""
+
+msgid ""
+"<div>Observer:</div><div><br></div><div>La personne semble-t-elle sur-"
+"stimulée, anxieuse ou agitée ?</div>"
+msgstr ""
+
+msgid ""
+"Suspicion de Delirium ou Confusion sur l'Hyperglycémie (coma acidocetose)"
+msgstr ""
+
+msgid ""
+"Délirium ou Confusion (lié à la consommation des substances psycho-actives)"
+msgstr ""
+
+msgid ""
+"Suspicion de Delirium ou Confusion sur suspicion de l'hypo ou hyperglycémie\n"
+"(coma acidocetose)"
+msgstr ""
+
+msgid "Suspicion de Delirium ou Confusion sur l'Hypoglycémie"
+msgstr ""
+
+msgid ""
+"path: Y-a-t-il eu une\n"
+"notion de prises de substances?"
+msgstr ""
+
+msgid "save select: Observer si la personne semble-t-elle confuse ?"
+msgstr ""
+
+msgid "Insomnie avec aggravation des signes dans la nuit ;"
+msgstr ""
+
+msgid "Changement des comportements tantôt agitation, tantôt stupeur ;"
+msgstr ""
+
+msgid "Quelques moments de lucidité marqués par la perplexité, l'anxiété"
+msgstr ""
+
+msgid "Incapacité de se souvenir de tout ce qui se passe pendant la crise ;"
+msgstr ""
+
+msgid ""
+"Baisse des autres fonctions intellectuelles (mémoire, attention, jugement,\n"
+"raisonnemement) ;"
+msgstr ""
+
+msgid ""
+"Désorientation dans le temps, dans l'espace et par rapport aux visages\n"
+"familiers ;"
+msgstr ""
+
+msgid "Fonctionnement en mode automatique, comme un somnambule ;"
+msgstr ""
+
+msgid "Observer si la personne semble-t-elle confuse ?"
+msgstr ""
+
+msgid "Agitations"
+msgstr ""
+
+msgid "Traitez l′état somatique et assurez le suivi."
+msgstr ""
+
+msgid "path: Traumatisme (tête, rage), ou prise de médicament,"
+msgstr ""
+
+msgid "Douleurs"
+msgstr ""
+
+msgid "Crise de dyspnée asphyxiante (apnée)"
+msgstr ""
+
+msgid "Examiner: le patient est-il sous sédation"
+msgstr ""
+
+msgid ""
+"<b>Notion de consommation alcool ou drogues:&nbsp;</b>Y a-t-il des signes de"
+" complications de la consommation d’alcool et/ou de drogues?"
+msgstr ""
+
+msgid "path: 1+ signe de psychose"
+msgstr ""
+
+msgid "path: drapeaux Depression"
+msgstr ""
+
+msgid ""
+"Traiter les causes de la dépréssion et demander au patient de revenir dans 4\n"
+"semaines"
+msgstr ""
+
+msgid "Conversion histérique"
+msgstr ""
+
+msgid "Depression à déterminer"
+msgstr ""
+
+msgid "Dépression unipolaire"
+msgstr ""
+
+msgid "Accun des symptômes ci-dessus"
+msgstr ""
+
+msgid "Effets secondaires des medicaments / drogues"
+msgstr ""
+
+msgid "Dépression cause somatique"
+msgstr ""
+
+msgid "Etat somatique"
+msgstr ""
+
+msgid ""
+"Observer et demander:\n"
+"Autres causes de la dépréssion"
+msgstr ""
+
+msgid "Dépression bipolaire"
+msgstr ""
+
+msgid ""
+"Pour l'épisode maniaque demander si présence de::<br>-&nbsp;<span "
+"style=\"\">Idées de grandeur, projets pharaoniques, optimisme "
+";<br></span>-&nbsp;<span style=\"\">Changement multiple d'habits au cours de"
+" la journée, hyper-maquillage<br></span>-&nbsp;<span style=\"\">Logorrhée ou"
+" parler sans arrêt, graphorrhée, chants, danses<br></span>-&nbsp;<span "
+"style=\"\">Augmentation de l'énergie avec hyperactivité sans "
+"fatigue<br>-&nbsp;</span><span style=\"\">Va-et-viens, rixe "
+";<br></span><span style=\"\">-&nbsp;</span><span style=\"\">Insomnie bien "
+"tolérée ;<br></span><span style=\"\">-&nbsp;</span><span style=\"\">Baisse "
+"de besoin du sommeil ou de la nourriture</span><span style=\"\"><br></span>"
+msgstr ""
+
+msgid ""
+"<div><font>Demander:</font></div><div><font>S'il y a des antécedants "
+"d'autres épisodes dépressives et/ou maniaque?</font></div>"
+msgstr ""
+
+msgid ""
+"<div>Observer e demander: "
+"symptômes:</div><div>hallucinations</div><div>OU</div><div>Illusions</div>"
+msgstr ""
+
+msgid ""
+"<div>Demander:</div><div>Rechercher des difficultés á assurer ses activités "
+"quotidiennes personelles, familiales, scolaires ou professionnelles.</div>"
+msgstr ""
+
+msgid "Incohérence entre plaintes et résultats des examens."
+msgstr ""
+
+msgid "Apparution de douleurs disséminées dans l'ensemble de l'organisme"
+msgstr ""
+
+msgid "Réactionnel(le) aux stimulis affectifs (aggravées en public) ;"
+msgstr ""
+
+msgid "Ne respectant pas la marche sémiologique classique ;"
+msgstr ""
+
+msgid "Crise sous forme d'état second, de transe ;"
+msgstr ""
+
+msgid "Théâtralisme (comportement excessif, qui vise à attirer l'attention) ;"
+msgstr ""
+
+msgid ""
+"Crises sous forme de perte d'une fonction de la vie de relation (conscience,\n"
+"vue, audition, motricité, language, ...), semblable à une crise d'épilepsie,\n"
+"sans explication anatomique - ni physio-pathologique ;"
+msgstr ""
+
+msgid ""
+"Demander et observer s'il existe chez le/la patient(e) les signes et les "
+"symptômes suivants :"
+msgstr ""
+
+msgid ""
+"<span style=\"text-align: center;\">Y-a-t-il sur le/la patient(e) les "
+"circonstances et le terrain de survenue suivants : frustration, défit "
+"affectif, personnalité histrionique, jeune fille?</span>"
+msgstr ""
+
+msgid "De survenue brutale."
+msgstr ""
+
+msgid "Toujours présents au déla de 2 semaines sans causes somatiques."
+msgstr ""
+
+msgid "Etat psychotique dû à la maladie somatique"
+msgstr ""
+
+msgid "Toujours présents dans moins de 2 semaines."
+msgstr ""
+
+msgid "Est-ce-que les symptomes sont :"
+msgstr ""
+
+msgid "Psychose associée à une maladie somatique"
+msgstr ""
+
+msgid ""
+"<span style=\"text-align: center;\">La confusion comme effet secondaire des "
+"médicaments severe?</span>"
+msgstr ""
+
+msgid ""
+"path: \n"
+"Infection Severe (paludisme neurologique, maladie"
+msgstr ""
+
+msgid "save select: Observer et demander s'il y a des symptômes suivan"
+msgstr ""
+
+msgid "save: Herpes Génital"
+msgstr ""
+
+msgid "État d′abattement a suivre"
+msgstr ""
+
+msgid "Plaintes somatiques diverses inexpliquées"
+msgstr ""
+
+msgid "Pleurs, amertume ou nervosité"
+msgstr ""
+
+msgid "Acte ou idées suícidaires"
+msgstr ""
+
+msgid "Manque d’éspoir, vision et idées négatives"
+msgstr ""
+
+msgid "Anxiété (peur inexpliquée)"
+msgstr ""
+
+msgid "Difficultés de prendre des décisions"
+msgstr ""
+
+msgid "Difficultés de concentration"
+msgstr ""
+
+msgid "Fatigue (baisse d'énergie) inexpliquée et non réparée par le repos"
+msgstr ""
+
+msgid "Négligéance de l'hygiène"
+msgstr ""
+
+msgid "Isolement social"
+msgstr ""
+
+msgid "Diminution de communication avec les autres"
+msgstr ""
+
+msgid "Variation de l’appétit ou du poids"
+msgstr ""
+
+msgid "Manque de sommeil, sommeil excessif ou perturbé"
+msgstr ""
+
+msgid "Est ce que le patient à les symptomes suivants"
+msgstr ""
+
+msgid "Est ce que cela dure depuis plus de 2 semaines"
+msgstr ""
+
+msgid ""
+"<div>Demander:</div><div>avec le patient et sa famille:</div><div>- S’Il y a"
+" humeur anormalement triste (depressive)&nbsp;</div><div>- Diminution du "
+"plaisir dans toutes les activités</div>"
+msgstr ""
+
+msgid "path: Depression"
+msgstr ""
+
+msgid "Absence de prise de conscience de présenter un trouble."
+msgstr ""
+
+msgid ""
+"Delires : Croyances erronées, bizarres inébranlables, non partagées par\n"
+"d'autres dans la culture de l'individu."
+msgstr ""
+
+msgid ""
+"Hallucinations : entend des voix et recent ou voit des choses qui ne sont pas\n"
+"réelles (entendant ou voyant des choses que les autres ne voyent ou\n"
+"n'entendent pas)."
+msgstr ""
+
+msgid ""
+"Agitation, augmentation ou diminution de l'activité, bizarrerie, agressivité\n"
+"verbale ou physique inexpliquée, atteinte à la pudeur."
+msgstr ""
+
+msgid ""
+"Comportement désorganisé, exemple : discours incohérent/hors sujet,\n"
+"monoloques, rires sans justification (rires immotivés), apparence étrange,\n"
+"signes de laisser aller ou d'apparence négligée ;"
+msgstr ""
+
+msgid ""
+"Changement marqués du comportement, avec une négligence des responsabilités,\n"
+"habituelles liées au travail, à la profession, aux activités domestiques ou\n"
+"sociales , se mettre à l'écart des autres et n'execute pas ses\n"
+"responsabilités;"
+msgstr ""
+
+msgid "Observer et demander s'il y a des symptômes suivants :"
+msgstr ""
+
+msgid "Herpes Génital"
+msgstr ""
+
+msgid "save: Constipation"
+msgstr ""
+
+msgid "Evaluation Trypanosomiase africaine humaine"
+msgstr ""
+
+msgid "path: Macules/papules/nodules purigineux predominant dan"
+msgstr ""
+
+msgid ""
+"INDICATION POUR UN EXAMEN DE DÉPISTAGE VIH:\n"
+"\n"
+"Demander et observer des symptomes:\n"
+"Diarrhée persistante pendant >14 jours\n"
+"Malnutrition / Perte de poids\n"
+"Aphtose et muguet persistante dans la bouche\n"
+"Bronchopneumonie persistante\n"
+"Inféctions cutanées persistantes (ou répétées)\n"
+"\n"
+"\n"
+"Demander pour des situations de risque:\n"
+"Rapport sexuel avec une personne vivant avec le VIH\n"
+"Parent, enfant, homme ou femme du patient avec VIH\n"
+"\n"
+"Demander pour d'autres maladies/syndromes associés à une inféction VIH comme:\n"
+"-Tuberculose\n"
+"-Autre inféction sexuellement transmissible"
+msgstr ""
+
+msgid ""
+"<div>Rapport sexuel non protégé&nbsp; avec une personne vivant avec le "
+"VIH</div><div><span style=\"background-color: initial;\">Parent, enfant, "
+"homme ou femme d'une personne vivant avec le VIH</span></div><div>histoire "
+"de viol, Accidents d'expositions aux liquides biologiques</div><div>Histoire"
+" des infections sexuellements transmissibles</div><div>Polygamie / rapports "
+"sexuels avec &gt;5 partenaires dans 6 mois / personnes ayant de multiples "
+"partenaires et vivant dans une zone à haute prévalence</div><div>Usage des "
+"drogues intraveineuses</div><div>Présentant une maladie liée au "
+"VIH</div><div>Professions à haute risque</div>"
+msgstr ""
+
+msgid ""
+"Traitement et prevention:\n"
+"ARV\n"
+"TB (FDC)\n"
+"prévention Tb (INH)\n"
+"PCP (cotrimazole)\n"
+"Viral load ou CD4 count connu?"
+msgstr ""
+
+msgid "VIH confirmé / connu?"
+msgstr ""
+
+msgid "Suspicion bilharziose génitale féminin"
+msgstr ""
+
+msgid ""
+"<div>voir Atlas de poche "
+"OMS</div><div>https://apps.who.int/iris/bitstream/handle/10665/255855/9789241509299-fre.pdf?sequence=1</div>"
+msgstr ""
+
+msgid ""
+"<div><div>la patiente a t-elle un des signes de&nbsp;<span style=\"text-"
+"align: center;\">Bilharziose Génitale Féminin</span>:</div><div>- taches "
+"jaunâtres d'aspect granuleux, aspect grain de sable ou</div><div>- vaisseaux"
+" sanguins anormaux ou</div><div>- papules d’aspect "
+"caoutchouteux&nbsp;</div></div>"
+msgstr ""
+
+msgid "Examen du col utérin au spéculum si disponible"
+msgstr ""
+
+msgid ""
+"Exposition à l’eau fraîche (natation , jeux dans les flaques d'eau, baignade"
+" dans les mares, lavage/lessive, pêche)"
+msgstr ""
+
+msgid "Lésions papillomateuses ou verrues génitales"
+msgstr ""
+
+msgid "traitement avec praziquantel reçu dans les 3 derniers mois?"
+msgstr ""
+
+msgid "Vomissements sur grossesse"
+msgstr ""
+
+msgid "Evaluation O&G"
+msgstr ""
+
+msgid ""
+"<div>Autres:</div><div><br></div><div>Problèmes de conception: stérilité, "
+"avortements?</div><div>Problèmes de menstruation / règles irrégulieres "
+"(saignements excessive, durée, rhythmes)</div>"
+msgstr ""
+
+msgid "Suspicion Oedème liée la grossesse"
+msgstr ""
+
+msgid "Anémie sévère sur grossesse"
+msgstr ""
+
+msgid "Pâleur des muqueuses?"
+msgstr ""
+
+msgid "path: paleur SANS ictère"
+msgstr ""
+
+msgid "Confirmer ou exclure le diagnostic de grossesse (βHCG dans l’urine)"
+msgstr ""
+
+msgid ""
+"Suspicion GEU\n"
+"Ou menace d’avortement"
+msgstr ""
+
+msgid "Stress aigu avec symptômes dissociatifs"
+msgstr ""
+
+msgid "save: Evaluer, existe-t-il une pathologie concomitante?::Dépression"
+msgstr ""
+
+msgid "save: Suspicion saignement /perforation ulcère gastro-du"
+msgstr ""
+
+msgid "Constipation"
+msgstr ""
+
+msgid "path: Sans diagnostic mal au ventre"
+msgstr ""
+
+msgid "Suspicion parasitose intestinale"
+msgstr ""
+
+msgid "path: sang dans les selles (rouge ou non)"
+msgstr ""
+
+msgid "Sans diagnostic mal au ventre"
+msgstr ""
+
+msgid ""
+"**Syndrome abdominale**  : douleurs abdominales hautes possibles causes à\n"
+"évaluer: Suspicion parasitose intestinale (sans fièvre) OU Suspicion abcès\n"
+"amibien OU autre"
+msgstr ""
+
+msgid ""
+"<div>Un des suivants:</div><div>[ictère]&nbsp; et TDR AgHBS/VHC "
+"négatif</div><div>Fièvre "
+"intermittente&nbsp;</div><div>[Diarrhée]&nbsp;&nbsp;</div><div>[Sang dans "
+"les selles]&nbsp;&nbsp;</div><div>[Vomissement]&nbsp; ou "
+"nausée</div><div>Hépatomégalie</div><div>Perte de poids</div>"
+msgstr ""
+
+msgid "Mal au ventre au cadran droit ou epigastrique?"
+msgstr ""
+
+msgid ""
+"Suspicion Reflux gastro-oesophagien, Gastrite ou ulcère gastro-duodenal"
+msgstr ""
+
+msgid "rythmée par les repas? OU Notion alcool ou AINS?&nbsp;"
+msgstr ""
+
+msgid ""
+"<div>Douleur thoracique,</div><div>Douleur (brulûres) épigastrique, "
+"retrosternale ou peri-ombilicale ou Gêne abdominale et nausée&nbsp; ET/OU "
+"anorexie&nbsp; OU Notion de prise d'alcool ou AINS??</div>"
+msgstr ""
+
+msgid "Suspicion saignement /perforation ulcère gastro-duodénal"
+msgstr ""
+
+msgid ""
+"<div>Saignement important (Perte de sang en grande "
+"quantité)</div><div>ET</div><div>Histoire de consommation d’Aspirine ou "
+"acide acétylsalicilique ou AINS (ibuprofen, voltarene)&nbsp;</div>"
+msgstr ""
+
+msgid "Hémorrhoides"
+msgstr ""
+
+msgid "Demander s’il ya une masse à reduire après la défécation"
+msgstr ""
+
+msgid ""
+"<div>Prurit anale&nbsp;</div><div>ET/OU&nbsp;</div><div>saignements minimes "
+"répétés&nbsp;</div>"
+msgstr ""
+
+msgid "Fissure ano-réctale"
+msgstr ""
+
+msgid "Lésion anale ET douleur pendant/ après la défécation"
+msgstr ""
+
+msgid ""
+"path: Sang rouge\n"
+"dans les selles"
+msgstr ""
+
+msgid "Suspecter Diabète type 2"
+msgstr ""
+
+msgid "Hypoglycemie"
+msgstr ""
+
+msgid "Hypoglycemie sévère"
+msgstr ""
+
+msgid ""
+"save: Demander, combien de temps s’est écoulé depuis l'é::Moins d'un mois"
+msgstr ""
+
+msgid ""
+"Suspicion infections génital hautes d’origine puerpérale, Endometrite,\n"
+"Septicémie puerpérale, Abcès"
+msgstr ""
+
+msgid "Avortement séptique"
+msgstr ""
+
+msgid "Faire consultation CPN"
+msgstr ""
+
+msgid "douleurs pelviennes"
+msgstr ""
+
+msgid "Chorioamniotite possible"
+msgstr ""
+
+msgid "Suspicion infection uterine ou fétale"
+msgstr ""
+
+msgid "Rupture des membranes + 18 h"
+msgstr ""
+
+msgid ""
+"<div>Ecoulement vaginal purulant&nbsp;</div><div>douleur au bas ventre à la "
+"palpation</div>"
+msgstr ""
+
+msgid "path: Femme enceinte ou accouchement récent ET Mal tête"
+msgstr ""
+
+msgid "Avisé si un soutient/suivit psychologique est nécéssaire"
+msgstr ""
+
+msgid "Stress aigu"
+msgstr ""
+
+msgid "autre symptômes dissociatifs"
+msgstr ""
+
+msgid "\\- Crise pseudo-convulsive"
+msgstr ""
+
+msgid "\\- Incapacité de paroler ou de voir ;"
+msgstr ""
+
+msgid "\\- paralysie médicalement inexpliquée ;"
+msgstr ""
+
+msgid ""
+"Observer et demander :\n"
+"Evaluer les symptômes dissociatifs, par exemple :"
+msgstr ""
+
+msgid "Un ou plus d'un mois"
+msgstr ""
+
+msgid "État de stress post – traumatique"
+msgstr ""
+
+msgid "Accune pathologie concomitante"
+msgstr ""
+
+msgid "Consommation nocive d’alcool ou drogues"
+msgstr ""
+
+msgid "path: Psychose"
+msgstr ""
+
+msgid "path: Dépression"
+msgstr ""
+
+msgid "Pathologies physique"
+msgstr ""
+
+msgid "Evaluer, existe-t-il une pathologie concomitante?"
+msgstr ""
+
+msgid "Moins d'un mois"
+msgstr ""
+
+msgid "Demander, combien de temps s’est écoulé depuis l'évènement?"
+msgstr ""
+
+msgid ""
+"<div>demander:</div><div>l’individu rencontre d’énorme difficultés à "
+"réaliser ses activités quotidiennes à cause des symptômes</div>"
+msgstr ""
+
+msgid "path: sang dans les selles"
+msgstr ""
+
+msgid "save: Est-ce qu’il y a une diarrhée sanglante (sang frai"
+msgstr ""
+
+msgid "DIARRHÉE AQUEUSE AIGUË"
+msgstr ""
+
+msgid "suspicion DIARRHÉE CHOLÉRIQUE"
+msgstr ""
+
+msgid "Selles: aspect eau de riz"
+msgstr ""
+
+msgid "Histoire des cas de diarrhée aigu en entourage et/ou épidémie en cours"
+msgstr ""
+
+msgid ""
+"Histoire: Apparition diarrhée aqueuse rapide (<24 heures) et/ou durée 24-48\n"
+"heures"
+msgstr ""
+
+msgid "Diarrhée selles aqueuses abondantes ET un des signes suivants"
+msgstr ""
+
+msgid "DIARRHÉE PERSISTANTE"
+msgstr ""
+
+msgid "Diarrhée &gt; 30 jours&nbsp;&nbsp;"
+msgstr ""
+
+msgid "DIARRHÉE PERSISTANTE SÉVÈRE OU chronique"
+msgstr ""
+
+msgid "path: Désydratation"
+msgstr ""
+
+msgid "Diarrhée &gt;14 jours (intermittente ou chronique)&nbsp;"
+msgstr ""
+
+msgid "Suspicion bilharziose intestinale"
+msgstr ""
+
+msgid "Suspicion Dysentérie sanglante amebienne"
+msgstr ""
+
+msgid ""
+"<span style=\"text-align: center;\">Suspicion:&nbsp; shigellose ou</span><br"
+" style=\"text-align: center;\"><span style=\"text-align: "
+"center;\">escherichia coli EHEC / EIEC Ou Campylobacter jejuni</span>"
+msgstr ""
+
+msgid "Suspicion dysenterie sanglante bactérienne (shigellose)"
+msgstr ""
+
+msgid "Douleur abdominale aigue, tenesmes ou douleurs réctales aigue"
+msgstr ""
+
+msgid ""
+"Est-ce qu’il y a une diarrhée sanglante (sang frais, rouge visible dans les "
+"selles)"
+msgstr ""
+
+msgid "réevaluate in 2 days"
+msgstr ""
+
+msgid "Cause hypertension à évaluée"
+msgstr ""
+
+msgid "hypertension déjà mesurée dans les p2 précedents jours"
+msgstr ""
+
+msgid ""
+"Evaluation du risque total de Maladie cardiovasculaire (MCV) et du diabète\n"
+"mellitus (DM)\n"
+"* âge >40 ans\n"
+"* Histoire infarctus ou AVC ou diabète\n"
+"* maladie des reins chronique\n"
+"* tabagisme /fumeur\n"
+"*  **histoire en famille** : infarctus ou AVC ou antécédents de MCV prématurée chez un parent du premier degré ou antécédents de diabète ou de maladie rénale chez un parent du premier degré\n"
+"* obésité\n"
+"* présence avérée d'un syndrome de Down"
+msgstr ""
+
+msgid "path: Histoire d' Hypertensions"
+msgstr ""
+
+msgid "Suspicion choc septique"
+msgstr ""
+
+msgid "Suspicion choc cardigènique"
+msgstr ""
+
+msgid "Suspicion choc hypovolémique / hémorragique"
+msgstr ""
+
+msgid "Suspicion choc hypovolémique /Anaphylaque"
+msgstr ""
+
+msgid ""
+"<span style=\"color: rgb(0 , 0 , 0) ; font-size: 11px\">notion prise / "
+"injection médicament (antibiotiques, vaccins) ou piqure insect: "
+"manifestations cutanées ou gonflement visage: urticaire, œdème pharyngo-"
+"laryngé,&nbsp; dyspnée, bronchospasme, chute TA</span>"
+msgstr ""
+
+msgid ""
+"<span style=\"font-size: 11px;\">Avez vous une suspicion&nbsp; Anaphylaxie, "
+"piqure ou ALLERGIE :&nbsp;</span>"
+msgstr ""
+
+msgid "path: traumatisme sévère"
+msgstr ""
+
+msgid "save: Ulcère ou histoires de vésicules récurrentes"
+msgstr ""
+
+msgid "save: Cas probable syphilis"
+msgstr ""
+
+msgid "Suspicion AVC"
+msgstr ""
+
+msgid "Persone à risque d'AVC"
+msgstr ""
+
+msgid "path: Trouble comportement/confusion"
+msgstr ""
+
+msgid "Troubles physiques médicalement inexpliqués"
+msgstr ""
+
+msgid "Hyperventilation"
+msgstr ""
+
+msgid "Changements brusques du comportement (comme agressivité)"
+msgstr ""
+
+msgid ""
+"Eviter des pensées déliberées déliberé des pensées, des souvenirs ou des\n"
+"situations rappeleant l’évènement récent"
+msgstr ""
+
+msgid "Émotions fortes"
+msgstr ""
+
+msgid "Réaction anormale élevée aux bruits ou aux mouvements inattendus"
+msgstr ""
+
+msgid "État exagéré de vigilance"
+msgstr ""
+
+msgid "Nervosité ou fébrilité"
+msgstr ""
+
+msgid "Cauchemars récurrants, souvenirs intrusifs d’un évenement récent"
+msgstr ""
+
+msgid "Problèmes de concentration"
+msgstr ""
+
+msgid "Anxiéte"
+msgstr ""
+
+msgid "Troubles de sommeil"
+msgstr ""
+
+msgid ""
+"Observer et demander :\n"
+"Evaluer il y a des symptômes significatifs :"
+msgstr ""
+
+msgid ""
+"Discuter avec le patient:\n"
+"\\- Quel évènement de stress majeur avez-vous vécu?\n"
+"- votre vie a-t-elle été menacée?\n"
+"\\- Sentez-vous en sécurité chez vous?\n"
+"\\- Avez-vous vécu quelque chose vraiment horrible?"
+msgstr ""
+
+msgid ""
+"par example: violence physique ou sexuelle, atrocités, accidents/blessure "
+"grave"
+msgstr ""
+
+msgid ""
+"<div>demander;</div><div>la personne a-t-elle récemment subi un évènement "
+"potentiellement traumatisant?</div><div><br></div><div><br></div>"
+msgstr ""
+
+msgid "path: diarrhée"
+msgstr ""
+
+msgid "Pas de Déhydratation"
+msgstr ""
+
+msgid "fièvre non grave"
+msgstr ""
+
+msgid "Suspecter syndrome grippale/virale"
+msgstr ""
+
+msgid ""
+"save: Intoxication alimentaire\n"
+"Ou gastroenterite"
+msgstr ""
+
+msgid "Dependance Alchool ou drogues"
+msgstr ""
+
+msgid "Larva migrans cutané"
+msgstr ""
+
+msgid ""
+"<div>Cordon sous la peau</div><div>comme un ver qui bouge ou qui&nbsp;<span "
+"style=\"background-color: initial;\">progresse chaque jour</span></div>"
+msgstr ""
+
+msgid "Nodules sur les orteils des pied"
+msgstr ""
+
+msgid ""
+"Suspecter Lésions de Kaposi\n"
+"Stade 3, 4"
+msgstr ""
+
+msgid ""
+"<div>Nodositées pourpres indolores sur la peau ou "
+"bouche/palais</div><div>ET/OU</div><div>VIH connu</div>"
+msgstr ""
+
+msgid "save: Pityriasis versicolor: pâle, squameuse, tronc, cou"
+msgstr ""
+
+msgid "path: Stresse"
+msgstr ""
+
+msgid ""
+"Demander si,&nbsp;<span style=\"text-align: center;\">sur un seul coté "
+",&nbsp;</span><br><span style=\"text-align: center;\">&nbsp;perte/diminution"
+" de la motricité ou sensibilité bras, jambre, du visage&nbsp;</span>"
+msgstr ""
+
+msgid "path: Lésions ET enflure membres"
+msgstr ""
+
+msgid ""
+"Suspecter syndrome grippale/virale/\n"
+"Cas probable d'arbovirose: (Chikungunia)"
+msgstr ""
+
+msgid ""
+"<div>Douleurs d’apparition</div><div>brutale ET</div><div>Limitation des "
+"<font color=\"#ff0000\">mouvements</font>&nbsp; ET <br></div><div>histoire "
+"de fièvre?</div>"
+msgstr ""
+
+msgid "Suspicion Arthrose"
+msgstr ""
+
+msgid ""
+"<div><div style=\"border-color: var(--border-color);\">Tuméfaction "
+"articulaire</div><div style=\"border-color: var(--border-color);\">chronique"
+" avec douleur chronique,<font style=\"border-color: var(--border-"
+"color);\">&nbsp;d'évolution lente, limittaion des mouvements, vielleis "
+"personnes, déformation</font></div></div>"
+msgstr ""
+
+msgid ""
+"Suspicion lymphadénite filariose lymphatique OU lymphoedème\n"
+"(épisode inflammatoire)"
+msgstr ""
+
+msgid ""
+"<font>T</font><font>uméfaction progressive membres inférieurs avec "
+"adénopathie<br>et / Ou fièvre<br>et/ ou chaleur et rougeur (épisode "
+"inflammatoire)</font>"
+msgstr ""
+
+msgid "path: Douleur des articulations ou des muscles (arthralg"
+msgstr ""
+
+msgid "Phlegmon ou érysipele"
+msgstr ""
+
+msgid "Rougeur ou chaleur avec Collection purulente fluctuante"
+msgstr ""
+
+msgid "lésion de peau: placard rouge, chaud, douloureux"
+msgstr ""
+
+msgid "Arthrite séptique"
+msgstr ""
+
+msgid "Gonflement articulaire chaud localisée à une seule articulation&nbsp;"
+msgstr ""
+
+msgid ""
+"Suspecter Ostéomyélite (sur drépanocytose) OU Mal de Pott (tuberculose\n"
+"osseuse)"
+msgstr ""
+
+msgid "save: <div style=\"border-color: var(--border-color); tex"
+msgstr ""
+
+msgid ""
+"save: Quels sont les type de douleurs:::boiterie, difficultées à marcher"
+msgstr ""
+
+msgid ""
+"save: Quels sont les type de douleurs:::douleur liée aux vertèbres/raideur "
+"localisée au do"
+msgstr ""
+
+msgid ""
+"save: Quels sont les type de douleurs:::myalgies : au niveau d'une/des "
+"muscles"
+msgstr ""
+
+msgid ""
+"save: Quels sont les type de douleurs:::Arthralgies : au niveau d'une/des "
+"articulations"
+msgstr ""
+
+msgid ""
+"Inféction hérpetique (gingivo-stomatique herpétique)\n"
+"Herpes labial (sur les lèvres)"
+msgstr ""
+
+msgid "Apthose / apthes"
+msgstr ""
+
+msgid "Suspicion syphilis secondaire"
+msgstr ""
+
+msgid "path: Syphylis"
+msgstr ""
+
+msgid ""
+"Granulome ulcéreux, souvent unique, non douloureuse, sans adénopathies<br "
+"style=\"border-color: var(--border-color); color: rgb(255, 25, 41);\">SI "
+"Granulome ulcéreux, souvent unique, non douloureuse, saigne facilement sans "
+"adénopathies: suspicion&nbsp;<br style=\"border-color: var(--border-color); "
+"color: rgb(255, 25, 41);\"><span style=\"border-color: var(--border-color); "
+"color: rgb(255, 25, 41);\">Granulome inguinal (donovanose): TT "
+"azithromycin</span>"
+msgstr ""
+
+msgid "Suspicion syphilis"
+msgstr ""
+
+msgid "Suspicion syphilis précoce"
+msgstr ""
+
+msgid "Non concluant"
+msgstr ""
+
+msgid "Cas probable syphilis"
+msgstr ""
+
+msgid "resultat test syphlilis"
+msgstr ""
+
+msgid "TDR syphilis disponible?"
+msgstr ""
+
+msgid ""
+"<div>Evaluation profil de risque:</div><div>Demander "
+"si</div><div><br></div><div>- le partenaire a un écoulement ou un ulcère "
+"génital</div><div>- ou le malade a au moins deux des facteurs "
+"suivants</div><div>. âge ‹ 25 ans</div><div>. plus d’un partenaire sexuel "
+"dans les 3 derniers mois, ou nouveau partenaire sexuel dans les 3 derniers "
+"mois</div><div>histoire de violence sexuel, viol, "
+"AES</div><div>polygamie???</div><div>MSF:</div><div><br></div><div>Ecoulement"
+" urétral chez le partenaire</div><div>Contexte de violences sexuelles ou de "
+"prostitution</div><div>Nouveau partenaire ou plus d’un partenaire au cours "
+"des 3 derniers mois</div>"
+msgstr ""
+
+msgid "path: ulcer genital"
+msgstr ""
+
+msgid "Histoire du traitement pour syphilis dans les 3 derniers mois?"
+msgstr ""
+
+msgid "Ulcère ou histoires de vésicules récurrentes"
+msgstr ""
+
+msgid "path: Examiner et Demander: Verrues et/ou Lésions papill"
+msgstr ""
+
+msgid "save: Demander si produits suivants:::Autres?"
+msgstr ""
+
+msgid "path: Déhydratation"
+msgstr ""
+
+msgid "Saignement au contact, vaisseaux anormale"
+msgstr ""
+
+msgid "Hématurie possible, néoplasie vésicale, lithiase urinaire"
+msgstr ""
+
+msgid "Urinaire"
+msgstr ""
+
+msgid "path: Sang dans les selles"
+msgstr ""
+
+msgid "rectale"
+msgstr ""
+
+msgid "Périnéale"
+msgstr ""
+
+msgid "Néoplasie vaginale, lacération vaginale possibles"
+msgstr ""
+
+msgid "Paroie vaginale"
+msgstr ""
+
+msgid ". Polype/ectropion cervicale ou  Néoplasie cervical possibles"
+msgstr ""
+
+msgid "Cervicale"
+msgstr ""
+
+msgid "Placenta praevia possible"
+msgstr ""
+
+msgid "Hématome rétro-placentaire possible"
+msgstr ""
+
+msgid ""
+"Rupture Uterine ou hématome rétro-placentaire ou placenta praevia\n"
+"possible"
+msgstr ""
+
+msgid "Saignement Exessifs"
+msgstr ""
+
+msgid "path: TA syst < 90"
+msgstr ""
+
+msgid "Saignement douloureux"
+msgstr ""
+
+msgid "Grossesse ectopique ou avortement manqué possilbe"
+msgstr ""
+
+msgid ""
+"béance du col cervical, menace d'avortement/ Avortment inévitable, grossesse\n"
+"extra-utérine, grossesse mollaire possilbe"
+msgstr ""
+
+msgid "Avortement"
+msgstr ""
+
+msgid "Hémorragie vaginale tachant les vetements"
+msgstr ""
+
+msgid "Col de l'utérus ouvert"
+msgstr ""
+
+msgid "Grossesse confirmé (avec in test ? )"
+msgstr ""
+
+msgid "path: Grossesse de plus de 20 semaines"
+msgstr ""
+
+msgid "Utérine"
+msgstr ""
+
+msgid "Examen au speculum: Origine de l'hémorragie"
+msgstr ""
+
+msgid ""
+"Examen bimanuel:\n"
+"\\- Taille utérine\n"
+"\\- Sensibilité pelvienne\n"
+"Masse/ Sensibilité annexielle"
+msgstr ""
+
+msgid ""
+"Procéder à un examen au physique\n"
+"\n"
+"Examen au spéculum:\n"
+"\\- vérifier l'importance de l'hémoragie\n"
+"¨- Origine de l'hémorragie\n"
+"\\- présence d'une dilatation de l'orifice cervical ou lésion cervicales"
+msgstr ""
+
+msgid ""
+"Poser immédiatement deux voies intraveineuse et Perfuser rapidement les\n"
+"solutès afin de stabiliser la patiente"
+msgstr ""
+
+msgid "path: TA syst < 90 mmHg  OU Notion de convultion OU poul"
+msgstr ""
+
+msgid ""
+"Intoxication alimentaire\n"
+"Ou gastroenterite"
+msgstr ""
+
+msgid ""
+"path: Diarrhée et/ou\n"
+"Vomissement et/ou\n"
+"fièvre"
+msgstr ""
+
+msgid "autres"
+msgstr ""
+
+msgid "INTOXICATION ALIMENTAIRES"
+msgstr ""
+
+msgid ""
+"Référer\n"
+"\n"
+"Demander si notion de prise sans mesures d'hygiènes?"
+msgstr ""
+
+msgid ""
+"manioc: fin de la saison de pluie et le debut de la saison sèche (Champignons\n"
+")"
+msgstr ""
+
+msgid "Igname (sauvage, domestique),"
+msgstr ""
+
+msgid ""
+"Demander si ingestion des aliments de conserves ou domestiques et/ou de "
+"recoltes mal conservés"
+msgstr ""
+
+msgid ""
+"INTOXICATION\n"
+"Avec d'autres produits"
+msgstr ""
+
+msgid "Autres?"
+msgstr ""
+
+msgid ""
+"INTOXICATION\n"
+"aux piles"
+msgstr ""
+
+msgid "piles sèches"
+msgstr ""
+
+msgid ""
+"INTOXICATION\n"
+"aux Insecticides / pesticides"
+msgstr ""
+
+msgid "Insecticides / pesticides"
+msgstr ""
+
+msgid "Demander si produits suivants:"
+msgstr ""
+
+msgid ""
+"INTOXICATION\n"
+"produits caustiques, pétroliers ou eau de javel"
+msgstr ""
+
+msgid "Demander si produits caustiques OU pétroliers OU eau de javel"
+msgstr ""
+
+msgid ""
+"<div>Demander si ingestion des produits non-"
+"alimentaires:</div><div><br></div><div>Pesticides</div><div>Piles</div><div>Produits"
+" petroliers</div><div>Produits caustiques?</div>"
+msgstr ""
+
+msgid "Aucuns des choix ci-dessus"
+msgstr ""
+
+msgid "Intoxication possible, ingestion inconnue"
+msgstr ""
+
+msgid "Autres traitements, y compris traditionels?"
+msgstr ""
+
+msgid "path: dépendance"
+msgstr ""
+
+msgid "Médicaments ou drogues (sédatifs)?"
+msgstr ""
+
+msgid "Ingestion"
+msgstr ""
+
+msgid "Suspecter ingestion Yambo"
+msgstr ""
+
+msgid ""
+"<div>Demander si</div><div><br></div><div>diminution sensibilité et "
+"sensation de brulûres de la bouche ET/Ou gonflement de la "
+"langue</div><div>ET/OU&nbsp;Notion de prise de Yambo</div>"
+msgstr ""
+
+msgid ""
+"<span style=\"font-family: calibri; font-size: 11.29px; text-align: "
+"center;\">Notion de prise d’alcool ET/OU haleine alcoolique</span>"
+msgstr ""
+
+msgid "Cas suspect Pian"
+msgstr ""
+
+msgid ""
+"1 ou plusieurs ulcères circulaire: Taille: Moins de 5 cm en diamètre Bords\n"
+"surélevés, volcan Croûte dorée ou jaune ou humide, rouge Non-douloureuse, sans\n"
+"odeur"
+msgstr ""
+
+msgid ""
+"1 ou plusieur nodules, verrues (papillomes) jaunes, dorée, rouge ou\n"
+"hypopigmentation (aspect framboise) mous Non-douloureuse, sans odeur"
+msgstr ""
+
+msgid ""
+"1 ou plusieurs plaques, jaunes, dorée, rouge ou hypopigmentation (aspect\n"
+"framboise) mous Non-douloureuse, sans odeur"
+msgstr ""
+
+msgid "examiner"
+msgstr ""
+
+msgid "Suspecter lèpre (lépromateuse)"
+msgstr ""
+
+msgid "Pityriasis versicolor"
+msgstr ""
+
+msgid ""
+"Pityriasis versicolor: pâle, squameuse, tronc, cou, extrémités / membres "
+"proximales"
+msgstr ""
+
+msgid ""
+"<div><div>Examiner si les tâches claires (hypochrome), chronique , macules, "
+"papules ou nodules (généralement sèches) se présente avec diminution ou "
+"perte de sensibilité, chaleur, douleur ET/OU contacts proches ou fréquent "
+"avec malades non traités</div><div><br></div><div>Pour vérifier s’il y a une"
+" perte de sensibilité, utilisez un objet pointu, un stylo par "
+"exemple</div><div>signes cardinaux de la lèpre:</div><div><br></div></div>"
+msgstr ""
+
+msgid ""
+"Rechercher des taches sèches (lichenifiées) ET/OU plus pâle (hypochromes) "
+"que le reste de la peau"
+msgstr ""
+
+msgid "save: Plaques jambes, très prurigineuses: Lichen"
+msgstr ""
+
+msgid ""
+"path: douleur liée aux vertèbres\n"
+"avec ou sans oedème/tum"
+msgstr ""
+
+msgid "Suspicion RHUMATISME ARTICULAIRE AIGUE (R.A.A.)"
+msgstr ""
+
+msgid ""
+"<div>Nodules sous la "
+"peau</div><div>douleurs&nbsp;</div>articulaires&nbsp;<div>&nbsp;migratoires "
+"(rougeur)</div><div>Difficultés "
+"respiratoires</div><div>Fatigue</div><div>Exanthème au dos ou au thorax ou "
+"au ventre</div>"
+msgstr ""
+
+msgid ""
+"Jeune malade avec notion d’antécédent d’angine (mal à la gorge/pharyngite) à"
+" répétition?"
+msgstr ""
+
+msgid "Accuns des symptômes ci-dessus"
+msgstr ""
+
+msgid "boiterie, difficultées à marcher"
+msgstr ""
+
+msgid "douleur liée aux vertèbres/raideur localisée au dos"
+msgstr ""
+
+msgid ""
+"<div style=\"border-color: var(--border-color); text-align: "
+"center;\">Douleurs d’apparition</div><div style=\"border-color: "
+"var(--border-color); text-align: center;\">brutale et limitation "
+"des</div><div style=\"border-color: var(--border-color); text-align: "
+"center;\"><font style=\"border-color: var(--border-color);\">mouvements des "
+"petit articulation mains pieds</font>&nbsp;et&nbsp;histoire de fièvre?</div>"
+msgstr ""
+
+msgid "myalgies : au niveau d'une/des muscles"
+msgstr ""
+
+msgid "Arthralgies : au niveau d'une/des articulations"
+msgstr ""
+
+msgid "Quels sont les type de douleurs:"
+msgstr ""
+
+msgid ""
+"Apparition&nbsp;<b style=\"border-color: var(--border-color); text-align: "
+"center;\">soudain aigüe</b><br style=\"border-color: var(--border-color); "
+"text-align: center;\"><span style=\"text-align: center;\">déficience "
+"motrice: faiblesse d'un bras, d'une jambe ou du visage, surtout d'un côté, "
+"difficulté à parler, perte d'équilibre, paralysie</span>"
+msgstr ""
+
+msgid "Entorse"
+msgstr ""
+
+msgid "Luxation"
+msgstr ""
+
+msgid "<span style=\"\">Notion de luxation</span>"
+msgstr ""
+
+msgid "Autres trauma dos. lombes, membres ou articulation"
+msgstr ""
+
+msgid "Notion de traumatisme avec&nbsp;déboîtement"
+msgstr ""
+
+msgid ""
+"path: faiblesse ou paralysie membres\n"
+"mal au dos ET/OU au"
+msgstr ""
+
+msgid "path: Fièvre Thyphoide ?"
+msgstr ""
+
+msgid "Rupture utérine, inertie utérine, retention placentaire"
+msgstr ""
+
+msgid "Suspicion Infections génitales hautes d’origine puerpérale"
+msgstr ""
+
+msgid "Suspicion Saignement post-abortun"
+msgstr ""
+
+msgid "Ulcères / neuropathie périphérique"
+msgstr ""
+
+msgid ""
+"1 ou plusieurs ulcères au pied ou entre doigts avec ou diminution de "
+"sensibilité ou pouls périphérique absent ou diabète connu?"
+msgstr ""
+
+msgid "Suspicion tuberculose uru-genitale ou autre pathologie uro-genitale"
+msgstr ""
+
+msgid "Pian"
+msgstr ""
+
+msgid "save: Ulcères douloureux?"
+msgstr ""
+
+msgid "path: Seulement nodule"
+msgstr ""
+
+msgid "Leishmaniose cutanée (petit nodosité lisse d’aspect vernissé)"
+msgstr ""
+
+msgid ""
+"&nbsp;nodositées indurées (Localisation unique ou multiples) ET/OU 1-3 "
+"ulcérées en groupes, rougeâtre, saignant facilement, indolores"
+msgstr ""
+
+msgid "localisées"
+msgstr ""
+
+msgid "généralises"
+msgstr ""
+
+msgid "les Nodosités ou vésicules sont :"
+msgstr ""
+
+msgid "Nodosités/nodules/papules ET sensibilité diminuée ou absente"
+msgstr ""
+
+msgid ""
+"Enflure avec Nodosité unique avec petites bosses purulentes et suintantes au"
+" pied?"
+msgstr ""
+
+msgid ""
+"Suspicion Onchocercose\n"
+"Référer pour diagnostic"
+msgstr ""
+
+msgid "indorée"
+msgstr ""
+
+msgid ""
+"Suspicion Kyste ou Lipome\n"
+"Référer pour diagnostic"
+msgstr ""
+
+msgid "mobilisation sous la peau"
+msgstr ""
+
+msgid "la tuméfaction est:"
+msgstr ""
+
+msgid ""
+"Examiner si tuméfaction, enflure est circonscrite, froide et indolore ET "
+"mobilisable sous la peau"
+msgstr ""
+
+msgid "Surinfection/Abcès"
+msgstr ""
+
+msgid "phlegmon"
+msgstr ""
+
+msgid "Diffuse et très douloureuse +/- adenopathie, fièvre"
+msgstr ""
+
+msgid "Abcès chaud"
+msgstr ""
+
+msgid "Tuméfactions molles (Collection purulente avec fluctuation)"
+msgstr ""
+
+msgid "path: Lésion localisée et histoire de picure ou morsure"
+msgstr ""
+
+msgid "Au niveau du/des membres ou du/des articulations ET/OU Fièvre"
+msgstr ""
+
+msgid ""
+"Examiner si is se présente une tuméfaction rougeatre, chaude et douloureuse"
+msgstr ""
+
+msgid "Lésions ou tuméfactions / Enflures douloureuses"
+msgstr ""
+
+msgid "path: plaques"
+msgstr ""
+
+msgid "Lichen simplex"
+msgstr ""
+
+msgid "Plaques jambes, très prurigineuses: Lichen"
+msgstr ""
+
+msgid "Dermatite séborrhéique"
+msgstr ""
+
+msgid ""
+"Plaques squameuses grasses sur la face/visage: nez, oreilles, "
+"sourcils,lisière des cheveux"
+msgstr ""
+
+msgid "Teigne(Mycose)"
+msgstr ""
+
+msgid ""
+"Teigne/tinea: plaque pâle, squameuses et annulaire/bords surélevés et "
+"prurigineuses cheveux, ongles, corps, pertes/chutes de cheveux"
+msgstr ""
+
+msgid "Eczema"
+msgstr ""
+
+msgid "Plaques sèches, lichenifié (peau épaisse, plis)"
+msgstr ""
+
+msgid "count: Lésions de peau"
+msgstr ""
+
+msgid ""
+"save: Demander s'il y a des  lésions ou tâches sur la pe::Ulcères/ Plaies"
+msgstr ""
+
+msgid ""
+"save: Demander s'il y a des  lésions ou tâches sur la pe::nodositées "
+"(nodules, papules)"
+msgstr ""
+
+msgid ""
+"**Suspicion maladie hèpatique non-fébrile\n"
+"** Ictère cause non identifiée autre cause à rechercher"
+msgstr ""
+
+msgid ""
+"Noma sade 2 de l’œdème\n"
+"Evolution en\n"
+"1 à 2 semaines"
+msgstr ""
+
+msgid ""
+"Suspicion noma: gingivite nécrosante aiguë (Stade 1)\n"
+"Durée indéterminée"
+msgstr ""
+
+msgid "Trichomonase ET Vaginite /Vaginose bactérienne"
+msgstr ""
+
+msgid "Candidose"
+msgstr ""
+
+msgid ""
+"<div>Demander si Pertes, écoulement vaginal épais, blanc, ressemblant à du "
+"fromage blanc ou à du lait caillé</div><div>Démangeaisons&nbsp;</div>"
+msgstr ""
+
+msgid "Infections cervicales"
+msgstr ""
+
+msgid "voir Atlas de poche OMS pour un diagnostique plus précis"
+msgstr ""
+
+msgid ""
+"Col utérin: tâches jaunâtres aspect granuleux, aspect grain sable, vaisseaux\n"
+"sanguins anormaux, papules d’aspect caoutchouteux"
+msgstr ""
+
+msgid "suspecter trichomonase"
+msgstr ""
+
+msgid "Secretion grisâtre, verdâtre mousseaux, col aspect rouge (fraise)"
+msgstr ""
+
+msgid "Suspecter gonorrhée"
+msgstr ""
+
+msgid "Secretions jaunâtre"
+msgstr ""
+
+msgid "Examen speculum"
+msgstr ""
+
+msgid "Examen au speculum dipsonible / possible&nbsp;"
+msgstr ""
+
+msgid ""
+"<div>Il y a au moins un facteurs de "
+"risque:</div><div><br></div><div>Ecoulement urétral chez le "
+"partenaire</div><div>contexte de violences sexuelles ou de "
+"prostitution</div><div>nouveau partenaire ou plus d’un partenaire au cours "
+"des 3 derniers mois</div><div>OU Ecoulement purulent par le col de "
+"l’utérus</div>"
+msgstr ""
+
+msgid ""
+"La patiente a-t-elle déja reçu un traitement pour ces symptomes uro-génitaux"
+" (écoullements, IST, cystite) sans que cela améliore ses symptomes?"
+msgstr ""
+
+msgid ""
+"<div>Demander si:</div><div><br></div><div>saignement au "
+"contact</div><div>post-coital</div>"
+msgstr ""
+
+msgid ""
+"Infections génitales hautes sexuellement transmises (Maladies Inflammatoires\n"
+"Pelviennes)\n"
+"Revoir la patiente 3 jours après"
+msgstr ""
+
+msgid ""
+"<div>Demander, rechercher et examiner ventre :</div><div><span "
+"style=\"background-color: initial;\">Bas ventre douloureux à<font "
+"color=\"#ff5c0a\">&nbsp;la palpation</font>?</span><br></div><div>Douleur à "
+"la mobilisation du col?</div>"
+msgstr ""
+
+msgid "path: Douleurs bas ventre"
+msgstr ""
+
+msgid "contact sexuels (sexuellement active ET/OU ecoulement génital?"
+msgstr ""
+
+msgid "save: Suspicion Lymphogranulome inguinale vénérien endém"
+msgstr ""
+
+msgid "save: Examiner et Demander: Verrues et/ou Lésions papill"
+msgstr ""
+
+msgid "Crise de drépanocytose"
+msgstr ""
+
+msgid "Suspicion Fièvre typhoide"
+msgstr ""
+
+msgid "Référer"
+msgstr ""
+
+msgid ""
+"<span style=\"text-align: center;\">Ballonnement abdominal avec ou sans "
+"signes de défense et de contractures abdominaux</span>"
+msgstr ""
+
+msgid "path: Troubles de consience ou maux de ventre très inten"
+msgstr ""
+
+msgid ""
+"constatez vous une dissociation pouls-température (bradycardie relative)"
+msgstr ""
+
+msgid "path: Mal à la tête?"
+msgstr ""
+
+msgid ""
+"Demander si :<br>epistaxis, <br>insomnie,<br>diarrhée jus de melon ?&nbsp;"
+msgstr ""
+
+msgid "path: mal au ventre"
+msgstr ""
+
+msgid "Papollomatose, condylume acumia"
+msgstr ""
+
+msgid "Herpesvirose"
+msgstr ""
+
+msgid "path: Pian"
+msgstr ""
+
+msgid "Suspicion mycétome, mycose profonde"
+msgstr ""
+
+msgid ""
+"Nodosités, écoulement de pus et de s<span style=\"border-color: "
+"var(--border-color); color: rgb(255, 25, 41); text-align: center;\">ang par "
+"les ouvertures des trajets fistuleux</span>"
+msgstr ""
+
+msgid ""
+"<b>Enflure avec Nodosité </b>unique avec petites bosses purulentes et "
+"suintantes au pied&nbsp;"
+msgstr ""
+
+msgid "Ulcère artériel ou veineuse"
+msgstr ""
+
+msgid ""
+"<div>Ulcères aux jambesou aux pieds</div><div><span style=\"background-"
+"color: initial;\">sans de pulsations artérielles</span><br></div><div>veines"
+" dilatées</div>"
+msgstr ""
+
+msgid "Sucre négatif"
+msgstr ""
+
+msgid "Suspecter acidocétose"
+msgstr ""
+
+msgid "Acétone"
+msgstr ""
+
+msgid "Sucre positif"
+msgstr ""
+
+msgid "Si aux pieds: Tester si sucre en bandelette urinaire"
+msgstr ""
+
+msgid "Localisation des ulcères sur les pieds"
+msgstr ""
+
+msgid "1 ou plusieurs ulcères avec perte de sensibilité?"
+msgstr ""
+
+msgid "Suspicion ulcère de buruli"
+msgstr ""
+
+msgid ""
+"Si &lt;15 -20 ans: suspecter ulcère de Burulli: 1-3 nodule/ulcère, large, "
+"surface jaunatre, base humide rougeâtre, bords décollés, zone oedemateuse "
+"membres, odeur"
+msgstr ""
+
+msgid "Suspecter Leishmaniose cutanée"
+msgstr ""
+
+msgid ""
+"Unique ou multiples lésions: nodositées indurées ou 1-3 ulcères surélévés en"
+" groupes, rougeàtre, saignant facilement, indolore"
+msgstr ""
+
+msgid "Ulcères douloureux?"
+msgstr ""
+
+msgid "Charbon bactèrien"
+msgstr ""
+
+msgid ""
+"<div>Ulcération avec escarre noirâtre indolore (pustules malignes) ET "
+"ganglions cervicaux (adénopathie) indolores</div><div>Elévages ou Contacts "
+"avec des animaux</div>"
+msgstr ""
+
+msgid "path: Ulcers / Plaies"
+msgstr ""
+
+msgid "Zona"
+msgstr ""
+
+msgid "vésicule en bande sur une moitier du coprs avec douleurs"
+msgstr ""
+
+msgid "vésicule groupé"
+msgstr ""
+
+msgid "path: nodositées (nodules, papules)"
+msgstr ""
+
+msgid "Onchodermatite"
+msgstr ""
+
+msgid ""
+"<div>&gt; 3 petit nodules épaules, ceinture pelvienne, iliaque (taille, "
+"cuisses) avec démangeaisons et</div><div>Prurit sévère ET/OU Peau de leopard"
+" (plaques plus sombres/foncées)</div>"
+msgstr ""
+
+msgid ""
+"Examiner: aspect plaques (sèches, lichenifiée, squameuse, anhnulaire) et\n"
+"localisation"
+msgstr ""
+
+msgid "Purigo"
+msgstr ""
+
+msgid "Macules/papules/nodules purigineux predominant dans les membres"
+msgstr ""
+
+msgid "path: Prurit ,plaque, tâche (démangeaisons)"
+msgstr ""
+
+msgid "Vésicule"
+msgstr ""
+
+msgid "Végétations"
+msgstr ""
+
+msgid "Ulcères/ Plaies"
+msgstr ""
+
+msgid "signes de surinfection: rougeur, chaleur, douleur, tuméfaction"
+msgstr ""
+
+msgid "Purit, plaques, tâches prurigineuses (démangeaisons)"
+msgstr ""
+
+msgid "plaques, tâches non prurigineuses"
+msgstr ""
+
+msgid ""
+"Gale (petites nodositées et sillons, prurit nocturne, caractère familial)\n"
+"Lésions secondaires: grattage (excoriations) ou surinfection (impétigo)"
+msgstr ""
+
+msgid ""
+"<div>Demander et examiner si un ou &gt; 3 petites nodosités (souvent "
+"purulentes) et sillons (tunnels), démangeaisons</div><div>se trouvent "
+"entre</div><div>les doigts, aux aisselles, fesses</div><div>coudes, poignets"
+" et sur</div><div>les parties génitales (nodules) ET prurit nocturne ET/OU "
+"caractère familial</div>"
+msgstr ""
+
+msgid "evaluation gâle"
+msgstr ""
+
+msgid "Tungose"
+msgstr ""
+
+msgid "Larva cutaneous migrans"
+msgstr ""
+
+msgid ""
+"<div>Cordon sous la peau</div><div>comme un ver qui bouge "
+"et&nbsp;</div><div>progresse chaque jour</div>"
+msgstr ""
+
+msgid "Nodules au niveau du pied sans autres localisations"
+msgstr ""
+
+msgid "Allergie (urticaire)"
+msgstr ""
+
+msgid ""
+"<div>Papules infiltrées&nbsp;<span style=\"background-color: "
+"initial;\">d’apparition rapide</span></div><div>mais fugaces avec "
+"peau&nbsp;<span style=\"background-color: initial;\">d’orange</span></div>"
+msgstr ""
+
+msgid "nodositées (nodules, papules)"
+msgstr ""
+
+msgid "Demander s'il y a des  lésions ou tâches sur la peau"
+msgstr ""
+
+msgid ""
+"Nécrose épidermique toxique, (syndrome de Steven Johnson,syndrome de Lyell)"
+msgstr ""
+
+msgid ""
+"Référé ET Stopper ces traimenents immediatement:\n"
+"Abacavir\n"
+"allopurinol\n"
+"antibiotiques\n"
+"anti-convulsants\n"
+"anti-fongiques\n"
+"Dapsone\n"
+"Diltiazem\n"
+"Isoniazide\n"
+"Névirapine"
+msgstr ""
+
+msgid "<div>hors paume, plante des pieds et cuir chevelu</div>"
+msgstr ""
+
+msgid ""
+"Lésion cutanée douloureuse,&nbsp; bulleuse et étendue d'apparition soudaine"
+msgstr ""
+
+msgid "path: Prise vaccination,ou medicaement"
+msgstr ""
+
+msgid ""
+"Sans écoulement: autre causes, non-sexuels: oreillon, brucellose, E.coli,\n"
+"Klebsiella, p. aerug., tb,"
+msgstr ""
+
+msgid "trauma testiculaire"
+msgstr ""
+
+msgid "Référence immédiat pour conseil médécin et pour conseil chirurgicale"
+msgstr ""
+
+msgid ""
+"<div>Demander et examiner si un des "
+"suivants</div><div><br></div><div>Rotation ou</div><div>elevation "
+"testiculaire</div><div>Histoire de trauma testiculaire?</div>"
+msgstr ""
+
+msgid ""
+"Suspecter filariose lymphatique,Tuberculose\n"
+"ou hydrocèle"
+msgstr ""
+
+msgid "path: Gonflement testiculaire ou inguinale chronique non"
+msgstr ""
+
+msgid "GONORRHEE ET CHLAMYDIOSE avec complications"
+msgstr ""
+
+msgid ""
+"<div>Ecoulement et ou brulures en miction et&nbsp;</div><span style=\"text-"
+"align: center;\">Examiner si inflammation et douleur scrotale avec ou sans "
+"fièvre</span>"
+msgstr ""
+
+msgid "Écoulement uretral avec émission d’urines laiteueses ou «eau de riz»"
+msgstr ""
+
+msgid ""
+"Examen clinique:\n"
+"L′écoulement urétral doit être constaté lors d’un examen clinique. Chez\n"
+"l’homme, masser\n"
+"doucement l’urètre si l’écoulement n’est pas visible."
+msgstr ""
+
+msgid "path: écoulement génitale (vaginale/urethrale), Sensatio"
+msgstr ""
+
+msgid "_**Chancre mou:  **_"
+msgstr ""
+
+msgid ""
+"Ulcère purulente, souvent unique, mous avec ou sans adénopathies "
+"douloureuses"
+msgstr ""
+
+msgid ""
+"DOULEUR: Ulcère ou vésicules douloureux, ulcères genitaux ou papule ou érosion\n"
+"douloureuse"
+msgstr ""
+
+msgid "Ulcère non-douloureuse, singulaire"
+msgstr ""
+
+msgid ""
+"lésions groupées ou en bouquets: vésicules douloureuses de petites tailles,\n"
+"parfois groupées en bouque ou ulcérations de petites tailles avec antécédents\n"
+"de vésicules récurrentes"
+msgstr ""
+
+msgid "path: ulcers genitaux, bouche ou vesicule"
+msgstr ""
+
+msgid ""
+"Suspicion Lymphogranulome inguinale vénérien endémique: en Afrique de l’Est et\n"
+"de l’Ouest, C. trachomatis L1,2,3"
+msgstr ""
+
+msgid ""
+"<ul style=\"border-color: var(--border-color); color: rgb(255, 25, "
+"41);\"><li style=\"border-color: var(--border-color);\">ganglions "
+"s’entourent rapidement de péri-adénite et adhèrent à la peau "
+"formant&nbsp;ainsi un bubon</li><li style=\"border-color: var(--border-"
+"color);\"><span style=\"border-color: var(--border-color);\" "
+"lang=\"FR\">Certains bubons se fistulisent en "
+"«&nbsp;pomm&nbsp;</span>d’arrosoir&nbsp;» et peuvent suppurer pendant des "
+"mois</li></ul>"
+msgstr ""
+
+msgid "IST Femme"
+msgstr ""
+
+msgid "path: BGF"
+msgstr ""
+
+msgid ""
+"Examiner et Demander: Verrues et/ou Lésions papillomateuse génitale ou "
+"anale? HPV"
+msgstr ""
+
+msgid "PEDICULOSE"
+msgstr ""
+
+msgid "Examiner et Demander: Si les lésions se trouvent au niveau pubien?"
+msgstr ""
+
+msgid "GALE"
+msgstr ""
+
+msgid ""
+"&lt;u&gt;Examiner et Demander&lt;/u&gt;: si les érosions existent aussi dans"
+" les sillons interdigitaux"
+msgstr ""
+
+msgid "path: des petites érosions ou lésions de grattage  **ET"
+msgstr ""
+
+msgid "GONORRHEE ET CHLAMYDIOSE sans complications"
+msgstr ""
+
+msgid "ecoulement anorectale présent?"
+msgstr ""
+
+msgid "Drèpancytose suspectée"
+msgstr ""
+
+msgid "Complication drépanocytose: Infection fulminante"
+msgstr ""
+
+msgid ""
+"Complication drépanocytose\n"
+": Accident vasculaire cérébral AVC"
+msgstr ""
+
+msgid "Complication: Syndrome thoracique aigu STA"
+msgstr ""
+
+msgid "Crise douloureuse vaso-occlusive CVO"
+msgstr ""
+
+msgid "Suspicion ostéonyélite"
+msgstr ""
+
+msgid "Anémie aigue sévère (avec insuffisance cardiaque)"
+msgstr ""
+
+msgid "Suspicion hépatite D, E foudroyante sur grossesse"
+msgstr ""
+
+msgid "**Suspicion maladie hèpatique fébrile**"
+msgstr ""
+
+msgid "Ictère cause non identifiée autre cause à rechercher"
+msgstr ""
+
+msgid "Suspicion Choléstase en grossesse"
+msgstr ""
+
+msgid ""
+"<ul style=\"font-size: 1px; text-align: center; margin: 0px;\"><li><font "
+"style=\"font-size: 11.29px; font-family: Calibri; direction: ltr; letter-"
+"spacing: 0px; line-height: 13.548px; opacity: 1;\">Prurit et signes de "
+"grattage?</font></li></ul>"
+msgstr ""
+
+msgid "Suspicion hépatite D, E sur  grossesse"
+msgstr ""
+
+msgid "Suspecter hépatite virale"
+msgstr ""
+
+msgid "save: Est ce que le test Hépatite B/C est disponible ?"
+msgstr ""
+
+msgid "save: Quel est le résultât du test Hépatite B/C?::Test négatif"
+msgstr ""
+
+msgid ""
+"noma stade 3\n"
+"Suspicion gangréne"
+msgstr ""
+
+msgid ""
+"Infection Abcès dento-ossaeux aigu\n"
+"Exclure noma et facteurs de risques: infections antécédents"
+msgstr ""
+
+msgid "Malnutrition, Kwashiorkor"
+msgstr ""
+
+msgid ""
+"Infections fébriles antécédents : mois, semaines (paludisme, rugéole,\n"
+"diarrhée, autres?)"
+msgstr ""
+
+msgid "Maladie chronique connu, infection à VIH?"
+msgstr ""
+
+msgid ""
+"Problèmes de nourriture ou alimentation: période suivant le sevrage de\n"
+"l’enfant, problémes allaitement,"
+msgstr ""
+
+msgid "Evaluation facteurs de risque noma ou condition antécédente:"
+msgstr ""
+
+msgid "Salivation excessive ou mauvaise haleine"
+msgstr ""
+
+msgid "ulcération gingivale et des muqueuses étendues"
+msgstr ""
+
+msgid "EXAMINER"
+msgstr ""
+
+msgid "Syphilis"
+msgstr ""
+
+msgid "save: Ulcérations muqueuses buccales"
+msgstr ""
+
+msgid "save: Examiner::Dyspareunia (douleurs lors des rapports sexuels)"
+msgstr ""
+
+msgid "save: Examiner::Douleur testiculaire: trauma, gonflements, inflamm"
+msgstr ""
+
+msgid "save: Examiner::Gonflement testiculaire ou inguinale chronique non"
+msgstr ""
+
+msgid "save: Examiner::Mal au ventre bas"
+msgstr ""
+
+msgid "save: Examiner::Dysurie (miction douloureuse ou fréquente) voir tr"
+msgstr ""
+
+msgid "save: Examiner::Écoulements urétraux et/ou sensation de brules gén"
+msgstr ""
+
+msgid "save: Examiner::verrues ou vésicules génitales (présent ou ont été"
+msgstr ""
+
+msgid "save: Examiner::érosions ou Lésion de grattage  génital"
+msgstr ""
+
+msgid "save: Examiner::Ulcères génitaux (autres parts du corps: bouche)"
+msgstr ""
+
+msgid "Bronchopneumonie sévère OU Pleurésie OU Pneumopathie"
+msgstr ""
+
+msgid ""
+"Bronchopneumonie\n"
+"modérée"
+msgstr ""
+
+msgid "save: <u>Mesurer</u> la Tension diastolique en mmHg?"
+msgstr ""
+
+msgid "save: <u>Mesurer</u> la Tension artérielle systolique en"
+msgstr ""
+
+msgid "suspicion diabète"
+msgstr ""
+
+msgid ""
+"Pouvez vous effectuer une bandelette urinaire:\n"
+"Evaluer proteine et glucose"
+msgstr ""
+
+msgid ""
+"<span style=\"color: rgb(255, 0, 0); text-align: center;\">soif intense et "
+"prise abondante de boissions</span>"
+msgstr ""
+
+msgid "path: troubles urinaires: polyurie (miction fréquente)"
+msgstr ""
+
+msgid "path: Lésions de peau"
+msgstr ""
+
+msgid "Douleur pulsatoire AVEC aggravation ET activité corporelle agitation"
+msgstr ""
+
+msgid "path: Mal à la tête Et Tension artérielle 160/90 mmHg ou"
+msgstr ""
+
+msgid "Angine de poitrine"
+msgstr ""
+
+msgid ""
+"<p style=\"font-size: 1px; text-align: center; margin: 0px; direction: "
+"ltr;\"><font style=\"font-size: 11.29px; font-family: Calibri; direction: "
+"ltr; letter-spacing: 0px; line-height: 13.548px; opacity: "
+"1;\">De</font><font style=\"font-size: 11.29px; font-family: Calibri; "
+"direction: ltr; letter-spacing: 0px; line-height: 13.548px; opacity: "
+"1;\">mander: d</font><font style=\"font-size: 11.29px; font-family: Calibri;"
+" direction: ltr; letter-spacing: 0px; line-height: 13.548px; opacity: "
+"1;\">ouleur&nbsp;</font><font style=\"font-size: 11.29px; font-family: "
+"Calibri; direction: ltr; letter-spacing: 0px; line-height: 13.548px; "
+"opacity: 1;\">à</font><font style=\"font-size: 11.29px; font-family: "
+"Calibri; direction: ltr; letter-spacing: 0px; line-height: 13.548px; "
+"opacity: 1;\">&nbsp;l’effort au niveau<br>du coeur, irradiant vers "
+"le<br></font></p><p style=\"font-size: 1px; text-align: center; margin: 0px;"
+" direction: ltr;\"><font style=\"font-size: 11.29px; font-family: Calibri; "
+"direction: ltr; letter-spacing: 0px; line-height: 13.548px; opacity: "
+"1;\">bras gauche</font><font style=\"font-size: 11.29px; font-family: "
+"Calibri; direction: ltr; letter-spacing: 0px; line-height: 13.548px; "
+"opacity: 1;\">&nbsp;ET/OU&nbsp;</font><font style=\"font-size: 11.29px; "
+"font-family: Calibri; color: rgb(255, 0, 0); direction: ltr; letter-spacing:"
+" 0px; line-height: 13.548px; opacity: 1;\">facteurs de risque cardiale "
+"connu</font><font style=\"font-size: 11.29px; font-family: Calibri; "
+"direction: ltr; letter-spacing: 0px; line-height: 13.548px; opacity: "
+"1;\">?(maladie de coeur, HTA ou diabète</font></p>"
+msgstr ""
+
+msgid "path: Mal au thorax"
+msgstr ""
+
+msgid "Accident vasculaire cérébrale"
+msgstr ""
+
+msgid "path: Troubles de la conscience"
+msgstr ""
+
+msgid ""
+"<span style=\"\">Diabète connu et/ou risque cardiovasculaire ou traitement "
+"cardiaque:&nbsp;</span>"
+msgstr ""
+
+msgid "path: Diabete"
+msgstr ""
+
+msgid "Suspicion Hypertophie bénine de la prostate"
+msgstr ""
+
+msgid "Suspicion fistule vésico-vaginales / vésico urinaire"
+msgstr ""
+
+msgid "Suspicion Trouble sphincterien"
+msgstr ""
+
+msgid "Suspicion bilharziose urogénitale"
+msgstr ""
+
+msgid "Suspicion Tumeur uro-genitale"
+msgstr ""
+
+msgid "path: Seulement sang dans des urines"
+msgstr ""
+
+msgid "Calcul rénal"
+msgstr ""
+
+msgid ""
+"<div>Demander la présence des</div><div><br></div><div>Attaques douloureuses"
+" fortes et/ou des douleurs à caractère coliques</div>"
+msgstr ""
+
+msgid "Traumatisme avec affection urogénitale"
+msgstr ""
+
+msgid "Demander si le patient a eu une Notion de traumatisme lombaire"
+msgstr ""
+
+msgid "Bilharziose Génitale Féminin"
+msgstr ""
+
+msgid "save: Resultat test urinaire::Preuve(positif) Erythrozytes"
+msgstr ""
+
+msgid ""
+"path: Test AgHBS et VHC négatif\n"
+"Palu négatif"
+msgstr ""
+
+msgid "path: Tests hépatiques négatifs"
+msgstr ""
+
+msgid ""
+"Notion de prise de médicaments (paracetamol, ARV, antiTb), traditionnels"
+msgstr ""
+
+msgid "Test négatif"
+msgstr ""
+
+msgid "Reféré"
+msgstr ""
+
+msgid "hépatite C"
+msgstr ""
+
+msgid "Test hépatite C positif"
+msgstr ""
+
+msgid "hépatite B"
+msgstr ""
+
+msgid "Test hépatite B positif"
+msgstr ""
+
+msgid "Quel est le résultât du test Hépatite B/C?"
+msgstr ""
+
+msgid "Est ce que le test Hépatite B/C est disponible ?"
+msgstr ""
+
+msgid "Test AgHBS et VHC"
+msgstr ""
+
+msgid "gingivite simple avec ou sans gingivorragie"
+msgstr ""
+
+msgid "path: Syphilis"
+msgstr ""
+
+msgid ""
+"<div>Petites vésicules douloureuses au niveau des lèvres ou dans la bouche "
+"(stomatite) groupées sur un&nbsp;</div><div>fond érythémateux</div>"
+msgstr ""
+
+msgid "Ulcérations muqueuses buccales"
+msgstr ""
+
+msgid ""
+"save: Faire un examen bucco-dentaire (ouvrir et examiner::Gencives gonflées"
+msgstr ""
+
+msgid ""
+"save: Faire un examen bucco-dentaire (ouvrir et examiner::ulcérations "
+"gencives"
+msgstr ""
+
+msgid ""
+"save: Faire un examen bucco-dentaire (ouvrir et examiner::saignements "
+"spontanées"
+msgstr ""
+
+msgid "Douleur testiculaire: trauma, gonflements, inflammation scrotale"
+msgstr ""
+
+msgid "Gonflement testiculaire ou inguinale chronique non douloureuse"
+msgstr ""
+
+msgid "Écoulements urétraux et/ou sensation de brules génital"
+msgstr ""
+
+msgid "path: _**écoulement et/ou**_ _ **  des**_ _ ** **_ ulcér"
+msgstr ""
+
+msgid "inguinale (ganglions lymphatiques inguinaux)"
+msgstr ""
+
+msgid "Gonflement fémoral"
+msgstr ""
+
+msgid ""
+"Lymphadénopathie unilaterale, douloureuse avec ou sans ulcérations, pus"
+msgstr ""
+
+msgid "Examiner et Demander"
+msgstr ""
+
+msgid "Mal au ventre bas"
+msgstr ""
+
+msgid "Dysurie (miction douloureuse ou fréquente) voir troubles urinaires"
+msgstr ""
+
+msgid "Dyspareunia (douleurs lors des rapports sexuels)"
+msgstr ""
+
+msgid "Écoulements et/ou sensation de brules génital"
+msgstr ""
+
+msgid "verrues ou vésicules génitales (présent ou ont été présent au début)"
+msgstr ""
+
+msgid "érosions ou Lésion de grattage génital"
+msgstr ""
+
+msgid "Ulcères génitaux (autres parts du corps: bouche)"
+msgstr ""
+
+msgid "Examiner"
+msgstr ""
+
+msgid ""
+"Suspicion Ostéomyélite (en drépanocytose) OU Mal de Pott tuberculose osseuse"
+msgstr ""
+
+msgid ""
+"<div>Douleur liée aux vertèbres et un des signes "
+"suivants:</div><div><br></div><div>oedème/érythème/tuméfaction "
+"ou</div><div>raideur&nbsp;localisée&nbsp;<span style=\"background-color: "
+"initial;\">du dos&nbsp;</span></div><div>Picotements</div>"
+msgstr ""
+
+msgid "Suspicion endocardite / R.A.A."
+msgstr ""
+
+msgid ""
+"<div>Jeune malade avec notion d’antécédent d’angine (mal à la "
+"gorge/pharyngite) ET un des suivants</div><div><br></div><div>Nodules sous "
+"la peau</div><div>[douleurs migratoires articulaires "
+"(rougeur)]</div><div><span style=\"background-color: "
+"initial;\">[Difficultées respiratoires]</span><br></div><div>Exanthème sur "
+"dos, thorax ou ventre</div>"
+msgstr ""
+
+msgid "save: Examiner&nbsp; Les conjonctives (Le «blanc» de l'œ"
+msgstr ""
+
+msgid "path: seulement sang dans les urine ou erythrocyte"
+msgstr ""
+
+msgid "Cystite/Infections urinaires"
+msgstr ""
+
+msgid "cystite compliqué"
+msgstr ""
+
+msgid "Pyélonephrite"
+msgstr ""
+
+msgid ""
+"<div>Fappez les lombes avec votre poing,&nbsp; Le patient a t-il des "
+"douleurs aigue</div>"
+msgstr ""
+
+msgid ""
+"Suspicion Maladie des reins (glomérulonéphrite)\n"
+"Post-streptococcal/VIH/HCV/HBV"
+msgstr ""
+
+msgid "path: VIH"
+msgstr ""
+
+msgid "Référer pour évaluation et causes"
+msgstr ""
+
+msgid "path: diag IST ?"
+msgstr ""
+
+msgid "inféction récidivantes SANS amélioration sous traitement antécedant:"
+msgstr ""
+
+msgid "Irritation sans signes d’inféction"
+msgstr ""
+
+msgid "Preuve(positif) Proteine"
+msgstr ""
+
+msgid "Preuve(positif) Glucose"
+msgstr ""
+
+msgid "Preuve(positif) Erythrozytes"
+msgstr ""
+
+msgid "Preuve(positif) Neucozytes"
+msgstr ""
+
+msgid "Preuve(positif) Nitrites"
+msgstr ""
+
+msgid "Resultat test urinaire"
+msgstr ""
+
+msgid ""
+"<div style=\"border-color: var(--border-color);\">&nbsp;Leucozytes (témoins "
+"d′un phénomène inflammatoire) et</div><div style=\"border-color: "
+"var(--border-color);\">Nitrites (témoins de la présence "
+"d'infection)</div><div style=\"border-color: var(--border-"
+"color);\">Erythrocype (hematurie)</div><div style=\"border-color: "
+"var(--border-color);\">Proteine (Maladie des reins/diabète-"
+"néphropathie)</div><div style=\"border-color: var(--border-"
+"color);\">Glucosurie (diabète)</div>"
+msgstr ""
+
+msgid "<div>Pouvez vous effectuer une bandelette urinaire:</div>"
+msgstr ""
+
+msgid "save: Quels sont les sympotomes du patient::Sang dans les urines"
+msgstr ""
+
+msgid ""
+"save: Quels sont les sympotomes du patient::Pertes d'urines / miction "
+"fréquente"
+msgstr ""
+
+msgid ""
+"save: Quels sont les sympotomes du patient::polyurie: miction abondante"
+msgstr ""
+
+msgid ""
+"save: Quels sont les sympotomes du patient::Pas d’urines depuis plus de 12 "
+"heures"
+msgstr ""
+
+msgid "path: Test AgHBS et VHC"
+msgstr ""
+
+msgid "path: Test AgHBS et VHC négatif"
+msgstr ""
+
+msgid "path: Demander la présence des"
+msgstr ""
+
+msgid ""
+"<font style=\"letter-spacing: 0px; text-align: center; font-size: 11.29px; "
+"font-family: Calibri; direction: ltr; line-height: 13.548px; opacity: "
+"1;\">Grande fatigue ET/OU&nbsp;</font><font style=\"letter-spacing: 0px; "
+"text-align: center; font-size: 11.29px; font-family: Themed; direction: ltr;"
+" line-height: 13.548px; opacity: 1;\">[</font><font style=\"letter-spacing: "
+"0px; text-align: center; font-size: 11.29px; font-family: Themed; direction:"
+" ltr; line-height: 13.548px; opacity: 1;\">douleur</font><font "
+"style=\"letter-spacing: 0px; text-align: center; font-size: 11.29px; font-"
+"family: Themed; direction: ltr; line-height: 13.548px; opacity: "
+"1;\">&nbsp;</font><font style=\"letter-spacing: 0px; text-align: center; "
+"font-size: 11.29px; font-family: Themed; direction: ltr; line-height: "
+"13.548px; opacity: 1;\">articulaire ET/OU mal au ventre&nbsp;</font><font "
+"style=\"letter-spacing: 0px; text-align: center; font-size: 11.29px; font-"
+"family: Themed; direction: ltr; line-height: 13.548px; opacity: "
+"1;\"><b>(sensibilité cadran sup droit)</b></font><font style=\"letter-"
+"spacing: 0px; text-align: center; font-size: 11.29px; font-family: Themed; "
+"direction: ltr; line-height: 13.548px; opacity: "
+"1;\">&nbsp;ET/OU&nbsp;</font><font style=\"letter-spacing: 0px; text-align: "
+"center; font-size: 11.29px; font-family: Themed; direction: ltr; line-"
+"height: 13.548px; opacity: 1;\">diarrhée</font><font style=\"letter-spacing:"
+" 0px; text-align: center; font-size: 11.29px; font-family: Themed; "
+"direction: ltr; line-height: 13.548px; opacity: 1;\">]</font>"
+msgstr ""
+
+msgid ""
+"**Suspicion hépatite   décompensée ou cirrhose ou hépathite chronique**"
+msgstr ""
+
+msgid "**Suspicion Encéphalopathie hépatique**"
+msgstr ""
+
+msgid ""
+"**Suspicion hémorragie digestive\n"
+"**\n"
+"Saignements varices ésophagiennes  _(_ **alcool** _, S. mansoni)  _ _\n"
+"**cirrhose décompensée**_"
+msgstr ""
+
+msgid ""
+"Suspicion anémie hémolytique ou déficit en G6PD, Ictère médicamenteuse\n"
+"/Intoxication chimique"
+msgstr ""
+
+msgid ""
+"Evaluation choc et hémoglobine:\n"
+"Vérifier TA, pouls, température, FR\n"
+"Tester HB si disponible"
+msgstr ""
+
+msgid ""
+"<div>Notion prise de sulfamide, médicaments ou d’autre produit toxique "
+"(alcool?):</div><div>Dapsone</div><div>Co-"
+"trimoxazole</div><div>Primaquine</div><div>Artesunate</div><div>autres ( y "
+"compris les médicaments traditionnels)</div>"
+msgstr ""
+
+msgid ""
+"Examiner&nbsp; Les conjonctives (Le «blanc» de l'œil), ont-elles une "
+"coloration jaune ou verte et/ou jaunisse"
+msgstr ""
+
+msgid "path: saignements spontanéess et ulcération gencives et"
+msgstr ""
+
+msgid "Gencives gonflées"
+msgstr ""
+
+msgid "ulcérations gencives"
+msgstr ""
+
+msgid "Ulcération d'une ou plusieurs papilles interdentaires"
+msgstr ""
+
+msgid "saignements spontanées"
+msgstr ""
+
+msgid "Saignements des gencives au toucher ou pendant le brossage"
+msgstr ""
+
+msgid "Gencives rougeatres ou de couleur pourpre?"
+msgstr ""
+
+msgid ""
+"Faire un examen bucco-dentaire (ouvrir et examiner la bouche): un des "
+"suivants"
+msgstr ""
+
+msgid "Carie dentaire"
+msgstr ""
+
+msgid ""
+"EXAMEN: 1) Gonflement (tuméfaction) ET/OU présence de pus autours de la "
+"dent?"
+msgstr ""
+
+msgid ""
+"<div>DEMANDER: Douleur localisée au niveau d’une ou des "
+"dents?</div><div>EXAMEN:&nbsp; Un trou OU</div><div>des tâches brun "
+"foncés/noires sur les dents?</div>"
+msgstr ""
+
+msgid "Tuméfaction inflammatoire douloureuse des gencives et des joues"
+msgstr ""
+
+msgid "lèvre ou joue molle?"
+msgstr ""
+
+msgid "Enflure du visage ou œdème"
+msgstr ""
+
+msgid ""
+"<span style=\"color: rgb(0, 0, 0);\">(Non-douloureuse enflure progression "
+"rapide: suspicion Burkitt-Lymphoma, âges 4-7, 2:1 garçons)</span>"
+msgstr ""
+
+msgid ""
+"DEMANDER: Joue ou bouche douloureuse et difficulté à manger ou trismus?"
+msgstr ""
+
+msgid ""
+"Décoloration noire bleuâtre au visage vis-à-vis des lésions intra-buccales\n"
+"(souvent joues, lévres)"
+msgstr ""
+
+msgid "Présence d’une lésion limitée entourant un centre nécrotique noirci"
+msgstr ""
+
+msgid "Déstruction importante des tissus bouche / visage"
+msgstr ""
+
+msgid "examiner la cavité buccale :"
+msgstr ""
+
+msgid "path: Notion de traumatisme / accident? tête"
+msgstr ""
+
+msgid "save: <u>Mesurer</u> la saturation en oxygène (O2) end %"
+msgstr ""
+
+msgid ""
+"Suspicion syndrome grippale\n"
+"Ou suspicion pharyngite virale"
+msgstr ""
+
+msgid "path: fièvre"
+msgstr ""
+
+msgid "Suspicion Angine bactérienne ou suspicion pharyngite virale"
+msgstr ""
+
+msgid "Angine bactérienne"
+msgstr ""
+
+msgid "Score"
+msgstr ""
+
+msgid "path: Score >=3"
+msgstr ""
+
+msgid "Aucuns des symptômes ci dessus"
+msgstr ""
+
+msgid "Douleurs des ganglions cervicals"
+msgstr ""
+
+msgid "Suppuration des amygdales"
+msgstr ""
+
+msgid ""
+"<div>&nbsp;(McIsaac Score): South Africa: (1+: exsudates, sans toux, sans "
+"nez qui coule)</div><div><br></div>"
+msgstr ""
+
+msgid "Evaluation probabilité d’une infection bacteriénne"
+msgstr ""
+
+msgid "path: toux"
+msgstr ""
+
+msgid "factor -1"
+msgstr ""
+
+msgid "path: Age > 45"
+msgstr ""
+
+msgid "path: fièvre  >38"
+msgstr ""
+
+msgid ""
+"<div><font color=\"#ff0000\">Examiner&nbsp;</font></div><div><font "
+"color=\"#ff0000\">- si la gorge et/ou les amygdales</font></div><div><font "
+"color=\"#ff0000\">sont rouges&nbsp;</font></div><div><font "
+"color=\"#ff0000\">- avec ou sans points blancs?</font></div>"
+msgstr ""
+
+msgid "Abcès amygdalien"
+msgstr ""
+
+msgid ""
+"Demander s’il y a une douleur intense avec une impossibilité de boire "
+"ET/OU&nbsp;<font color=\"#ff0000\">difficultées respiratoires, "
+"stridor</font>"
+msgstr ""
+
+msgid "path: Mal à la gorge ou adenopathie cervicale"
+msgstr ""
+
+msgid "Muguet buccale (candidose orale ou oropharyngée bénigne)"
+msgstr ""
+
+msgid ""
+"Suspicion candidose oropharyngée modérée ou sévère OU Candidose "
+"oesophagienne"
+msgstr ""
+
+msgid "Problèmes de déglutir ET/OU douleur ET/OU s’étendant au pharynx"
+msgstr ""
+
+msgid "Suspicion Diphtérie"
+msgstr ""
+
+msgid ""
+"<div>Membranes grisatres trés épaisses&nbsp;<font "
+"color=\"#ff0000\">très</font>&nbsp;adhérentes (parfois saignements en "
+"ET</div><div>un des suivants</div><div><br></div><div>Adénopathies "
+"cervicales</div><div><span style=\"background-color: initial;\">Dysphagie "
+"(Pharyngite, laryngite)</span><br></div><div>Fièvre</div>"
+msgstr ""
+
+msgid ""
+"<div>EXAMEN PRUDENT</div><div><br></div><div>examiner la cavité buccale et "
+"la gorge : rouge, présence de muguet sur la langue, du pus sur les "
+"tonsilles, présence de "
+"sang<br></div><div><br></div><div>ET&nbsp;</div><div><br></div><div>s’il y a"
+" des membranes blanchâtres dans la gorge qui sont difficiles à e<span "
+"style=\"background-color: initial;\">nlever</span></div><div><span "
+"style=\"background-color: "
+"initial;\"><br></span></div><div>OU</div><div><br></div><div>Plaques "
+"blanches brûlantes tapissent surtout la langue</div>"
+msgstr ""
+
+msgid "path: Depanocytose"
+msgstr ""
+
+msgid "Infections voies respiratoires antécédents (inclus covid-19)"
+msgstr ""
+
+msgid "Dyspnée au repos ou effort physique"
+msgstr ""
+
+msgid "Déclenché par le froid ou à l'effort physique"
+msgstr ""
+
+msgid "Douleur thoracique et un des signes suivants:"
+msgstr ""
+
+msgid "Suspicion Infarctus ou Angine de poitrine"
+msgstr ""
+
+msgid "crise hypertensive d’urgence"
+msgstr ""
+
+msgid ""
+"<div>douleur thoracique aiguë à l’effort au niveau du coeur irradiant vers "
+"le bras gauche et&nbsp;au cou ?</div><div><span style=\"background-color: "
+"initial;\">(avec ou sans les suivants)</span></div><div><br></div><div>A "
+"discuter: Maladie cardiaque connu ou traitement cardiaque (hypertension "
+"artérielle ou autres) OU</div><div>A discuter: Facteurs de risque cardiaque:"
+" tabac,chicha&nbsp;hypertension, cholésterol, diabète, familial)</div>"
+msgstr ""
+
+msgid "path: Notion de traumatisme: accident ou blessures?"
+msgstr ""
+
+msgid "Accun des symptômes ci dessus"
+msgstr ""
+
+msgid "Tirage inter-costal ou sus-claviculaire"
+msgstr ""
+
+msgid "Battements des ailes de nez"
+msgstr ""
+
+msgid "Examiner les signes de gravité:"
+msgstr ""
+
+msgid "path: Détresse résiparatoire ou confusion, troubles de l"
+msgstr ""
+
+msgid "Dépression"
+msgstr ""
+
+msgid "save: Maladie fébrile très grave"
+msgstr ""
+
+msgid "Prendre en charge le cas selon le protocole et le référer si possible"
+msgstr ""
+
+msgid "Maladie fébrile très grave"
+msgstr ""
+
+msgid ""
+"<span style=\"text-align: center;\">Fièvre hémorrhagique virale/dengue "
+"grave, leptospirosis, autres</span>"
+msgstr ""
+
+msgid "Maladie fébrile très grave: Référer"
+msgstr ""
+
+msgid ""
+"Suspicion hémorragie digestive\n"
+"Saignements varices ésophagiques (alcool, S. mansoni)"
+msgstr ""
+
+msgid "path: Choc"
+msgstr ""
+
+msgid ""
+"Douleurs aux rapports sexuels ou partenaires (problèmes avec lésion,\n"
+"écoulement)"
+msgstr ""
+
+msgid "Ecoulement genital ou Lésions genitales (ulcères, verrues, vésicules)"
+msgstr ""
+
+msgid "path: pas d'urine"
+msgstr ""
+
+msgid "Sang dans les urines"
+msgstr ""
+
+msgid "Pertes d'urines / miction fréquente"
+msgstr ""
+
+msgid "polyurie: miction abondante"
+msgstr ""
+
+msgid "brûlures mictionelles,"
+msgstr ""
+
+msgid "Maladies fébriles avec défaillance rénale"
+msgstr ""
+
+msgid ""
+"Anurie/Défaillance rénale\n"
+"Prise des médicaments indigènes?"
+msgstr ""
+
+msgid "path: Déhydration"
+msgstr ""
+
+msgid "Retention d’urine aiguë"
+msgstr ""
+
+msgid "Présence globe vésical?"
+msgstr ""
+
+msgid "Pas d’urines depuis plus de 12 heures"
+msgstr ""
+
+msgid "Quels sont les sympotomes du patient"
+msgstr ""
+
+msgid "Toux ou rhume (infection respiratoire aiguë d’origine virale)"
+msgstr ""
+
+msgid ""
+"<div><font color=\"#ff0000\">Syndrome grippale cas "
+"suspect:</font></div><div><font color=\"#ff0000\">-Un brusque accès de "
+"fièvre &gt; 38 ºC ET</font></div><div><font color=\"#ff0000\">-Toux ou maux "
+"de gorge, sans qu’aucun autre diagnostic ne permette d’expliquer la "
+"maladie</font></div>"
+msgstr ""
+
+msgid "Suspicion syndrome grippale"
+msgstr ""
+
+msgid "path: Mesure respiration"
+msgstr ""
+
+msgid ""
+"<span style=\"background-color: initial;\">Demander et "
+"observer&nbsp;<font>s'il y a une e</font></span><span style=\"background-"
+"color: initial;\"><font>xpectoration purulente</font></span>"
+msgstr ""
+
+msgid "path: Mal à la bouche"
+msgstr ""
+
+msgid ""
+"Suspicion tuberculose\n"
+"Problème pulmonaire chronique (si notion prise de chicha, tabagisme : conseil\n"
+"arréter de fumer)"
+msgstr ""
+
+msgid ""
+"<div>&lt;u&gt;Demander ET&nbsp;<font>e</font>xaminer &lt;/u&gt; "
+"si&nbsp;<font>au</font>&nbsp;moins 1 des symptômes "
+"suivants<font>:</font></div><div><span style=\"background-color: "
+"initial;\">* Crachats sanguinolents dans les 3 derniers "
+"mois</span><br></div><div>*&nbsp;<font>Toux</font>&nbsp;plus de 15 "
+"jours</div>"
+msgstr ""
+
+msgid "path: Toux ou nez qui coule"
+msgstr ""
+
+msgid "path: Stress"
+msgstr ""
+
+msgid "Asthme chronique"
+msgstr ""
+
+msgid ""
+"<div>Classification et TT de fond "
+"MSF:</div><div>Intermittent:</div><div><span style=\"background-color: "
+"initial;\"><br></span></div><div><span style=\"background-color: "
+"initial;\">Symptômes diurnes &lt; 1 fois par "
+"semaine,</span><br></div><div>symptômes nocturnes &lt; 2 fois par "
+"mois,</div><div>activité physique normale.</div><div>Persistant "
+"légèr:</div><div><br></div><div>symptômes diurnes &gt; 1 fois par semaine "
+"mais &lt;1 fois par jour</div><div>Symptômes nocturnes &gt; 2 fois par "
+"mois,</div><div>Crises pouvant retentir sur l’activité</div><div>Persistant "
+"moderé:</div><div><br></div><div>Symptômes diurnes "
+"quotidiens</div><div>Symptômes nocturnes &gt; 1 fois par "
+"semaine</div><div>Crises retentissant sur l’activité</div><div>Inhalation "
+"quotidienne de salbutamol</div><div>Persistant "
+"sévère:</div><div><br></div><div>Symptômes diurnes "
+"continus</div><div>Symptômes nocturnes fréquents</div><div>Activité physique"
+" limitée par les symptômes:</div>"
+msgstr ""
+
+msgid ""
+"<div>Evaluation&nbsp;<font>l'</font>asthme</div><div>Demander:</div><div><br></div><div>Episodes"
+" des symptômes respiratoires (respiration sifflante, essoufflement, "
+"sensation d′oppression thoracique et/ou toux)&nbsp;<font>obligeant le/la "
+"patient (e)</font></div><div><font>à se réveiller la nuit et "
+"à&nbsp;</font>s’asseoir pour respirer, pendant ou après un effort "
+"physique</div><div>(épisodes liée aux facteurs déclechants, aggravants: "
+"pollutions, allergènes, exercice physique, médicaments, tabac etc?)</div>"
+msgstr ""
+
+msgid "Insuffisance cardiaque sans fièvre"
+msgstr ""
+
+msgid "veines du cou congestionnées"
+msgstr ""
+
+msgid "path: vomissement sang ou vomissement ou mal au ventre o"
+msgstr ""
+
+msgid ""
+"Suspicion leishmaniose viscérale ou paludisme\n"
+"Drépanocytose"
+msgstr ""
+
+msgid "<div>&nbsp;</div><div>Splenomegalie</div>"
+msgstr ""
+
+msgid "save: Drépanocytose connu?"
+msgstr ""
+
+msgid "path: drépanocytose connu ?"
+msgstr ""
+
+msgid "path: Ictere sans raison identifié"
+msgstr ""
+
+msgid ""
+"path: TA syst >140 mmHg\n"
+"Et sans fièvre"
+msgstr ""
+
+msgid "Crisis non epiléptique:"
+msgstr ""
+
+msgid "count: >1"
+msgstr ""
+
+msgid "Hypertension artérielle chronique"
+msgstr ""
+
+msgid "Suspicion de pré-éclampsie sur-ajoutée"
+msgstr ""
+
+msgid ""
+"<span style=\"text-align: center;\">Céphalées intenses, vision floue, "
+"bourdonnements d'oreilles, douleurs abdominales hautes</span>"
+msgstr ""
+
+msgid "Pré-éclampsie sur-ajoutée"
+msgstr ""
+
+msgid "Tension chronique"
+msgstr ""
+
+msgid "path: Grossesse de moins de 20 semaines"
+msgstr ""
+
+msgid "Hypertension artérielle gestationnelle"
+msgstr ""
+
+msgid "hypertension gestationnelle probable"
+msgstr ""
+
+msgid "test pas disponible"
+msgstr ""
+
+msgid "Pré-éclampsie"
+msgstr ""
+
+msgid "éclampsie"
+msgstr ""
+
+msgid "path: convulsion"
+msgstr ""
+
+msgid "Preuve(positif) proteine"
+msgstr ""
+
+msgid "TEST urgent des urines pour la présence de proteines"
+msgstr ""
+
+msgid "path: Grossesse de plus de 20 semaines ou femme  en trav"
+msgstr ""
+
+msgid "Suspicion anémie sévère"
+msgstr ""
+
+msgid "path: Blessures ou accidents"
+msgstr ""
+
+msgid "Pas concluant"
+msgstr ""
+
+msgid ">10"
+msgstr ""
+
+msgid ">7 and >=10"
+msgstr ""
+
+msgid "<=7"
+msgstr ""
+
+msgid "Resultat test HB"
+msgstr ""
+
+msgid "Pouvez vous faire un test HB ?"
+msgstr ""
+
+msgid "Yeux fermés"
+msgstr ""
+
+msgid "Longe épisode"
+msgstr ""
+
+msgid "Récuperation rápide"
+msgstr ""
+
+msgid "Association avec stress"
+msgstr ""
+
+msgid "Demander en observer:"
+msgstr ""
+
+msgid "Syncope"
+msgstr ""
+
+msgid "Suspicion anémie modérée"
+msgstr ""
+
+msgid "path: Pâleur ou faiblaisse"
+msgstr ""
+
+msgid ""
+"Signes de gravité: état de choc, extrémités froides, sueur, soif, Oedemes des\n"
+"jambes, détresse respiratoire, dyspnée, pâleur marquée des muqueuses"
+msgstr ""
+
+msgid ""
+"Si [Hémorrhagie: signes hémorragie externe (saignements des plaies) OU\n"
+"interne: Vomissement sang, selles: sang frais, rouge ou selles noires"
+msgstr ""
+
+msgid "Oedemes des jambes (membres inférieurs)"
+msgstr ""
+
+msgid "Dyspnée, Fréquence respiratoire >30/min"
+msgstr ""
+
+msgid "¨Pâleur marquée : muqueuses, plantes, paumes et conjonctives"
+msgstr ""
+
+msgid "Le patient est-il oppressé au repos?"
+msgstr ""
+
+msgid "Examiner et mesurer:"
+msgstr ""
+
+msgid "path: femmes à risque"
+msgstr ""
+
+msgid "Déhydratation modérée"
+msgstr ""
+
+msgid "Déhydratation sévère"
+msgstr ""
+
+msgid ""
+"path: signe cardinaux\n"
+"Sévère >=2"
+msgstr ""
+
+msgid "Pouls: facilement palpable"
+msgstr ""
+
+msgid ""
+"Signe cardinaux\n"
+"modéré"
+msgstr ""
+
+msgid "Palpable (éventuellement rapide)"
+msgstr ""
+
+msgid ""
+"Signe cardinaux\n"
+"sévére"
+msgstr ""
+
+msgid "Difficile à palper (filant) ou absent"
+msgstr ""
+
+msgid "Palpation du pouls"
+msgstr ""
+
+msgid "boit normal"
+msgstr ""
+
+msgid "Boit avec avidité, assoiffé"
+msgstr ""
+
+msgid "Incapacité ou difficulté à boire"
+msgstr ""
+
+msgid "<u> Demader</u> comment le patient boit"
+msgstr ""
+
+msgid "s’efface rapidement"
+msgstr ""
+
+msgid "s’efface lentement (<= 2 secondes)"
+msgstr ""
+
+msgid "s’efface très lentement (> 2 secondes)"
+msgstr ""
+
+msgid "plis cutané"
+msgstr ""
+
+msgid ""
+"<span>&lt;u&gt;Examiner&lt;/u&gt;&nbsp; les yeux sont-ils enfoncés,ou/et "
+"creux</span><br style=\"padding: 0px ; margin: 0px\"><span>&nbsp;</span>"
+msgstr ""
+
+msgid "Langue séche"
+msgstr ""
+
+msgid "normal, éveillé"
+msgstr ""
+
+msgid "Agité, irritable"
+msgstr ""
+
+msgid "état de conscience"
+msgstr ""
+
+msgid "Déhydratation"
+msgstr ""
+
+msgid "count: >=1"
+msgstr ""
+
+msgid "path: Mesure tension"
+msgstr ""
+
+msgid "path: choc"
+msgstr ""
+
+msgid "save: Rechercher les antécédents de :::Traumatisme cranio-encephalique"
+msgstr ""
+
+msgid "path: Aucun diagnositique IST"
+msgstr ""
+
+msgid "path: Pré-éclampsie / éclampsie"
+msgstr ""
+
+msgid "Douleur en barre epigastrique"
+msgstr ""
+
+msgid "Epilepsie idiopathique"
+msgstr ""
+
+msgid "Consommation d'alcool ou de drogues"
+msgstr ""
+
+msgid "path: AVC"
+msgstr ""
+
+msgid "Epilepsie probable"
+msgstr ""
+
+msgid ""
+"Trouble comportement, motricité, faiblaisse membres, de la parole ou Perte de\n"
+"l'équilibre"
+msgstr ""
+
+msgid "Suspicion Maladie du someil"
+msgstr ""
+
+msgid "Maladie du someil connue (faiblesse motrice)"
+msgstr ""
+
+msgid "Suspicion neuro-cysticercosis"
+msgstr ""
+
+msgid "Proximité avec élevage porc et/ou consommateur de porc mal cuite"
+msgstr ""
+
+msgid "épilepsie dans la famille"
+msgstr ""
+
+msgid "Souffrance/inféction cérébral fébrile"
+msgstr ""
+
+msgid "Traumatisme cranio-encephalique"
+msgstr ""
+
+msgid "Anoxie à la naissance/accouchement"
+msgstr ""
+
+msgid "Rechercher les antécédents de :"
+msgstr ""
+
+msgid "path: >=1"
+msgstr ""
+
+msgid "Legers tremblements"
+msgstr ""
+
+msgid "Assombrissement de la vision"
+msgstr ""
+
+msgid "Pâleur"
+msgstr ""
+
+msgid "Transpiration"
+msgstr ""
+
+msgid "Perte de connaisance"
+msgstr ""
+
+msgid ""
+"crise convulsion peu probable\n"
+"Examiner et observe  l’etat clinique:"
+msgstr ""
+
+msgid "Référer à l'hôpital pour tests de drépanocytose"
+msgstr ""
+
+msgid ""
+"<span style=\"text-align: center;\">Notion de consanguinité avec</span><br "
+"style=\"text-align: center;\"><span style=\"text-align: "
+"center;\">transfusions ou crises douloureuses ou&nbsp;</span><br "
+"style=\"text-align: center;\"><span style=\"text-align: center;\">Infections"
+" à répétitions</span>"
+msgstr ""
+
+msgid "Evaluation causes, infections avoir déclenché la crise"
+msgstr ""
+
+msgid ""
+"Anémie chronique ou anémie aigu sévère: Chronique avec crises de fatigue, "
+"pâleur, essoufflement, tachycardie, syncope, insuffisance cardiaque"
+msgstr ""
+
+msgid ""
+"[douleur osseuse limitée à une seule région (ne répondant pas aux "
+"antalgiques)&nbsp;<font color=\"#ff3333\">ET au moins un des signes "
+"suivants:</font><br><font color=\"#ff3333\">- fièvre<br>- érythème<br>- "
+"œdème]</font>&nbsp;"
+msgstr ""
+
+msgid "path: fievre ?"
+msgstr ""
+
+msgid "Drépanocytose connu?"
+msgstr ""
+
+msgid "save: localisations des Œdèmes ou enflures : ::Autres"
+msgstr ""
+
+msgid "save: localisations des Œdèmes ou enflures : ::Cou ou  cervicale"
+msgstr ""
+
+msgid "save: localisations des Œdèmes ou enflures : ::Ventre (ascites)"
+msgstr ""
+
+msgid "Crise  d’asthme a tester"
+msgstr ""
+
+msgid ""
+"&nbsp;En l’absence de chambre d’inhalation, utiliser une bouteille en "
+"plastique de 500 ml : l’embout de<br style=\"border-color: var(--border-"
+"color); text-align: center;\"><span style=\"text-align: "
+"center;\">l’inhalateur est introduit dans une ouverture pratiquée dans le "
+"fond de la bouteille (le récipient</span><br style=\"border-color: "
+"var(--border-color); text-align: center;\"><span style=\"text-align: "
+"center;\">doit être le plus hermétique possible). L’enfant respire par le "
+"goulot, de la même manière</span><br style=\"border-color: var(--border-"
+"color); text-align: center;\"><span style=\"text-align: center;\">qu’avec "
+"une chambre d’inhalation. L’utilisation d’un gobelet en plastique comme "
+"substitut de</span><br style=\"border-color: var(--border-color); text-"
+"align: center;\"><span style=\"text-align: center;\">chambre d’inhalation "
+"n’est pas suffisamment efficace pour être recommandée.</span>"
+msgstr ""
+
+msgid ""
+"installer en position demi-assise.\n"
+"Donner du salbutamol aérosol (bronchodilatateurs): 2-4 bouffées.Répétez à\n"
+"nouveau au bout de 20 minutes et 40 minutes: jusqu’à 10 bouffées si nécessaire\n"
+"pendant la première heure\n"
+"- prednisolone PO : une dose de 1 à 2 mg/kg\n"
+"Si l’amélioration est incomplète, poursuivre le salbutamol 2 à 4 bouffées\n"
+"toutes les 3 ou 4 heures en cas de crise légère ; 6 bouffées toutes les 1 à 2\n"
+"heures en cas de crise modérée, jusqu’à la résolution des symptômes\n"
+"Sans amélioration, il s'agit d'une crise d'asthme grâve"
+msgstr ""
+
+msgid "Crise grave d’asthme grave OU asthme très sévère"
+msgstr ""
+
+msgid ""
+"<div>Incapacité à terminer une phrase sans reprendre sa "
+"respiration</div><div>ET/OU</div><div><br></div><div>Impossibilité de parler"
+" ou de s’alimenter en raison de la dyspnée</div>"
+msgstr ""
+
+msgid "path: Respiration rapidde(FR plus de 25)"
+msgstr ""
+
+msgid "save: localisations des Œdèmes ou enflures : ::Tête: visage / yeux"
+msgstr ""
+
+msgid ""
+"save: Demander et regarder et observez:::Oedemes, enflures, ascites "
+"(collection liquidienne"
+msgstr ""
+
+msgid ""
+"save: Demander et regarder et observez:::Fatigue, faiblesse, Palpitation, "
+"vertige, céphalée"
+msgstr ""
+
+msgid ""
+"save: Demander et regarder et observez:::Pâleur : conjonctives, muqueuses, "
+"paumes des mains"
+msgstr ""
+
+msgid "Autres"
+msgstr ""
+
+msgid "Géneralisés / Sur tout le corps"
+msgstr ""
+
+msgid "path: BoucheGorge"
+msgstr ""
+
+msgid "Cou ou cervicale"
+msgstr ""
+
+msgid "Membre inferieures"
+msgstr ""
+
+msgid "Genital, femorale ou inguinal"
+msgstr ""
+
+msgid "path: pied ou main"
+msgstr ""
+
+msgid "Oedemes Unilatéral seulement sur un coté"
+msgstr ""
+
+msgid "Pieds"
+msgstr ""
+
+msgid "Jambes"
+msgstr ""
+
+msgid "Bras"
+msgstr ""
+
+msgid "mains"
+msgstr ""
+
+msgid "Ventre (ascites)"
+msgstr ""
+
+msgid "Tête: visage / yeux"
+msgstr ""
+
+msgid ""
+"\"gonflement\" mou,<span style=\"\"> diffus, froid et indolore du tissu "
+"souscutané par </span><span style=\"\">infiltration de liquide provenant du "
+"plasma sanguin</span>"
+msgstr ""
+
+msgid "localisations des Œdèmes ou enflures :"
+msgstr ""
+
+msgid "save: <u>Mesurer</u> la fréquence respiratoire par minut"
+msgstr ""
+
+msgid "Détresse résiparatoire"
+msgstr ""
+
+msgid "path: risque de choc"
+msgstr ""
+
+msgid "risque de choc"
+msgstr ""
+
+msgid "Suspicion de déshydratation"
+msgstr ""
+
+msgid "path: oedeme"
+msgstr ""
+
+msgid "Oedemes, enflures, ascites (collection liquidiennes)"
+msgstr ""
+
+msgid "Fatigue, faiblesse, Palpitation, vertige, céphalées"
+msgstr ""
+
+msgid ""
+"Pâleur : conjonctives, muqueuses, paumes des mains et/ou plantes des pieds"
+msgstr ""
+
+msgid "Demander et regarder et observez:"
+msgstr ""
+
+msgid "Suspicion fièvre hemoragique"
+msgstr ""
+
+msgid "save select: Déficit neurologique central:"
+msgstr ""
+
+msgid "path: Trouble soudain de la parole ou Perte de l'équilib"
+msgstr ""
+
+msgid "path: >0"
+msgstr ""
+
+msgid "Aucun des signes ci-dessus"
+msgstr ""
+
+msgid "fatigue, somnolence, céphalée, douleur musculaire depuis la crise"
+msgstr ""
+
+msgid "Incontinence urine/selles"
+msgstr ""
+
+msgid "Perte de conscience ou somnolence"
+msgstr ""
+
+msgid "Blessure de la langue ou du corps"
+msgstr ""
+
+msgid "Rigidité"
+msgstr ""
+
+msgid ""
+"Demander si suivant une crise convulsive Et/ou examiner si signes présents"
+msgstr ""
+
+msgid "2 crises convulsives séparées dans la derniere année"
+msgstr ""
+
+msgid "Suspicion du syndrôme de nodding associé ä onchocercose"
+msgstr ""
+
+msgid ""
+"<p style=\"font-size: medium; margin: 0px;\">Evaluation nodding syndrome. "
+"Sejour dans un milieu endémique à cecité (Onchocerchose) crises de hochement"
+" de tête (chutes involontaires répétitives de la tête vers la poitrine à "
+"deux occasions ou plus), confirmées par un clinicien qualifié, survenant "
+"chez un enfant auparavant en bonne santé (age 5-15 ans) </p>"
+msgstr ""
+
+msgid "Crise de hochement de tête (surtout entre 5 et 15 ans)"
+msgstr ""
+
+msgid "Crises convulsives plus longues et généralement en public"
+msgstr ""
+
+msgid "Crises convulsives de 1-2 minutes?"
+msgstr ""
+
+msgid "Demander s'il y a une histoire de :"
+msgstr ""
+
+msgid "Suspicion Tétanos"
+msgstr ""
+
+msgid ""
+"Patient&nbsp;<font>conscient</font>&nbsp;avec Spasmes ou mouvement "
+"sacaddé&nbsp;<font>des yeux,</font>&nbsp;spasmes douloureuses déclenché "
+"par&nbsp;<font>un</font>&nbsp;<font>stimulis</font>&nbsp;(bruit, lumière, "
+"etc) ?"
+msgstr ""
+
+msgid ""
+"save: Déficit neurologique central:::Perte de l'équilibre trouble de la "
+"locomotion"
+msgstr ""
+
+msgid "save: Déficit neurologique central:::Trouble soudain de la parole"
+msgstr ""
+
+msgid ""
+"save: Déficit neurologique central:::Absence de réaction des pupilles ou "
+"réation asymét"
+msgstr ""
+
+msgid "save: Déficit neurologique central:::Trismus, opisthotonos"
+msgstr ""
+
+msgid "ŒDème aigu des poumons (O.A.P.) sans fièvre"
+msgstr ""
+
+msgid "Crachats mousseux, abondants, rosés"
+msgstr ""
+
+msgid "path: respiration siflante"
+msgstr ""
+
+msgid ""
+"save: Déficit neurologique central:::Perte OU troubles de conscience / "
+"vigilence : somn"
+msgstr ""
+
+msgid "path: 1+  SANS Trauma/blésures tête ni rage (suspision o"
+msgstr ""
+
+msgid "Perte de l'équilibre trouble de la locomotion"
+msgstr ""
+
+msgid "Trouble soudain de la parole"
+msgstr ""
+
+msgid "path: trouble membres"
+msgstr ""
+
+msgid "Faiblesse motrice ou perte sensibilité d'un ou de plusieurs menbres"
+msgstr ""
+
+msgid "Absence de réaction des pupilles ou réation asymétrique"
+msgstr ""
+
+msgid "Spasme"
+msgstr ""
+
+msgid "Trismus, opisthotonos"
+msgstr ""
+
+msgid "Léthargique ou inconscient"
+msgstr ""
+
+msgid ""
+"Perte OU troubles de conscience / vigilence : somnolence, agitation, sudation,\n"
+"confusion"
+msgstr ""
+
+msgid "Déficit neurologique central:"
+msgstr ""
+
+msgid "path: Dificulté réspiratoire"
+msgstr ""
+
+msgid ""
+"\\- Si obstruction des voies aériennes, difficultées respiratoires : Expulsion\n"
+"du corps étranger:\n"
+"Pratiquer manoeuvre de [Heimlich] : se placer derrière le patient et avec les\n"
+"deux mains à donner une pression brusque au niveau de l’épigastre. A répéter\n"
+"si nécéssaire. Recommencer jusqu′à ce que le corps étranger soit expulsé et\n"
+"que le patient reprenne une respiration spontanée (tousse, pleure, parle). Si\n"
+"le patient perd conscience, commencer une ventilation et une réanimation\n"
+"cardio-respiratoire.\n"
+"\\- Si mal à la gorge: Si le corps étranger est accessible, faites ablation du\n"
+"corps étranger mais sans insister suivie d’un antalgique oral."
+msgstr ""
+
+msgid "Corps etranger"
+msgstr ""
+
+msgid ""
+"<div>Demander et examiner:</div><div><br></div><div>Toux de survenue "
+"brutale, crachats, présence de n<span style=\"background-color: "
+"initial;\">otion de corps étranger dans les voies respiratoires</span></div>"
+msgstr ""
+
+msgid "save: Examiner si le patient présente au moins 1 des sig::Dyspnée"
+msgstr ""
+
+msgid ""
+"save: Examiner si le patient présente au moins 1 des sig::Respiration "
+"sifflante"
+msgstr ""
+
+msgid "save: Traumatisme crânien et ou cervicale dù à la perte"
+msgstr ""
+
+msgid "save: Le patient a-t-il des pertes de connaissance ou de"
+msgstr ""
+
+msgid "path: Trouble de la conciense"
+msgstr ""
+
+msgid "path: Pre-eclampsie / éclampsie"
+msgstr ""
+
+msgid "Etat de mal épileptique"
+msgstr ""
+
+msgid "Convulsion post-traumatisme crânien et/ou cervical"
+msgstr ""
+
+msgid "Aucun des symptômes ci dessus"
+msgstr ""
+
+msgid "Stridor ou voix rauque"
+msgstr ""
+
+msgid ""
+"Détresse respiratoire (respiration bruyante, gène à la respiration, polypnée,\n"
+"bradypnée)"
+msgstr ""
+
+msgid "Dyspnée"
+msgstr ""
+
+msgid ""
+"Examiner si le patient présente au moins 1 des signes des difficultées "
+"respiratoires ci-dessous:"
+msgstr ""
+
+msgid "path: Dificulté réspiratoire/douleurs thoraxiques"
+msgstr ""
+
+msgid "AVC"
+msgstr ""
+
+msgid "Stresse"
+msgstr ""
+
+msgid "Abdomen aiguë"
+msgstr ""
+
+msgid ""
+"<span style=\"text-align: center;\">(comprend: appendicite, péritonite, "
+"perforation digestive, occlusion intestinale, pancreatite aigu, abcès "
+"amibien) femmes: avortement compliqué, Endométrite, péritonite, abcés "
+"pelvien, GEU</span>"
+msgstr ""
+
+msgid "Abdomen aiguë: Référer"
+msgstr ""
+
+msgid "Syndrome abdominal par traumatisme"
+msgstr ""
+
+msgid "path: Trauma ventre"
+msgstr ""
+
+msgid "save: <span>Vomissement de sang ?</span>"
+msgstr ""
+
+msgid "save: Demander et Examiner::Douleur abdominale aiguë"
+msgstr ""
+
+msgid "path: Signes réspiratoire"
+msgstr ""
+
+msgid "Mal de tête isolé"
+msgstr ""
+
+msgid "path: sang dans les selles ou masse abdominale"
+msgstr ""
+
+msgid "<span>Vomissement de sang ?</span>"
+msgstr ""
+
+msgid "ballonement abdominal"
+msgstr ""
+
+msgid "contracture"
+msgstr ""
+
+msgid "Arrêt de matières et des gaz"
+msgstr ""
+
+msgid "Defense"
+msgstr ""
+
+msgid "Douleur abdominale aiguë"
+msgstr ""
+
+msgid "Demander et Examiner"
+msgstr ""
+
+msgid "path: Mal au ventre ou vomissement"
+msgstr ""
+
+msgid "save: <span style=\"\">Trouble de la vision</span>"
+msgstr ""
+
+msgid "save: Trouble de la vision d'un seul oeil ?&nbsp;"
+msgstr ""
+
+msgid ""
+"save: Rechercher les symptomes du patient suivants:::Douleur thoracique"
+msgstr ""
+
+msgid "save: Rechercher les symptomes du patient suivants:::Mal à la bouche"
+msgstr ""
+
+msgid "save: Rechercher les symptomes du patient suivants:::Mal à la gorge"
+msgstr ""
+
+msgid ""
+"save: Rechercher les symptomes du patient suivants:::Dificultés "
+"réspiratoires"
+msgstr ""
+
+msgid "save: Rechercher les symptomes du patient suivants:::Nez qui coule"
+msgstr ""
+
+msgid "save: Rechercher les symptomes du patient suivants:::Toux"
+msgstr ""
+
+msgid "path: Grossesse ou  post partum"
+msgstr ""
+
+msgid "path: pas trauma tête  et (céphalé intense ou perte de l"
+msgstr ""
+
+msgid "Migraine"
+msgstr ""
+
+msgid ""
+"Douleur unilateral ET/OU symptômes végétatives (Vue, Ouïe sont "
+"desabgréables) troubles de la vision et auditive ou troubles de la vision et"
+" de l’ouie"
+msgstr ""
+
+msgid "Sinusite"
+msgstr ""
+
+msgid ""
+"Douleur au niveau du front et/ou au dessous yeux ET nez qui coule / "
+"écoulement nasal purulent ET/OU obstruction nasale"
+msgstr ""
+
+msgid "Hypertension modéré sans critères de sévérité ou danger"
+msgstr ""
+
+msgid "Crise hypertensive"
+msgstr ""
+
+msgid "Céphalées pulsatiles"
+msgstr ""
+
+msgid "path: hypertension modéré (160 ou plus)"
+msgstr ""
+
+msgid "Glaucome"
+msgstr ""
+
+msgid ""
+"Globe oculaire dur et très douloureux et aggravation de la vue baisse de la "
+"vision et mal à l’oeil"
+msgstr ""
+
+msgid ""
+"Trauma cranien /\n"
+"Suspicion Hémorragie intracranielle"
+msgstr ""
+
+msgid "Crise hypertensive intracranienne URGENCE"
+msgstr ""
+
+msgid "Mal au ventre ou vomissement"
+msgstr ""
+
+msgid "path: Signes : abdominaux"
+msgstr ""
+
+msgid ""
+"save: Démander: Le patient a-t’il ::Envies incessantes d'aller à la selle "
+"sans défécat"
+msgstr ""
+
+msgid "save: Démander: Le patient a-t’il ::Douleurs anales"
+msgstr ""
+
+msgid "save: Démander: Le patient a-t’il :: Selles dures et rares"
+msgstr ""
+
+msgid "save: Démander: Le patient a-t’il ::Diarrhée"
+msgstr ""
+
+msgid "save: Démander: Le patient a-t’il ::Masse abdominale"
+msgstr ""
+
+msgid "save: Démander: Le patient a-t’il ::Du vomissement , Nausées"
+msgstr ""
+
+msgid "save select: Est ce que le patient à:"
+msgstr ""
+
+msgid "save: Est ce que le patient à:::Lésions ET enflure membres"
+msgstr ""
+
+msgid "save: Est ce que le patient à:::Mal au membres ou articulations"
+msgstr ""
+
+msgid "save: Est ce que le patient à:::mal au dos ?"
+msgstr ""
+
+msgid "save: Est ce que le patient à:::mal  aux lombes?"
+msgstr ""
+
+msgid "Bouchon de cerumen"
+msgstr ""
+
+msgid ""
+"Sifflement dans l’oreille avec ou sans diminuation récente de l’audition?"
+msgstr ""
+
+msgid "Infection aigue de l'oreille"
+msgstr ""
+
+msgid "Infection chronique de l'oreille"
+msgstr ""
+
+msgid "Durée: plus de 14 jours?"
+msgstr ""
+
+msgid "Ecoulement de pus?"
+msgstr ""
+
+msgid "Mastoidite"
+msgstr ""
+
+msgid "Examiner: tuméfaction douloureuse derrière l’oreille?"
+msgstr ""
+
+msgid "Traumatisme cranien / Otorragie"
+msgstr ""
+
+msgid "<span style=\"\">notion corps étranger (enfants)</span>"
+msgstr ""
+
+msgid "path: [Notion de traumatisme?]"
+msgstr ""
+
+msgid ""
+"Demander: Est-ce qu’il y a mal aux oreilles ET/OU écoulement de sang ou pus?"
+msgstr ""
+
+msgid "save: Douleur et localisation::dos/lombes, membres, articulations"
+msgstr ""
+
+msgid "Crise Hypertensive"
+msgstr ""
+
+msgid "Hypertension légère"
+msgstr ""
+
+msgid "Hypertension modéré"
+msgstr ""
+
+msgid "save: Douleur et localisation::maux de tête"
+msgstr ""
+
+msgid ""
+"path: SI TA syst ≥180 et/ou TA diast ≥ 110\n"
+"ET und des su"
+msgstr ""
+
+msgid "path: Grossesse OU  en travail OU post partum"
+msgstr ""
+
+msgid "Trouble de la vision d'un seul oeil ?&nbsp;"
+msgstr ""
+
+msgid "<span style=\"\">Trouble de la vision</span>"
+msgstr ""
+
+msgid "Aucun des choix ci dessus"
+msgstr ""
+
+msgid "Douleur thoracique"
+msgstr ""
+
+msgid "Mal à la bouche"
+msgstr ""
+
+msgid "Mal à la gorge"
+msgstr ""
+
+msgid "Dificultés réspiratoires"
+msgstr ""
+
+msgid "Nez qui coule"
+msgstr ""
+
+msgid "Toux"
+msgstr ""
+
+msgid "Rechercher les symptomes du patient suivants:"
+msgstr ""
+
+msgid "save: Démander: Le patient a-t’il ::Mal au ventre"
+msgstr ""
+
+msgid "path: Signes:respiration"
+msgstr ""
+
+msgid "path: Douleurs au ventre (haut ou bas)  OU Vomissement"
+msgstr ""
+
+msgid "Aucun de ses symptômes"
+msgstr ""
+
+msgid "Envies incessantes d'aller à la selle sans défécation"
+msgstr ""
+
+msgid "Douleurs anales"
+msgstr ""
+
+msgid "Selles dures et rares"
+msgstr ""
+
+msgid "sang dans les selles"
+msgstr ""
+
+msgid "Selles noires"
+msgstr ""
+
+msgid "Sang rouge dans les selles"
+msgstr ""
+
+msgid "Masse abdominale"
+msgstr ""
+
+msgid "Du vomissement , Nausées"
+msgstr ""
+
+msgid "Démander: Le patient a-t’il"
+msgstr ""
+
+msgid "path: Intoxication"
+msgstr ""
+
+msgid "path: Oedemes"
+msgstr ""
+
+msgid "Lésions ET enflure membres"
+msgstr ""
+
+msgid "path: Mal au dos, Membres ou lombes"
+msgstr ""
+
+msgid "Mal au membres ou articulations"
+msgstr ""
+
+msgid "mal au dos ?"
+msgstr ""
+
+msgid "path: Meta: Uro"
+msgstr ""
+
+msgid "mal aux lombes?"
+msgstr ""
+
+msgid "paralysie membres"
+msgstr ""
+
+msgid "Est ce que le patient à:"
+msgstr ""
+
+msgid "dos/lombes, membres, articulations"
+msgstr ""
+
+msgid "path: Symptomes Abdominaux"
+msgstr ""
+
+msgid "Ventre"
+msgstr ""
+
+msgid "path: Symptomes réspiration"
+msgstr ""
+
+msgid "Thorax"
+msgstr ""
+
+msgid "path: Oreilles"
+msgstr ""
+
+msgid "oreilles"
+msgstr ""
+
+msgid "gorge, bouche, dents"
+msgstr ""
+
+msgid "path: Tesion"
+msgstr ""
+
+msgid "path: Tête"
+msgstr ""
+
+msgid "maux de tête"
+msgstr ""
+
+msgid "Douleur et localisation"
+msgstr ""
+
+msgid "DOULEURS: symptomes"
+msgstr ""
+
+msgid ""
+"save: Quel sont les problèmes du patient? ::3. Problèmes / Troubles génito-"
+"urinaires"
+msgstr ""
+
+msgid "save select: Demander si la patient à Ingeré ou inhalé récemmen"
+msgstr ""
+
+msgid ""
+"save: Demander si la patient à Ingeré ou inhalé récemmen::Alcool, drogues, "
+"Yambo ou  traitement herbalistes"
+msgstr ""
+
+msgid ""
+"save: Demander si la patient à Ingeré ou inhalé récemmen::Medicaments, "
+"vaccins"
+msgstr ""
+
+msgid "Psychose"
+msgstr ""
+
+msgid "fièvre  persistante"
+msgstr ""
+
+msgid "path: Signe de  maladie fébrile grâve"
+msgstr ""
+
+msgid "cas suspect de dengue"
+msgstr ""
+
+msgid "cas suspect de dengue grave"
+msgstr ""
+
+msgid "Score Dengue sévère"
+msgstr ""
+
+msgid "path: Score Dengue sévère >0"
+msgstr ""
+
+msgid "[Léthargie] [grande agitation] [anxiété]"
+msgstr ""
+
+msgid "Respiration rapide"
+msgstr ""
+
+msgid "Vomissements persistants"
+msgstr ""
+
+msgid ""
+"Douleurs abdominales persistantes (douleur ou sensibilité à la palpation au\n"
+"noiveau abdominal)"
+msgstr ""
+
+msgid ""
+"Evaluation signes d’alerte: Dengue severe/ syndrome maladie fébrile très "
+"grave"
+msgstr ""
+
+msgid "Score Dengue"
+msgstr ""
+
+msgid "Mal à l'oeil"
+msgstr ""
+
+msgid "presence d'Adénopathie"
+msgstr ""
+
+msgid "Examiner/ Demander"
+msgstr ""
+
+msgid "Accuns des ces problèmes ci dessus"
+msgstr ""
+
+msgid "path: Signes de danger D"
+msgstr ""
+
+msgid ""
+"9\\. Problémes neurologiques( troubles de la conscience, du comportement, de la\n"
+"parole, de la motricité faiblaisse motrice ou perte de sensibilité)"
+msgstr ""
+
+msgid "path: GYNECOLOGIE"
+msgstr ""
+
+msgid "path: Uro"
+msgstr ""
+
+msgid "path: Signes: Abdo"
+msgstr ""
+
+msgid "8\\. Gynécologique et Obstétrique"
+msgstr ""
+
+msgid "path: Peau"
+msgstr ""
+
+msgid "path: Douleurs"
+msgstr ""
+
+msgid "7\\. Problèmes de peau (nodules, taches, vesicules, ulceres..)"
+msgstr ""
+
+msgid "6\\. Douleur et localisation"
+msgstr ""
+
+msgid "path: Ictère"
+msgstr ""
+
+msgid "path: Paleur"
+msgstr ""
+
+msgid "5\\. Pâleur, Faiblesse, ictère, oedemes, enflures"
+msgstr ""
+
+msgid ""
+"4\\. Problémes cardiovasculaires (mal au thorax, difficultées respiratoires,\n"
+"oedèmes, mal à la tête, diabète)"
+msgstr ""
+
+msgid "path: Oedeme"
+msgstr ""
+
+msgid "3\\. Problèmes / Troubles génito-urinaires"
+msgstr ""
+
+msgid "2\\. Problémes abdominaux / digestifs"
+msgstr ""
+
+msgid "path: Signes: Resp"
+msgstr ""
+
+msgid "1\\. Problémes de respiration, voies aériennes, gorge, bouche, dents"
+msgstr ""
+
+msgid "Quel sont les problèmes du patient?"
+msgstr ""
+
+msgid "Entrez le poids en kilos"
+msgstr ""
+
+msgid "Age en années"
+msgstr ""
+
+msgid "Aucun"
+msgstr ""
+
+msgid ""
+"Autre produit non alimantaire (phytosaniataire, produit d'entretient,\n"
+"solvants)"
+msgstr ""
+
+msgid "notion de prises de substances"
+msgstr ""
+
+msgid "Alcool, drogues, Yambo ou traitement herbalistes (haleine)"
+msgstr ""
+
+msgid "Medicaments, vaccins"
+msgstr ""
+
+msgid ""
+"Demander si la patient à Ingeré ou inhalé récemment un des ces produits:"
+msgstr ""
+
+msgid "VIH"
+msgstr ""
+
+msgid "Signe de gravité fièvre"
+msgstr ""
+
+msgid "Paludisme grâve confirmé"
+msgstr ""
+
+msgid "Paludisme simple probable"
+msgstr ""
+
+msgid "Maladie fébrile grave"
+msgstr ""
+
+msgid "Paludisme simple confirmé"
+msgstr ""
+
+msgid "Paludisme resistant confirmé"
+msgstr ""
+
+msgid "Tranferer pour examen microscopique et TT antipaludéen 2ème intention"
+msgstr ""
+
+msgid ""
+"<span style=\"\">Demander si le patient à reçu un traitement antipaludique "
+"dans les deux semaines</span>"
+msgstr ""
+
+msgid "Signe de gravité du paludisme"
+msgstr ""
+
+msgid "Autre syndrome febrile"
+msgstr ""
+
+msgid "save select: Evaluation symptômes et signes et symptômes de gra"
+msgstr ""
+
+msgid "save: Examiner,&nbsp;<span style=\"\">Raideur de la nuque"
+msgstr ""
+
+msgid ""
+"<p style=\"font-size: medium; margin: 0px;\"><span style=\"font-family: "
+"&quot;Sans Serif&quot;; font-size: 14px;\">suspicion méningite</span></p><p "
+"style=\"font-size: medium; margin: 0px;\"><span style=\"font-family: "
+"&quot;Sans Serif&quot;; font-size: 14px;\">cas isolé ou épidémique +/- "
+"saisonnières: cas suspect: définition cas à notifier</span></p><p "
+"style=\"font-size: medium; margin: 0px;\"><span style=\"font-family: "
+"&quot;Sans Serif&quot;; font-size: 14px;\">Si traumatisme crânien: germes: "
+"salmonella ou S.aureus possible</span></p><p style=\"font-size: medium; "
+"margin: 0px;\"><span style=\"font-family: &quot;Sans Serif&quot;; font-size:"
+" 14px;\">Si drépanocytose: germes: S.aureus est possible</span></p><p "
+"style=\"font-size: medium; margin: 0px;\"><span style=\"font-family: "
+"&quot;Sans Serif&quot;; font-size: 14px;\">Si VIH positif: penser à une "
+"cryptococcose, méningite tuberculeuse</span></p>"
+msgstr ""
+
+msgid "Suspicion meningites"
+msgstr ""
+
+msgid ""
+"Paludisme grâve confirmé avec signe de\n"
+"meningites"
+msgstr ""
+
+msgid ""
+"save: Evaluation symptômes et signes et symptômes de gra::Eruption cutanée "
+"non-localisée (Exantheme)"
+msgstr ""
+
+msgid "save: Suspecter vous le paludisme / Le patient a-t-il le"
+msgstr ""
+
+msgid "save select: Le patient a-t-il les signes cliniques du paludism"
+msgstr ""
+
+msgid ""
+"save: Le patient a-t-il les signes cliniques du paludism::Ictére clinique "
+"(yeux jaunes)"
+msgstr ""
+
+msgid "save: Effectuer un TDR pour le paludisme::Rupture"
+msgstr ""
+
+msgid "save: Effectuer un TDR pour le paludisme::Négatif"
+msgstr ""
+
+msgid "save: Effectuer un TDR pour le paludisme::Positif"
+msgstr ""
+
+msgid "save: Fièvre depuis plus de 7 jours"
+msgstr ""
+
+msgid ""
+"save: Evaluation symptômes et signes et symptômes de gra::Mal au ventre "
+"sévère ET/OU Vomissement incoercible"
+msgstr ""
+
+msgid ""
+"save: Le patient a-t-il les signes cliniques du paludism::Saignement "
+"spontané"
+msgstr ""
+
+msgid ""
+"save: Le patient a-t-il les signes cliniques du paludism::Trouble de la "
+"concience (y compris un coma aréacti"
+msgstr ""
+
+msgid ""
+"save: Le patient a-t-il les signes cliniques du paludism::Prostation, c'est-"
+"à-dire une une faiblesse général"
+msgstr ""
+
+msgid ""
+"save: Le patient a-t-il les signes cliniques du paludism::Convulsions "
+"répétées: plus de deux (2) épisodes en"
+msgstr ""
+
+msgid "path: palu positif ET signe de gravité paludisme cas sus"
+msgstr ""
+
+msgid "cas suspect de rougeole"
+msgstr ""
+
+msgid ""
+"<span style=\"\">&lt;u&gt;Demander éruption maculopapulaire&nbsp;</span><br "
+"style=\"padding: 0px; margin: 0px;\"><span style=\"\">Nez qui coule OU toux "
+"OU&nbsp; rhume OU conjonctivite (yeux rouges)</span>"
+msgstr ""
+
+msgid "path: palu positif"
+msgstr ""
+
+msgid ""
+"Examiner,&nbsp;<span style=\"\">Raideur de la nuque accompagné de "
+"céphalé</span>"
+msgstr ""
+
+msgid "Eruption cutanée non-localisée (Exantheme)"
+msgstr ""
+
+msgid "Faiblesse prononcée, Incapable de se tenir debout"
+msgstr ""
+
+msgid "Mal au ventre sévère ET/OU Vomissement incoercibles"
+msgstr ""
+
+msgid ""
+"Pâleur / pâleur des conjonctives et muqueuses, taux d’hémoglobine < 7 g/dl)"
+msgstr ""
+
+msgid "Anurie (pas d'urine), Hémoglobinurie (urine foncée)"
+msgstr ""
+
+msgid ""
+"Evaluation symptômes et signes et symptômes de gravité / danger fébriles"
+msgstr ""
+
+msgid "Aucun des symptomes ci-dessus"
+msgstr ""
+
+msgid "Saignement spontané"
+msgstr ""
+
+msgid "Anèmie clinique (paleur des conjonctives et des muqueuses)"
+msgstr ""
+
+msgid "Ictére clinique (yeux jaunes)"
+msgstr ""
+
+msgid "Rareté des urines, anurie ou noires \"coca-cola\" (Lésion rénale aigue)"
+msgstr ""
+
+msgid ""
+"Collaspsus circulatoire ou choc, tension arterielle systolique < 70 mm Hg"
+msgstr ""
+
+msgid "Oedème pulmonaire aigue et syndrome de détresse respiratoire aigue"
+msgstr ""
+
+msgid "Réspiration profonde et détresse respiratoire (respiration acidosique)"
+msgstr ""
+
+msgid "Convulsions répétées: plus de deux (2) épisodes en 24h"
+msgstr ""
+
+msgid ""
+"Prostation, c'est-à-dire une une faiblesse généralisée, de sorte que le\n"
+"patient est incapable de s'assoir, de se tenir debout ou de marcher sans\n"
+"assistance"
+msgstr ""
+
+msgid "Trouble de la concience (y compris un coma aréactif)"
+msgstr ""
+
+msgid "Le patient a-t-il les signes cliniques du paludisme grâve ?"
+msgstr ""
+
+msgid "path: Trouble de la concience ou saignement, choc"
+msgstr ""
+
+msgid ""
+"Suspecter vous le paludisme / Le patient a-t-il les symptomes du paludisme "
+"simple ?&nbsp;<br><br>- Fièvre ave ou sans frissons<br>- Sudation/ "
+"Sueur<br>- Toux (chez 20 à 30 % des patients)<br>- Troubles digestifs / "
+"anorexie, nausée, vomissement et diahrée<br>- Fatigue<br>- Céphalées/mal à "
+"la tête<br>- Douleurs articulaires<br>- Douleurs abdominales<br>- Herpès "
+"labial (parfois)"
+msgstr ""
+
+msgid "Rupture"
+msgstr ""
+
+msgid "Négatif"
+msgstr ""
+
+msgid "Positif"
+msgstr ""
+
+msgid "Effectuer un TDR pour le paludisme"
+msgstr ""
+
+msgid "Fièvre depuis plus de 7 jours"
+msgstr ""
+
+msgid "Mal au ventre"
+msgstr ""
+
+msgid "Intoxication"
+msgstr ""
+
+msgid "Bouche"
+msgstr ""
+
+msgid "Diarrhée"
+msgstr ""
+
+msgid "Drépanocytose"
+msgstr ""
+
+msgid "fievre"
+msgstr ""
+
+msgid "gorge"
+msgstr ""
+
+msgid "path: fièvre  ?"
+msgstr ""
+
+msgid "Aucun des choix"
+msgstr ""
+
+msgid "Le patient a-t-il pris un médicament antipaludéen"
+msgstr ""
+
+msgid ""
+"Le patient a-t-il reçu du paracétamol ou tout autre médicament pour faire\n"
+"baisser la fièvre (antipyrétique) au cours des 12 dernières heures?"
+msgstr ""
+
+msgid "Histoire de fièvre"
+msgstr ""
+
+msgid "Proxy pour la fièvre"
+msgstr ""
+
+msgid "La mesure de la température n′est pas possible?"
+msgstr ""
+
+msgid "Entrez la température °C"
+msgstr ""
+
+msgid "Enregistrement"
+msgstr ""
+
+msgid "path: Enregistrement"
+msgstr ""
+
+msgid ""
+"Informer le médécin traitant pour evaluation et administration vaccination\n"
+"contre tétanos (actif ou passif)"
+msgstr ""
+
+msgid "Trouble de conciences/ convulsions"
+msgstr ""
+
+msgid "Nodules"
+msgstr ""
+
+msgid "Peau"
+msgstr ""
+
+msgid "Mal aux membres et lombes"
+msgstr ""
+
+msgid "Douleurs Thoraciques"
+msgstr ""
+
+msgid "mal a l'oreille"
+msgstr ""
+
+msgid "count: Trauma"
+msgstr ""
+
+msgid "save: <u>Observer</u> Si le traumatisme semble sévère::oui"
+msgstr ""
+
+msgid ""
+"Si animal doméstique encore vivant après 10 jours: pas continuer avec\n"
+"vaccination"
+msgstr ""
+
+msgid "save: Suspicion contact rage"
+msgstr ""
+
+msgid "save: Suspicion rage symptomatique"
+msgstr ""
+
+msgid ""
+"save: <u>Demander</u> si l'animal est toujours vivant ap::Contact de moins "
+"de 10 jours"
+msgstr ""
+
+msgid ""
+"save: <u>Demander</u> si l'animal est toujours vivant ap::toujours vivant "
+"après 10 jours"
+msgstr ""
+
+msgid ""
+"save: <u>Demander</u> Quelle espece est responsable du c::Doméstique (chien,"
+" chat, chèvre,…)"
+msgstr ""
+
+msgid "save: De quel animal  ?::Autres animaux"
+msgstr ""
+
+msgid "save: De quel animal  ?::Reptiles, rongeur (souris, rat)"
+msgstr ""
+
+msgid "save: De quel animal  ?::Serpents"
+msgstr ""
+
+msgid "save: De quel animal  ?::Humain"
+msgstr ""
+
+msgid ""
+"save: <u>Demander</u> si la patient a une histoire de tr::Trauma génital,  "
+"viol, risque VIH/IST (AES)"
+msgstr ""
+
+msgid "save: <u>Demander</u> si la patient a une histoire de tr::Brulures"
+msgstr ""
+
+msgid ""
+"save: <u>Demander</u> si la patient a une histoire de tr::Piqures "
+"(scorpions, araignée, abeille, guepe, etc)"
+msgstr ""
+
+msgid ""
+"save: <u>Demander</u> si la patient a une histoire de tr::Morsure / griffure"
+msgstr ""
+
+msgid ""
+"save: <u>Demander</u> si la patient a une histoire de tr::Notion ou histoire"
+" de plaies / lésions/ puncture r"
+msgstr ""
+
+msgid "Alcool"
+msgstr ""
+
+msgid "save: Quelles parties du corp ont été touchés::les/un membre(s)"
+msgstr ""
+
+msgid "save: Quelles parties du corp ont été touchés::le dos"
+msgstr ""
+
+msgid "save: Quelles parties du corp ont été touchés::le thorax"
+msgstr ""
+
+msgid ""
+"save: <u>Demander</u> si la patient a une histoire de tr::Accident /chutes /"
+" bagare / choc violent"
+msgstr ""
+
+msgid ""
+"save: Quelles parties du corp ont été touchés::la tête/cou/rachis cervical"
+msgstr ""
+
+msgid "Aucun traumatisme"
+msgstr ""
+
+msgid "Réaction absente des pupilles ou pupilles asymmétriques"
+msgstr ""
+
+msgid "path: IST"
+msgstr ""
+
+msgid "Trauma génital, viol, risque VIH/IST (AES)"
+msgstr ""
+
+msgid "<u>Observer</u> Si le traumatisme semble sévère"
+msgstr ""
+
+msgid "Brulures"
+msgstr ""
+
+msgid "Piqures (scorpions, araignée, abeille, guepe, etc)"
+msgstr ""
+
+msgid "path: animal  dopmestique >0 ?"
+msgstr ""
+
+msgid ""
+"<u>Donner</u> ESSEN IM selon ce calendrier:\n"
+"\n"
+"Jours: 0 : 1 dose\n"
+"Jours: 3 : 1 dose\n"
+"Jours: 7 : 1 dose\n"
+"Jours: 14 : 1 dose\n"
+"Jours: 21 : 1 dose\n"
+"Jours: 28 : 1 dose\n"
+"\n"
+"<u>Donner</u> ZAGREB IM selon ce calendrier:\n"
+"\n"
+"Jours: 0 : 2 dose\n"
+"Jours: 7 : 1 dose\n"
+"Jours: 21 : 1 dose"
+msgstr ""
+
+msgid ""
+"Faire le suivi avec le patient\n"
+"Contacter dès que vaccin est disponible"
+msgstr ""
+
+msgid "Est ce que le traitement vaccin anti-rabique est disponible ?"
+msgstr ""
+
+msgid "Suspicion contact rage"
+msgstr ""
+
+msgid "Suspicion rage symptomatique"
+msgstr ""
+
+msgid "path: Convuslsion spasme"
+msgstr ""
+
+msgid "Pas classifié / connu"
+msgstr ""
+
+msgid "Animal sauvage (singe, jakal, chauve souris…)"
+msgstr ""
+
+msgid "Inconnue"
+msgstr ""
+
+msgid "Contact de moins de 10 jours"
+msgstr ""
+
+msgid "Animal mort"
+msgstr ""
+
+msgid "Pas de prophylaxie post-exposition pour la rage nécéssaire"
+msgstr ""
+
+msgid "toujours vivant après 10 jours"
+msgstr ""
+
+msgid "<u>Demander</u> si l'animal est toujours vivant après 10 jours"
+msgstr ""
+
+msgid "Doméstique (chien, chat, chèvre,…)"
+msgstr ""
+
+msgid "<u>Demander</u> Quelle espece est responsable du contact"
+msgstr ""
+
+msgid ""
+"III: morsures ou égratignures transdermiques uniques ou multiples,\n"
+"contamination d'une muqueuse ou d'une peau éraflée par la salive d'un animal\n"
+"léché, expositions dues à un contact direct avec des chauves-souris\n"
+"(exposition grave)"
+msgstr ""
+
+msgid ""
+"II: grignotage de la peau non couverte, égratignures ou abrasions mineures\n"
+"sans saignement (exposition)"
+msgstr ""
+
+msgid ""
+"I: toucher ou nourrir des animaux, lécher des animaux sur une peau intacte\n"
+"(pas d'exposition)"
+msgstr ""
+
+msgid "<u>Demander</u> Quelle est la catégorie de contact:"
+msgstr ""
+
+msgid ""
+"Evaluation rage: classification (catégorie de contact) et PEC et notification:\n"
+"laver la plaie avec eau et savon pour 10 min"
+msgstr ""
+
+msgid "Autres animaux"
+msgstr ""
+
+msgid ""
+"Informer le médécin traitant pour evaluation du traitement\n"
+"antibiotiques et serum antitetanique(SAT)"
+msgstr ""
+
+msgid "Reptiles, rongeur (souris, rat)"
+msgstr ""
+
+msgid ""
+"Administration antivénimeux si genre de serpent connu ou non\n"
+"Informer le médécin traitant pour evaluation\n"
+"Le cas échéant, procéder à la référence\n"
+"Pour renforcement des capacités, consulter le Vapaguide\n"
+"(https://www.vapaguide.info/)"
+msgstr ""
+
+msgid "Serpents"
+msgstr ""
+
+msgid "Humain"
+msgstr ""
+
+msgid "De quel animal  ?"
+msgstr ""
+
+msgid "Morsure / griffure"
+msgstr ""
+
+msgid "Notion ou histoire de plaies / lésions/ puncture récente"
+msgstr ""
+
+msgid "path: Alcool"
+msgstr ""
+
+msgid "Aucune de ces zones"
+msgstr ""
+
+msgid "les/un membre(s)"
+msgstr ""
+
+msgid "le dos"
+msgstr ""
+
+msgid "trauma ventre"
+msgstr ""
+
+msgid "non"
+msgstr ""
+
+msgid "signe pour pneumothorax de tension"
+msgstr ""
+
+msgid ""
+"signe pour pneumothorax de tension: Consulter médecin traitant pour appliquer\n"
+"traitement"
+msgstr ""
+
+msgid "oui"
+msgstr ""
+
+msgid ""
+"Auscultation des poumons: détecter l’absence des&nbsp; bruits respiratoire "
+"partiels ou généralisés"
+msgstr ""
+
+msgid ""
+"Est-ce qu’il y a des:\n"
+"Mouvements thoraciques asymmetriques et notion \n"
+"ou histoire de traumatisme ou blessures/ brulures extensives au thorax"
+msgstr ""
+
+msgid "path: Dificulté réspiratoire severe ?"
+msgstr ""
+
+msgid "l’abdomen"
+msgstr ""
+
+msgid "le thorax"
+msgstr ""
+
+msgid ""
+"<h4> Traumatisme</h4>\n"
+"\n"
+"* Protéger la colonne cervicale en cas de trauma suspecté, autrement mettre le patient en position latérale de sécurité ou aidez-le à se mettre dans une position favorisant la respiration"
+msgstr ""
+
+msgid "la tête/cou/rachis cervical"
+msgstr ""
+
+msgid "Quelles parties du corp ont été touchés"
+msgstr ""
+
+msgid "Accident /chutes / bagare / choc violent"
+msgstr ""
+
+msgid "<u>Demander</u> si la patient a une histoire de trauma:"
+msgstr ""
+
+msgid "path: Historie de Trauma"
+msgstr ""
+
+msgid ""
+"Pas d'amélioraton si Série de crises convulsives sont sans reprise complète "
+"de la conscience entre les crises ou crise ininterrompue de plus de 30 "
+"minutes"
+msgstr ""
+
+msgid ""
+"Y-a-il eu des améliorations aprés l'administation du médicament (deux "
+"tentative maximum)"
+msgstr ""
+
+msgid ""
+"i disponible Midazolam IM 5-20mg chez l'adúlte en sub-linguale\n"
+"Ou\n"
+"Diazepam\n"
+"10mg\n"
+"réctale si disponible"
+msgstr ""
+
+msgid ""
+"-Serum salé 0.9% 500ml\n"
+"-Serum glucose 5% (OR) 500 ml\n"
+"Diazepam IV 10mg adulte ou 1mg/année enfants"
+msgstr ""
+
+msgid "Perfusion intraveineuse presente?"
+msgstr ""
+
+msgid "Crise convulsive"
+msgstr ""
+
+msgid "Antécedant d’epílepsie."
+msgstr ""
+
+msgid "path: Femme"
+msgstr ""
+
+msgid "Traumatisme crânien et ou cervicale dù à la perte de connaissance"
+msgstr ""
+
+msgid ""
+"<div>Demander :</div><div>Si la blessure est survenue avant la crise "
+"convulsive?</div>"
+msgstr ""
+
+msgid ""
+"<div>Examiner en recherchant :&nbsp;</div><div>&nbsp;Une blessure a la tête "
+"ou au cou (</div><span style=\"color: rgb(255, 25, 41);\">Histoire de "
+"traumatisme tête</span><span style=\"background-color: "
+"initial;\">)</span><span style=\"color: rgb(255, 25, 41);\"><br></span>"
+msgstr ""
+
+msgid ""
+"<div>Observer :&nbsp;&nbsp;</div><div><br></div><div>Si la crise est en "
+"cours:</div>"
+msgstr ""
+
+msgid ""
+"Le patient a-t-il des pertes de connaissance ou de convulsions (passés ou "
+"présent)?&nbsp;"
+msgstr ""
+
+msgid ""
+"<h4>Corriger l'hypoglycémie sevère</h4>\n"
+"\n"
+"* Patient avec troubles de la conscience:\n"
+"donner 1 ml/kg Glucose 50% en IV lente (3-5 min)\n"
+"après dilution de serum physiologie  ou SG 5%\n"
+"à 2 ml/kg\n"
+"\n"
+"* Si le Patient est conscient et capable d'avaler : 15-20g de sucre (3-4 morceaux de sucre) ou boisson sucrée (eau sucrée, jus de fruit)\n"
+"\n"
+"* SI pas possible par voie orale: placer une sonde nasogastrique: dextrose 10%, 5ml/kg (ajouter 1 part 50% dextrose eau à 4 parts eau pour dilution 10%)."
+msgstr ""
+
+msgid "Hypoglycemie probable"
+msgstr ""
+
+msgid "Sueur"
+msgstr ""
+
+msgid "Fatigue, somnolence"
+msgstr ""
+
+msgid "Essoufflement"
+msgstr ""
+
+msgid "Vertiges"
+msgstr ""
+
+msgid "Signe clinique d'hypoglycemie"
+msgstr ""
+
+msgid "path: Trouble de la conscience"
+msgstr ""
+
+msgid "Hyperglycemie"
+msgstr ""
+
+msgid "<span>Le patient est-il a jeun ?&nbsp;</span>"
+msgstr ""
+
+msgid ""
+"<h4>Corriger l'hypoglycémie</h4>\n"
+"\n"
+"Patient conscient, solution glucose: 3 cuillères de thé de sucre (15g) en\n"
+"200ml de l'eau, 5ml/kg\n"
+"\n"
+"* SI pas possible par voie orale: placer une sonde nasogastrique: dextrose 10%, 5ml/kg (ajouter 1 part 50% dextrose eau à 4 parts eau pour dilution 10%).\n"
+"\n"
+"* Si Alcool ou malnutrition adultes: donner thiamine (100mg IV/IM) AVANT IV glucose"
+msgstr ""
+
+msgid "path: Glycemie < 45 ?"
+msgstr ""
+
+msgid "<u>Mesurer</u> et entrer la glycémie du patient en mg/dl ?"
+msgstr ""
+
+msgid "<span>Pouvez-vous mesurer la glycémie du patient ?</span>"
+msgstr ""
+
+msgid "path: pas de reaction ou réaction qu'au stimulus douleur"
+msgstr ""
+
+msgid "pas de reaction ou réaction qu'au stimulus douleureux"
+msgstr ""
+
+msgid "U (Unconscience) : Inconscience (Aucune réaction)"
+msgstr ""
+
+msgid "P (Pain) : Douleur (réaction à une stimulation douloureuse)"
+msgstr ""
+
+msgid "V (Voice) : Ordres (répond aux ordres, mais n'est pas cohérente)"
+msgstr ""
+
+msgid "A (Alerte) : Éveillé (conscience normale)"
+msgstr ""
+
+msgid "<u>Examier</u> et indiquer le  score AVPU"
+msgstr ""
+
+msgid "AVPU"
+msgstr ""
+
+msgid "path: AVPU"
+msgstr ""
+
+msgid "path: Signe de danger C sans choc"
+msgstr ""
+
+msgid "path: Signe de danger C and D"
+msgstr ""
+
+msgid "Symptomes: Réspiration"
+msgstr ""
+
+msgid "path: signe de danger C"
+msgstr ""
+
+msgid "path: Symptome :Réspiration"
+msgstr ""
+
+msgid ""
+"<h3>EVALUATION voies aériennes, respiratoires dans les 10 à 15 premières\n"
+"minutes A, B</h3>\n"
+"\n"
+"* MESURER: Saturation d'oxygène (SpO2) si possible\n"
+"\n"
+"<h4>Position:</h4>\n"
+"\n"
+"* En cas de vomissements / risque d’aspiration:  tourner sur le côté et garantir le dégagement des voies aériennes\n"
+"\n"
+"* Si difficultées respiratoires et suspicion O.A.P. ou insuffisance cardiaque ou asthme: Maintenir le malade en position semi-assise à (45°) ou plus position plus comfortable\n"
+"\n"
+"* Si patient inconscient ou suspicion choc: Position 2: Maintenir le malade en position allongé, les jambes surélévées\n"
+"\n"
+"* Femmes / filles enceinte:  tourner sur le côté gauche (décubitus latérale gauche)\n"
+"\n"
+"\n"
+"<h4>Suivre</h4>"
+msgstr ""
+
+msgid "Assister la réspiration Maintenant"
+msgstr ""
+
+msgid "Detresse réspiratoire avec Désaturation"
+msgstr ""
+
+msgid "path: <90"
+msgstr ""
+
+msgid "<u>Mesurer</u> la saturation en oxygène (O2) end %?"
+msgstr ""
+
+msgid ""
+"Est-il possible de mesuré la&nbsp;<span style=\"text-align: "
+"center;\">saturation en oxygène spO2)</span>"
+msgstr ""
+
+msgid "path: <10"
+msgstr ""
+
+msgid "<u>Mesurer</u> la fréquence respiratoire par minute ?"
+msgstr ""
+
+msgid "Mesure réspiration"
+msgstr ""
+
+msgid "classification choc"
+msgstr ""
+
+msgid "path: Mesure réspiration"
+msgstr ""
+
+msgid ""
+"<h2>Traitement de stabilisation des signes de danger A/B</h2>\n"
+"\n"
+"* Donner de l’oxygène (si disponible) 5-8l/min\n"
+"\n"
+"* Si détresse : ventiller avec masque\n"
+"\n"
+"* Si suspicion allergie/ anaphylaxie : prise des médicaments, vaccins, piqures insecte, donner un traitement anaphylaxie / allergie"
+msgstr ""
+
+msgid ""
+"<h4>Crise d’asthme possible moins de 4 heures </h4>\n"
+"\n"
+"2-4 bouffées de <u>Salbutamol</u> toutes les 20 à 30 minutes, jusqu’à 10\n"
+"bouffées si nécessaire\n"
+"\n"
+"Une dose de 1 à 2 mg/kg <u>Prednisolone</u> PO (Guide clinique MSF)"
+msgstr ""
+
+msgid "path: Respiration sifflante >0"
+msgstr ""
+
+msgid "Corps étranger présent ?"
+msgstr ""
+
+msgid ""
+"<h4> Obstruction des voies aériennes moins de 4 heures</h4>\n"
+"\n"
+"Vérifier s'il y a des obstruction des voies aérienne\n"
+"\n"
+"* Libérer les voies respiratoires obstruées\n"
+"\n"
+"* <u>En cas d’un corps étranger plus bas:</u> manœuvre de Heimlich: se placer derrière le patient. Mettre un poing fermé sous les côtes dans le creux de l'estomac. Placer l'autre main sur le poing et exercer une traction rapide vers soi et vers le haut pour comprimer les poumons. Effectuer une à cinq fois cette manœuvre pour déloger l’objet."
+msgstr ""
+
+msgid "count: >0"
+msgstr ""
+
+msgid "Oedema"
+msgstr ""
+
+msgid ""
+"save: Voies aériennes A et respiration B\n"
+"CHERCHER Obstru::Etouffement"
+msgstr ""
+
+msgid ""
+"save: Voies aériennes A et respiration B\n"
+"CHERCHER Obstru::Respiration sifflante"
+msgstr ""
+
+msgid "choc"
+msgstr ""
+
+msgid ""
+"<div style=\"font-size: 11px;\"><div>Position:</div><div>Si difficultées ou "
+"détresse respiratoires et suspicion O.A.P. ou insuffisance cardiaque "
+"(crachats mousseux, rosés, râles, geignements) ou asthme: Maintenir le "
+"malade en position assise à 45° ou plus position plus "
+"comfortable</div><div>Si patient inconscient ou suspicion choc: Position 2: "
+"Maintenir le malade en position allongé, les jambes "
+"surélévées,&nbsp;</div><div>En cas de vomissements / risque "
+"d’aspiration:&nbsp; tourner sur le côté et garantir le dégagement des voies "
+"aériennes</div><div>Femmes / filles enceinte:&nbsp; tourner sur le côté "
+"(côté gauche)</div></div>"
+msgstr ""
+
+msgid ""
+"<u> Choc</u> MESURER et surveiller : saturation d'oxygène (SpO2), FR, TA,\n"
+"pouls, glycémie, temp, AVPU\n"
+"Maintenir le patient au chaud en cas de froideur des extrémités\n"
+"Si difficultées respiratoires ou SpO2: donner de l’oxygène (si disponible)\n"
+"5-8l/min\n"
+"Mettre une voie veineuse péripherique de gros calibre (16G): 1litre en bolus\n"
+"Si détresse respiratoire ventilation avec masque"
+msgstr ""
+
+msgid "Hypotension"
+msgstr ""
+
+msgid "path: systolique >= 180 ou diastolic >=110"
+msgstr ""
+
+msgid "Tension arterielle diastolique abolie"
+msgstr ""
+
+msgid "<u>Mesurer</u> la Tension diastolique en mmHg?"
+msgstr ""
+
+msgid "path: pouls>110"
+msgstr ""
+
+msgid ""
+"si la mesure de la Tension arterielle systolique n'est pas possible, cochez la\n"
+"case ci-dessous:"
+msgstr ""
+
+msgid "Cannot be selected with a value entered above"
+msgstr ""
+
+msgid "NO_LABEL"
+msgstr ""
+
+msgid "<u>Mesurer</u> la Tension artérielle systolique en mmHg?"
+msgstr ""
+
+msgid "<u>Mesurer</u> le pouls en nombre de pulsations par minute ?"
+msgstr ""
+
+msgid "Normal ou Fort"
+msgstr ""
+
+msgid "Faible"
+msgstr ""
+
+msgid "Très faible / abolie / imprenable"
+msgstr ""
+
+msgid "<u>Jugez</u> le pouls"
+msgstr ""
+
+msgid "Tension et choc (signe dange C)"
+msgstr ""
+
+msgid "save: Histoir d'une seule ou de plusieurs crises"
+msgstr ""
+
+msgid ""
+"save: Situtation/diagnostique su patient lors du précede::hypertension dans "
+"les dernier jours"
+msgstr ""
+
+msgid "Difficultées réspiratoire"
+msgstr ""
+
+msgid "Oedème / gonflement visage, bouche, cou"
+msgstr ""
+
+msgid "Etouffement"
+msgstr ""
+
+msgid "Stridor"
+msgstr ""
+
+msgid "Respiration sifflante"
+msgstr ""
+
+msgid "Incapacité de parler"
+msgstr ""
+
+msgid "Obstruction des voies aériennes: Corps étranger, vomissement, sang"
+msgstr ""
+
+msgid ""
+"Voies aériennes A et respiration B\n"
+"CHERCHER Obstruction des voies aériennes:"
+msgstr ""
+
+msgid "Signe de danger A"
+msgstr ""
+
+msgid "Ictère"
+msgstr ""
+
+msgid "Saignements vaginaux"
+msgstr ""
+
+msgid "Pré-éclampsie / éclampsie"
+msgstr ""
+
+msgid "path: Signe de danger"
+msgstr ""
+
+msgid "Signes: Réspiration"
+msgstr ""
+
+msgid "Diabete"
+msgstr ""
+
+msgid "Gynecologie"
+msgstr ""
+
+msgid "fièvre thyphoide"
+msgstr ""
+
+msgid "mal à la tête"
+msgstr ""
+
+msgid "Abdominaux: Symptomes"
+msgstr ""
+
+msgid "Signe de danger femmes"
+msgstr ""
+
+msgid "Mesure glycemie"
+msgstr ""
+
+msgid "Traumatisme"
+msgstr ""
+
+msgid "Fiévre"
+msgstr ""
+
+msgid "Paleur"
+msgstr ""
+
+msgid "Signes: Abdominaux"
+msgstr ""
+
+msgid "Symptomes: Uro"
+msgstr ""
+
+msgid "IST"
+msgstr ""
+
+msgid "Accuns des symptômes ci dessus"
+msgstr ""
+
+msgid "path: Mesure Tension"
+msgstr ""
+
+msgid "Histoir d'une seule ou de plusieurs crises"
+msgstr ""
+
+msgid "hypertension dans les dernier jours"
+msgstr ""
+
+msgid "No"
+msgstr ""
+
+msgid "Asthme modéré ou légère"
+msgstr ""
+
+msgid "Yes"
+msgstr ""
+
+msgid "Est ce que la réspiration siflante c'est amélioré ?"
+msgstr ""
+
+msgid "Test d'athmse avec du sabultanole"
+msgstr ""
+
+msgid "Situtation/diagnostique su patient lors du précedent interogatoire"
+msgstr ""
+
+msgid "réevaluation"
+msgstr ""
+
+msgid "path: Signe de danger A >0 ?"
+msgstr ""
+
+msgid ""
+"<h2>PEC Signes de danger</h2>\n"
+"\n"
+"* Ne pas laisser le patient seul\n"
+"\n"
+"* Demander de l’aide\n"
+"\n"
+"* Proteger le patient des chutes ou des blessures secondaires"
+msgstr ""
+
+msgid "save select: Signe de danger feminin"
+msgstr ""
+
+msgid "save select: Situation de la femme"
+msgstr ""
+
+msgid ""
+"save: Situation de la femme::Retard des régles après les rapports sexuels "
+"non p"
+msgstr ""
+
+msgid "Femme enceinte ou grossesse possible"
+msgstr ""
+
+msgid "Retard des régles après les rapports sexuels non protégés"
+msgstr ""
+
+msgid "save: Situation de la femme::Histoire avortement ou fausse-couche"
+msgstr ""
+
+msgid "Histoire avortement ou fausse-couche"
+msgstr ""
+
+msgid "save: Situation de la femme::Accouchement récent (post-partum)"
+msgstr ""
+
+msgid "Accouchement récent (post-partum)"
+msgstr ""
+
+msgid "save: Situation de la femme::Grossesse ou en travail"
+msgstr ""
+
+msgid "path: signe de danger >0  ?"
+msgstr ""
+
+msgid ""
+"save: Situation de la grossesse :::Grossesse non visible ou moins de 20 "
+"semaines"
+msgstr ""
+
+msgid "Grossesse non visible ou moins de 20 semaines"
+msgstr ""
+
+msgid ""
+"save: Situation de la grossesse :::Grossesse visible et/ou plus de 20 "
+"semaines"
+msgstr ""
+
+msgid "Grossesse visible et/ou plus de 20 semaines"
+msgstr ""
+
+msgid "save: Situation de la grossesse :::Contration"
+msgstr ""
+
+msgid "Contration"
+msgstr ""
+
+msgid "save: Situation de la grossesse :::En travail"
+msgstr ""
+
+msgid "En travail"
+msgstr ""
+
+msgid "Situation de la grossesse :"
+msgstr ""
+
+msgid "Grossesse ou en travail"
+msgstr ""
+
+msgid "Situation de la femme"
+msgstr ""
+
+msgid "Douleurs au ventre (haut ou bas)"
+msgstr ""
+
+msgid "save: Signe de danger feminin::Saignement vaginal anormal"
+msgstr ""
+
+msgid "Signe de danger chez la femme"
+msgstr ""
+
+msgid "path: femme"
+msgstr ""
+
+msgid "Signe de danger C"
+msgstr ""
+
+msgid "Saignement vaginal anormal"
+msgstr ""
+
+msgid "Signe de danger feminin"
+msgstr ""
+
+msgid "path: femme ?"
+msgstr ""
+
+msgid "Aucun des symptômes ci-dessus"
+msgstr ""
+
+msgid ""
+"save: En ce moment, le patient présente-t'il des signes ::[P] Douleur "
+"thoracique sévère génant la respiratio"
+msgstr ""
+
+msgid "Signe de danger P"
+msgstr ""
+
+msgid "[P] Douleur thoracique sévère génant la respiration **aigüe**"
+msgstr ""
+
+msgid ""
+"save: En ce moment, le patient présente-t'il des signes ::[P] Céphalée "
+"sévère (maux de tête sévère)"
+msgstr ""
+
+msgid "[P] Céphalée sévère (maux de tête sévère)"
+msgstr ""
+
+msgid ""
+"save: En ce moment, le patient présente-t'il des signes ::[P] Mal au ventre "
+"sévère aigüe"
+msgstr ""
+
+msgid "path: symptômes: Abdominaux"
+msgstr ""
+
+msgid "[P] Mal au ventre sévère aigüe"
+msgstr ""
+
+msgid ""
+"save: En ce moment, le patient présente-t'il des signes ::[D] Spasmes "
+"(contractures involontaires)"
+msgstr ""
+
+msgid "Signe de danger D"
+msgstr ""
+
+msgid "[D] Spasmes (contractures involontaires)"
+msgstr ""
+
+msgid "[C] Faiblesse **prononcée** , Incapable de se tenir debout"
+msgstr ""
+
+msgid ""
+"save: En ce moment, le patient présente-t'il des signes ::[C] Saignements "
+"important de plaies ou spontanés ("
+msgstr ""
+
+msgid ""
+"[C] Saignements important de plaies ou spontanés (nez, peau, dans le vomi /\n"
+"selles)"
+msgstr ""
+
+msgid ""
+"save: En ce moment, le patient présente-t'il des signes ::[C] Peau ou "
+"muqueueses cyanotique / peau et/ou sue"
+msgstr ""
+
+msgid "[C] Peau ou muqueueses cyanotique / peau et/ou sueur froid"
+msgstr ""
+
+msgid ""
+"save: En ce moment, le patient présente-t'il des signes ::[D] Déficit "
+"neurologique; trouble de conscience, d"
+msgstr ""
+
+msgid ""
+"[D] Déficit neurologique; trouble de conscience, de la parole ou moteur"
+msgstr ""
+
+msgid ""
+"save: En ce moment, le patient présente-t'il des signes ::[B] Détresse / "
+"difficulté respiratoire <b>sévère</"
+msgstr ""
+
+msgid "Signe de danger A/B"
+msgstr ""
+
+msgid "[B] Détresse / difficulté respiratoire **sévère**"
+msgstr ""
+
+msgid ""
+"save: En ce moment, le patient présente-t'il des signes ::[A] Voies "
+"respiratoires obstruées"
+msgstr ""
+
+msgid "[A] Voies respiratoires obstruées"
+msgstr ""
+
+msgid ""
+"save: En ce moment, le patient présente-t'il des signes ::[D] Convulsions  "
+"ou perte de concience"
+msgstr ""
+
+msgid "[D] Convulsions ou perte de concience"
+msgstr ""
+
+msgid "**None** cannot be selected together with choice."
+msgstr ""
+
+msgid ""
+"En ce moment, le patient présente-t'il des signes de danger menançant son "
+"prognostic vital?"
+msgstr ""
+
+msgid "save: Quel est le sexe du patient?::Feminin"
+msgstr ""
+
+msgid "Feminin"
+msgstr ""
+
+msgid "Masculin"
+msgstr ""
+
+msgid "Quel est le sexe du patient?"
+msgstr ""
+
+msgid "path: Réevaluaiton"
+msgstr ""
+
+msgid "Réevaluation (Après test, correction, stabilisation)"
+msgstr ""
+
+msgid "Nouveau cas"
+msgstr ""
+
+msgid "Ancien cas"
+msgstr ""
+
+msgid "Selon la définition du MSPXXX"
+msgstr ""
+
+msgid "La consultation est-elle ?"
+msgstr ""
+
+msgid "Signes de danger"
+msgstr ""
