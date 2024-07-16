@@ -258,11 +258,11 @@ def process_reference(node,  calculates ,used_calculates,processed_nodes, warn =
     if issubclass(node.__class__, TriccRhombusMixIn):
         if isinstance(node.reference, str) :
             logger.debug("process_reference:{}: {} ".format(node.get_name(), node.reference))
-            ref_regex=r'(\$\{[^\}]+\})'
-            lookup = re.findall(ref_regex, node.reference)
+            ref_pattern=r'(\$\{[^\}]+\})'
+            lookup = re.findall(ref_pattern, node.reference)
             if lookup and len(lookup)>0:
                 ref_list = [x[2:-1] for x in lookup]
-                expression_reference = re.sub(ref_regex,r"${{{}}}", node.reference )
+                expression_reference = re.sub(ref_pattern,r"${{{}}}", node.reference )
             else:
                 ref_list= [node.reference]
             for ref in ref_list:

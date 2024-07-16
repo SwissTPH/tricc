@@ -14,51 +14,12 @@ from tricc_oo.converters.utils import generate_id
 
     
 
-class TriccNodeCalculateBase(TriccNodeBaseModel):
-    #input: Dict[TriccOperation, TriccNodeBaseModel] = {}
-    reference: Optional[Union[List[Union[TriccNodeBaseModel,TriccStatic]], Expression]]
-    expression_reference: Optional[Union[str, TriccOperation]]
-    version: int = 1
-    last: bool = True
-
-    # to use the enum value of the TriccNodeType
-    class Config:
-        use_enum_values = True  # <--
-
-    def make_instance(self, instance_nb, activity, **kwargs):
-        # shallow copy
-        instance = super().make_instance(instance_nb, activity=activity)
-        #input = {}
-        #instance.input = input
-        expression = self.expression.copy() if self.expression is not None else None
-        instance.expression = expression
-        version = 1
-        instance.version = version
-        return instance
-
-    def __init__(self, **data):
-        super().__init__(**data)
-        self.gen_name()
-        
-    def append(self, elm):
-        reference.append(elm)
-    
-    def get_references(self):
-        if isinstance(self.reference, set):
-            return self.reference
-        elif isinstance(self.reference, list):
-            return set(self.reference)
-        elif isinstance(self.expression_reference, TriccOperation):
-            self.reference =  self.expression_reference.get_references()
-            return self.reference
-        elif self.reference:
-            raise NotImplementedError("Cannot get reference from a sting")
 
 
 class TriccNodeDisplayCalculateBase(TriccNodeCalculateBase):
-    save: Optional[str]  # contribute to another calculate
-    hint: Optional[str]  # for diagnostic display
-    help: Optional[str]  # for diagnostic display
+    save: Optional[str] = None  # contribute to another calculate
+    hint: Optional[str] = None  # for diagnostic display
+    help: Optional[str] = None  # for diagnostic display
     # no need to copy save
     def to_fake(self):
         data = vars(self)

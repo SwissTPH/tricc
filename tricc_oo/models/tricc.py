@@ -11,6 +11,46 @@ from strenum import StrEnum
 from .base import *
 from tricc_oo.converters.utils import generate_id
 
+class TriccNodeCalculateBase(TriccNodeBaseModel):
+    #input: Dict[TriccOperation, TriccNodeBaseModel] = {}
+    reference: Union[List[Union[TriccNodeBaseModel,TriccStatic]], Expression] = None
+    expression_reference: Union[str, TriccOperation] = None
+    version: int = 1
+    last: bool = True
+
+    # to use the enum value of the TriccNodeType
+    class Config:
+        use_enum_values = True  # <--
+
+    def make_instance(self, instance_nb, activity, **kwargs):
+        # shallow copy
+        instance = super().make_instance(instance_nb, activity=activity)
+        #input = {}
+        #instance.input = input
+        expression = self.expression.copy() if self.expression is not None else None
+        instance.expression = expression
+        version = 1
+        instance.version = version
+        return instance
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        self.gen_name()
+        
+    def append(self, elm):
+        reference.append(elm)
+    
+    def get_references(self):
+        if isinstance(self.reference, set):
+            return self.reference
+        elif isinstance(self.reference, list):
+            return set(self.reference)
+        elif isinstance(self.expression_reference, TriccOperation):
+            self.reference =  self.expression_reference.get_references()
+            return self.reference
+        elif self.reference:
+            raise NotImplementedError("Cannot get reference from a sting")
+
 
 class TriccNodeActivity(TriccNodeBaseModel):
     tricc_type: TriccNodeType = TriccNodeType.activity
@@ -169,11 +209,11 @@ class TriccNodeActivity(TriccNodeBaseModel):
 
 class TriccNodeDisplayModel(TriccNodeBaseModel):
     name: str
-    image: Optional[b64]
-    hint: Optional[Union[str, Dict[str,str]]]
-    help: Optional[Union[str, Dict[str,str]]]
-    group: Optional[Union[TriccGroup, TriccNodeActivity]]
-    relevance: Optional[Union[Expression, TriccOperation]]
+    image: Optional[b64] = None
+    hint: Optional[Union[str, Dict[str,str]]] = None
+    help: Optional[Union[str, Dict[str,str]]] = None
+    group: Optional[Union[TriccGroup, TriccNodeActivity]] = None
+    relevance: Optional[Union[Expression, TriccOperation]] = None
 
     def make_instance(self, instance_nb, activity=None):
         instance = super().make_instance(instance_nb, activity=activity)
@@ -188,9 +228,9 @@ class TriccNodeNote(TriccNodeDisplayModel):
 
 class TriccNodeInputModel(TriccNodeDisplayModel):
     required: Optional[Union[Expression, TriccOperation]] = '1'
-    constraint_message: Optional[Union[str, Dict[str,str]]]
-    constraint: Optional[Expression]
-    save: Optional[str]  # contribute to another calculate
+    constraint_message: Optional[Union[str, Dict[str,str]]] = None
+    constraint: Optional[Expression] = None
+    save: Optional[str] = None # contribute to another calculate
 
 
 class TriccNodeDate(TriccNodeInputModel):
@@ -199,8 +239,8 @@ class TriccNodeDate(TriccNodeInputModel):
 
 class TriccNodeMainStart(TriccNodeBaseModel):
     tricc_type: TriccNodeType = TriccNodeType.start
-    form_id: Optional[str]
-    process: Optional[str]
+    form_id: Optional[str] = None
+    process: Optional[str] = None
 
 
 class TriccNodeLinkIn(TriccNodeBaseModel):
@@ -209,7 +249,7 @@ class TriccNodeLinkIn(TriccNodeBaseModel):
 
 class TriccNodeLinkOut(TriccNodeBaseModel):
     tricc_type: TriccNodeType = TriccNodeType.link_out
-    reference: Optional[Union[TriccNodeLinkIn, triccId]]
+    reference: Optional[Union[TriccNodeLinkIn, triccId]] = None
     # no need to copy
 
 
@@ -229,7 +269,7 @@ class TriccNodeGoTo(TriccNodeBaseModel):
 class TriccNodeSelectOption(TriccNodeDisplayModel):
     tricc_type: TriccNodeType = TriccNodeType.select_option
     label: Union[str, Dict[str,str]]
-    save: Optional[str]
+    save: Optional[str] = None
     select: TriccNodeInputModel
     list_name: str
 
@@ -247,7 +287,7 @@ class TriccNodeSelectOption(TriccNodeDisplayModel):
 
 
 class TriccNodeSelect(TriccNodeInputModel):
-    filter: Optional[str]
+    filter: Optional[str] = None
     options: Dict[int, TriccNodeSelectOption] = {}
     list_name: str
 
@@ -279,8 +319,8 @@ class TriccNodeSelectMultiple(TriccNodeSelect):
 
 
 class TriccNodeNumber(TriccNodeInputModel):
-    min: Optional[float]
-    max: Optional[float]
+    min: Optional[float] = None
+    max: Optional[float] = None
     # no need to copy min max in make isntance
 
 

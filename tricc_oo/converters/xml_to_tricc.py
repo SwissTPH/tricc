@@ -235,7 +235,7 @@ def create_root_node(diagram):
             name="ms" + diagram.attrib.get("id"),
             label=elm.attrib.get("label"),
             form_id=elm.attrib.get("form_id"),
-            process=elm.attrib.get("process"),
+            process=elm.attrib.get("process") or 'main',
         )
     else:
         elm = get_tricc_type(diagram, "object", TriccNodeType.activity_start)
@@ -664,7 +664,7 @@ def add_tricc_hybrid_select_nodes(nodes, type, list, group, attributes):
             parent=elm.attrib.get("parent"),
             label=label if type != TriccNodeSelectNotAvailable else NO_LABEL,
             name=name,
-            required=True,
+            required='1',
             group=group,
             activity=group,
             list_name=(
@@ -690,7 +690,7 @@ def add_tricc_select_nodes(diagram, nodes, type, list, group, attributes):
             parent=elm.attrib.get("parent"),
             label=elm.attrib.get("label"),
             name=elm.attrib.get("name"),
-            required=True,
+            required='1',
             group=group,
             activity=group,
             list_name=TRICC_LIST_NAME.format(id),

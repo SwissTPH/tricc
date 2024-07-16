@@ -14,12 +14,12 @@ from tricc_oo.converters.utils import generate_id
 
 logger = logging.getLogger("default")
 
-Expression = constr(regex="^[^\\/]+$")
+Expression = constr(pattern="^[^\\/]+$")
 
-triccId = constr(regex="^.+$")
-triccIdList = constr(regex="^.+$")
+triccId = constr(pattern="^.+$")
+triccIdList = constr(pattern="^.+$")
 
-b64 = constr(regex="[^-A-Za-z0-9+/=]|=[^=]|={3,}$")
+b64 = constr(pattern="[^-A-Za-z0-9+/=]|=[^=]|={3,}$")
 
 TriccEdge = ForwardRef('TriccEdge')
 # data:page/id,UkO_xCL5ZjyshJO9Bexg
@@ -152,10 +152,12 @@ class TriccGroup(TriccBaseModel):
         else:
             return self.name
 
+FwTriccNodeBaseModel = ForwardRef('TriccNodeBaseModel')
+
 
 class TriccNodeBaseModel(TriccBaseModel):
     path_len: int = 0
-    group: Optional[Union[TriccGroup, TriccNodeActivity]] = None
+    group: Optional[Union[TriccGroup, FwTriccNodeBaseModel]] = None
     name: Optional[str] = None
     export_name:Optional[str] = None
     label: Optional[Union[str, Dict[str,str]]] = None
@@ -163,7 +165,7 @@ class TriccNodeBaseModel(TriccBaseModel):
     prev_nodes: Set[TriccNodeBaseModel] = set()
     expression: Optional[Union[Expression, TriccOperation]] = None  # will be generated based on the input
     expression_inputs: List[Expression] = []
-    activity: Optional[TriccNodeActivity] = None
+    activity: Optional[FwTriccNodeBaseModel] = None
     ref_def: Optional[Union[int,str]]  = None# for medal creator
 
     class Config:

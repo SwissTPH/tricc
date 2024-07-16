@@ -5,22 +5,26 @@
       "name": "Main",
       "type": "python",
       "request": "launch",
-      "program": "main.py",
+      "program": "tests/build.py",
       "args": [
         "-i",
-        "/home/rukshan/Downloads/adult_v31.drawio",
+        "/home/delcpa/Development/cht-chad/forms/app/adult_v31.drawio",
         "-l",
         "d",
         "-o",
-        "/home/rukshan/Documents/repos/tricc/output/",
+        "/home/delcpa/Development/tricc-mage/output",
         "-t",
         "-O",
         "XLSFormCHTStrategy",
         "-D",
-        "/home/rukshan/Documents/repos/tricc/output/"
+        "/home/delcpa/Development/tricc-mage/output"
       ],
       "console": "integratedTerminal",
-      "justMyCode": true
+      "justMyCode": true,
+      "env":{
+        "PYTHONPATH": "${workspaceFolder}${pathSeparator}${env:PYTHONPATH}"
+
+      }
     },
     {
       "name": "TEST",
