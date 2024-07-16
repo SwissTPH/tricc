@@ -3,8 +3,9 @@ from tricc_og.models.base import (
     TriccBaseModel,
     TriccMixinRef,
     add_flow,
+    to_scv
 )
-from tricc_og.models.tricc import TriccNodeType, to_scv
+from tricc_og.models.tricc import TriccNodeType
 from tricc_og.builders.utils import generate_id
 logger = logging.get_logger(__name__)
 ## Process edges

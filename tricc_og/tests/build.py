@@ -131,13 +131,12 @@ if __name__ == "__main__":
     strategy = globals()[input_strategy](in_filepath)
     logger.info(f"build the graph from strategy {input_strategy}")
     media_path = os.path.join(out_path, "media-tmp")
-    try:
-        project = strategy.execute(in_filepath, media_path)
-    except Exception as e:
-        logger.error(f"in strategy {output_strategy} failed with {e}")
-        exit(-1)
+    #try:
+    project = strategy.execute(in_filepath, media_path)
+    #except Exception as e:
+    #    logger.error(f"in strategy {input_strategy} failed with {e}")
+    #    exit(-1)
     strategy = globals()[output_strategy](out_path)
-
     logger.info("Using strategy {}".format(strategy.__class__))
     logger.info("update the node with basic information")
     # create constraints, clean name

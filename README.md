@@ -18,6 +18,7 @@
 ### calculate
 
     tricc_type: calculate
+
 ### Negate/Exclusive
 
     tricc_type:not
@@ -186,11 +187,10 @@ the Rhombus act as an AND between its imputs and its reference BUT it is an OR b
 
 
 # READ Xressource
+
 https://jgraph.github.io/drawio-tools/tools/convert.html
 
-
 option can have only incoming edge from images to be placed as option$
-
 
 # Note
 
@@ -204,7 +204,6 @@ option can have only incoming edge from images to be placed as option$
 
 ### if the node is a calculate [get_node_expression, calculate = true]
 
-    
     then we calculate based on the previous nodes: [get_prev_node_expression]
         - if a "fake" calculate (Rhombus, exclusion) then get the underlying expression (should not depend of Calcualte = true) [get_calculation_terms]
         - if a Select, manage it as a calculate too (should not depend of Calcualte = true) [get_calculation_terms]

@@ -5,6 +5,7 @@ import logging
 from networkx import MultiDiGraph
 from strenum import StrEnum
 from enum import auto
+from tricc_og.models.tricc import TriccNodeType
 
 TriccCode = constr(regex="^.+$")
 TriccSystem = constr(regex="^.+$")
@@ -59,6 +60,14 @@ class AttributesMixin(BaseModel):
     attributes: Dict[str, Union[str, SelfTriccBaseModel]] = {}
 
 
+SelfTriccMixinContext = ForwardRef("TriccContext")
+
+
+class TriccContext(TriccMixinRef, TriccTypeMixIn, AttributesMixin):
+    # context: SelfTriccMixinContext = None
+    label: str
+
+
 class TriccBaseModel(TriccMixinRef, AttributesMixin, TriccTypeMixIn):
     def __str__(self):
         return self.__resp__()
@@ -68,6 +77,7 @@ class TriccBaseModel(TriccMixinRef, AttributesMixin, TriccTypeMixIn):
 
     instantiate: SelfTriccBaseModel = None
     instances: List[SelfTriccBaseModel] = []
+    context: TriccContext = None
     label: str = ""
     
     class Config:
@@ -142,12 +152,6 @@ class TriccOperation(BaseModel):
             raise NotImplementedError(f"cannot manage {self.reference.__class__}")
 
 
-SelfTriccMixinContext = ForwardRef("TriccContext")
-
-
-class TriccContext(TriccMixinRef, TriccTypeMixIn, AttributesMixin):
-    context: SelfTriccMixinContext = None
-    label: str
 
 
 class TriccDataModel(TriccBaseAbstractModel):
@@ -167,6 +171,10 @@ class FlowType(StrEnum):
 
 
 class TriccActivity(TriccBaseModel):
+    
+    def __resp__(self):
+        return super().__resp__()
+    
     # TODO: how to define the default/ main outputs
     data_inputs: Set[TriccDataInputModel] = set()
     process_output: TriccOperation = None
@@ -215,7 +223,8 @@ class TriccProject(TriccBaseAbstractModel, TriccContext):
     impl_graph: MultiDiGraph = MultiDiGraph()
     # authored graph
     graph: MultiDiGraph = MultiDiGraph()
-    
+    # list of context:
+    contexts : Set[TriccContext] = set()
     # TODO manage trad properly
     def get_keyword_trad(keyword):
         return keyword
@@ -229,3 +238,29 @@ class TriccProject(TriccBaseAbstractModel, TriccContext):
     @validator("abs_graph", allow_reuse=True)
     def validate_graph(cls, value):
         validate_graph(value)
+    
+    def get_context(self, system, code, version=None):
+        for context in self.contexts:
+            if (
+                code == context.code and
+                system == context.system and
+                version == context.version
+            ):
+                return context 
+        context = TriccContext(
+                code=code,
+                system=system,
+                version=version,
+                label=code,
+                type_scv=TriccMixinRef(system="tricc_type", code=str(TriccNodeType.context)),
+            )
+        self.contexts.add(context)
+        return context
+
+
+def to_scv(tricc_node_type):
+    if isinstance(tricc_node_type, TriccNodeType):
+        return TriccMixinRef( 
+            system='tricc_type',
+            code=tricc_node_type
+        )

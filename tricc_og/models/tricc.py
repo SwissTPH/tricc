@@ -1,5 +1,4 @@
 from strenum import StrEnum
-from .base import TriccMixinRef
 
 
 class TriccNodeType(StrEnum):
@@ -39,9 +38,4 @@ class TriccNodeType(StrEnum):
     context = 'context'
 
 
-def to_scv(tricc_node_type):
-    if isinstance(tricc_node_type, TriccNodeType):
-        return TriccMixinRef( 
-            system='tricc_type',
-            code=tricc_node_type
-        )
+

@@ -2,11 +2,7 @@ import logging
 from networkx import MultiDiGraph, union
 from tricc_og.builders.drawio_type_map import TYPE_MAP
 
-from tricc_og.builders.utils import (
-    remove_html,
-    clean_str,
-    generate_id
-)
+from tricc_og.builders.utils import remove_html, clean_str, generate_id
 from tricc_og.models.base import (
     TriccMixinRef,
     TriccActivity,
@@ -50,14 +46,11 @@ def create_activity(project, diagram, media_path):
             code=get_drawio_name(diagram),
             system=project.code,
             label=name,
-            attributes={
-               'form_id': form_id,
-               'id': drawio_id
-               },
+            attributes={"form_id": form_id, "id": drawio_id},
             elements=nodes,
             graph=graph,
         )
-        
+
         get_edges(diagram, activity)
         project.graph = union(project.graph, activity.graph)
     else:
@@ -67,10 +60,7 @@ def create_activity(project, diagram, media_path):
 def get_nodes(diagram, activity):
     graph = MultiDiGraph()
     for tricc_type in TYPE_MAP:
-        list = get_tricc_type_list(
-            diagram,
-            TYPE_MAP[tricc_type]["objects"],
-            tricc_type)
+        list = get_tricc_type_list(diagram, TYPE_MAP[tricc_type]["objects"], tricc_type)
         add_tricc_base_node(
             graph,
             tricc_type,
@@ -106,10 +96,7 @@ def get_nodes(diagram, activity):
 
 def get_node_by_attibute(nodes, attribute_name, attribute_value):
     filtered = list(
-        filter(
-            lambda n: n.attributes[attribute_name] == attribute_value,
-            nodes
-        )
+        filter(lambda n: n.attributes[attribute_name] == attribute_value, nodes)
     )
     if filtered:
         return filtered[0]
@@ -124,7 +111,7 @@ def set_additional_attributes(node, elm, attribute_names):
     for attributename in attribute_names:
         attribute = elm.attrib.get(attributename)
         if attribute is not None:
-            # input expression can add a condition to either 
+            # input expression can add a condition to either
             # relevance (display) or calculate expression
             if attributename == "expression_inputs":
                 attribute = [attribute]
@@ -160,8 +147,7 @@ def get_select_options(diagram, select_node, nodes):
             code=name,
             system=select_node.get_name(),
             type_scv=TriccMixinRef(
-                system="tricc_type",
-                code=str(TriccNodeType.select_option)
+                system="tricc_type", code=str(TriccNodeType.select_option)
             ),
             label=elm.attrib.get("label"),
             attributes={
@@ -218,14 +204,10 @@ def set_mandatory_attribute(node, elm, mandatory_attributes):
             )
             if mandatory_attributes == "source":
                 if elm.attrib.get("target") is not None:
-                    logger.error(
-                        f"the attribute target is {elm.attrib.get('target')}"
-                    )
+                    logger.error(f"the attribute target is {elm.attrib.get('target')}")
             elif mandatory_attributes == "target":
                 if elm.attrib.get("source") is not None:
-                    logger.error(
-                        f"the attribute target is {elm.attrib.get('source')}"
-                    )
+                    logger.error(f"the attribute target is {elm.attrib.get('source')}")
             exit()
         if attributes == "link":
             value = clean_link(attribute_value)
@@ -244,6 +226,7 @@ def clean_link(link):
     link_parts = link.split(",")
     if link_parts[0] == "data:page/id" and len(link_parts) == 2:
         return link_parts[1]
+
 
 # TODO support group
 # TODO support contained including images
@@ -314,14 +297,10 @@ def get_message(elm, activity):
                 code=get_drawio_name(elm),
                 system=activity.system,
                 label=elm.attrib.get("label"),
-                type_scv=TriccMixinRef(
-                    system="tricc_type",
-                    code=str(tricc_type)
-                ),
+                type_scv=TriccMixinRef(system="tricc_type", code=str(tricc_type)),
                 context=activity,
                 attributes={
                     "parent": elm.attrib.get("parent"),
                     "id": elm.attrib.get("id"),
                 },
             )
-

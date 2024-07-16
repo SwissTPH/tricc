@@ -82,9 +82,3 @@ instance
  - "id": ,
  - "children":  to nodes (QS id or in condition of another question)
  - "final_diagnosis_conditions": null --> question conditionned by df
-
- # building Steps:
-
-1. read source
-
-2. 
