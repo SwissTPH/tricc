@@ -1,5 +1,5 @@
 import logging
-from tricc_og.models.base import TriccMixinRef, FlowType, TriccBaseModel
+from tricc_og.models.base import TriccMixinRef, FlowType, TriccBaseModel, to_scv_str
 
 logger = logging.getLogger(__name__)
 
@@ -7,12 +7,12 @@ def get_element(graph, system, code, version=None, instance=None, white_list=Non
     try:
         if not white_list:
             # list(filter(lambda x: hasattr(x, 'attributes')  and  'id' in x.attributes and x.attributes == code, set_of_elements))
-            ref = TriccMixinRef(
+            ref = to_scv_str(
                 code=code,
                 system=system,
                 version=version,
                 instance=instance
-            ).__resp__()
+            )
             match = graph.nodes[ref]
             if match:
                 return match['data']
@@ -37,7 +37,7 @@ def get_element(graph, system, code, version=None, instance=None, white_list=Non
 
 
 def get_elements(graph, system, code, version=None):
-    ref = TriccMixinRef(code=code, system=system, version=version).__resp__()
+    ref = TriccMixinRef(code=code, system=system, version=version).scv()
     return [ n[1]['data'] for n in filter(lambda node:  node[0].startswith(ref), graph.nodes(data=True))]
 
 
@@ -54,9 +54,9 @@ def add_flow(
     if label:
         attributes['label'] = label
     if not isinstance(from_, (str, int)):
-        from_ = from_.__resp__()
+        from_ = from_.scv()
     if not isinstance(to_, (str, int)):
-        to_ = to_.__resp__()
+        to_ = to_.scv()
     graph.add_edge(
         from_,
         to_,

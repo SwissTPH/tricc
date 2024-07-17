@@ -183,7 +183,7 @@ def add_tricc_base_node(
 
         set_mandatory_attribute(node, elm, mandatory_attributes)
         set_additional_attributes(node, elm, attributes)
-        graph.add_node(node.__resp__(), data=node)
+        graph.add_node(node.scv(), data=node)
 
 
 def set_mandatory_attribute(node, elm, mandatory_attributes):

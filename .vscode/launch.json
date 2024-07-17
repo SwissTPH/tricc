@@ -41,7 +41,7 @@
                 "-l","d","-t",
                 "-o","./tricc_oo/tests/data/", 
                 "-I","MedalCStrategy",
-                "-O","XLSFormCDSSStrategy"],
+                "-O","XLSFormStrategy"],
             "console": "integratedTerminal",
             "env": {"PYTHONPATH": "${workspaceFolder}/"},
         },{

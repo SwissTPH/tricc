@@ -3,7 +3,7 @@ from tricc_og.models.base import (
     TriccBaseModel,
     TriccMixinRef,
     add_flow,
-    to_scv
+    to_scv_type
 )
 from tricc_og.models.tricc import TriccNodeType
 from tricc_og.builders.utils import generate_id
@@ -13,7 +13,7 @@ logger = logging.get_logger(__name__)
 
 def process_nodes(project):
     for elm, data in project.graph.nodes(data=True):
-        if elm.type_scv == to_scv(TriccNodeType.select_yesno):
+        if elm.type_scv == to_scv_type(TriccNodeType.select_yesno):
             get_yesno_options(project, elm)
 
 
@@ -36,7 +36,7 @@ def get_yesno_options(project, select_node):
 
 def process_edges(project):
     for u, v, attrs in project.graph.edges(data=True):
-        if u.type_scv == to_scv(TriccNodeType.select_yesno):
+        if u.type_scv == to_scv_type(TriccNodeType.select_yesno):
             process_yesno_edge(project, u, v, attrs)
             
 def process_yesno_edge(u, v, attrs):            

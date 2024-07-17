@@ -18,7 +18,7 @@ from tricc_og.strategies.input.medalcreator import MedalCStrategy
 
 # from tricc_oo.serializers.medalcreator import execute
 
-#from tricc_oo.strategies.output.xls_form import XLSFormStrategy
+from tricc_og.strategies.export.xls_form import XLSFormStrategy
 #from tricc_oo.strategies.output.xlsform_cdss import XLSFormCDSSStrategy
 #from tricc_oo.strategies.output.xlsform_cht import XLSFormCHTStrategy
 
@@ -136,12 +136,12 @@ if __name__ == "__main__":
     #except Exception as e:
     #    logger.error(f"in strategy {input_strategy} failed with {e}")
     #    exit(-1)
-    strategy = globals()[output_strategy](out_path)
+    strategy = globals()[output_strategy](project, out_path)
     logger.info("Using strategy {}".format(strategy.__class__))
     logger.info("update the node with basic information")
     # create constraints, clean name
 
-    strategy.execute(start_page, pages=pages)
+    strategy.execute()
 
     if trad:
         langs.to_po_file("./trad.po")

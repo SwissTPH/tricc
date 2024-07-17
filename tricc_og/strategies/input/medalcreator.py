@@ -32,28 +32,9 @@ import random
 
 
 class MedalCStrategy(BaseInputStrategy):
-    processes = [
-        "triage",
-        "registration",
-        "emergency-care",
-        "local-urgent-care",
-        "acute-tertiary-care",
-        "history-and-physical",
-        "diagnostic-testing",
-        "determine-diagnosis",
-        "provide-counseling",
-        "dispense-medications",
-        "monitor-and-follow-up-of-patient",
-        "alerts-reminders-education",
-        "discharge-referral-of-patient",
-        "charge-for-service",
-        "record-and-report",
-    ]
-
     def execute(self, in_filepath, media_path):
         # reading input file
         # pages = {}
-        diagrams = []
         # start_pages = {}
         # read all pages
         logger.info("# Reading the input file")
@@ -104,8 +85,8 @@ class MedalCStrategy(BaseInputStrategy):
             )
         for node_id in js_diagnoses:
             import_mc_flow_from_diagnose(
-                js_diagnoses[node_id], DIAGNOSE_SYSTEM, project.graph, start
-            )             
+                js_diagnoses[node_id], DIAGNOSE_SYSTEM, project, start
+            )
 
         # make the implementation version
         make_implementation(project)
@@ -126,7 +107,7 @@ class MedalCStrategy(BaseInputStrategy):
                 js_nodes, project, start_impl, order
             )
         self.save_simple_graph(project.impl_graph, start_impl, "qs_loaded.png")
-        self.save_simple_tree(project.impl_graph, start_impl, "tree.png")
+        self.save_simple_tree(project.impl_graph, start_impl.scv(), "tree.png")
         logger.info(f"implementatin graph have {project.impl_graph.number_of_edges()} edges")
 
         # add calculate ?  how to design activity outcome ?
@@ -194,9 +175,9 @@ class MedalCStrategy(BaseInputStrategy):
         plt.savefig(filename, dpi=300)
         
         
-def hierarchical_pos(G, root, width=1., vert_gap=0.2, vert_loc=0, xcenter=0.5):
-
-    pos = {root: (xcenter, vert_loc)}
+def hierarchical_pos(G, root, width=1., pos=None, vert_gap=0.2, vert_loc=0, xcenter=0.5):
+    if not pos:
+        pos = {root: (xcenter, vert_loc)}
     neighbors = [e[1] for e in G.edges(root)]
     if len(neighbors) != 0:
         dx = width / len(neighbors) 
@@ -205,8 +186,8 @@ def hierarchical_pos(G, root, width=1., vert_gap=0.2, vert_loc=0, xcenter=0.5):
             if all([e[0] in pos for e in G.in_edges(neighbor)]):
                 nextx += dx
                 pos[neighbor] = (nextx, vert_loc - vert_gap)
-                pos.update(hierarchical_pos(G, neighbor, width=dx, vert_gap=vert_gap, 
-                                            vert_loc=vert_loc-vert_gap, xcenter=nextx))
+                hierarchical_pos(G, neighbor, pos=pos, width=dx, vert_gap=vert_gap, 
+                                            vert_loc=vert_loc-vert_gap, xcenter=nextx)
             else:
                 pass
     

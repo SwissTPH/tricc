@@ -2,6 +2,7 @@ from strenum import StrEnum
 from enum import auto
 
 
+
 # IDEALLY use ELM
 class TriccOperator(StrEnum):
     AND = auto()  # and between left and rights

@@ -1,14 +1,18 @@
-# TRICC-ON : Object networkx
+# TRICC-OG : Object networkx
 
 
 This version of Tricc is made to merge the features of the tricc-oo and the networkx library (use in legacy triccs) while using BPMN principles (https://www.youtube.com/playlist?list=PLrAWWpbaj-7JlEV3_BfBLNYdYKrpqoC68)
 
-The definitions will be slitted in 2 groups: the abstracted block definitions and the implementable definition (block and patterns).
-
+The definitions will be slitted in 3 groups: the  the abstracted block definitions (schedule/Trigger of event), the Authored block definition  and the implementable definition (block and patterns).
 
 ## Project
 
-Set of abstract Activity and authored Activity that will make an CDSS target to a specific use case. 
+Set of abstract block definition will composed only by activity without inner authored content 
+Set of authored block that will make an CDSS target to a specific use case. 
+
+upon import, the Abstract and the authored block should reflect the imported documents
+
+the Set of implementable block definition will be generated from the other 2 sets and will already define a layout strategy (TBC a layout strategy might be useful here, to achieve this, the import must contain all information required)
 
 
 Project could be composed only of abstracted elements (Guideline project)
