@@ -1,5 +1,5 @@
 import logging
-from tricc_og.models.base import TriccMixinRef, FlowType, TriccBaseModel, to_scv_str
+from tricc_og.models.base import TriccMixinRef, FlowType, TriccBaseModel, to_scv_str, TriccSCV
 
 logger = logging.getLogger(__name__)
 
@@ -65,3 +65,42 @@ def add_flow(
         **attributes
     )
 
+
+def is_ready_to_process(G, node, processed):
+    references = []
+    if hasattr(node, 'expression') and node.expression:
+        references = node.expression.get_reference()
+    return all([
+        *[e[0] in processed for e in G.in_edges(node)],
+        *[any(p.startswith(r) for p in processed) for r in references if isinstance(r, TriccSCV)]
+        ])
+
+
+
+def walktrhough_tricc_node_processed_stached(G, scv, callback, processed_nodes, stashed_nodes,
+                                  warn=False, node_path=[], **kwargs):
+    # logger.debug("walkthrough::{}::{}".format(callback.__name__, node.get_name()))
+    node = G.nodes[scv]
+    if (callback(node, processed_nodes=processed_nodes, stashed_nodes=stashed_nodes, warn=warn, node_path=node_path, **kwargs)):
+        node_path.append(node)
+        # node processing succeed 
+        if scv not in processed_nodes:
+            processed_nodes.add(scv)
+            logger.debug("{}::{}: processed ({})".format(callback.__name__, node.get_name(), len(processed_nodes)))
+        if scv in stashed_nodes:
+            stashed_nodes.remove(node)
+        #reorder_node_list(stashed_nodes, node.group)
+        stashed_nodes.update(G.successors(scv))
+    else:
+        if scv not in processed_nodes and scv not in stashed_nodes:
+            if node not in stashed_nodes:
+                stashed_nodes.insert_at_bottom(node)
+                logger.debug("{}::{}: stashed({})".format(callback.__name__, node.get_name(), len(stashed_nodes)))
+
+def walktrhough_tricc_processed_stached(G, start, callback, processed_nodes, stashed_nodes,
+                                  warn=False, node_path=[], **kwargs):
+    walktrhough_tricc_node_processed_stached(G, start, callback, processed_nodes, stashed_nodes,
+                                  warn=False, node_path=[], **kwargs)
+    while stashed_nodes:
+        walktrhough_tricc_node_processed_stached(G, stashed_nodes.pop(), callback, processed_nodes, stashed_nodes,
+                                  warn=False, node_path=[], **kwargs)
