@@ -24,8 +24,7 @@ setup(
         "xlsxwriter",
         "pandas",
         "polib",
-        "StrEnum"
-        "pip instal"
+        "StrEnum",
         ],
     #extras_require={
     #    'test': ['pytest', 'coverage'],
