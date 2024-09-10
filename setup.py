@@ -6,7 +6,7 @@ with open(os.path.join(os.path.dirname(__file__), 'README.md')) as readme:
 
 
 setup(
-    name='tricc-oo',
+    name='tricc-og',
     version='1.0.2',
     author='DHU SwissTPH httu.admin@swisstph.ch',
     description='Python library that converts XLS to Fhir SDC ressource.',
@@ -24,7 +24,9 @@ setup(
         "xlsxwriter",
         "pandas",
         "polib",
-        "StrEnum",
+        "networkx",
+        "strenum",
+        "matplotlib"
         ],
     #extras_require={
     #    'test': ['pytest', 'coverage'],
