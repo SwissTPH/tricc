@@ -16,3 +16,8 @@
 1. inject the questionsSequence
 1. load the questionsSequence edges
 1. unloop the questions 
+
+## Exporting Medal Algorithms:
+
+Use the API under:
+https://api.medal-creator.wavelab.top/api/v2/algorithms/<project-id>
