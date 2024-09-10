@@ -13,11 +13,11 @@ TriccVersion = constr(regex="^.+$")
 logger = logging.getLogger("default")
 
 
-def to_scv_str(system, code, version=None, instance=None):
+def to_scv_str(system, code, version=None, instance=None, with_instance=True):
     return (
-        f"{system}|{code}"
+        f"{system}_{code}" # here it was a pipe but I was getting './tricc_oo/tests/data/tricc|medlacreator.xlsx' so changed. Not sure of other implications so comenting FIXME
         + (f"|{version}" if version else "")
-        + (f"::{instance}" if instance else "")
+        + (f"::{instance}" if instance and with_instance else "")
     )
 
 
@@ -30,12 +30,13 @@ class TriccMixinRef(BaseModel):
     def get_name(self):
         return self.scv()
     
-    def scv(self):
+    def scv(self,with_instance=True):
         return to_scv_str(
             self.system,
             self.code,
             self.version,
-            self.instance
+            self.instance,
+            with_instance=with_instance
         )
     
     def __hash__(self):
@@ -50,6 +51,9 @@ class TriccMixinRef(BaseModel):
 
 
 class TriccTypeMixIn(BaseModel):
+    def __str__():
+        return type_scv.code
+        
     type_scv: TriccMixinRef = None
 
 
@@ -69,21 +73,50 @@ FwTriccBaseModel = ForwardRef("TriccBaseModel")
 class TriccStatic(BaseModel):
     value: Union[str, float, int]
 
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validate
+
+    @classmethod
+    def validate(cls, v):
+        if isinstance(v, cls):
+            return v
+        return cls(value=v)
+
     def __init__(self, value):
         super().__init__(value=value)
         
 class TriccSCV(BaseModel):
     value: str
 
+    def __hash__(self):
+        return hash(self.value)
+
     def __init__(self, value):
         super().__init__(value=value)
+    
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validate
+
+    @classmethod
+    def validate(cls, v):
+        if isinstance(v, cls):
+            return v
+        return cls(value=v)
 
 FwTriccOperation = ForwardRef("TriccOperation")
 
 class TriccOperation(BaseModel):
     operator: TriccOperator = TriccOperator.NATIVE
-    reference: List[Union[FwTriccOperation, TriccStatic, FwTriccBaseModel]] = []
-
+    reference: List[Union[FwTriccOperation, TriccSCV, TriccStatic, FwTriccBaseModel]] = []
+    @validator('reference', pre=True, each_item=True)
+    def validate_reference_items(cls, v):
+        if isinstance(v, (TriccOperation, TriccSCV, TriccStatic, FwTriccBaseModel)):
+            return v
+        raise ValueError(f"Invalid type in reference: {type(v)}")
+    def __str__(self):
+        return f"operator: {self.operator if self.operator else 'No operator'}, references: {self.get_references() if self.reference else 'No reference'}"
     def __init__(self, tricc_operator, reference=[]):
         operator = tricc_operator.upper() if isinstance(tricc_operator, str) else tricc_operator
         super().__init__(operator=operator, reference=reference)
@@ -94,7 +127,7 @@ class TriccOperation(BaseModel):
             for reference in self.reference:
                 if isinstance(reference, TriccOperation):
                     predecessor = predecessor | reference.get_references()
-                elif issubclass(reference.__class__, FwTriccBaseModel):
+                elif isinstance(reference, (TriccSCV, TriccBaseModel, TriccActivity, TriccTask)):
                     predecessor.add(reference)
         else:
             raise NotImplementedError("cannot find predecessor of a str")
@@ -109,7 +142,7 @@ class TriccOperation(BaseModel):
                 if isinstance(self.reference[key], TriccOperation):
                     self.reference[key].replace_node(old_node, new_node)
                 elif (
-                    issubclass(self.reference[key].__class__, FwTriccBaseModel)
+                    issubclass(self.reference[key].__class__, TriccBaseModel)
                     and self.reference[key] == old_node.scv() if hasattr(old_node, 'scv') else old_node
                 ):
                     self.reference[key] = new_node.scv() if hasattr(new_node, 'scv') else new_node
@@ -133,7 +166,8 @@ class TriccContext(TriccMixinRef, TriccTypeMixIn, AttributesMixin):
 class TriccBaseModel(TriccMixinRef, AttributesMixin, TriccTypeMixIn):
     def __str__(self):
         return self.scv()
-
+    def __repr__(self):
+        return f"{self.scv()}: {self.label} ({self.context.scv() if self.context else ''}) ; expression:{self.expression}"
     # def scv(self):
     #     return f"{self.type_scv.get_name()}:{self.get_name()}"
 
@@ -181,8 +215,8 @@ class FlowType(StrEnum):
 
 class TriccActivity(TriccBaseModel):
     
-    def scv(self):
-        return super().scv()
+    def scv(self, with_instance=True):
+        return super().scv(with_instance=True)
     
     # TODO: how to define the default/ main outputs
     data_inputs: Set[TriccDataInputModel] = set()
@@ -210,10 +244,14 @@ def validate_graph(value):
 
 
 class TriccTask(TriccBaseModel):
+    
     pass
 
 
+
 class TriccProject(TriccBaseAbstractModel, TriccContext):
+    title: str = "My project"
+    description: str = ""
     lang_code: str = "en"
     # abstract graph / Scheduling
     abs_graph: MultiDiGraph = MultiDiGraph()

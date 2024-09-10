@@ -1,12 +1,17 @@
 import logging
 
 
-from tricc_og.converters.utils import clean_name, remove_html
+from tricc_og.builders.utils import clean_name, remove_html
 from tricc_og.models.lang import SingletonLangClass
 from tricc_og.visitors.tricc_project import is_ready_to_process
-from tricc_og.models.base import TriccActivity
+from tricc_og.models.base import (
+    TriccActivity, 
+    TriccOperation, 
+    TriccStatic,
+    TriccSCV
+    )
 from tricc_og.models.paterns import TriccPaterns
-
+from tricc_og.strategies.export.base_export_strategy import BaseExportStrategy
 logger = logging.getLogger("default")
 
 langs = SingletonLangClass()
@@ -146,13 +151,18 @@ SURVEY_MAP = {
     "repeat_count": "repeat_count",
     "media::image": "image",
 }
+
+OPERATOR_MAP = {
+    "EQUAL" : '='
+}
+
 CHOICE_MAP = {"list_name": "list_name", "value": "name", **langs.get_trads_map("label")}
 
 
 TRAD_MAP = ["label", "constraint_message", "required_message", "hint", "help"]
 
 
-def generate_xls_form_export(node, processed_nodes, stashed_nodes, df_survey, df_choice,df_calculate, cur_group, **kargs):
+def generate_xls_form_export2(node, processed_nodes, stashed_nodes, df_survey, df_choice,df_calculate, cur_group, **kargs):
     # check that all prev nodes were processed
     if is_ready_to_process(node,processed_nodes):
         if node not in processed_nodes :
@@ -250,6 +260,46 @@ def generate_xls_form_export(
     cur_group,
     **kargs,
 ):
+    # check that all prev nodes were processed
+    if is_ready_to_process(G, node, processed_nodes):
+        if node not in processed_nodes :
+            logger.debug("printing node {}".format(node.get_name()))
+            # clean stashed node when processed
+            if node in stashed_nodes:
+                stashed_nodes.remove(node)
+                logger.debug("generate_xls_form_export: unstashing processed node{} ".format(node.get_name()))
+            if isinstance(node, TriccNodeSelectOption):
+                values = []
+                for column in CHOICE_MAP:
+                    values.append(get_xfrom_trad(node, column, CHOICE_MAP, True ))
+                # add only if not existing
+                if len(df_choice[(df_choice['list_name'] == node.list_name) & (df_choice['value'] == node.name)])  == 0:
+                    df_choice.loc[len(df_choice)] = values
+            elif node.tricc_type in ODK_TRICC_TYPE_MAP and ODK_TRICC_TYPE_MAP[node.tricc_type] is not None:
+                if ODK_TRICC_TYPE_MAP[node.tricc_type] =='calculate':
+                    values = []
+                    for column in SURVEY_MAP:
+                        if column == 'default' and issubclass(node.__class__, TriccNodeDisplayCalculateBase):
+                            values.append(0)
+                        else:
+                            values.append(get_xfrom_trad(node, column, SURVEY_MAP ))
+                    if len(df_calculate[df_calculate.name == get_export_name(node)])==0:
+                        df_calculate.loc[len(df_calculate)] = values
+                    else:
+                        logger.error("name {} found twice".format(node.name))
+                    
+                elif  ODK_TRICC_TYPE_MAP[node.tricc_type] !='':
+                    values = []
+                    for column in SURVEY_MAP:
+                        values.append(get_xfrom_trad(node,column,SURVEY_MAP))
+                    df_survey.loc[len(df_survey)] = values
+                else:
+                    logger.warning("node {} have an unmapped type {}".format(node.get_name(),node.tricc_type))
+            else:
+                logger.warning("node {} have an unsupported type {}".format(node.get_name(),node.tricc_type))
+            #continue walk °
+            return True
+    return False
     
     
 
@@ -673,3 +723,265 @@ def get_list_names(list):
         elif isinstance(elm, str):
             names.append(elm)
     return names
+
+def convert_basic(node):
+    name = clean_name(node.scv())
+    label = node.label
+    odk_type = node.type_scv.code
+    return (name, label, odk_type)
+
+def convert_note(G, node, processed_nodes, **kwargs):
+    odk_type = ODK_TRICC_TYPE_MAP[node.tricc_type]
+    survey.loc[len(survey)]= convert_basic(odk_type)
+    nodes_dict['type'].append()
+    pass
+
+# Create helper to generate relevance from path in graph 
+# for Activity end the relevance will be the expression if there is no expression 
+
+def convert_calculate(G, node, processed_nodes, out_strategy, **kwargs):
+    name, label, odk_type = convert_basic(node)
+
+    expressions = [
+        convert_expression(
+            data['condition'], 
+            u, 
+            G, 
+            node, 
+            processed_nodes,
+            out_strategy,
+            **kwargs) for u, v, data in G.in_edges(node, data=True)
+        ]
+    data_condition = ' or '.join(
+        expr for expr in expressions
+    )
+
+    df_survey = kwargs.get('df_survey')
+    df_survey.loc[len(df_survey)] = [
+        odk_type,
+        name,
+        label,
+        '' ,#hint
+        '' ,#help
+        '',#default
+        '',#'appearance', clean_name
+        '',#'constraint', 
+        '' ,#'constraint_message'
+        '',#'relevance'
+        '',#'disabled'
+        '',#'required'
+        '' ,#'required message'
+        '',#'read only'
+        data_condition,#'expression'
+        '',#'repeat_count'
+        ''#'image'  
+    ]
+    return df_survey
+
+def convert(G, node, processed_nodes, df_survey,df_choices , out_strategy, **kwargs):
+    if is_ready_to_process(G, node, processed_nodes):
+        if node.type_scv and node.type_scv.system + \
+            '.'+node.type_scv.code in TRICC_BUILDERS:
+            builder=node.type_scv.system +'.'+node.type_scv.code
+            TRICC_BUILDERS[builder](G, node, processed_nodes, out_strategy, df_survey=df_survey, df_choices=df_choices)
+            return True
+        elif not node.type_scv:
+            logger.error(f"{node.scv()}: missing type")
+            exit()
+        else:
+            logger.error(f"{node.scv()}: no converter for {node.type_scv}")
+            exit()
+
+def get_value(processed_nodes, ref, stategy):
+
+    if isinstance(ref, (TriccSCV, str)):
+        svc = processed_nodes.get_latest_matching_str(
+            ref.value.split('::')[0]
+        )
+        return stategy.get_tricc_operation_operand(svc)
+    else:
+        return stategy.get_tricc_operation_operand(ref)
+#Move to base export strategy?   
+def convert_expression(expression, in_node, G, node, processed_nodes, out_strategy, **kwargs ):
+    operator = expression.operator
+    ## exp is never Tricc Operation but TriccStatic
+    references =  [
+        convert_expression(
+            exp, 
+            None,
+            G,
+            node, 
+            processed_nodes, 
+            out_strategy,
+            **kwargs
+        ) if isinstance(
+                exp, 
+                TriccOperation
+        ) else get_value(processed_nodes, exp, out_strategy) for exp in expression.reference
+    ]
+    return out_strategy.OPERATOR_EXPORT[expression.operator](references)
+
+
+    #  or f'{OPERATOR_MAP[operator]}' if not isinstance(exp, TriccStatic) else exp.value
+    
+#def get_latest_instance(expression, G, node, processed_nodes, **kwargs):
+#    if isinstance(expression, TriccSCV):
+#        return get_latest_matching_str(f"{expression.value}::")
+#    else:
+#        return str(exp)
+    
+
+def convert_select_multiple(G, node, processed_nodes, startegy, **kwargs):
+        #expression =convert_expression(G, node.expression, processed_nodes, 
+        #            df_survey=df_survey, df_choices=df_choices)
+        #else: 
+        pass
+
+
+def convert_select_one(G, node, processed_nodes, strategy, **kwargs):
+    pass
+
+
+def convert_select_yesno(G, node, processed_nodes, strategy, **kwargs):
+    pass
+
+
+def convert_select_option(G,node, processed_nodes, strategy, **kwargs):
+    pass
+
+
+def convert_decimal(G,node, processed_nodes, strategy, **kwargs):
+    pass
+
+
+def convert_integer(G,node, processed_nodes, strategy, **kwargs):
+    pass
+
+
+def convert_text(G,node, processed_nodes, strategy, **kwargs):
+    pass
+
+
+def convert_date(G,node, processed_nodes, strategy, **kwargs):
+    pass
+
+
+def convert_rhombus(G,node, processed_nodes, strategy, **kwargs):
+    pass
+
+def convert_goto(G,node, processed_nodes, strategy, **kwargs):
+    pass
+
+def convert_start(G,node, processed_nodes, strategy, **kwargs):
+    pass
+
+def convert_activity_start(G,node, processed_nodes, strategy, **kwargs):
+    pass
+
+def convert_link_in(G,node, processed_nodes, strategy, **kwargs):
+    pass
+
+
+def convert_link_out(G,node, processed_nodes, strategy, **kwargs):
+    pass
+
+
+def convert_count(G,node, processed_nodes, strategy, **kwargs):
+    pass
+
+def convert_add(G,node, processed_nodes, strategy, **kwargs):
+    pass
+
+def convert_container_hint_media(G,node, processed_nodes, strategy, **kwargs):
+    pass
+
+def convert_activity(G,node, processed_nodes, strategy, **kwargs):
+    pass
+
+
+def convert_help_message(G,node, processed_nodes, strategy, **kwargs):
+    pass
+
+
+def convert_hint_message(G,node, processed_nodes, strategy, **kwargs):
+    pass
+
+
+def convert_not(G,node, processed_nodes, strategy, **kwargs):
+    pass
+
+
+def convert_end(G,node, processed_nodes, strategy, **kwargs):
+    pass
+
+
+def convert_activity_end(G,node, processed_nodes, strategy, **kwargs):
+    pass
+
+
+def convert_edge(G,node, processed_nodes, strategy, **kwargs):
+    pass
+
+
+def convert_page(G,node, processed_nodes, strategy, **kwargs):
+    pass
+
+
+def convert_not_available(G,node, processed_nodes, strategy, **kwargs):
+    pass
+
+
+def convert_quantity(G,node, processed_nodes, strategy, **kwargs):
+    pass
+
+
+def convert_bridge(G,node, processed_nodes, strategy, **kwargs):
+    pass
+
+
+def convert_wait(G,node, processed_nodes, strategy, **kwargs):
+    pass
+
+
+def convert_operation(G,node, processed_nodes, strategy, **kwargs):
+    pass
+
+def convert_context(G,node, processed_nodes, strategy, **kwargs):
+    pass
+
+
+TRICC_BUILDERS = {
+    'tricc_type.note': convert_note,
+    'tricc_type.calculate': convert_calculate,
+    'tricc_type.select_multiple': convert_select_multiple,
+    'tricc_type.select_one': convert_select_one,
+    'tricc_type.select_yesno': convert_select_yesno,
+    'tricc_type.select_option': convert_select_option,
+    'tricc_type.decimal': convert_decimal,
+    'tricc_type.integer': convert_integer,
+    'tricc_type.text': convert_text,
+    'tricc_type.date': convert_date,
+    'tricc_type.rhombus': convert_rhombus,  # fetch data
+    'tricc_type.goto': convert_goto,  #: start the linked activity within the target activity
+    'tricc_type.start': convert_start,  #: main start of the algo
+    'tricc_type.activity_start': convert_activity_start,  #: start of an activity (link in)
+    'tricc_type.link_in': convert_link_in,
+    'tricc_type.link_out': convert_link_out,
+    'tricc_type.count': convert_count,  #: count the number of valid input
+    'tricc_type.add': convert_add,  # add counts
+    'tricc_type.container_hint_media': convert_container_hint_media,  # DEPRECATED
+    'tricc_type.activity': convert_activity,
+    'tricc_type.help': convert_help_message,
+    'tricc_type.hint': convert_hint_message,
+    'tricc_type.exclusive': convert_not,
+    'tricc_type.end': convert_end,
+    'tricc_type.activity_end': convert_activity_end,
+    'tricc_type.edge': convert_edge,
+    'tricc_type.page': convert_page,
+    'tricc_type.not_available': convert_not_available,
+    'tricc_type.quantity': convert_quantity,
+    'tricc_type.bridge': convert_bridge,
+    'tricc_type.wait': convert_wait,
+    'tricc_type.operation': convert_operation,
+    'tricc_type.context': convert_context,
+}

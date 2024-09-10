@@ -36,8 +36,8 @@ MANDATORY_STAGE = [
     "first_look_assessment_step",
     "complaint_category",
 ]
-
-NODE_ID = "7356"
+# FIXME to be remoded after dev OK
+NODE_ID = "382"
 
 
 def import_mc_nodes(json_node, system, project, js_fullorder, start):
@@ -134,18 +134,24 @@ def add_flow_from_condition(
         _from = get_element(
             graph, QUESTION_SYSTEM, cond["node_id"], white_list=white_list
         )
+        # if the node start fron the activity (start) but NOT inside the that activity
+        _from_activity_end= None
+        if isinstance(_from, TriccActivity) and _from != activity:
+            ### FIXME this is not working, we might need a function to change the scv of an element
+            _from_activity_end = to_scv_str(ACTIVITY_END_SYSTEM, _from.code, _from.version, _from.instance)
         condition = None
         if not _from or "answer_id" not in cond:
             logger.error(f"node {cond['node_id']} not found")
         elif "answer_id" in cond:
             condition = TriccOperation(
                 TriccOperator.EQUAL,
-                [TriccSCV(_from.get_name()), TriccStatic(cond["answer_id"])],
+                ## Make this conditional? Either take first _from.getname() OR the second without get_name
+                [TriccSCV(_from.get_name()), TriccStatic(cond["answer_id"])]
             )
         add_flow(
             activity.graph if hasattr(activity, "graph") else graph,
             activity,
-            _from,
+            _from_activity_end if _from_activity_end != None else _from, 
             _to,
             label=None,
             condition=condition,
@@ -160,18 +166,21 @@ def import_mc_flow_from_qss(js_nodes, project, start, order):
             unprocessed = import_mc_flow_from_qs(
                 js_nodes[node_id], project, start, qs_processed
             )
+            # adding empty list to know that this node was processed once 
+            # and may need to be reprocessed if another instance if found later
             qs_processed[str(node_id)] = unprocessed or []
-
             new_activities = unloop_from_node(project.impl_graph, start, order)
+            # new activity from unlooping are not extended so we will need to do that later
             for act_code, qs_start_list in new_activities.items():
                 if act_code in qs_processed:
                     qs_processed[str(act_code)] += qs_start_list
-
+    # get the QS that have new instance to extend
     filtered_qs = dict((k, v) for k, v in qs_processed.items() if v)
     unprocess_count = 0
     while len(filtered_qs) > 0 and len(filtered_qs) != unprocess_count:
         unprocess_count = 0
         for qs_code, instances in filtered_qs.items():
+            ## Added to this condition to not call import_mc_flow_from_qs from questions
             unprocessed = import_mc_flow_from_qs(
                 js_nodes[qs_code], project, start, qs_processed, qs_impl=instances
             )
@@ -185,9 +194,6 @@ def import_mc_flow_from_qss(js_nodes, project, start, order):
 
 
 def import_mc_flow_from_qs(json_node, project, start, qs_processed, qs_impl=[]):
-    if str(json_node["id"]) == NODE_ID:
-        pass
-
     logger.info(f"loading QS {json_node['label']}")
     # 1- generate output
     # 2- generate graph
@@ -200,10 +206,10 @@ def import_mc_flow_from_qs(json_node, project, start, qs_processed, qs_impl=[]):
     if json_node["value_format"] != "Boolean":
         logger.error(f"value_format {json_node['value_format']} is not supported")
         exit(-1)
-
+    # getting the implementation of the QS
     if not qs_impl:
         qs_impl = get_elements(project.impl_graph, QUESTION_SYSTEM, json_node["id"])
-
+    # getting node defintion 
     qs_nodes = [
         get_element(project.graph, QUESTION_SYSTEM, i["id"])
         for i in json_node["instances"].values()
@@ -211,15 +217,22 @@ def import_mc_flow_from_qs(json_node, project, start, qs_processed, qs_impl=[]):
     main_result = project.graph.nodes[to_scv_str(ACTIVITY_END_SYSTEM, json_node["id"])][
         "data"
     ]
+    # for each unextended instance of the question sequence,
+    # we extend it by adding the contained node and the ActuvityEnd
     unprocessed = []
     for i in qs_impl:
         # don't load the QS if the start node is isolated/dandling
+        # because when creatin the implementation graph every QS 
+        # got at least one instance, it makes no sense to extend it now 
+        # and could messup the unlooping
         if not list(project.impl_graph.in_edges(i.scv())):
             unprocessed.append(i)
         else:
-            process_qs(
+            is_unprocessed = process_qs(
                 i, json_node, main_result, qs_nodes, project, start, qs_processed
             )
+            if is_unprocessed:
+                unprocessed.append(is_unprocessed)
     return unprocessed
 
 
@@ -248,55 +261,62 @@ def process_qs(
         paths = list(
             nx.node_disjoint_paths(project.impl_graph, start.scv(), qs_start.scv())
         )
+        # getting the list of the nodes instance that need to be used inside the QS
         i_nodes += [
             get_most_probable_instance(
                 project.impl_graph, paths, QUESTION_SYSTEM, n.code, n.version
             )
             for n in qs_nodes
         ]
-
+    # if QS start not attached to start, SHOULD NOT be use
+    # This is actually needed   
     except NetworkXNoPath:
-        i_nodes = []
-        for n in qs_nodes:
-            node = get_most_probable_instance(
-                project.impl_graph,
-                [],
-                n.system,
-                n.code,
-                version=n.version,
-                force_new=True,
-            )
-            i_nodes.append(node)
-            # in case the QS instance were already processed, save it for later
-            if n.code not in qs_processed:
-                qs_processed[str(n.code)] = []
-            qs_processed[str(n.code)].append(n)
-
+        return qs_start
+         #    i_nodes = []
+    #    for n in qs_nodes:
+    #        node = get_most_probable_instance(
+    #            project.impl_graph,
+    #            [],
+    #            n.system,
+    #            n.code,
+    #            version=n.version,
+    #            force_new=True,
+    #        )
+    #        i_nodes.append(node)
+    #        # in case the QS instance were already processed, save it for later TODO im here
+    #        if n.code not in qs_processed and isinstance(n, TriccActivity):
+    #            qs_processed[str(n.code)] = []
+    #        qs_processed[str(n.code)].append(n)
+#
     except Exception as e:
         logger.error(f"unexpected error {e}")
+        exit(-1)
     # add node to graph (if any new)
     project.impl_graph.add_nodes_from(i_nodes)
-    # rebase node following the QS after the result (before adding the internal QS node)
-    rebase_edges(project.impl_graph, qs_start, result)
-    # add the flow using the i_nodes
+    
+    # FIXME update edge condtion from node should be done arround here
+    # add the flow defined on the QS
     dandling = add_flow_from_instances(
-        project.impl_graph,
+        qs_start.graph,
         json_node["instances"].values(),
         qs_start,
         white_list=i_nodes,
     )
-
+    # attached the node that no "in" edges inside the QS
+    # we assume they are the first node inside the QS 
     for n in dandling:
-        if NODE_ID in n.scv():
-            pass
         add_flow(qs_start.graph, qs_start, qs_start.scv(), n.scv())
 
     # add calculate
     project.impl_graph.add_node(result.scv(), data=result)
+    # rebase node following the QS after the result (before adding the internal QS node)
+    rebase_edges(project.impl_graph, qs_start, result)
+
+    # "expression" of the ActivityEnd
     i_nodes.append((result.scv(), {"data": result}))
     # add calculate flow
     add_flow_from_condition(
-        project.impl_graph,
+        qs_start.graph,
         json_node["conditions"],
         result.scv(),
         qs_start,
@@ -311,9 +331,14 @@ def get_most_probable_instance(
 ):
     nodes = get_elements(graph, system, code)
     if not force_new:
+        # look if the exisitng instance of the inner node are already 
+        # in a path leading to the QS start, 
+        # if it the case it would for sure lead to a loop
         for n in nodes:
             if not any(n.scv() in path for path in paths):
                 return (n.scv(), {"data": n})
+    # no instance found that won't lead to a loop
+    # then create a new one
     if nodes:
         new = nodes[0].make_instance(sibling=True)
         return (new.scv(), {"data": new})
@@ -495,8 +520,6 @@ def unloop_from_node(graph, start, order):
             # meaning that the context of the node is not going back to the loop
             # lower the score will be more likely will be the unlooping
             for e in loop:
-                if NODE_ID in e[1] or NODE_ID in e[0]:
-                    pass
                 out_edge = list(graph.edges(e[0], keys=True, data=True))
                 in_edge = list(graph.in_edges(e[1], keys=True, data=True))
                 # avoid moving instance > 1 of e[1] for e TODO
@@ -797,12 +820,12 @@ def add_background_calculation_options(json_node):
                 opa_v = None
                 if x_node and z_node:
                     opa_v = TriccOperation("izscore")
-                    opa_v.append(x_node)
-                    opa_v.append(z_node)
+                    opa_v.append(TriccSCV(x_node))
+                    opa_v.append(TriccSCV(z_node))
                 elif x_node and y_node:
                     opa_v = TriccOperation("zscore")
-                    opa_v.append(x_node)
-                    opa_v.append(y_node)
+                    opa_v.append(TriccSCV(x_node))
+                    opa_v.append(TriccSCV(y_node))
 
                 else:
                     pass
@@ -829,7 +852,7 @@ def get_answer_operation(ref, a):
     opa = None
     val = a["value"].split(",")
     opa = TriccOperation(a["operator"])
-    opa.append(ref)
+    opa.append(TriccSCV(ref))
     expected_values = 1 + int(a["operator"] == "between")
     if len(val) != expected_values:
         raise ValueError(
@@ -845,13 +868,13 @@ def generate_cut_off_exp(js_node, node):
     if "cut_off_start" in js_node or "cut_off_end" in js_node:
         if "cut_off_start" in js_node and js_node["cut_off_start"] is not None:
             cs = TriccOperation(TriccOperator.MORE_OR_EQUAL)
-            cs.append(to_scv_str(QUESTION_SYSTEM, "age_day"))
+            cs.append(TriccSCV(to_scv_str(QUESTION_SYSTEM, "age_day")))
             cs.append(TriccStatic(js_node["cut_off_start"]))
             exp.append(cs)
 
         if "cut_off_end" in js_node and js_node["cut_off_end"] is not None:
             ce = TriccOperation(TriccOperator.LESS)
-            ce.append(to_scv_str(QUESTION_SYSTEM, "age_day"))
+            ce.append(TriccSCV(to_scv_str(QUESTION_SYSTEM, "age_day")))
             ce.append(TriccStatic(js_node["cut_off_end"]))
             exp.append(ce)
     if exp:
