@@ -40,8 +40,8 @@ class MedalCStrategy(BaseInputStrategy):
         logger.info("# Reading the input file")
 
         if os.path.isfile(in_filepath):
-            f = open(in_filepath)
-            js_full = json.load(f)
+            with open(in_filepath, encoding='utf8') as f:
+                js_full = json.load(f)
         else:
             logger.error(f"input file not found {in_filepath}")
             exit(-1)
@@ -92,12 +92,12 @@ class MedalCStrategy(BaseInputStrategy):
         make_implementation(project)
         logger.info(f"implementatin graph have {project.impl_graph.number_of_edges()} edges")
         start_impl = start.instances[0]
+        # image
         self.save_simple_graph(project.impl_graph, start_impl, "loaded.png")
         order = fullorder_to_order(js_fullorder)
-        # find cycle
         unloop_from_node(project.impl_graph, start_impl, order)
         logger.info(f"implementatin graph have {project.impl_graph.number_of_edges()} edges")
-
+        # image
         self.save_simple_graph(project.impl_graph, start_impl, "unlooped.png")
         # make QS
         # 1- create QS flow
@@ -106,6 +106,7 @@ class MedalCStrategy(BaseInputStrategy):
         import_mc_flow_from_qss(
                 js_nodes, project, start_impl, order
             )
+        # image
         self.save_simple_graph(project.impl_graph, start_impl, "qs_loaded.png")
         self.save_simple_tree(project.impl_graph, start_impl.scv(), "tree.png")
         logger.info(f"implementatin graph have {project.impl_graph.number_of_edges()} edges")

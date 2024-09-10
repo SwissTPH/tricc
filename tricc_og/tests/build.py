@@ -136,7 +136,7 @@ if __name__ == "__main__":
     #except Exception as e:
     #    logger.error(f"in strategy {input_strategy} failed with {e}")
     #    exit(-1)
-    strategy = globals()[output_strategy](project, out_path)
+    strategy = globals()[output_strategy](project, out_path, input_strategy)
     logger.info("Using strategy {}".format(strategy.__class__))
     logger.info("update the node with basic information")
     # create constraints, clean name

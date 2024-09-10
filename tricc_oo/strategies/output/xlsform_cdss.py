@@ -28,7 +28,6 @@ class XLSFormCDSSStrategy(XLSFormStrategy):
                 self.df_survey.loc[len(self.df_survey)] = get_diagnostic_line(diag)
             self.df_survey.loc[len(self.df_survey)] = get_diagnostic_none_line(diags)
             self.df_survey.loc[len(self.df_survey)] = get_diagnostic_add_line(diags, self.df_choice)
-            
             self.df_survey.loc[len(self.df_survey)] = get_diagnostic_stop_group_line()
         #TODO inject the TT flow
         

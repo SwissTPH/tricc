@@ -3,6 +3,7 @@ from tricc_og.models.base import TriccMixinRef, FlowType, TriccBaseModel, to_scv
 
 logger = logging.getLogger(__name__)
 
+
 def get_element(graph, system, code, version=None, instance=None, white_list=None):
     try:
         if not white_list:
@@ -38,7 +39,7 @@ def get_element(graph, system, code, version=None, instance=None, white_list=Non
 
 def get_elements(graph, system, code, version=None):
     ref = TriccMixinRef(code=code, system=system, version=version).scv()
-    return [ n[1]['data'] for n in filter(lambda node:  node[0].startswith(ref), graph.nodes(data=True))]
+    return [n[1]['data'] for n in filter(lambda node:  node[0].startswith(ref), graph.nodes(data=True))]
 
 
 def add_flow(
@@ -69,38 +70,50 @@ def add_flow(
 def is_ready_to_process(G, node, processed):
     references = []
     if hasattr(node, 'expression') and node.expression:
-        references = node.expression.get_reference()
+        references = node.expression.get_references()
     return all([
-        *[e[0] in processed for e in G.in_edges(node)],
-        *[any(p.startswith(r) for p in processed) for r in references if isinstance(r, TriccSCV)]
-        ])
+        *[e[0] in processed for e in list(G.in_edges(node.scv(), keys = True))],
+        *[any(p.startswith("{r}.") for p in processed) for r in references if isinstance(r, TriccSCV)]
+    ])
 
 
-
-def walktrhough_tricc_node_processed_stached(G, scv, callback, processed_nodes, stashed_nodes,
-                                  warn=False, node_path=[], **kwargs):
+def walktrhough_tricc_node_processed_stached(G, scv, callback, processed_nodes, stashed_nodes, strategy,
+                                             warn=False, node_path=[], **kwargs):
     # logger.debug("walkthrough::{}::{}".format(callback.__name__, node.get_name()))
-    node = G.nodes[scv]
-    if (callback(node, processed_nodes=processed_nodes, stashed_nodes=stashed_nodes, warn=warn, node_path=node_path, **kwargs)):
+    node = G.nodes[scv]['data']
+    df_survey = kwargs.get('df_survey')
+    df_choices = kwargs.get('df_choices')
+    if (callback(G, node, processed_nodes, out_strategy= strategy, df_survey= df_survey, df_choices=df_choices)):
         node_path.append(node)
-        # node processing succeed 
+        # node processing succeed
         if scv not in processed_nodes:
             processed_nodes.add(scv)
             logger.debug("{}::{}: processed ({})".format(callback.__name__, node.get_name(), len(processed_nodes)))
         if scv in stashed_nodes:
             stashed_nodes.remove(node)
-        #reorder_node_list(stashed_nodes, node.group)
-        stashed_nodes.update(G.successors(scv))
+        # reorder_node_list(stashed_nodes, node.group)
+        stashed_nodes._add_items(list(G.successors(scv)))
+        #for el in list(G.successors(scv)):
+        #    stashed_nodes.add(el)
     else:
         if scv not in processed_nodes and scv not in stashed_nodes:
             if node not in stashed_nodes:
-                stashed_nodes.insert_at_bottom(node)
+                stashed_nodes.insert_at_bottom(node.scv())
                 logger.debug("{}::{}: stashed({})".format(callback.__name__, node.get_name(), len(stashed_nodes)))
 
-def walktrhough_tricc_processed_stached(G, start, callback, processed_nodes, stashed_nodes,
-                                  warn=False, node_path=[], **kwargs):
-    walktrhough_tricc_node_processed_stached(G, start, callback, processed_nodes, stashed_nodes,
-                                  warn=False, node_path=[], **kwargs)
+def walktrhough_tricc_processed_stached(G, start, callback, processed_nodes, stashed_nodes, strategy,
+                                        warn=False, node_path=[], **kwargs):
+    
+    walktrhough_tricc_node_processed_stached(G, start, callback, processed_nodes, stashed_nodes, strategy,
+                                             warn=False, node_path=[], **kwargs)
     while stashed_nodes:
-        walktrhough_tricc_node_processed_stached(G, stashed_nodes.pop(), callback, processed_nodes, stashed_nodes,
-                                  warn=False, node_path=[], **kwargs)
+        walktrhough_tricc_node_processed_stached(G, stashed_nodes.pop(), callback, processed_nodes, stashed_nodes, strategy,
+                            warn=False, node_path=[], **kwargs)
+
+#def export_tricc_operation(t_o, orderd_set_available_scv, export_strategy):
+    # find the convertor from the strategy based on the operator
+    # for all reference that are TriccOperation, recursive call
+    # for all refernece that are TriccSCV, find the most recent instance in orderd_set_available_scv
+    # for all triccValue, just use them as is
+    # error for all other type
+    # call the convertor with the list of refrence

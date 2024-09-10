@@ -58,3 +58,12 @@ class OrderedSet:
             return list(self._od.keys())[index]
         except IndexError:
             raise IndexError("Index out of range") from None
+            
+    def get_latest_matching_str(self, scv):
+        # Iterate through the items in reverse order
+        for item in reversed(self._od.keys()):
+            # Check if the item is a string and starts with f"{mystr}."
+            if isinstance(item, str) and item.startswith(scv):
+                return item.replace("::", "_")
+        # If no matching item is found, return None
+        return None

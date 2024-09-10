@@ -1,6 +1,7 @@
 import abc
 import logging
 from tricc_oo.visitors.tricc import stashed_node_func
+from tricc_og.models.base import TriccOperator
 import datetime
 
 logger = logging.getLogger('default')
@@ -20,59 +21,89 @@ class BaseExportStrategy:
     @abc.abstractmethod
     def execute(self, processes=[]):
         pass
-        
 
-    def tricc_operation_equal(self, ref_expressions):
+    @staticmethod
+    def tricc_operation_equal(ref_expressions):
+        return ' = '.join(ref_expressions)
         raise NotImplementedError(f"This type of opreration  is not supported in this strategy")
-    def tricc_operation_not_equal(self, ref_expressions):
+    
+    @staticmethod
+    def tricc_operation_not_equal(ref_expressions):
         raise NotImplementedError(f"This type of opreration  is not supported in this strategy")
-    def tricc_operation_not(self, ref_expressions):
+    @staticmethod
+    def tricc_operation_not(ref_expressions):
         raise NotImplementedError(f"This type of opreration  is not supported in this strategy")
-    def tricc_operation_and(self, ref_expressions):
+    @staticmethod
+    def tricc_operation_and(ref_expressions):
         raise NotImplementedError(f"This type of opreration  is not supported in this strategy")
-    def tricc_operation_or(self, ref_expressions):
+    @staticmethod
+    def tricc_operation_or(ref_expressions):
         raise NotImplementedError(f"This type of opreration  is not supported in this strategy")
-    def tricc_operation_or_and(self, ref_expressions):
+    @staticmethod
+    def tricc_operation_or_and(ref_expressions):
         raise NotImplementedError(f"This type of opreration  is not supported in this strategy")
-    def tricc_operation_native(self, ref_expressions):
+    @staticmethod
+    def tricc_operation_native(ref_expressions):
         raise NotImplementedError(f"This type of opreration  is not supported in this strategy")
-    def tricc_operation_istrue(self, ref_expressions):
+    @staticmethod
+    def tricc_operation_istrue(ref_expressions):
         raise NotImplementedError(f"This type of opreration  is not supported in this strategy")
-    def tricc_operation_isfalse(self, ref_expressions):
+    @staticmethod
+    def tricc_operation_isfalse(ref_expressions):
         raise NotImplementedError(f"This type of opreration  is not supported in this strategy")
-    def tricc_operation_selected(self, ref_expressions):
+    @staticmethod
+    def tricc_operation_selected(ref_expressions):
         raise NotImplementedError(f"This type of opreration  is not supported in this strategy")
-    def tricc_operation_more_or_equal(self, ref_expressions):
+    @staticmethod
+    def tricc_operation_more_or_equal(ref_expressions):
         raise NotImplementedError(f"This type of opreration  is not supported in this strategy")
-    def tricc_operation_less_or_equal(self, ref_expressions):
+    @staticmethod
+    def tricc_operation_less_or_equal(ref_expressions):
         raise NotImplementedError(f"This type of opreration  is not supported in this strategy")
-    def tricc_operation_more(self, ref_expressions):
+    @staticmethod
+    def tricc_operation_more(ref_expressions):
         raise NotImplementedError(f"This type of opreration  is not supported in this strategy")
-    def tricc_operation_less(self, ref_expressions):
+    @staticmethod
+    def tricc_operation_less(ref_expressions):
         raise NotImplementedError(f"This type of opreration  is not supported in this strategy")
-    def tricc_operation_between(self, ref_expressions):
+    @staticmethod
+    def tricc_operation_between(ref_expressions):
         raise NotImplementedError(f"This type of opreration  is not supported in this strategy")
-    def tricc_operation_case(self, ref_expressions):
+    @staticmethod
+    def tricc_operation_case(ref_expressions):
         raise NotImplementedError(f"This type of opreration  is not supported in this strategy")
-    def tricc_operation_if(self, ref_expressions):
+    @staticmethod
+    def tricc_operation_if(ref_expressions):
         raise NotImplementedError(f"This type of opreration  is not supported in this strategy")
-    def tricc_operation_contains(self, ref_expressions):
+    @staticmethod
+    def tricc_operation_contains(ref_expressions):
         raise NotImplementedError(f"This type of opreration  is not supported in this strategy")
-    def tricc_operation_exists(self, ref_expressions):
+    @staticmethod
+    def tricc_operation_exists(ref_expressions):
         raise NotImplementedError(f"This type of opreration  is not supported in this strategy")
-    def tricc_operation_has_qualifier(self, ref_expressions):
+    @staticmethod
+    def tricc_operation_has_qualifier(ref_expressions):
         raise NotImplementedError(f"This type of opreration  is not supported in this strategy")
-    def tricc_operation_zscore(self, ref_expressions):
+    @staticmethod
+    def tricc_operation_zscore(ref_expressions):
         raise NotImplementedError(f"This type of opreration  is not supported in this strategy")
-    def tricc_operation_izscore(self, ref_expressions):
+    @staticmethod
+    def tricc_operation_izscore(ref_expressions):
         raise NotImplementedError(f"This type of opreration  is not supported in this strategy")
-    def tricc_operation_age_day(self, ref_expressions):
+    @staticmethod
+    def tricc_operation_age_day(ref_expressions):
         raise NotImplementedError(f"This type of opreration  is not supported in this strategy")
-    def tricc_operation_age_month(self, ref_expressions):
+    @staticmethod
+    def tricc_operation_age_month(ref_expressions):
         raise NotImplementedError(f"This type of opreration  is not supported in this strategy")
-    def tricc_operation_age_year(self, ref_expressions):
+    @staticmethod
+    def tricc_operation_age_year(ref_expressions):
         raise NotImplementedError(f"This type of opreration  is not supported in this strategy")
 
+    OPERATOR_EXPORT = {
+        TriccOperator.EQUAL: tricc_operation_equal,
+
+    }  
 ## Utils
     def do_clean(self, **kwargs):
         pass

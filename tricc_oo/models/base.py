@@ -221,7 +221,7 @@ class TriccOperator(StrEnum):
     NOT_EQUAL = 'not_equal'
     BETWEEN = 'between'
     LESS = 'less'
-    CASE = 'case' #(cond, res), (cond,res)
+    CASE = 'case' #(cond, res), (cond,res), default
     IF = 'if' # cond val_true, val_false
     CONTAINS = 'contains' # ref, txt Does CONTAINS make sense, like Select with wildcard
     EXISTS = 'exists'
