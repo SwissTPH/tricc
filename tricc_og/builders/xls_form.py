@@ -33,7 +33,7 @@ TRICC_NUMBER = "number({})"
 TRICC_AND_EXPRESSION = "{0} and {1}"
 VERSION_SEPARATOR = "_Vv_"
 INSTANCE_SEPARATOR = "_Ii_"
-
+NODE_IDS = ['7370', '7371', '7719','7724', '7725', '7729']
 
 def start_group(
     strategy, cur_group, groups, df_survey, df_calculate, relevance=False, **kargs
@@ -750,7 +750,7 @@ def convert_calculate(G, node, processed_nodes, out_strategy, **kwargs):
             node, 
             processed_nodes,
             out_strategy,
-            **kwargs) for u, v, data in G.in_edges(node, data=True)
+            **kwargs) for u, v, data in G.in_edges(node, data=True) if 'condition' in data
         ]
     data_condition = ' or '.join(
         expr for expr in expressions
@@ -798,13 +798,16 @@ def get_value(processed_nodes, ref, stategy):
         svc = processed_nodes.get_latest_matching_str(
             ref.value.split('::')[0]
         )
+        if svc == None :
+            pass
         return stategy.get_tricc_operation_operand(svc)
     else:
+        if ref == None:
+            pass
         return stategy.get_tricc_operation_operand(ref)
 #Move to base export strategy?   
 def convert_expression(expression, in_node, G, node, processed_nodes, out_strategy, **kwargs ):
     operator = expression.operator
-    ## exp is never Tricc Operation but TriccStatic
     references =  [
         convert_expression(
             exp, 

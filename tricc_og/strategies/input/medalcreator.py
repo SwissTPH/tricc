@@ -9,7 +9,6 @@ from tricc_og.builders.mc_to_tricc import (
     import_mc_nodes,
     get_registration_nodes,
     import_mc_flow_from_diagnose,
-    add_formula_association_flow,
     fullorder_to_order,
     import_mc_flow_from_qss,
     make_implementation,
@@ -68,7 +67,7 @@ class MedalCStrategy(BaseInputStrategy):
         for node_id in js_nodes:
             node = import_mc_nodes(js_nodes[node_id], QUESTION_SYSTEM, project, js_fullorder, start)
             
-        add_formula_association_flow(project)
+        #add_formula_association_flow(project)
         # build other sequences
         js_diagnoses = js_full["medal_r_json"]["diagnoses"]
         yi_cc_id = js_full["medal_r_json"]["config"]["basic_questions"]["general_cc_id"]
@@ -90,15 +89,15 @@ class MedalCStrategy(BaseInputStrategy):
 
         # make the implementation version
         make_implementation(project)
-        logger.info(f"implementatin graph have {project.impl_graph.number_of_edges()} edges")
+        logger.info(f"implementing graph have {project.impl_graph.number_of_edges()} edges")
         start_impl = start.instances[0]
         # image
-        self.save_simple_graph(project.impl_graph, start_impl, "loaded.png")
+        #self.save_simple_graph(project.impl_graph, start_impl, "loaded.png")
         order = fullorder_to_order(js_fullorder)
         unloop_from_node(project.impl_graph, start_impl, order)
-        logger.info(f"implementatin graph have {project.impl_graph.number_of_edges()} edges")
+        logger.info(f"Unlooped graph has {project.impl_graph.number_of_edges()} edges")
         # image
-        self.save_simple_graph(project.impl_graph, start_impl, "unlooped.png")
+        #self.save_simple_graph(project.impl_graph, start_impl, "unlooped.png")
         # make QS
         # 1- create QS flow
         # 2- attached named output (conditionnal flow or calculate)
@@ -109,7 +108,7 @@ class MedalCStrategy(BaseInputStrategy):
         # image
         self.save_simple_graph(project.impl_graph, start_impl, "qs_loaded.png")
         self.save_simple_tree(project.impl_graph, start_impl.scv(), "tree.png")
-        logger.info(f"implementatin graph have {project.impl_graph.number_of_edges()} edges")
+        logger.info(f"Final graph has {project.impl_graph.number_of_edges()} edges")
 
         # add calculate ?  how to design activity outcome ?
 
@@ -205,7 +204,7 @@ def left_to_right_layout(G, ref_node):
             if not G.in_edges(node) and not G.edges(node):
                 isolated.append(node)
             elif not G.in_edges(node):
-                logger.warning(f"node {node} is dandling")
+                logger.warning(f"node {node} is dangling")
     for node in isolated:
         logger.debug(f"node {node} is isolated")
             

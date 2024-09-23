@@ -36,7 +36,7 @@ MANDATORY_STAGE = [
     "first_look_assessment_step",
     "complaint_category",
 ]
-# FIXME to be remoded after dev OK
+# FIXME to be removed after dev OK
 NODE_ID = "382"
 
 
@@ -54,8 +54,11 @@ def import_mc_nodes(json_node, system, project, js_fullorder, start):
             graph=project.graph,
             js_fullorder=js_fullorder,
         )
-    if json_node["category"] == "background_calculation":
-        node.expression = add_background_calculation_options(json_node)
+    if json_node["category"] in (
+        "background_calculation",
+        "basic_demographic"
+    ):
+        add_background_calculation_options(json_node, node)
 
     return node
 
@@ -94,7 +97,11 @@ def add_flow_from_instances(graph, instances, activity, white_list=None):
         if str(instance["id"]) == NODE_ID:
             pass
         _to = get_element(graph, QUESTION_SYSTEM, instance["id"], white_list=white_list)
+        _to_activity_end = None
+        if isinstance(_to, TriccActivity) and _to == activity:
+            _to_activity_end = get_element(graph, ACTIVITY_END_SYSTEM, instance["id"], white_list=white_list)
 
+        _to = _to_activity_end if _to_activity_end else _to
         if no_forced_link(graph, _to):
             # if activity is a real activity then we add the edges on the activity level
             # else we add it on the main graph
@@ -137,7 +144,6 @@ def add_flow_from_condition(
         # if the node start fron the activity (start) but NOT inside the that activity
         _from_activity_end= None
         if isinstance(_from, TriccActivity) and _from != activity:
-            ### FIXME this is not working, we might need a function to change the scv of an element
             _from_activity_end = to_scv_str(ACTIVITY_END_SYSTEM, _from.code, _from.version, _from.instance)
         condition = None
         if not _from or "answer_id" not in cond:
@@ -145,8 +151,9 @@ def add_flow_from_condition(
         elif "answer_id" in cond:
             condition = TriccOperation(
                 TriccOperator.EQUAL,
-                ## Make this conditional? Either take first _from.getname() OR the second without get_name
-                [TriccSCV(_from.get_name()), TriccStatic(cond["answer_id"])]
+                ## Seems like with the else statement it has an infinite loop? why? FIXME
+                [TriccSCV(_from.get_name()), TriccStatic(cond["answer_id"])] if not _from_activity_end else
+                    [TriccSCV(_from_activity_end), TriccStatic(cond["answer_id"])]
             )
         add_flow(
             activity.graph if hasattr(activity, "graph") else graph,
@@ -221,7 +228,7 @@ def import_mc_flow_from_qs(json_node, project, start, qs_processed, qs_impl=[]):
     # we extend it by adding the contained node and the ActuvityEnd
     unprocessed = []
     for i in qs_impl:
-        # don't load the QS if the start node is isolated/dandling
+        # don't load the QS if the start node is isolated/dangling
         # because when creatin the implementation graph every QS 
         # got at least one instance, it makes no sense to extend it now 
         # and could messup the unlooping
@@ -249,9 +256,26 @@ def process_qs(
             version=qs_start.version,
         )
     ]["data"]
+    ## add expression to result from qs [x]
+    ## get references from the expression 
+    ## add an edge from all the nodes that are mentioned in the reference
+    ## to the activity_end node
     if not result:
         result = main_result.make_instance()
         project.impl_graph.add_node(result.scv(), data=result)
+    for condition in json_node['conditions']:
+        expression = TriccOperation(TriccOperator.AND)
+        ref = TriccSCV(condition['node_id'])
+        val = TriccSCV(condition['answer_id'])
+        expression.append(ref)
+        expression.append(val)
+    add_flow_from_condition(project.impl_graph, 
+            json_node['conditions'], 
+            result, 
+            qs_start,
+            #white_list= ,
+            flow_type="SEQUENCE")
+        
     i_nodes = [(result.scv(), {"data": result})]
     # if i.instance > 1:
     #     i_nodes = [n.make_instance() for n in qs_nodes]
@@ -420,6 +444,8 @@ def to_node(json_node, tricc_type, system, project, graph, js_fullorder):
         node.context = project.get_context(STAGE_SYSTEM, context_code)
         get_options(json_node, node, tricc_type, system, project)
         graph.add_node(node.scv(), data=node)
+    else:
+        pass
     return node
 
 
@@ -603,7 +629,7 @@ def unloop_from_node(graph, start, order):
                     graph.add_node(new_end.scv(), data=new_end)
                     if graph.in_edges(new_end.scv()):
                         logger.warning(
-                            f"instance creation of an activity end {new_end.scv()} that was not dandling"
+                            f"instance creation of an activity end {new_end.scv()} that was not dangling"
                         )
                 if old_node.code not in new_activity_instances:
                     new_activity_instances[str(old_node.code)] = []
@@ -664,21 +690,6 @@ def get_context_from_fullorder(js_id, js_fullorder):
     )
 
 
-def add_formula_association_flow(project):
-    dob = get_element(project.graph, QUESTION_SYSTEM, "birth_date")
-    # add flow to edges nodes
-    for node_ref, attr in project.graph.nodes(data=True):
-        if "formula" in attr["data"].attributes:
-            if attr["data"].attributes["formula"] in ("ToMonth", "ToDay", "ToYear"):
-                add_flow(project.graph, None, dob, node_ref, flow_type="ASSOCIATION")
-            else:
-                matches = re.findall(
-                    r"([0-9a-zA-Z_]+),?", attr["data"].attributes["formula"]
-                )
-                for m in matches:
-                    n = get_element(project.graph, QUESTION_SYSTEM, m)
-                    add_flow(project.graph, None, n, node_ref, flow_type="ASSOCIATION")
-
 
 def get_registration_nodes():
     js_nodes = {}
@@ -702,6 +713,22 @@ def get_registration_nodes():
         "type": "Question",
         "category": "patient_data",
         "value_format": "Date",
+    }
+    js_nodes["age_day"] = {
+        "id": "age_day",
+        "label": {"en": "Age in days", "fr": "Age en jours"},
+        "type": "Question",
+        "category": "basic_demographic",
+        "value_format": "Float",
+        "formula":"ToDay"
+    }
+    js_nodes["age_month"] = {
+        "id": "age_month",
+        "label": {"en": "Age in Months", "fr": "age en mois"},
+        "type": "Question",
+        "category": "basic_demographic",
+        "value_format": "Float",
+        "formula":"ToMonth"
     }
     return js_nodes
 
@@ -776,76 +803,102 @@ def fullorder_to_order(js_fullorder):
 
 ### TODO tranlate it for
 
+#  node_age_day=[], node_age_month=[], node_age_year=[] are mutable, they will be shared between all the calls of the function
 
-def add_background_calculation_options(json_node):
-    op = TriccOperation(TriccOperator.CASE)
-    for a in json_node["answers"].values():
-        if "operator" in a:
-            ref = get_formula_ref(json_node)
-            if ref:  # Manage slices
-                op.append(get_answer_operation(ref, a))
-                # op.append(TriccStatic(str(a['id'])))
-            elif "reference_table_x_id" in json_node:  # manage ZScore
-                x_node = None
-                y_node = None
-                z_node = None
-                # run the code only if there is data in the setup fields, case condition
-                opa_c = TriccOperation("exists")
-                if (
-                    json_node["reference_table_x_id"] is not None
-                    and json_node["reference_table_x_id"] != ""
-                ):
-                    x_node = to_scv_str(
-                        QUESTION_SYSTEM, json_node["reference_table_x_id"]
-                    )
-                    opa_c.append(x_node)
-                if (
-                    json_node["reference_table_y_id"] is not None
-                    and json_node["reference_table_y_id"] != ""
-                ):
-                    y_node = to_scv_str(
-                        QUESTION_SYSTEM, json_node["reference_table_y_id"]
-                    )
-                    opa_c.append(y_node)
-                if (
-                    json_node["reference_table_z_id"] is not None
-                    and json_node["reference_table_z_id"] != ""
-                ):
-                    z_node = to_scv_str(
-                        QUESTION_SYSTEM, json_node["reference_table_z_id"]
-                    )
-                    opa_c.append(z_node)
-
-                op.append(opa_c)
-                opa_v = None
-                if x_node and z_node:
-                    opa_v = TriccOperation("izscore")
-                    opa_v.append(TriccSCV(x_node))
-                    opa_v.append(TriccSCV(z_node))
-                elif x_node and y_node:
-                    opa_v = TriccOperation("zscore")
-                    opa_v.append(TriccSCV(x_node))
-                    opa_v.append(TriccSCV(y_node))
-
-                else:
-                    pass
-                if opa_v:
-                    op.append(opa_v)
-            else:
-                raise NotImplementedError(
-                    "opertaion not implemented, only slice and tables are"
-                )
-    return op
-
-
-def get_formula_ref(json_node):
-    if "formula" in json_node:
+def add_background_calculation_options(json_node, node, node_age_day=[], node_age_month=[], node_age_year=[]):
+    # in a previous functions basic_demographic node should be identified (How to keep the old id ?) use a filter ? 
+    #   toDay -> age_data
+    #   toMonth -> age_month
+    #   toYear -> age year
+    # if not found must be created
+    # here retrieve thos 3 nodes and replace all other ToMonth/toDay/toYear reference with the equivalent node
+    op = None
+    if json_node["category"] in (
+        "basic_demographic"
+    ) and 'formula' in json_node:
+        # the expression must be created to do the proper calcualtion for toYear, ToMonth, ToDay
+        ref = to_scv_str(QUESTION_SYSTEM, "birth_date")
         if json_node["formula"] == "ToMonth":
-            return to_scv_str(QUESTION_SYSTEM, "birth_date")
+            op = TriccOperation(TriccOperator.AGE_MONTH)
+            op.append(TriccSCV(ref))
+            node_age_month.append(node)
         elif json_node["formula"] == "ToDay":
-            return to_scv_str(QUESTION_SYSTEM, "age_day")
+            op = TriccOperation(TriccOperator.AGE_DAY)
+            op.append(TriccSCV(ref))
+            node_age_day.append(node)
+        else:
+            logger.error("basic_demographic unrelated to age not supported")
+            exit(-1)
+    else:
+        op = TriccOperation(TriccOperator.IFS)
+        for a in json_node["answers"].values():
+            if "operator" in a:
+                ref = get_formula_ref(json_node, node_age_day, node_age_month, node_age_year)
+                if ref:  # Manage slices
+                    op.append(get_answer_operation(ref, a))
+                    # op.append(TriccStatic(str(a['id'])))
+                elif "reference_table_x_id" in json_node:  # manage ZScore
+                    x_node = None
+                    y_node = None
+                    z_node = None
+                    # run the code only if there is data in the setup fields, case condition
+                    opa_c = TriccOperation("exists")
+                    if (
+                        json_node["reference_table_x_id"] is not None
+                        and json_node["reference_table_x_id"] != ""
+                    ):
+                        x_node = to_scv_str(
+                            QUESTION_SYSTEM, json_node["reference_table_x_id"]
+                        )
+                        opa_c.append(x_node)
+                    if (
+                        json_node["reference_table_y_id"] is not None
+                        and json_node["reference_table_y_id"] != ""
+                    ):
+                        y_node = to_scv_str(
+                            QUESTION_SYSTEM, json_node["reference_table_y_id"]
+                        )
+                        opa_c.append(y_node)
+                    if (
+                        json_node["reference_table_z_id"] is not None
+                        and json_node["reference_table_z_id"] != ""
+                    ):
+                        z_node = to_scv_str(
+                            QUESTION_SYSTEM, json_node["reference_table_z_id"]
+                        )
+                        opa_c.append(z_node)
+
+                    op.append(opa_c)
+                    opa_v = None
+                    if x_node and z_node:
+                        opa_v = TriccOperation("izscore")
+                        opa_v.append(TriccSCV(x_node))
+                        opa_v.append(TriccSCV(z_node))
+                    elif x_node and y_node:
+                        opa_v = TriccOperation("zscore")
+                        opa_v.append(TriccSCV(x_node))
+                        opa_v.append(TriccSCV(y_node))
+                    if opa_v:
+                        op.append(opa_v)
+                else:
+                    raise NotImplementedError(
+                        "opertaion not implemented, only slice and tables are"
+                    )
+                    exit(-1)
+    node.expression = op
+
+
+def get_formula_ref(json_node, node_age_day, node_age_month, node_age_year):
+    if "formula" in json_node:
+        if json_node["formula"] == "ToMonth" and node_age_month:
+            return node_age_month[-1].scv()
+        elif json_node["formula"] == "ToDay" and node_age_day:
+            return node_age_day[-1].scv()
         elif json_node["formula"][0] == "[" and json_node["formula"][-1] == "]":
             return to_scv_str(QUESTION_SYSTEM, json_node["formula"][1:-1])
+        else:
+            logger.error(f"ref {json_node['formula']} not supported or not yet known")
+            exit(-1)
 
 
 def get_answer_operation(ref, a):

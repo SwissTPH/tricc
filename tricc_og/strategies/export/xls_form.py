@@ -119,7 +119,10 @@ class XLSFormStrategy(BaseExportStrategy):
             df_survey=self.df_survey, 
             df_choices=self.df_choice,
         )
-
+        logger.info("dangling nodes")
+        for node in self.project.impl_graph.nodes():
+            if node not in processed_nodes:
+                logger.infor(node)
         # create a Pandas Excel writer using XlsxWriter as the engine
         self.export_as_xlsx(self.project.impl_graph, self.df_survey, self.df_choice, df_settings, newpath)
 

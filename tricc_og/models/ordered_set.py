@@ -37,7 +37,7 @@ class OrderedSet:
 
     def _add_items(self, items):
         for item in items:
-            if item not in self:
+            if item not in self._od:
                 self.insert_at_bottom(item)
 
     def __or__(self, other):

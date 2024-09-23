@@ -18,8 +18,9 @@ class TriccOperator(StrEnum):
     NOT_EQUAL = auto()
     BETWEEN = auto()
     LESS = auto()
-    CASE = auto()  # (cond, res), (cond,res)
+    SWITCH = auto()  # (cond, res), (cond,res)
     IF = auto()  # cond val_true, val_false
+    IFS = auto()
     CONTAINS = auto()  # ref, txt Does CONTAINS make sense, like Select with wildcard
     EXISTS = auto()
     # CDSS Specific

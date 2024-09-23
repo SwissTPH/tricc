@@ -70,16 +70,34 @@ def add_flow(
 def is_ready_to_process(G, node, processed):
     references = []
     if hasattr(node, 'expression') and node.expression:
-        references = node.expression.get_references()
+        references = node.expression.get_references() # gives only triccSCV
+    previous_node_processed = [e[0] in processed for e in list(G.in_edges(node.scv(), keys = True))]
+    calculate_references_processed = (
+            [any(p.startswith(f"{r.value}::") for p in processed) for r in references ]
+                if references
+                else [True])
+
     return all([
-        *[e[0] in processed for e in list(G.in_edges(node.scv(), keys = True))],
-        *[any(p.startswith("{r}.") for p in processed) for r in references if isinstance(r, TriccSCV)]
+        *previous_node_processed,
+        *calculate_references_processed
     ])
 
+def add_dangling_node(G, node, stashed_nodes):
+    # Check if reference that hasn't been processed has in_nodes, if 
+    # it doesn't, stash it 
+    if hasattr(node, 'expression') and node.expression:
+        references = node.expression.get_references()
+        for r in references:
+            if not G.in_edges(r.value, data=True):
+                element = (get_elements(G, 'questions', r.value.split('_', 1)[1])[-1] if r.value.startswith('questions') else  
+                    get_elements(G, 'ActivityEnd', r.value.split('_', 1)[1])[-1] if r.value.startswith('Activity')
+                else get_elements(G, 'diagnose', r.value.split('_', 1)[1])[-1]
+                )
+                stashed_nodes.insert_at_bottom(element.scv())
 
 def walktrhough_tricc_node_processed_stached(G, scv, callback, processed_nodes, stashed_nodes, strategy,
                                              warn=False, node_path=[], **kwargs):
-    # logger.debug("walkthrough::{}::{}".format(callback.__name__, node.get_name()))
+    logger.debug("walkthrough::{}::{}".format(callback.__name__, scv))
     node = G.nodes[scv]['data']
     df_survey = kwargs.get('df_survey')
     df_choices = kwargs.get('df_choices')
@@ -90,25 +108,31 @@ def walktrhough_tricc_node_processed_stached(G, scv, callback, processed_nodes, 
             processed_nodes.add(scv)
             logger.debug("{}::{}: processed ({})".format(callback.__name__, node.get_name(), len(processed_nodes)))
         if scv in stashed_nodes:
-            stashed_nodes.remove(node)
+            stashed_nodes.remove(scv)
         # reorder_node_list(stashed_nodes, node.group)
         stashed_nodes._add_items(list(G.successors(scv)))
         #for el in list(G.successors(scv)):
         #    stashed_nodes.add(el)
     else:
+        add_dangling_node(G, node, stashed_nodes)
         if scv not in processed_nodes and scv not in stashed_nodes:
-            if node not in stashed_nodes:
-                stashed_nodes.insert_at_bottom(node.scv())
-                logger.debug("{}::{}: stashed({})".format(callback.__name__, node.get_name(), len(stashed_nodes)))
+            stashed_nodes.insert_at_bottom(node.scv())
+            logger.debug("{}::{}: stashed({})".format(callback.__name__, node.get_name(), len(stashed_nodes)))
 
 def walktrhough_tricc_processed_stached(G, start, callback, processed_nodes, stashed_nodes, strategy,
                                         warn=False, node_path=[], **kwargs):
     
     walktrhough_tricc_node_processed_stached(G, start, callback, processed_nodes, stashed_nodes, strategy,
                                              warn=False, node_path=[], **kwargs)
+    next_node = None
+    prev_node = None
     while stashed_nodes:
-        walktrhough_tricc_node_processed_stached(G, stashed_nodes.pop(), callback, processed_nodes, stashed_nodes, strategy,
+        next_node = stashed_nodes.pop()
+        if prev_node == next_node:
+            logger.error("LOOOOOOOOOOOOOOOOOOOOOP")
+        walktrhough_tricc_node_processed_stached(G, next_node, callback, processed_nodes, stashed_nodes, strategy,
                             warn=False, node_path=[], **kwargs)
+        prev_node = next_node
 
 #def export_tricc_operation(t_o, orderd_set_available_scv, export_strategy):
     # find the convertor from the strategy based on the operator

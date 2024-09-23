@@ -53,7 +53,7 @@ class TriccMixinRef(BaseModel):
 class TriccTypeMixIn(BaseModel):
     def __str__():
         return type_scv.code
-        
+                                                                                
     type_scv: TriccMixinRef = None
 
 
@@ -127,8 +127,16 @@ class TriccOperation(BaseModel):
             for reference in self.reference:
                 if isinstance(reference, TriccOperation):
                     predecessor = predecessor | reference.get_references()
+                    #predecessor.update(reference.get_references())
                 elif isinstance(reference, (TriccSCV, TriccBaseModel, TriccActivity, TriccTask)):
                     predecessor.add(reference)
+        elif isinstance(self.reference, TriccOperation):
+            predecessor = predecessor | reference.get_references()
+            #predecessor.update(self.reference.get_references())
+        elif isinstance(self.reference, TriccSCV):
+            predecessor.add(self.reference)
+        elif isinstance(self.reference, (TriccBaseModel, TriccActivity, TriccTask)):
+            predecessor.add(self.reference.scv())
         else:
             raise NotImplementedError("cannot find predecessor of a str")
         return predecessor
