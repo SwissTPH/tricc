@@ -1,5 +1,6 @@
 import logging
 from tricc_og.models.base import TriccMixinRef, FlowType, TriccBaseModel, to_scv_str, TriccSCV
+import networkx as nx
 
 logger = logging.getLogger(__name__)
 
@@ -141,3 +142,50 @@ def walktrhough_tricc_processed_stached(G, start, callback, processed_nodes, sta
     # for all triccValue, just use them as is
     # error for all other type
     # call the convertor with the list of refrence
+def save_graphml(G, start_node, filename, remove_dandling=True):
+    graph = G.copy()
+    # Get hierarchical layout
+    pos = hierarchical_pos(graph, start_node)
+    for node, attr in list(graph.nodes(data=True)):
+        if node not in pos:
+            if remove_dandling:
+                graph.remove_node(node)
+            else:
+                pos[node] = (-1, -1)
+        if node in pos:
+            tricc_node = attr['data']
+            #graph.nodes[node]['viz'] = {'position': {'x': pos[node][0], 'y': pos[node][1]}}
+            graph.nodes[node]['x'] = pos[node][0]
+            graph.nodes[node]['y'] = pos[node][1]
+            graph.nodes[node]['label'] = tricc_node.label
+            del graph.nodes[node]['data']
+        
+    for edge in graph.edges(keys=True, data=True):
+        edge[3]['flow_type'] = str(edge[3]['flow_type'])
+        if edge[3]['activity']:
+            edge[3]['activity'] = edge[3]['activity'].scv()
+        else:
+            del edge[3]['activity']
+        if 'condition' in edge[3] and edge[3]['condition']:
+            edge[3]['condition'] = str(edge[3]['condition'])
+        
+    # Draw the graph
+    nx.write_gexf(graph, f"{filename}.gexf")
+
+def hierarchical_pos(G, root, width=1., pos=None, vert_gap=0.2, vert_loc=0.0, xcenter=0.5):
+    if not pos:
+        pos = {root: (xcenter, vert_loc)}
+    neighbors = [e[1] for e in G.edges(root)]
+    if len(neighbors) != 0:
+        dx = width / len(neighbors) 
+        nextx = xcenter - width/2
+        for neighbor in neighbors:
+            if all([e[0] in pos for e in G.in_edges(neighbor)]):
+                nextx += dx
+                pos[neighbor] = (nextx, vert_loc - vert_gap)
+                hierarchical_pos(G, neighbor, pos=pos, width=dx, vert_gap=vert_gap, 
+                                            vert_loc=vert_loc-vert_gap, xcenter=nextx)
+            else:
+                pass
+    
+    return pos
