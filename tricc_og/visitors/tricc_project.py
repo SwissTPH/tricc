@@ -73,7 +73,7 @@ def is_ready_to_process(G, node, processed):
         references = node.expression.get_references() # gives only triccSCV
     previous_node_processed = [e[0] in processed for e in list(G.in_edges(node.scv(), keys = True))]
     calculate_references_processed = (
-            [any(p.startswith(f"{r.value}::") for p in processed) for r in references ]
+            [any(p.startswith(f"{r.value}") for p in processed) for r in references ]
                 if references
                 else [True])
 
