@@ -33,7 +33,7 @@ TRICC_NUMBER = "number({})"
 TRICC_AND_EXPRESSION = "{0} and {1}"
 VERSION_SEPARATOR = "_Vv_"
 INSTANCE_SEPARATOR = "_Ii_"
-NODE_IDS = ['7370', '7371', '7719','7724', '7725', '7729']
+NODE_ID = '7636'
 
 def start_group(
     strategy, cur_group, groups, df_survey, df_calculate, relevance=False, **kargs
@@ -262,7 +262,7 @@ def generate_xls_form_export(
 ):
     # check that all prev nodes were processed
     if is_ready_to_process(G, node, processed_nodes):
-        if node not in processed_nodes :
+        if node not in processed_nodes:
             logger.debug("printing node {}".format(node.get_name()))
             # clean stashed node when processed
             if node in stashed_nodes:
@@ -778,11 +778,14 @@ def convert_calculate(G, node, processed_nodes, out_strategy, **kwargs):
     ]
     return df_survey
 
-def convert(G, node, processed_nodes, df_survey,df_choices , out_strategy, **kwargs):
-    if is_ready_to_process(G, node, processed_nodes):
+def convert(G, node, processed_nodes,df_survey, df_choices,stashed_nodes,out_strategy, **kwargs):
+    if is_ready_to_process(G, node, processed_nodes, stashed_nodes ):
+        if NODE_ID in node.scv():
+                pass
         if node.type_scv and node.type_scv.system + \
             '.'+node.type_scv.code in TRICC_BUILDERS:
             builder=node.type_scv.system +'.'+node.type_scv.code
+            processed_nodes.add(node.scv())
             TRICC_BUILDERS[builder](G, node, processed_nodes, out_strategy, df_survey=df_survey, df_choices=df_choices)
             return True
         elif not node.type_scv:
@@ -802,12 +805,11 @@ def get_value(processed_nodes, ref, stategy):
             pass
         return stategy.get_tricc_operation_operand(svc)
     else:
-        if ref == None:
-            pass
         return stategy.get_tricc_operation_operand(ref)
 #Move to base export strategy?   
 def convert_expression(expression, in_node, G, node, processed_nodes, out_strategy, **kwargs ):
     operator = expression.operator
+    
     references =  [
         convert_expression(
             exp, 
