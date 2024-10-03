@@ -22,10 +22,11 @@ from tricc_og.builders.mc_to_tricc import (
 from tricc_og.models.base import TriccBaseModel, TriccProject
 from tricc_og.strategies.input.base_input_strategy import BaseInputStrategy
 from tricc_og.parsers.xml import read_drawio
-from tricc_og.visitors.tricc_project import get_element, add_flow
+from tricc_og.visitors.tricc_project import get_element, add_flow, save_graphml
 
 logger = logging.getLogger("default")
-
+logging.getLogger('matplotlib.font_manager').setLevel(logging.ERROR)
+logging.getLogger('PIL').setLevel(logging.INFO)
 
 import random
 
@@ -108,6 +109,7 @@ class MedalCStrategy(BaseInputStrategy):
         # image
         self.save_simple_graph(project.impl_graph, start_impl, "qs_loaded.png")
         self.save_simple_tree(project.impl_graph, start_impl.scv(), "tree.png")
+        save_graphml(project.impl_graph, start_impl.scv(), "decisiontree.graphml")
         logger.info(f"Final graph has {project.impl_graph.number_of_edges()} edges")
 
         # add calculate ?  how to design activity outcome ?
