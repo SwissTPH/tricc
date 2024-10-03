@@ -37,7 +37,7 @@ MANDATORY_STAGE = [
     "complaint_category",
 ]
 # FIXME to be removed after dev OK
-NODE_ID = "382"
+NODE_ID = "7331"
 
 
 def import_mc_nodes(json_node, system, project, js_fullorder, start):
@@ -54,6 +54,7 @@ def import_mc_nodes(json_node, system, project, js_fullorder, start):
             graph=project.graph,
             js_fullorder=js_fullorder,
         )
+        
     if json_node["category"] in (
         "background_calculation",
         "basic_demographic"
@@ -242,6 +243,23 @@ def import_mc_flow_from_qs(json_node, project, start, qs_processed, qs_impl=[]):
                 unprocessed.append(is_unprocessed)
     return unprocessed
 
+def add_expression_from_condition(graph, conditions):
+    expression_or = TriccOperation(TriccOperator.OR)
+    expression = None
+    for condition in conditions:
+        if (NODE_ID) == str(condition['node_id']):
+            pass
+        expression = TriccOperation(TriccOperator.EQUAL)
+        ref = get_elements(
+            graph, QUESTION_SYSTEM, condition['node_id']
+        )[-1]
+        val = str(ref.attributes[f'options_{condition["answer_id"]}'].reference)
+        ref = TriccSCV(ref.scv())
+        expression.append(ref)
+        expression.append(val)
+        if len(conditions) > 1:
+            expression_or.append(expression)
+    return expression_or if len(conditions) > 1 else expression
 
 def process_qs(
     qs_start, json_node, main_result, qs_nodes, project, start, qs_processed
@@ -263,19 +281,7 @@ def process_qs(
     if not result:
         result = main_result.make_instance()
         project.impl_graph.add_node(result.scv(), data=result)
-    for condition in json_node['conditions']:
-        expression = TriccOperation(TriccOperator.AND)
-        ref = TriccSCV(condition['node_id'])
-        val = TriccSCV(condition['answer_id'])
-        expression.append(ref)
-        expression.append(val)
-    add_flow_from_condition(project.impl_graph, 
-            json_node['conditions'], 
-            result, 
-            qs_start,
-            #white_list= ,
-            flow_type="SEQUENCE")
-        
+    result.expression = add_expression_from_condition(project.impl_graph, json_node['conditions'])
     i_nodes = [(result.scv(), {"data": result})]
     # if i.instance > 1:
     #     i_nodes = [n.make_instance() for n in qs_nodes]
@@ -293,8 +299,8 @@ def process_qs(
             for n in qs_nodes
         ]
     # if QS start not attached to start, SHOULD NOT be use
-    # This is actually needed   
     except NetworkXNoPath:
+        print("NOT CONNECTED WITH START:: ", result)
         return qs_start
          #    i_nodes = []
     #    for n in qs_nodes:
@@ -307,7 +313,7 @@ def process_qs(
     #            force_new=True,
     #        )
     #        i_nodes.append(node)
-    #        # in case the QS instance were already processed, save it for later TODO im here
+    #        # in case the QS instance were already processed, save it for later TODO 
     #        if n.code not in qs_processed and isinstance(n, TriccActivity):
     #            qs_processed[str(n.code)] = []
     #        qs_processed[str(n.code)].append(n)
@@ -319,8 +325,10 @@ def process_qs(
     project.impl_graph.add_nodes_from(i_nodes)
     
     # FIXME update edge condtion from node should be done arround here
-    # add the flow defined on the QS
-    dandling = add_flow_from_instances(
+    # add the flow defined on the QS - If we make a new instance before, are we 
+    # adding flow from that instance? Seems like we just are taking the instances that
+    # were already there
+    dangling = add_flow_from_instances(
         qs_start.graph,
         json_node["instances"].values(),
         qs_start,
@@ -328,7 +336,7 @@ def process_qs(
     )
     # attached the node that no "in" edges inside the QS
     # we assume they are the first node inside the QS 
-    for n in dandling:
+    for n in dangling:
         add_flow(qs_start.graph, qs_start, qs_start.scv(), n.scv())
 
     # add calculate
@@ -345,7 +353,7 @@ def process_qs(
         result.scv(),
         qs_start,
         white_list=i_nodes,
-        flow_type="ASSOCIATION",
+        flow_type="SEQUENCE",
     )
     project.impl_graph = nx.compose(project.impl_graph, qs_start.graph)
 
@@ -390,6 +398,7 @@ def to_activity(json_node, system, graph, generate_end=True):
         type_scv=TriccMixinRef(system="tricc_type", code=str(TriccNodeType.activity)),
     )
     graph.add_node(node.scv(), data=node)
+    get_options(json_node, node, str(TriccNodeType.activity), system)
     generate_cut_off_exp(json_node, node)
     if generate_end:
         end = TriccBaseModel(
@@ -439,39 +448,37 @@ def to_node(json_node, tricc_type, system, project, graph, js_fullorder):
     if not context_code:
         if "category" in json_node and json_node["category"]:
             context_code = json_node["category"]
-
+        
     if context_code:
         node.context = project.get_context(STAGE_SYSTEM, context_code)
-        get_options(json_node, node, tricc_type, system, project)
+        get_options(json_node, node, tricc_type, system)
         graph.add_node(node.scv(), data=node)
     else:
         pass
     return node
 
 
-def get_options(json_node, select_node, tricc_type, system, project):
-    if tricc_type == TriccNodeType.select_one:
-        if "answers" in json_node and json_node["answers"]:
-            i = 0
-            for key, elm in json_node["answers"].items():
-                option = TriccBaseModel(
-                    code=get_mc_name(json_node["id"]),
-                    system=select_node.get_name(),
-                    type_scv=TriccMixinRef(
-                        system="tricc_type", code=str(TriccNodeType.select_option)
-                    ),
-                    label=json_node["label"][list(json_node["label"].keys())[0]],
-                )
-                set_additional_attributes(
-                    option,
-                    json_node,
-                    ["id", "type", "reference", "cut_off_start", "cut_off_end"],
-                )
-                select_node.attributes[f"output_options[{i}]"] = option
-                i += 1
-        else:
-            raise ValueError(f"Select one {system}:{json_node['id']} must have answers")
-
+def get_options(json_node, select_node, tricc_type, system):
+    if "answers" in json_node and json_node["answers"]:
+        i = 0
+        for key, elm in json_node["answers"].items():
+            label = elm['label']['en'] if isinstance(elm['label'], dict) else elm['label']
+            option = TriccBaseModel(
+                code=key,
+                system=select_node.system,
+                type_scv=TriccMixinRef(
+                    system="tricc_type", code=str(TriccNodeType.select_option)
+                ),
+                label=label,
+                reference=elm['reference']
+            )
+            set_additional_attributes(
+                option,
+                json_node,
+                ["id", "type", "reference", "cut_off_start", "cut_off_end"],
+            )
+            select_node.attributes[f"options_{key}"] = option
+            i += 1
 
 def set_additional_attributes(node, json_node, attribute_names):
     if not isinstance(attribute_names, list):
