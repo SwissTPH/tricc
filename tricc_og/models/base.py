@@ -116,7 +116,9 @@ class TriccOperation(BaseModel):
             return v
         raise ValueError(f"Invalid type in reference: {type(v)}")
     def __str__(self):
-        return f"operator: {self.operator if self.operator else 'No operator'}, references: {self.get_references() if self.reference else 'No reference'}"
+
+        str_ref = map(str, self.reference)
+        return f"{self.operator}({', '.join(str_ref)})"
     def __init__(self, tricc_operator, reference=[]):
         operator = tricc_operator.upper() if isinstance(tricc_operator, str) else tricc_operator
         super().__init__(operator=operator, reference=reference)
@@ -185,6 +187,7 @@ class TriccBaseModel(TriccMixinRef, AttributesMixin, TriccTypeMixIn):
     applicability: TriccOperation = None
     expression: TriccOperation = None
     label: str = ""
+    reference: str = ""
     
     class Config:
         # Allow arbitrary types for validation
