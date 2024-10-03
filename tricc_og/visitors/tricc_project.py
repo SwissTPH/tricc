@@ -3,7 +3,7 @@ from tricc_og.models.base import TriccMixinRef, FlowType, TriccBaseModel, to_scv
 import networkx as nx
 
 logger = logging.getLogger(__name__)
-
+NODE_ID = '7636'
 
 def get_element(graph, system, code, version=None, instance=None, white_list=None):
     try:
@@ -68,16 +68,20 @@ def add_flow(
     )
 
 
-def is_ready_to_process(G, node, processed):
+def is_ready_to_process(G, node, processed, stashed_nodes):
     references = []
     if hasattr(node, 'expression') and node.expression:
         references = node.expression.get_references() # gives only triccSCV
     previous_node_processed = [e[0] in processed for e in list(G.in_edges(node.scv(), keys = True))]
+    if previous_node_processed:
+        stashed_nodes._add_items(
+        e[0] for e, is_processed in 
+        zip(G.in_edges(node.scv(), keys=True), previous_node_processed) 
+        if not is_processed)
     calculate_references_processed = (
             [any(p.startswith(f"{r.value}") for p in processed) for r in references ]
                 if references
                 else [True])
-
     return all([
         *previous_node_processed,
         *calculate_references_processed
@@ -102,7 +106,7 @@ def walktrhough_tricc_node_processed_stached(G, scv, callback, processed_nodes, 
     node = G.nodes[scv]['data']
     df_survey = kwargs.get('df_survey')
     df_choices = kwargs.get('df_choices')
-    if (callback(G, node, processed_nodes, out_strategy= strategy, df_survey= df_survey, df_choices=df_choices)):
+    if (callback(G, node, processed_nodes,df_survey, df_choices, stashed_nodes=stashed_nodes, out_strategy= strategy)):
         node_path.append(node)
         # node processing succeed
         if scv not in processed_nodes:
