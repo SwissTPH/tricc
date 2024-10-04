@@ -254,7 +254,7 @@ def import_mc_flow_from_activities(project, start, order):
 def attempt_import_mc_flow_from_activity(node, project, start, qs_processed, order, qs_impl=None):
 
     unprocessed = import_mc_flow_from_activity(
-        node, project, start, qs_processed ,qs_impl
+        node, project, start, qs_processed, qs_impl
     )
     # adding empty list to know that this node was processed once 
     # and may need to be reprocessed if another instance if found later
@@ -275,7 +275,7 @@ def import_mc_flow_from_activity(node, project, start, qs_processed, qs_impl=[])
     activity_label = node.label + (("::" + str(node.instance)) if node.instance else '')
     logger.info(f"loading Activity {activity_label}")
     # getting node defintion
-    main_result = node.attributes['output']
+    
     # for each unextended instance of the question sequence,
     # we extend it by adding the contained node and the ActuvityEnd
     unprocessed = []
@@ -288,7 +288,6 @@ def import_mc_flow_from_activity(node, project, start, qs_processed, qs_impl=[])
     else:
         is_unprocessed = expend_impl_activity(
             node,
-            main_result,
             project,
             start,
             qs_processed
@@ -299,7 +298,7 @@ def import_mc_flow_from_activity(node, project, start, qs_processed, qs_impl=[])
 
 
 def expend_impl_activity(
-    node, main_result, project, start, qs_processed
+    node, project, start, qs_processed
 ):
     if "expended" in node.attributes and node.attributes["expended"]:
         logger.error(f"trying to expend an activity already expended")
@@ -321,12 +320,15 @@ def expend_impl_activity(
         exit(-1)
     # add node to graph (if any new)
     node.attributes["expended"] = True
-    output = output_def.make_instance(instance=node.instance)
+    output = node.attributes['output']
+    if not output:
+        output = output_def.make_instance(instance=node.instance)
+        node.attributes['output'] = output
     i_nodes = [
         (output.scv(), {"data": output},),
         (node.scv(), {"data": node},)
         ]
-    qs_nodes = [a['data'] for (n, a) in node.instantiate.graph.nodes(data=True)]
+    qs_nodes = [a['data'] for (n, a) in node_def.graph.nodes(data=True)]
     qs_nodes.remove(node_def)
     qs_nodes.remove(output_def)
     # getting the list of the nodes instance that need to be used inside the QS
@@ -444,12 +446,11 @@ def unloop_from_node(graph, start, order):
                 out_edge = list(graph.out_edges(e[0], keys=True, data=True))
                 in_edge = list(graph.in_edges(e[1], keys=True, data=True))
                 # avoid moving instance > 1 of e[1] for e TODO
-                scores[e[0]] = UNLOOP_SCORE_INSTANCE_1P if graph.nodes[e[1]]["data"].instance > 1 else UNLOOP_SCORE_INSTANCE_0
+                scores[e[0]] = UNLOOP_SCORE_INSTANCE_1P  if graph.nodes[e[1]]["data"].instance > 1 else UNLOOP_SCORE_INSTANCE_0
                 # activity end cannot be duplicated
                 to_node = graph.nodes[e[1]]["data"]
                 edges_activities = set(d["activity"] for k, d in e_data.items())
-                
-                if len(edges_activities)>1:
+                if len(edges_activities) > 1:
                     scores[e[0]] += UNLOOP_SCORE_EDGE_MULTIPLE_ACTIVITY
                 if to_node.type_scv.system == "tricc_type" and to_node.type_scv.code == 'output':
                     scores[e[0]] += UNLOOP_SCORE_CALCULATE
@@ -457,25 +458,16 @@ def unloop_from_node(graph, start, order):
                     scores[e[0]] += UNLOOP_SCORE_ACTIVITY
                 if all([d["flow_type"] != "SEQUENCE" for k, d in e_data.items()]):
                     scores[e[0]] += UNLOOP_SCORE_ASSOCIATION
-                            
                 for oe in out_edge:
                     # avoid duplicating edge that is duplicated with
                     # an edge from an activity involved in the loop
-                    
                     if e[1] != oe[1] and nx.has_path(graph, oe[1], e[1]):
                         scores[e[0]] += UNLOOP_SCORE_SUB_EDGE
-                        # scores[e[0]] += len(list(all_simple_paths(
-                        #         graph,
-                        #         oe[1],
-                        #         e[1],
-                        #         cutoff=5,
-                        #         max_len=3)))
                     elif oe[1] != e[1]:
                         if oe[3]['activity'] in edges_activities:
                             scores[e[0]] += UNLOOP_SCORE_TO_OTHER_NODE_SAME_ACTIVITY
                         else:
                             scores[e[0]] += UNLOOP_SCORE_TO_OTHER_NODE_OTHER_ACTIVITY
-                        
                 # add a score for edge going to the to edge from the same activity but different node
                 for ie in in_edge:
                     if (
@@ -530,16 +522,6 @@ def unloop_from_node(graph, start, order):
                     graph.remove_edge(*se[:3])
                     # create new edge
                     graph.add_edge(se[0], new_node.scv(), **se[3])
-            # find edge form node with the same activity, using a list to fix its size2
-            # edges_to_assess = list(graph.edges(old_edge[1], keys=True, data=True))
-            # for e in edges_to_assess:
-            #    if old_edge[3]["activity"] == e[3]["activity"]:
-            #        # remove the edge, the data e[3] must not be part of the call
-            #        graph.remove_edge(*e[:3])
-            #        graph.add_edge(new_node.scv(), e[1], **e[3])
-            #        logger.debug(
-            #            f"source of edge from {old_edge} to {e[1]} replaced by {new_node}"
-            #        )
         except NetworkXNoCycle:
             no_cycle_found = False
     return new_activity_instances

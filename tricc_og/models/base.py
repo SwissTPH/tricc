@@ -253,9 +253,11 @@ class TriccActivity(TriccBaseModel):
     def make_instance(self, sibling=False, **kwargs):
         instance = super(TriccActivity, self).make_instance(sibling=sibling, **kwargs)
         # the base instance might be already expended
-        if sibling:
+        if sibling or len(self.instances) > 1:
             instance.attributes['expended'] = False
         instance.graph = MultiDiGraph()
+        if 'output' in self.attributes and self.attributes['output']:
+            instance.attributes['output'] = self.attributes['output'].make_instance(sibling=sibling)
         return instance
         
         

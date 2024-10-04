@@ -26,6 +26,7 @@ class TriccPaterns(StrEnum):
     # end
     escalated_end = auto()
     activity_end = auto()
+    output = auto()
 
     # processing patern
     calculate = auto()

@@ -4,7 +4,8 @@ from strenum import StrEnum
 class TriccNodeType(StrEnum):
     #replace with auto ? 
     note = 'note'
-    calculate = 'calculate'
+    calculate = 'calculate',
+    output = 'output',
     select_multiple = 'select_multiple'
     select_one = 'select_one'
     select_yesno = 'select_yesno'

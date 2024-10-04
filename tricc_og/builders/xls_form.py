@@ -108,6 +108,7 @@ ODK_TRICC_TYPE_MAP = {
     TriccPaterns.exclusive: "calculate",
     TriccPaterns.inclusive: "calculate",
     TriccPaterns.wait: "calculate",
+    TriccPaterns.output: "calculate",
     TriccPaterns.escalated_end: "escalated_end",
     TriccPaterns.activity_end: "activity_end",
     TriccPaterns.calculate: "calculate",
@@ -958,6 +959,7 @@ def convert_context(G,node, processed_nodes, strategy, **kwargs):
 TRICC_BUILDERS = {
     'tricc_type.note': convert_note,
     'tricc_type.calculate': convert_calculate,
+    'tricc_type.output': convert_calculate,
     'tricc_type.select_multiple': convert_select_multiple,
     'tricc_type.select_one': convert_select_one,
     'tricc_type.select_yesno': convert_select_yesno,

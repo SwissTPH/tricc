@@ -74,6 +74,7 @@ class MedalCStrategy(BaseInputStrategy):
         # load on questions
         for node_id in js_nodes:
             node = import_mc_nodes(js_nodes[node_id], QUESTION_SYSTEM, project, js_fullorder, start)
+        # then build the internal qs graph
         for node_id in js_nodes:
             if js_nodes[node_id]["type"] == "QuestionsSequence":
                 node = import_qs_inner_flow(js_nodes[node_id], QUESTION_SYSTEM, project)
@@ -92,15 +93,13 @@ class MedalCStrategy(BaseInputStrategy):
         import_mc_flow_from_diagram(
                 js_diagram, QUESTION_SYSTEM, project.graph, start
             )
+        # TODO check if ti works for diagnoses in diagnoses
         for node_id in js_diagnoses:
             import_mc_flow_from_diagnose(
                 js_diagnoses[node_id], DIAGNOSE_SYSTEM, project, start
             )
-            
-        
-        #self.save_simple_tree(project.graph, start.scv(), "tree.png")
-        # make the implementation version
-        
+        order = fullorder_to_order(js_fullorder)
+
         ### TRANSFORM
         make_implementation(project)
         logger.info(f"implementing graph have {project.impl_graph.number_of_edges()} edges")
@@ -108,7 +107,7 @@ class MedalCStrategy(BaseInputStrategy):
         save_graphml(project.graph, start.scv(), "graph")
         # image
         #self.save_simple_graph(project.impl_graph, start_impl, "loaded.png")
-        order = fullorder_to_order(js_fullorder)
+        
         unloop_from_node(project.impl_graph, start_impl, order)
         
         logger.info(f"Unlooped graph has {project.impl_graph.number_of_edges()} edges")
