@@ -203,6 +203,10 @@ class TriccBaseModel(TriccMixinRef, AttributesMixin, TriccTypeMixIn):
         instance.instantiate = self.instantiate if sibling else self
         instance.instance = instance.instantiate.get_next_instance()
         instance.instantiate.instances.append(instance)
+        instance.attributes = {}
+        for k, v in self.attributes.items():
+            instance.attributes[k] = v
+        # self.instances is share accross def and instances 
         return instance
 
     def get_next_instance(self):

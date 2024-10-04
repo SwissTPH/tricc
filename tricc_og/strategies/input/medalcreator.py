@@ -10,9 +10,6 @@ from tricc_og.builders.mc_to_tricc import (
     get_registration_nodes,
     import_mc_flow_from_diagnose,
     fullorder_to_order,
-    import_mc_flow_from_activities,
-    make_implementation,
-    unloop_from_node,
     get_start_node,
     QUESTION_SYSTEM,
     DIAGNOSE_SYSTEM,
@@ -27,7 +24,10 @@ from tricc_og.visitors.tricc_project import (
     get_element,
     add_flow,
     save_graphml,
-    hierarchical_pos
+    hierarchical_pos,
+    unloop_from_node,
+    import_mc_flow_from_activities,
+    make_implementation,
 )
 from tricc_og.builders.tricc_to_bpmn import create_bpmn_from_dict
 from bpmn_python.bpmn_diagram_export import BpmnDiagramGraphExport

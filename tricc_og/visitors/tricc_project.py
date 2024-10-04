@@ -1,9 +1,11 @@
 import logging
-from tricc_og.models.base import TriccMixinRef, FlowType, TriccBaseModel, to_scv_str, TriccSCV
+from tricc_og.models.base import TriccMixinRef, FlowType, TriccBaseModel, TriccActivity, to_scv_str, TriccSCV
 import networkx as nx
+from networkx.exception import NetworkXNoCycle, NetworkXNoPath, NetworkXError
 
 logger = logging.getLogger(__name__)
 NODE_ID = '7636'
+
 
 def get_element(graph, system, code, version=None, instance=None, white_list=None):
     try:
@@ -72,12 +74,13 @@ def is_ready_to_process(G, node, processed, stashed_nodes):
     references = []
     if hasattr(node, 'expression') and node.expression:
         references = node.expression.get_references() # gives only triccSCV
-    previous_node_processed = [e[0] in processed for e in list(G.in_edges(node.scv(), keys = True))]
+    previous_node_processed = [e[0] in processed for e in list(G.in_edges(node.scv(), keys=True))]
     if previous_node_processed:
         stashed_nodes._add_items(
-        e[0] for e, is_processed in 
-        zip(G.in_edges(node.scv(), keys=True), previous_node_processed) 
-        if not is_processed)
+            e[0] for e, is_processed in 
+                zip(G.in_edges(node.scv(), keys=True), previous_node_processed) 
+            if not is_processed
+        )
     calculate_references_processed = (
             [any(p.startswith(f"{r.value}") for p in processed) for r in references ]
                 if references
@@ -211,3 +214,351 @@ def hierarchical_pos(G, root, width=1., pos=None, vert_gap=0.2, vert_loc=0.0, xc
                 pass
     
     return pos
+
+
+
+def import_mc_flow_from_activities(project, start, order):
+    qs_processed = {}
+    # looping on all activity
+    for node_id, attr in project.impl_graph.nodes(data=True):
+        node = attr['data']
+        if isinstance(node, TriccActivity) and node.attributes['expended']==False:
+            attempt_import_mc_flow_from_activity(
+                node,
+                project,
+                start,
+                qs_processed,
+                order
+            )
+    # get the QS that have new instance to extend (QS with [] as value are filtered out)
+    filtered_qs = dict((k, v) for k, v in qs_processed.items() if v)
+    # process QS as long as there is unprocessed qs
+    while len(filtered_qs) > 0:
+        for qs_code, instances in filtered_qs.items():
+            instances_copy = instances.copy()
+            for instance in instances_copy:
+                # we remove the instance to be processed from the list
+                qs_processed[qs_code].remove(instance)
+                # we tried again, if it fail it will be added again on qs_processed
+                attempt_import_mc_flow_from_activity(
+                    instance,
+                    project, start,
+                    qs_processed,
+                    order,
+                    qs_impl=instances
+                )
+            
+        filtered_qs = dict((k, v) for k, v in qs_processed.items() if v)
+
+
+def attempt_import_mc_flow_from_activity(node, project, start, qs_processed, order, qs_impl=None):
+
+    unprocessed = import_mc_flow_from_activity(
+        node, project, start, qs_processed ,qs_impl
+    )
+    # adding empty list to know that this node was processed once 
+    # and may need to be reprocessed if another instance if found later
+    if node.code not in qs_processed:
+        qs_processed[node.code] = []
+    if unprocessed:
+        qs_processed[node.code] += unprocessed
+    else:
+        # adding the activity graph may have created loops
+        new_activities = unloop_from_node(project.impl_graph, start, order)
+        # new activity from unlooping are not extended so we will need to do that later
+        for act_code, qs_start_list in new_activities.items():
+            if act_code in qs_processed:
+                qs_processed[node.code] += qs_start_list
+
+
+def import_mc_flow_from_activity(node, project, start, qs_processed, qs_impl=[]):
+    activity_label = node.label + (("::" + str(node.instance)) if node.instance else '')
+    logger.info(f"loading Activity {activity_label}")
+    # getting node defintion
+    main_result = node.attributes['output']
+    # for each unextended instance of the question sequence,
+    # we extend it by adding the contained node and the ActuvityEnd
+    unprocessed = []
+    # don't load the QS if the start node is isolated/dangling
+    # because when creatin the implementation graph every QS 
+    # got at least one instance, it makes no sense to extend it now 
+    # and could messup the unlooping
+    if not list(project.impl_graph.in_edges(node.scv())):
+        unprocessed.append(node)
+    else:
+        is_unprocessed = expend_impl_activity(
+            node,
+            main_result,
+            project,
+            start,
+            qs_processed
+        )
+        if is_unprocessed:
+            unprocessed.append(node)
+    return unprocessed
+
+
+def expend_impl_activity(
+    node, main_result, project, start, qs_processed
+):
+    if "expended" in node.attributes and node.attributes["expended"]:
+        logger.error(f"trying to expend an activity already expended")
+        return None
+    node_def = node.instantiate
+    output_def = node_def.attributes['output']
+    # avoid expending an activity not connected to main start
+    try:
+        # will raise an exception if no path found
+        paths = list(
+            nx.node_disjoint_paths(project.impl_graph, start.scv(), node.scv())
+        )
+    # if QS start not attached to start, SHOULD NOT be use
+    except NetworkXNoPath:
+        print("NOT CONNECTED WITH START:: ", node)
+        return node
+    except Exception as e:
+        logger.error(f"unexpected error {e}")
+        exit(-1)
+    # add node to graph (if any new)
+    node.attributes["expended"] = True
+    output = output_def.make_instance(instance=node.instance)
+    i_nodes = [
+        (output.scv(), {"data": output},),
+        (node.scv(), {"data": node},)
+        ]
+    qs_nodes = [a['data'] for (n, a) in node.instantiate.graph.nodes(data=True)]
+    qs_nodes.remove(node_def)
+    qs_nodes.remove(output_def)
+    # getting the list of the nodes instance that need to be used inside the QS
+    i_nodes += [
+        get_most_probable_instance(
+            project.impl_graph, paths, n.system, n.code, n.version
+        )
+        for n in qs_nodes
+    ]
+    node.graph.add_nodes_from(i_nodes)
+    edges_def = list(node_def.graph.edges(keys=True, data=True))
+    for e in edges_def:
+        u = node_def.graph.nodes[e[0]]['data']
+        imp_u = get_element(project.impl_graph, u.system, u.code, u.version, white_list=i_nodes)
+        v = node_def.graph.nodes[e[1]]['data']
+        imp_v = get_element(project.impl_graph, v.system, v.code, v.version, white_list=i_nodes)
+        
+        data = {}
+        for key, value in e[3].items():
+            data[key] = value if key != 'activity' else node
+        node.graph.add_edge(imp_u.scv(), imp_v.scv(), **data)
+    
+    # add calculate
+    # rebase node following the QS after the result (before adding the internal QS nod
+    project.impl_graph = nx.compose(project.impl_graph, node.graph)
+    rebase_edges(project.impl_graph, node, output, black_list=[scv for (scv, n,) in i_nodes])
+
+
+def get_most_probable_instance(
+    graph, paths, system, code, version=None, force_new=False
+):
+    nodes = get_elements(graph, system, code)
+    if not force_new:
+        # look if the exisitng instance of the inner node are already 
+        # in a path leading to the QS start, 
+        # if it the case it would for sure lead to a loop
+        for n in nodes:
+            if not any(n.scv() in path for path in paths):
+                return (n.scv(), {"data": n})
+    # no instance found that won't lead to a loop
+    # then create a new one
+    if nodes:
+        new = nodes[0].make_instance(sibling=True)
+        return (new.scv(), {"data": new})
+    else:
+        logger.error(f"node not found {to_scv_str(system, code, version)}")
+
+
+def make_implementation(project):
+    for node_hash, attr in project.graph.nodes(data=True):
+        node = attr["data"]
+        # Create a new custom node with the same attributes
+        impl_node = node.make_instance()
+        # Add custom node to the new graph with the same node id
+        project.impl_graph.add_node(impl_node.scv(), data=impl_node)
+
+    for process, start_nodes in project.graph_process_start.items():
+        for start_node in start_nodes:
+            if process not in project.impl_graph_process_start:
+                project.impl_graph_process_start[process] = []
+            project.impl_graph_process_start[process].append(start_node.instances[0])
+
+    for u, v, data in project.graph.edges(data=True):
+        if (
+            project.graph.nodes[u]["data"].code == NODE_ID
+            or project.graph.nodes[v]["data"].code == NODE_ID
+        ):
+            pass
+        u_impl = project.graph.nodes[u]["data"].instances[0]
+        v_impl = project.graph.nodes[v]["data"].instances[0]
+        project.impl_graph.add_edge(u_impl.scv(), v_impl.scv(), **data)
+
+
+# Unlooping function
+# unlooping my only work if the loop are compose of edges with different context (case 1)
+# in case the loop is within a context then it might be harder to unloop them (case 2)
+# case 1: look for an edge that lead to a node that don't have an edge from the same context
+# going back to the loop
+
+
+def get_code_from_scv(scvi):
+    sc = scvi.split("|")
+    if len(sc) > 1:
+        return sc[1].split("::")[0]
+
+
+#unloop scores
+UNLOOP_SCORE_CALCULATE = 1000
+UNLOOP_SCORE_ASSOCIATION = 1000
+UNLOOP_SCORE_ISOLATION = 1000
+UNLOOP_SCORE_ACTIVITY = 80
+UNLOOP_SCORE_INSTANCE_0 = 3
+UNLOOP_SCORE_INSTANCE_1P = 0
+UNLOOP_SCORE_EDGE_MULTIPLE_ACTIVITY = 10
+UNLOOP_SCORE_SUB_EDGE = 80
+UNLOOP_SCORE_TO_OTHER_NODE_OTHER_ACTIVITY = 5
+UNLOOP_SCORE_TO_OTHER_NODE_SAME_ACTIVITY = 1
+UNLOOP_SCORE_FROM_SAME_ACTIVITY = 5
+UNLOOP_SCORE_REVERSE_ORDER = 4
+UNLOOP_SCORE_NOT_IN_ORDER = 0
+
+def unloop_from_node(graph, start, order):
+    no_cycle_found = True
+    new_activity_instances = {}
+    while no_cycle_found:
+        try:
+            loop = list(nx.find_cycle(graph, start.scv()))
+            old_edge = []
+            scores = {}
+            # looking for edge that once replace with a new node will open the loop
+            # meaning that the context of the node is not going back to the loop
+            # lower the score will be more likely will be the unlooping
+            for e in loop:
+                e_data = graph.get_edge_data(e[0], e[1])
+                out_edge = list(graph.out_edges(e[0], keys=True, data=True))
+                in_edge = list(graph.in_edges(e[1], keys=True, data=True))
+                # avoid moving instance > 1 of e[1] for e TODO
+                scores[e[0]] = UNLOOP_SCORE_INSTANCE_1P if graph.nodes[e[1]]["data"].instance > 1 else UNLOOP_SCORE_INSTANCE_0
+                # activity end cannot be duplicated
+                to_node = graph.nodes[e[1]]["data"]
+                edges_activities = set(d["activity"] for k, d in e_data.items())
+                
+                if len(edges_activities)>1:
+                    scores[e[0]] += UNLOOP_SCORE_EDGE_MULTIPLE_ACTIVITY
+                if to_node.type_scv.system == "tricc_type" and to_node.type_scv.code == 'output':
+                    scores[e[0]] += UNLOOP_SCORE_CALCULATE
+                if isinstance(to_node, TriccActivity):
+                    scores[e[0]] += UNLOOP_SCORE_ACTIVITY
+                if all([d["flow_type"] != "SEQUENCE" for k, d in e_data.items()]):
+                    scores[e[0]] += UNLOOP_SCORE_ASSOCIATION
+                            
+                for oe in out_edge:
+                    # avoid duplicating edge that is duplicated with
+                    # an edge from an activity involved in the loop
+                    
+                    if e[1] != oe[1] and nx.has_path(graph, oe[1], e[1]):
+                        scores[e[0]] += UNLOOP_SCORE_SUB_EDGE
+                        # scores[e[0]] += len(list(all_simple_paths(
+                        #         graph,
+                        #         oe[1],
+                        #         e[1],
+                        #         cutoff=5,
+                        #         max_len=3)))
+                    elif oe[1] != e[1]:
+                        if oe[3]['activity'] in edges_activities:
+                            scores[e[0]] += UNLOOP_SCORE_TO_OTHER_NODE_SAME_ACTIVITY
+                        else:
+                            scores[e[0]] += UNLOOP_SCORE_TO_OTHER_NODE_OTHER_ACTIVITY
+                        
+                # add a score for edge going to the to edge from the same activity but different node
+                for ie in in_edge:
+                    if (
+                        ie[0] != start.scv()
+                        and ie[0] != e[0]
+                        and ie[3]["flow_type"] == "SEQUENCE"
+                        and (ie[3]["activity"] in edges_activities)
+                    ):
+                        scores[e[0]] += UNLOOP_SCORE_FROM_SAME_ACTIVITY
+                    # avoid dandling
+                # check if cutting the node will make it dandling
+                if nx.has_path(graph, start, e[0]):
+                    buffer = []
+                    for ie in in_edge:
+                        if ie[:2] == e[:2]:
+                            buffer.append(ie)
+                            graph.remove_edge(*ie[:2])
+                    if not nx.has_path(graph, start, e[1]):
+                        scores[e[0]] += UNLOOP_SCORE_ISOLATION
+                    for be in buffer:
+                        graph.add_edge(*be[:2], **be[3])
+                else:
+                    pass
+                # add 1 to the score if the edge goes according to fullorder
+                id1 = get_code_from_scv(e[0])
+                id2 = get_code_from_scv(e[1])
+                # if id2 is a QS, avoid unlooping
+                if order:
+                    if id2 not in order:
+                        scores[e[0]] += UNLOOP_SCORE_NOT_IN_ORDER
+                    elif id1 in order and order.index(id2) < order.index(id1):
+                        scores[e[0]] += UNLOOP_SCORE_REVERSE_ORDER
+                    if not old_edge or scores[old_edge[0]] >= scores[e[0]]:
+                        old_edge = e
+            if min(scores.values()) > 90:
+                logger.warning(f"unloop with high min score {min(scores.values())} for {old_edge}, {max(scores.values())}")
+            # find the edge data, it includes activity
+            # create another instance of the target node
+
+            old_node = graph.nodes[old_edge[1]]["data"]
+            new_node = old_node.make_instance(sibling=True)
+            if isinstance(old_node, TriccActivity):
+                if old_node.code not in new_activity_instances:
+                    new_activity_instances[str(old_node.code)] = []
+                new_activity_instances[str(old_node.code)].append(new_node)
+
+            graph.add_node(new_node.scv(), data=new_node)
+            # replace all edges between those node with the same context (used for select multiple)
+            out_edge = list(graph.edges(old_edge[0], keys=True, data=True))
+            for se in out_edge:
+                if se[1] == old_edge[1]:
+                    graph.remove_edge(*se[:3])
+                    # create new edge
+                    graph.add_edge(se[0], new_node.scv(), **se[3])
+            # find edge form node with the same activity, using a list to fix its size2
+            # edges_to_assess = list(graph.edges(old_edge[1], keys=True, data=True))
+            # for e in edges_to_assess:
+            #    if old_edge[3]["activity"] == e[3]["activity"]:
+            #        # remove the edge, the data e[3] must not be part of the call
+            #        graph.remove_edge(*e[:3])
+            #        graph.add_edge(new_node.scv(), e[1], **e[3])
+            #        logger.debug(
+            #            f"source of edge from {old_edge} to {e[1]} replaced by {new_node}"
+            #        )
+        except NetworkXNoCycle:
+            no_cycle_found = False
+    return new_activity_instances
+
+
+def rebase_edges(graph, old_node, new_node, black_list=[]):
+    # get all edges from old node
+    node_edges = [e for e in graph.edges(old_node.scv(), keys=True, data=True) if e[1] not in black_list]
+    # assign each one to the new node
+    for e in node_edges:
+        graph.remove_edge(*e[:3])
+        data = e[3]
+        # update condition
+        if "condition" in data and data["condition"]:
+            ref = f'"{old_node.instantiate.scv() if old_node.instantiate else old_node.scv()}"'
+            if ref in data["condition"]:
+                data["condition"] = data["condition"].replace(
+                    ref,
+                    f'"{new_node.instantiate.scv() if new_node.instantiate else new_node.scv()}"',
+                )
+        graph.add_edge(new_node.scv(), e[1], **data)
+
