@@ -43,6 +43,7 @@
                 "-I","MedalCStrategy",
                 "-O","XLSFormStrategy"],
             "console": "integratedTerminal",
+            "justMyCode": false,
             "env": {"PYTHONPATH": "${workspaceFolder}/"},
         },{
             "name": "tricc OG demo",

@@ -10,7 +10,7 @@ from tricc_og.builders.mc_to_tricc import (
     get_registration_nodes,
     import_mc_flow_from_diagnose,
     fullorder_to_order,
-    import_mc_flow_from_qss,
+    import_mc_flow_from_activities,
     make_implementation,
     unloop_from_node,
     get_start_node,
@@ -18,12 +18,19 @@ from tricc_og.builders.mc_to_tricc import (
     DIAGNOSE_SYSTEM,
     MANDATORY_STAGE,
     import_mc_flow_from_diagram,
+    import_qs_inner_flow,
 )
 from tricc_og.models.base import TriccBaseModel, TriccProject
 from tricc_og.strategies.input.base_input_strategy import BaseInputStrategy
 from tricc_og.parsers.xml import read_drawio
-from tricc_og.visitors.tricc_project import get_element, add_flow, save_graphml
-
+from tricc_og.visitors.tricc_project import (
+    get_element,
+    add_flow,
+    save_graphml,
+    hierarchical_pos
+)
+from tricc_og.builders.tricc_to_bpmn import create_bpmn_from_dict
+from bpmn_python.bpmn_diagram_export import BpmnDiagramGraphExport
 logger = logging.getLogger("default")
 logging.getLogger('matplotlib.font_manager').setLevel(logging.ERROR)
 logging.getLogger('PIL').setLevel(logging.INFO)
@@ -67,7 +74,9 @@ class MedalCStrategy(BaseInputStrategy):
         # load on questions
         for node_id in js_nodes:
             node = import_mc_nodes(js_nodes[node_id], QUESTION_SYSTEM, project, js_fullorder, start)
-            
+        for node_id in js_nodes:
+            if js_nodes[node_id]["type"] == "QuestionsSequence":
+                node = import_qs_inner_flow(js_nodes[node_id], QUESTION_SYSTEM, project)
         #add_formula_association_flow(project)
         # build other sequences
         js_diagnoses = js_full["medal_r_json"]["diagnoses"]
@@ -87,15 +96,21 @@ class MedalCStrategy(BaseInputStrategy):
             import_mc_flow_from_diagnose(
                 js_diagnoses[node_id], DIAGNOSE_SYSTEM, project, start
             )
-
+            
+        
+        #self.save_simple_tree(project.graph, start.scv(), "tree.png")
         # make the implementation version
+        
+        ### TRANSFORM
         make_implementation(project)
         logger.info(f"implementing graph have {project.impl_graph.number_of_edges()} edges")
         start_impl = start.instances[0]
+        save_graphml(project.graph, start.scv(), "graph")
         # image
         #self.save_simple_graph(project.impl_graph, start_impl, "loaded.png")
         order = fullorder_to_order(js_fullorder)
         unloop_from_node(project.impl_graph, start_impl, order)
+        
         logger.info(f"Unlooped graph has {project.impl_graph.number_of_edges()} edges")
         # image
         #self.save_simple_graph(project.impl_graph, start_impl, "unlooped.png")
@@ -103,8 +118,8 @@ class MedalCStrategy(BaseInputStrategy):
         # 1- create QS flow
         # 2- attached named output (conditionnal flow or calculate)
         # 3- "inject" qs as question list / or activity abstract + implementation
-        import_mc_flow_from_qss(
-                js_nodes, project, start_impl, order
+        import_mc_flow_from_activities(
+                project, start_impl, order
             )
         # image
         self.save_simple_graph(project.impl_graph, start_impl, "qs_loaded.png")
@@ -175,25 +190,11 @@ class MedalCStrategy(BaseInputStrategy):
         plt.axis('off')
         plt.tight_layout()
         plt.savefig(filename, dpi=300)
-        
-        
-def hierarchical_pos(G, root, width=1., pos=None, vert_gap=0.2, vert_loc=0, xcenter=0.5):
-    if not pos:
-        pos = {root: (xcenter, vert_loc)}
-    neighbors = [e[1] for e in G.edges(root)]
-    if len(neighbors) != 0:
-        dx = width / len(neighbors) 
-        nextx = xcenter - width/2 - dx/2
-        for neighbor in neighbors:
-            if all([e[0] in pos for e in G.in_edges(neighbor)]):
-                nextx += dx
-                pos[neighbor] = (nextx, vert_loc - vert_gap)
-                hierarchical_pos(G, neighbor, pos=pos, width=dx, vert_gap=vert_gap, 
-                                            vert_loc=vert_loc-vert_gap, xcenter=nextx)
-            else:
-                pass
+   
     
-    return pos
+
+        
+
 
 
 def left_to_right_layout(G, ref_node):

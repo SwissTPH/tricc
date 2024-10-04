@@ -21,7 +21,7 @@ from tricc_oo.visitors.tricc import (
     walktrhough_tricc_node_processed_stached,
     is_ready_to_process,
 )
-from tricc_oo.serializers.xls_form import (
+from tricc_oo.builders.xls_form import (
     CHOICE_MAP,
     SURVEY_MAP,
     end_group,

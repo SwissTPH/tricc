@@ -43,7 +43,7 @@ NODE_ID = "7331"
 def import_mc_nodes(json_node, system, project, js_fullorder, start):
     if json_node["type"] == "QuestionsSequence":
         node = to_activity(json_node, system, project.graph)
-
+        node.attributes['expended'] = False
     else:
         tricc_type = get_mc_tricc_type(json_node)
         node = to_node(
@@ -74,6 +74,7 @@ def import_mc_flow_from_diagram(js_diagram, system, graph, start):
 
 def import_mc_flow_from_diagnose(json_node, system, project, start):
     diag = to_activity(json_node, system, project.graph, generate_end=False)
+    diag.attributes['expended'] = True
     # FIXME answer for the CC must be true reference == 1
     if json_node["complaint_category"]:
         cc = get_element(
@@ -82,9 +83,9 @@ def import_mc_flow_from_diagnose(json_node, system, project, start):
         add_flow(project.graph, diag, cc.scv(), diag.scv())
     else:
         add_flow(project.graph, diag, start.scv(), diag.scv())
-    # node_list = get_node_list_from_instance(graph, json_node["instances"].values())
+    node_list = get_node_list_from_instance(project.graph, json_node["instances"].values())
     dandling = add_flow_from_instances(
-        project.graph, json_node["instances"].values(), diag
+        diag.graph, json_node["instances"].values(), diag, white_list=node_list
     )
 
     for n in dandling:
@@ -125,7 +126,7 @@ def no_forced_link(graph, node):
     )
 
 
-def get_node_list_from_instance(graph, instances):
+def get_node_list_from_instance(graph, instances, white_list=None):
     node_list = []
     for instance in instances:
         node = get_element(
@@ -143,9 +144,9 @@ def add_flow_from_condition(
             graph, QUESTION_SYSTEM, cond["node_id"], white_list=white_list
         )
         # if the node start fron the activity (start) but NOT inside the that activity
-        _from_activity_end= None
-        if isinstance(_from, TriccActivity) and _from != activity:
-            _from_activity_end = to_scv_str(ACTIVITY_END_SYSTEM, _from.code, _from.version, _from.instance)
+        _from_activity_end = None
+        #if isinstance(_from, TriccActivity) and _from != activity:
+        #    _from_activity_end = to_scv_str(ACTIVITY_END_SYSTEM, _from.code, _from.version, _from.instance)
         condition = None
         if not _from or "answer_id" not in cond:
             logger.error(f"node {cond['node_id']} not found")
@@ -167,81 +168,124 @@ def add_flow_from_condition(
         )
 
 
-def import_mc_flow_from_qss(js_nodes, project, start, order):
-    qs_processed = {}
-    for node_id in js_nodes:
-        if js_nodes[node_id]["type"] == "QuestionsSequence":
-            unprocessed = import_mc_flow_from_qs(
-                js_nodes[node_id], project, start, qs_processed
-            )
-            # adding empty list to know that this node was processed once 
-            # and may need to be reprocessed if another instance if found later
-            qs_processed[str(node_id)] = unprocessed or []
-            new_activities = unloop_from_node(project.impl_graph, start, order)
-            # new activity from unlooping are not extended so we will need to do that later
-            for act_code, qs_start_list in new_activities.items():
-                if act_code in qs_processed:
-                    qs_processed[str(act_code)] += qs_start_list
-    # get the QS that have new instance to extend
-    filtered_qs = dict((k, v) for k, v in qs_processed.items() if v)
-    unprocess_count = 0
-    while len(filtered_qs) > 0 and len(filtered_qs) != unprocess_count:
-        unprocess_count = 0
-        for qs_code, instances in filtered_qs.items():
-            ## Added to this condition to not call import_mc_flow_from_qs from questions
-            unprocessed = import_mc_flow_from_qs(
-                js_nodes[qs_code], project, start, qs_processed, qs_impl=instances
-            )
-            qs_processed[str(qs_code)] = unprocessed or []
-            if unprocessed:
-                unprocess_count += 1
-            new_activities = unloop_from_node(project.impl_graph, start, order)
-            for act_code, qs_start_list in new_activities.items():
-                qs_processed[str(act_code)] += qs_start_list
-        filtered_qs = dict((k, v) for k, v in qs_processed.items() if v)
-
-
-def import_mc_flow_from_qs(json_node, project, start, qs_processed, qs_impl=[]):
-    logger.info(f"loading QS {json_node['label']}")
-    # 1- generate output
-    # 2- generate graph
-    # 3- look for implementation
-    # 4- if instance 1, then add graph and result.
-    #        then take the link over out link from the QS
-    # 5- else:
-    #       create new instance of all nodes in the QS
-    #       add all links
+def import_qs_inner_flow(json_node, QUESTION_SYSTEM, project):
+    qs_start = project.graph.nodes[
+        to_scv_str(
+            QUESTION_SYSTEM,
+            json_node['id'],
+        )
+    ]["data"]
     if json_node["value_format"] != "Boolean":
         logger.error(f"value_format {json_node['value_format']} is not supported")
         exit(-1)
-    # getting the implementation of the QS
-    if not qs_impl:
-        qs_impl = get_elements(project.impl_graph, QUESTION_SYSTEM, json_node["id"])
-    # getting node defintion 
-    qs_nodes = [
-        get_element(project.graph, QUESTION_SYSTEM, i["id"])
-        for i in json_node["instances"].values()
-    ]
-    main_result = project.graph.nodes[to_scv_str(ACTIVITY_END_SYSTEM, json_node["id"])][
-        "data"
-    ]
+    # get node from main graph
+    i_nodes = get_node_list_from_instance(project.graph, json_node["instances"].values()) 
+    # add node to internal graph
+    qs_start.graph.add_nodes_from(i_nodes)
+    # create expression for output
+    output = qs_start.attributes['output']
+    output.expression = add_expression_from_condition(qs_start.graph, json_node['conditions'])
+    # add flow to output
+    add_flow_from_condition(
+        qs_start.graph,
+        json_node["conditions"],
+        output.scv(),
+        qs_start,
+        flow_type="ASSOCIATION",
+    )
+    dangling = add_flow_from_instances(
+        qs_start.graph,
+        json_node["instances"].values(),
+        qs_start,
+    )
+    # attached the node that no "in" edges inside the QS
+    # we assume they are the first node inside the QS 
+    for n in dangling:
+        add_flow(qs_start.graph, qs_start, qs_start.scv(), n.scv())
+    return qs_start
+
+
+def import_mc_flow_from_activities(project, start, order):
+    qs_processed = {}
+    # looping on all activity
+    for node_id, attr in project.impl_graph.nodes(data=True):
+        node = attr['data']
+        if isinstance(node, TriccActivity) and node.attributes['expended']==False:
+            attempt_import_mc_flow_from_activity(
+                node,
+                project,
+                start,
+                qs_processed,
+                order
+            )
+    # get the QS that have new instance to extend (QS with [] as value are filtered out)
+    filtered_qs = dict((k, v) for k, v in qs_processed.items() if v)
+    # process QS as long as there is unprocessed qs
+    while len(filtered_qs) > 0:
+        for qs_code, instances in filtered_qs.items():
+            instances_copy = instances.copy()
+            for instance in instances_copy:
+                # we remove the instance to be processed from the list
+                qs_processed[qs_code].remove(instance)
+                # we tried again, if it fail it will be added again on qs_processed
+                attempt_import_mc_flow_from_activity(
+                    instance,
+                    project, start,
+                    qs_processed,
+                    order,
+                    qs_impl=instances
+                )
+            
+        filtered_qs = dict((k, v) for k, v in qs_processed.items() if v)
+
+
+def attempt_import_mc_flow_from_activity(node, project, start, qs_processed, order, qs_impl=None):
+
+    unprocessed = import_mc_flow_from_activity(
+        node, project, start, qs_processed, qs_impl
+    )
+    # adding empty list to know that this node was processed once 
+    # and may need to be reprocessed if another instance if found later
+    if node.code not in qs_processed:
+        qs_processed[node.code] = []
+    if unprocessed:
+        qs_processed[node.code] += unprocessed
+    else:
+        # adding the activity graph may have created loops
+        new_activities = unloop_from_node(project.impl_graph, start, order)
+        # new activity from unlooping are not extended so we will need to do that later
+        for act_code, qs_start_list in new_activities.items():
+            if act_code in qs_processed:
+                qs_processed[node.code] += qs_start_list
+
+
+def import_mc_flow_from_activity(node, project, start, qs_processed, qs_impl=[]):
+    logger.info(f"loading Activity {node.label}")
+    # getting node defintion
+    qs_nodes = [a['data'] for (n, a) in node.instantiate.graph.nodes(data=True)]
+    main_result = node.attributes['output']
     # for each unextended instance of the question sequence,
     # we extend it by adding the contained node and the ActuvityEnd
     unprocessed = []
-    for i in qs_impl:
-        # don't load the QS if the start node is isolated/dangling
-        # because when creatin the implementation graph every QS 
-        # got at least one instance, it makes no sense to extend it now 
-        # and could messup the unlooping
-        if not list(project.impl_graph.in_edges(i.scv())):
-            unprocessed.append(i)
-        else:
-            is_unprocessed = process_qs(
-                i, json_node, main_result, qs_nodes, project, start, qs_processed
-            )
-            if is_unprocessed:
-                unprocessed.append(is_unprocessed)
+    # don't load the QS if the start node is isolated/dangling
+    # because when creatin the implementation graph every QS 
+    # got at least one instance, it makes no sense to extend it now 
+    # and could messup the unlooping
+    if not list(project.impl_graph.in_edges(node.scv())):
+        unprocessed.append(node)
+    else:
+        is_unprocessed = expend_impl_activity(
+            node,
+            main_result,
+            qs_nodes,
+            project,
+            start,
+            qs_processed
+        )
+        if is_unprocessed:
+            unprocessed.append(node)
     return unprocessed
+
 
 def add_expression_from_condition(graph, conditions):
     expression_or = TriccOperation(TriccOperator.OR)
@@ -261,101 +305,59 @@ def add_expression_from_condition(graph, conditions):
             expression_or.append(expression)
     return expression_or if len(conditions) > 1 else expression
 
-def process_qs(
-    qs_start, json_node, main_result, qs_nodes, project, start, qs_processed
+
+def expend_impl_activity(
+    node, main_result, qs_nodes, project, start, qs_processed
 ):
-    # context to be used by the flow
-    # qs_start.attributes['processed'] = True
-    result = project.impl_graph.nodes[
-        to_scv_str(
-            ACTIVITY_END_SYSTEM,
-            qs_start.code,
-            instance=qs_start.instance,
-            version=qs_start.version,
-        )
-    ]["data"]
-    ## add expression to result from qs [x]
-    ## get references from the expression 
-    ## add an edge from all the nodes that are mentioned in the reference
-    ## to the activity_end node
-    if not result:
-        result = main_result.make_instance()
-        project.impl_graph.add_node(result.scv(), data=result)
-    result.expression = add_expression_from_condition(project.impl_graph, json_node['conditions'])
-    i_nodes = [(result.scv(), {"data": result})]
-    # if i.instance > 1:
-    #     i_nodes = [n.make_instance() for n in qs_nodes]
-    # else:
+    if "expended" in node.attributes and node.attributes["expended"]:
+        logger.error(f"trying to expend an activity already expended")
+        return None
+    node_def = node.instantiate
+    output_def = node_def.attributes['output']
+    # avoid expending an activity not connected to main start
     try:
         # will raise an exception if no path found
         paths = list(
-            nx.node_disjoint_paths(project.impl_graph, start.scv(), qs_start.scv())
+            nx.node_disjoint_paths(project.impl_graph, start.scv(), node.scv())
         )
-        # getting the list of the nodes instance that need to be used inside the QS
-        i_nodes += [
-            get_most_probable_instance(
-                project.impl_graph, paths, QUESTION_SYSTEM, n.code, n.version
-            )
-            for n in qs_nodes
-        ]
     # if QS start not attached to start, SHOULD NOT be use
     except NetworkXNoPath:
-        print("NOT CONNECTED WITH START:: ", result)
-        return qs_start
-         #    i_nodes = []
-    #    for n in qs_nodes:
-    #        node = get_most_probable_instance(
-    #            project.impl_graph,
-    #            [],
-    #            n.system,
-    #            n.code,
-    #            version=n.version,
-    #            force_new=True,
-    #        )
-    #        i_nodes.append(node)
-    #        # in case the QS instance were already processed, save it for later TODO 
-    #        if n.code not in qs_processed and isinstance(n, TriccActivity):
-    #            qs_processed[str(n.code)] = []
-    #        qs_processed[str(n.code)].append(n)
-#
+        print("NOT CONNECTED WITH START:: ", node)
+        return node
     except Exception as e:
         logger.error(f"unexpected error {e}")
         exit(-1)
     # add node to graph (if any new)
-    project.impl_graph.add_nodes_from(i_nodes)
+    node.attributes["expended"] = True
+    output = output_def.make_instance(instance=node.instance)
+    i_nodes = [
+        (output.scv(), {"data": output},),
+        (node.scv(), {"data": node},)
+        ]
+    # getting the list of the nodes instance that need to be used inside the QS
+    i_nodes += [
+        get_most_probable_instance(
+            project.impl_graph, paths, QUESTION_SYSTEM, n.code, n.version
+        )
+        for n in qs_nodes
+    ]
+    node.graph.add_nodes_from(i_nodes)
+    edges_def = list(node_def.graph.edges(keys=True, data=True))
+    for e in edges_def:
+        u = node_def.graph.nodes[e[0]]['data']
+        imp_u = get_element(project.impl_graph, u.system, u.code, u.version, white_list=i_nodes)
+        v = node_def.graph.nodes[e[1]]['data']
+        imp_v = get_element(project.impl_graph, v.system, v.code, v.version, white_list=i_nodes)
+        
+        data = {}
+        for key, value in e[3].items():
+            data[key] = value if key != 'activity' else node
+        node.graph.add_edge(imp_u.scv(), imp_v.scv(), **data)
     
-    # FIXME update edge condtion from node should be done arround here
-    # add the flow defined on the QS - If we make a new instance before, are we 
-    # adding flow from that instance? Seems like we just are taking the instances that
-    # were already there
-    dangling = add_flow_from_instances(
-        qs_start.graph,
-        json_node["instances"].values(),
-        qs_start,
-        white_list=i_nodes,
-    )
-    # attached the node that no "in" edges inside the QS
-    # we assume they are the first node inside the QS 
-    for n in dangling:
-        add_flow(qs_start.graph, qs_start, qs_start.scv(), n.scv())
-
     # add calculate
-    project.impl_graph.add_node(result.scv(), data=result)
-    # rebase node following the QS after the result (before adding the internal QS node)
-    rebase_edges(project.impl_graph, qs_start, result)
-
-    # "expression" of the ActivityEnd
-    i_nodes.append((result.scv(), {"data": result}))
-    # add calculate flow
-    add_flow_from_condition(
-        qs_start.graph,
-        json_node["conditions"],
-        result.scv(),
-        qs_start,
-        white_list=i_nodes,
-        flow_type="SEQUENCE",
-    )
-    project.impl_graph = nx.compose(project.impl_graph, qs_start.graph)
+    # rebase node following the QS after the result (before adding the internal QS nod
+    project.impl_graph = nx.compose(project.impl_graph, node.graph)
+    rebase_edges(project.impl_graph, node, output, black_list=[scv for (scv, n,) in i_nodes])
 
 
 def get_most_probable_instance(
@@ -407,7 +409,9 @@ def to_activity(json_node, system, graph, generate_end=True):
             label=json_node["label"][list(json_node["label"].keys())[0]],
             type_scv=TriccMixinRef(system="tricc_type", code="calculate"),
         )
-        graph.add_node(end.scv(), data=end)
+        node.attributes['output'] = end
+        node.graph.add_node(end.scv(), data=end)
+        node.graph.add_node(node.scv(), data=node)
     return node
 
 
@@ -623,21 +627,6 @@ def unloop_from_node(graph, start, order):
             old_node = graph.nodes[old_edge[1]]["data"]
             new_node = old_node.make_instance(sibling=True)
             if isinstance(old_node, TriccActivity):
-                activity_end = graph.nodes[
-                    to_scv_str(
-                        system=ACTIVITY_END_SYSTEM,
-                        code=old_node.code,
-                        instance=old_node.instance,
-                        version=old_node.version,
-                    )
-                ]["data"]
-                if activity_end:
-                    new_end = activity_end.make_instance(sibling=True)
-                    graph.add_node(new_end.scv(), data=new_end)
-                    if graph.in_edges(new_end.scv()):
-                        logger.warning(
-                            f"instance creation of an activity end {new_end.scv()} that was not dangling"
-                        )
                 if old_node.code not in new_activity_instances:
                     new_activity_instances[str(old_node.code)] = []
                 new_activity_instances[str(old_node.code)].append(new_node)
@@ -667,22 +656,20 @@ def unloop_from_node(graph, start, order):
 
 def rebase_edges(graph, old_node, new_node, black_list=[]):
     # get all edges from old node
-    node_edges = list(graph.edges(old_node.scv(), keys=True, data=True))
+    node_edges = [e for e in graph.edges(old_node.scv(), keys=True, data=True) if e[1] not in black_list]
     # assign each one to the new node
     for e in node_edges:
-        if e[1] not in black_list:
-            graph.remove_edge(*e[:3])
-            data = e[3]
-            # update condition
-            if "condition" in data and data["condition"]:
-                ref = f'"{old_node.instantiate.scv() if old_node.instantiate else old_node.scv()}"'
-                if ref in data["condition"]:
-                    data["condition"] = data["condition"].replace(
-                        ref,
-                        f'"{new_node.instantiate.scv() if new_node.instantiate else new_node.scv()}"',
-                    )
-
-            graph.add_edge(new_node.scv(), e[1], **data)
+        graph.remove_edge(*e[:3])
+        data = e[3]
+        # update condition
+        if "condition" in data and data["condition"]:
+            ref = f'"{old_node.instantiate.scv() if old_node.instantiate else old_node.scv()}"'
+            if ref in data["condition"]:
+                data["condition"] = data["condition"].replace(
+                    ref,
+                    f'"{new_node.instantiate.scv() if new_node.instantiate else new_node.scv()}"',
+                )
+        graph.add_edge(new_node.scv(), e[1], **data)
 
 
 def get_mc_name(name):

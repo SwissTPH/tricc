@@ -100,13 +100,24 @@ def add_dangling_node(G, node, stashed_nodes):
                 )
                 stashed_nodes.insert_at_bottom(element.scv())
 
+
 def walktrhough_tricc_node_processed_stached(G, scv, callback, processed_nodes, stashed_nodes, strategy,
                                              warn=False, node_path=[], **kwargs):
-    logger.debug("walkthrough::{}::{}".format(callback.__name__, scv))
+    logger.debug(f"walkthrough({len(stashed_nodes)})::{callback.__name__}::{scv}")
     node = G.nodes[scv]['data']
     df_survey = kwargs.get('df_survey')
     df_choices = kwargs.get('df_choices')
-    if (callback(G, node, processed_nodes,df_survey, df_choices, stashed_nodes=stashed_nodes, out_strategy= strategy)):
+    if (
+        callback(
+            G,
+            node,
+            processed_nodes,
+            df_survey,
+            df_choices,
+            stashed_nodes=stashed_nodes,
+            out_strategy=strategy
+        )
+    ):
         node_path.append(node)
         # node processing succeed
         if scv not in processed_nodes:
@@ -179,15 +190,22 @@ def save_graphml(G, start_node, filename, remove_dandling=True):
 def hierarchical_pos(G, root, width=1., pos=None, vert_gap=0.2, vert_loc=0.0, xcenter=0.5):
     if not pos:
         pos = {root: (xcenter, vert_loc)}
-    neighbors = [e[1] for e in G.edges(root)]
+    neighbors = [e[1] for e in G.out_edges(root)]
     if len(neighbors) != 0:
         dx = width / len(neighbors) 
         nextx = xcenter - width/2
         for neighbor in neighbors:
             if all([e[0] in pos for e in G.in_edges(neighbor)]):
                 nextx += dx
-                pos[neighbor] = (nextx, vert_loc - vert_gap)
-                hierarchical_pos(G, neighbor, pos=pos, width=dx, vert_gap=vert_gap, 
+                if neighbor in pos:
+                    deltax = pos[neighbor][0] - nextx
+                    deltay = pos[neighbor][1] - vert_loc + vert_gap
+                    logger.warning(f"pos already updated {neighbor}: {deltax}:{deltay}")
+                    if deltax > 0:
+                        pos[neighbor] = (nextx, vert_loc - vert_gap)     
+                else:
+                    pos[neighbor] = (nextx, vert_loc - vert_gap)
+                    hierarchical_pos(G, neighbor, pos=pos, width=dx, vert_gap=vert_gap, 
                                             vert_loc=vert_loc-vert_gap, xcenter=nextx)
             else:
                 pass

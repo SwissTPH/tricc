@@ -299,7 +299,7 @@ def generate_cut_off_exp(age_node, js_node):
             ce.append(TriccStatic(js_node['cut_off_end']))
             exp.append(ce)
 
-    return exp 
+    return exp
 
             
 def fetch_reference(all_nodes, prefix = ''):

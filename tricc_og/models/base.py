@@ -246,7 +246,15 @@ class TriccActivity(TriccBaseModel):
     def validate_graph(cls, value):
         validate_graph(value)
 
-
+    def make_instance(self, sibling=False, **kwargs):
+        instance = super(TriccActivity, self).make_instance(sibling=sibling, **kwargs)
+        # the base instance might be already expended
+        if sibling:
+            instance.attributes['expended'] = False
+        instance.graph = MultiDiGraph()
+        return instance
+        
+        
 def validate_graph(value):
     # Add your custom validation logic here if needed
     if not isinstance(value, MultiDiGraph):

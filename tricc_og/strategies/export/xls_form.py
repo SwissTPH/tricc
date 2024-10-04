@@ -52,8 +52,8 @@ class XLSFormStrategy(BaseExportStrategy):
 
         # self.df_survey.merge(nodes_dict[['name','label']], how='left', on= 'name')
         with pd.ExcelWriter(newpath, engine="xlsxwriter") as writer:
-            if len(df_survey[df_survey['name'] == 'version']):
-                df_survey.loc[df_survey['name'] == 'version', 'label'] = f"v{version}"
+            #if len(df_survey[df_survey['name'] == 'version']):
+            #    df_survey.loc[df_survey['name'] == 'version', 'label'] = f"v{version}"
             df_survey.to_excel(writer, sheet_name="survey", index=False)
             df_choice.to_excel(writer, sheet_name="choices", index=False)
             df_settings.to_excel(writer, sheet_name="settings", index=False)
@@ -122,7 +122,7 @@ class XLSFormStrategy(BaseExportStrategy):
         logger.info("dangling nodes")
         for node in self.project.impl_graph.nodes():
             if node not in processed_nodes:
-                logger.infor(node)
+                logger.info(node)
         # create a Pandas Excel writer using XlsxWriter as the engine
         self.export_as_xlsx(self.project.impl_graph, self.df_survey, self.df_choice, df_settings, newpath)
 
