@@ -5,8 +5,9 @@ from tricc_og.builders.utils import clean_name, remove_html
 from tricc_og.models.lang import SingletonLangClass
 from tricc_og.visitors.tricc_project import is_ready_to_process
 from tricc_og.models.base import (
-    TriccActivity, 
-    TriccOperation, 
+    TriccActivity,
+    TriccOperation,
+    TriccOperator,
     TriccStatic,
     TriccSCV
     )
@@ -740,47 +741,42 @@ def convert_note(G, node, processed_nodes, **kwargs):
 # Create helper to generate relevance from path in graph 
 # for Activity end the relevance will be the expression if there is no expression 
 
-def convert_calculate(G, node, processed_nodes, out_strategy, **kwargs):
+
+def convert_calculate(G, node, processed_nodes, out_strategy, df_survey, **kwargs):
     name, label, odk_type = convert_basic(node)
+    data_condition = convert_expression(node.expression, node.context, G, node, processed_nodes, out_strategy, **kwargs )
 
-    expressions = [
-        convert_expression(
-            data['condition'], 
-            u, 
-            G, 
-            node, 
-            processed_nodes,
-            out_strategy,
-            **kwargs) for u, v, data in G.in_edges(node, data=True) if 'condition' in data
-        ]
-    data_condition = ' or '.join(
-        expr for expr in expressions
-    )
-
-    df_survey = kwargs.get('df_survey')
     df_survey.loc[len(df_survey)] = [
         odk_type,
         name,
         label,
-        '' ,#hint
-        '' ,#help
-        '',#default
-        '',#'appearance', clean_name
-        '',#'constraint', 
-        '' ,#'constraint_message'
-        '',#'relevance'
-        '',#'disabled'
-        '',#'required'
-        '' ,#'required message'
-        '',#'read only'
-        data_condition,#'expression'
-        '',#'repeat_count'
-        ''#'image'  
+        '',  # hint
+        '',  # help
+        '',  # default
+        '',  # 'appearance', clean_name
+        '',  # 'constraint', 
+        '',  # 'constraint_message'
+        '',  # 'relevance'
+        '',  # 'disabled'
+        '',  # 'required'
+        '',  # 'required message'
+        '',  # 'read only'
+        data_condition,  # 'expression'
+        '',  # 'repeat_count'
+        ''  # 'image'  
     ]
-    return df_survey
 
-def convert(G, node, processed_nodes,df_survey, df_choices,stashed_nodes,out_strategy, **kwargs):
-    if is_ready_to_process(G, node, processed_nodes, stashed_nodes ):
+def convert(
+    G,
+    node,
+    processed_nodes,
+    df_survey,
+    df_choices,
+    stashed_nodes,
+    out_strategy,
+    **kwargs
+):
+    if is_ready_to_process(G, node, processed_nodes, stashed_nodes):
         if NODE_ID in node.scv():
                 pass
         if node.type_scv and node.type_scv.system + \
@@ -796,24 +792,28 @@ def convert(G, node, processed_nodes,df_survey, df_choices,stashed_nodes,out_str
             logger.error(f"{node.scv()}: no converter for {node.type_scv}")
             exit()
 
-def get_value(processed_nodes, ref, stategy):
+def get_value(processed_nodes, ref, strategy):
 
-    if isinstance(ref, (TriccSCV, str)):
+    if isinstance(ref, (TriccSCV)):
         svc = processed_nodes.get_latest_matching_str(
             ref.value.split('::')[0]
         )
         if svc == None :
             pass
-        return stategy.get_tricc_operation_operand(svc)
+        return strategy.get_tricc_operation_operand(svc)
     else:
-        return stategy.get_tricc_operation_operand(ref)
+        return strategy.get_tricc_operation_operand(ref)
 #Move to base export strategy?   
-def convert_expression(expression, in_node, G, node, processed_nodes, out_strategy, **kwargs ):
-    operator = expression.operator
-    
-    references =  [
+def convert_expression(expression, activity, G, node, processed_nodes, out_strategy, **kwargs ):
+    if activity:
+        activity_expression = get_relevance(
+            G, activity, processed_nodes, out_strategy, **kwargs
+        )
+    else:
+        activity_expression = None
+    references = [
         convert_expression(
-            exp, 
+            exp,
             None,
             G,
             node, 
@@ -825,9 +825,11 @@ def convert_expression(expression, in_node, G, node, processed_nodes, out_strate
                 TriccOperation
         ) else get_value(processed_nodes, exp, out_strategy) for exp in expression.reference
     ]
-    return out_strategy.OPERATOR_EXPORT[expression.operator](references)
-
-
+    expression = out_strategy.OPERATOR_EXPORT[expression.operator](references)
+    if activity_expression:
+        return out_strategy.OPERATOR_EXPORT[TriccOperator.AND]([activity_expression, expression])
+    else:
+        return expression
     #  or f'{OPERATOR_MAP[operator]}' if not isinstance(exp, TriccStatic) else exp.value
     
 #def get_latest_instance(expression, G, node, processed_nodes, **kwargs):
@@ -835,124 +837,229 @@ def convert_expression(expression, in_node, G, node, processed_nodes, out_strate
 #        return get_latest_matching_str(f"{expression.value}::")
 #    else:
 #        return str(exp)
+
+def get_relevance(G, node, processed_nodes, strategy, **kwargs):
+    expressions = [
+        convert_expression(
+            data['condition'],
+            data['activity'],
+            G,
+            node,
+            processed_nodes,
+            strategy,
+            **kwargs) for u, v, data in G.in_edges(node.scv(), data=True) if 'condition' in data
+        ]
+    return ' or '.join(
+        expr for expr in expressions
+    )
+
+def convert_generic(
+    G, node, processed_nodes, strategy, df_survey,
+    df_choices, **kwargs
+):
+    name, label, odk_type = convert_basic(node)
+    data_condition = get_relevance(
+        G, node, processed_nodes, strategy, **kwargs
+    )
+    return [
+        odk_type,
+        name,
+        label,
+        '',  # hint
+        '',  # help
+        '',  # default
+        '',  # 'appearance', clean_name
+        '',  # 'constraint', 
+        '',  # 'constraint_message'
+        data_condition,  # 'relevance'
+        '',  # 'disabled'
+        '',  # 'required'
+        '',  # 'required message'
+        '',  # 'read only'
+        '',  # 'expression'
+        '',  # 'repeat_count'
+        ''  # 'image'  
+    ]
     
 
-def convert_select_multiple(G, node, processed_nodes, startegy, **kwargs):
-        #expression =convert_expression(G, node.expression, processed_nodes, 
-        #            df_survey=df_survey, df_choices=df_choices)
-        #else: 
-        pass
+def convert_select_multiple(G, node, processed_nodes, strategy, df_survey,
+        df_choices, **kwargs):
+    survey_row = convert_generic(
+        G, node, processed_nodes, strategy, df_survey,
+        df_choices, **kwargs
+    )
+    list_name = add_options(node, df_choices)
+    survey_row[0] = f"select_multiple list_{list_name}"
+    df_survey.loc[len(df_survey)] = survey_row
 
 
-def convert_select_one(G, node, processed_nodes, strategy, **kwargs):
+def add_options(node, df_choices):
+    list_name = node.attributes.get(
+        'option_list_name',
+        clean_name(node.scv(with_instance=False))
+    )
+    list_name_exists = len(df_choices[df_choices['list_name'] == list_name])
+    if list_name_exists:
+        return list_name
+    options = [
+        att for k, att in node.attributes.items() if k.startswith('options_') 
+    ]
+    for o in options:
+        df_choices.loc[len(df_choices)] = [
+            list_name,  # "list_name"
+            o.code,  # "name"
+            o.label,  # "label"
+        ]
+
+    return list_name
+
+def add_yes_no_options(df_choices):
+    list_name = 'yes_no'
+    if len(df_choices[df_choices['list_name'] == list_name])> 0:
+        for o in [(1, 'Yes'), (-1, 'No')]:
+            df_choices.loc[len(df_choices)] = [
+                list_name,  # "list_name"
+                o[0],  # "name"
+                o[1],  # "label"
+            ]
+    return list_name
+
+def convert_select_one(G, node, processed_nodes, strategy, df_survey,
+        df_choices, **kwargs):
+    survey_row = convert_generic(
+        G, node, processed_nodes, strategy, df_survey,
+        df_choices, **kwargs
+    )
+    list_name = add_options(node, df_choices)
+    survey_row[0] = f"select_multiple list_{list_name}"
+    df_survey.loc[len(df_survey)] = survey_row
+
+
+def convert_select_yesno(G, node, processed_nodes, strategy, df_survey,
+        df_choices, **kwargs):
+    survey_row = convert_generic(
+        G, node, processed_nodes, strategy, df_survey,
+        df_choices, **kwargs
+    )
+    list_name = add_yes_no_options(df_choices)
+    survey_row[0] = f"select_multiple list_{list_name}"
+    df_survey.loc[len(df_survey)] = survey_row
+
+
+
+def convert_select_option(G, node, processed_nodes, strategy, df_choices, **kwargs):
+    add_options(node, df_choices)
+
+
+def convert_decimal(G, node, processed_nodes, strategy, df_survey, df_choices, **kwargs):
+    df_survey.loc[len(df_survey)] = convert_generic(
+        G, node, processed_nodes, strategy, df_survey,
+        df_choices, **kwargs
+    )
+
+
+def convert_integer(G, node, processed_nodes, strategy, df_survey, df_choices, **kwargs):
+    df_survey.loc[len(df_survey)] = convert_generic(
+        G, node, processed_nodes, strategy, df_survey,
+        df_choices, **kwargs
+    )
+
+
+def convert_text(G, node, processed_nodes, strategy, df_survey, df_choices, **kwargs):
+    df_survey.loc[len(df_survey)] = convert_generic(
+        G, node, processed_nodes, strategy, df_survey,
+        df_choices, **kwargs
+    )
+
+
+def convert_date(G, node, processed_nodes, strategy, df_survey, df_choices, **kwargs):
+    df_survey.loc[len(df_survey)] = convert_generic(
+        G, node, processed_nodes, strategy, df_survey,
+        df_choices, **kwargs
+    )
+
+
+def convert_rhombus(G, node, processed_nodes, strategy, df_survey, df_choices, **kwargs):
+    pass
+
+def convert_goto(G, node, processed_nodes, strategy, df_survey, df_choices, **kwargs):
+    pass
+
+def convert_start(G, node, processed_nodes, strategy, df_survey, df_choices, **kwargs):
+    pass
+
+def convert_activity_start(G, node, processed_nodes, strategy, df_survey, df_choices, **kwargs):
+    pass
+
+def convert_link_in(G, node, processed_nodes, strategy, df_survey, df_choices, **kwargs):
     pass
 
 
-def convert_select_yesno(G, node, processed_nodes, strategy, **kwargs):
+def convert_link_out(G, node, processed_nodes, strategy, df_survey, df_choices, **kwargs):
     pass
 
 
-def convert_select_option(G,node, processed_nodes, strategy, **kwargs):
+def convert_count(G, node, processed_nodes, strategy, df_survey, df_choices, **kwargs):
+    pass
+
+def convert_add(G, node, processed_nodes, strategy, df_survey, df_choices, **kwargs):
+    pass
+
+def convert_container_hint_media(G, node, processed_nodes, strategy, df_survey, df_choices, **kwargs):
+    pass
+
+def convert_activity(G, node, processed_nodes, strategy, df_survey, df_choices, **kwargs):
     pass
 
 
-def convert_decimal(G,node, processed_nodes, strategy, **kwargs):
+def convert_help_message(G, node, processed_nodes, strategy, df_survey, df_choices, **kwargs):
     pass
 
 
-def convert_integer(G,node, processed_nodes, strategy, **kwargs):
+def convert_hint_message(G, node, processed_nodes, strategy, df_survey, df_choices, **kwargs):
     pass
 
 
-def convert_text(G,node, processed_nodes, strategy, **kwargs):
+def convert_not(G, node, processed_nodes, strategy, df_survey, df_choices, **kwargs):
     pass
 
 
-def convert_date(G,node, processed_nodes, strategy, **kwargs):
+def convert_end(G, node, processed_nodes, strategy, df_survey, df_choices, **kwargs):
     pass
 
 
-def convert_rhombus(G,node, processed_nodes, strategy, **kwargs):
-    pass
-
-def convert_goto(G,node, processed_nodes, strategy, **kwargs):
-    pass
-
-def convert_start(G,node, processed_nodes, strategy, **kwargs):
-    pass
-
-def convert_activity_start(G,node, processed_nodes, strategy, **kwargs):
-    pass
-
-def convert_link_in(G,node, processed_nodes, strategy, **kwargs):
+def convert_activity_end(G, node, processed_nodes, strategy, df_survey, df_choices, **kwargs):
     pass
 
 
-def convert_link_out(G,node, processed_nodes, strategy, **kwargs):
+def convert_edge(G, node, processed_nodes, strategy, df_survey, df_choices, **kwargs):
     pass
 
 
-def convert_count(G,node, processed_nodes, strategy, **kwargs):
-    pass
-
-def convert_add(G,node, processed_nodes, strategy, **kwargs):
-    pass
-
-def convert_container_hint_media(G,node, processed_nodes, strategy, **kwargs):
-    pass
-
-def convert_activity(G,node, processed_nodes, strategy, **kwargs):
+def convert_page(G, node, processed_nodes, strategy, df_survey, df_choices, **kwargs):
     pass
 
 
-def convert_help_message(G,node, processed_nodes, strategy, **kwargs):
+def convert_not_available(G, node, processed_nodes, strategy, df_survey, df_choices, **kwargs):
     pass
 
 
-def convert_hint_message(G,node, processed_nodes, strategy, **kwargs):
+def convert_quantity(G, node, processed_nodes, strategy, df_survey, df_choices, **kwargs):
     pass
 
 
-def convert_not(G,node, processed_nodes, strategy, **kwargs):
+def convert_bridge(G, node, processed_nodes, strategy, df_survey, df_choices, **kwargs):
     pass
 
 
-def convert_end(G,node, processed_nodes, strategy, **kwargs):
+def convert_wait(G, node, processed_nodes, strategy, df_survey, df_choices, **kwargs):
     pass
 
 
-def convert_activity_end(G,node, processed_nodes, strategy, **kwargs):
+def convert_operation(G, node, processed_nodes, strategy, df_survey, df_choices, **kwargs):
     pass
 
-
-def convert_edge(G,node, processed_nodes, strategy, **kwargs):
-    pass
-
-
-def convert_page(G,node, processed_nodes, strategy, **kwargs):
-    pass
-
-
-def convert_not_available(G,node, processed_nodes, strategy, **kwargs):
-    pass
-
-
-def convert_quantity(G,node, processed_nodes, strategy, **kwargs):
-    pass
-
-
-def convert_bridge(G,node, processed_nodes, strategy, **kwargs):
-    pass
-
-
-def convert_wait(G,node, processed_nodes, strategy, **kwargs):
-    pass
-
-
-def convert_operation(G,node, processed_nodes, strategy, **kwargs):
-    pass
-
-def convert_context(G,node, processed_nodes, strategy, **kwargs):
+def convert_context(G, node, processed_nodes, strategy, df_survey, df_choices, **kwargs):
     pass
 
 

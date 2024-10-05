@@ -121,9 +121,9 @@ class MedalCStrategy(BaseInputStrategy):
                 project, start_impl, order
             )
         # image
-        self.save_simple_graph(project.impl_graph, start_impl, "qs_loaded.png")
-        self.save_simple_tree(project.impl_graph, start_impl.scv(), "tree.png")
-        save_graphml(project.impl_graph, start_impl.scv(), "decisiontree.graphml")
+        # self.save_simple_graph(project.impl_graph, start_impl, "qs_loaded.png")
+        # self.save_simple_tree(project.impl_graph, start_impl.scv(), "tree.png")
+        # save_graphml(project.impl_graph, start_impl.scv(), "decisiontree.graphml")
         logger.info(f"Final graph has {project.impl_graph.number_of_edges()} edges")
 
         # add calculate ?  how to design activity outcome ?
