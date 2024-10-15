@@ -236,11 +236,6 @@ class XLSFormStrategy(BaseExportStrategy):
             return f"'{r}'"
         elif isinstance(r, (int, float)):
             return r
-        #elif isinstance(r, TriccNodeSelectOption):
-        #    return r.name
-        #TODO is this also deprecated?
-        #elif issubclass(r.__class__, TriccBaseModel):
-        #    return f"${{{get_export_name(r)}}}"
         elif isinstance(r, TriccSCV):
             return f"${{{r.value}}}"
         else:

@@ -36,8 +36,7 @@ MANDATORY_STAGE = [
     "first_look_assessment_step",
     "complaint_category",
 ]
-# FIXME to be removed after dev OK
-NODE_ID = "7331"
+
 
 
 def import_mc_nodes(json_node, system, project, js_fullorder, start):
@@ -101,8 +100,6 @@ def import_mc_flow_to_diagnose(json_node, system, project, start):
 def add_flow_from_instances(graph, instances, activity, white_list=None):
     dandling = set()
     for instance in instances:
-        if str(instance["id"]) == NODE_ID:
-            pass
         _to = get_element(graph, QUESTION_SYSTEM, instance["id"], white_list=white_list)
         _to_activity_end = None
         if isinstance(_to, TriccActivity) and _to == activity:
@@ -216,8 +213,6 @@ def add_expression_from_condition(graph, conditions):
     expression_or = TriccOperation(TriccOperator.OR)
     expression = None
     for condition in conditions:
-        if (NODE_ID) == str(condition['node_id']):
-            pass
         expression = TriccOperation(TriccOperator.EQUAL)
         ref = get_elements(
             graph, QUESTION_SYSTEM, condition['node_id']
@@ -480,19 +475,17 @@ def fullorder_to_order(js_fullorder):
 
 ### TODO tranlate it for
 
-#  node_age_day=[], node_age_month=[], node_age_year=[] are mutable, they will be shared between all the calls of the function
-
 def add_age_calculation(json_node, dob):
-        if json_node["formula"] == "ToMonth":
-            op = TriccOperation(TriccOperator.AGE_MONTH)
-            op.append(TriccSCV(dob.scv()))
-        elif json_node["formula"] == "ToDay":
-            op = TriccOperation(TriccOperator.AGE_DAY)
-            op.append(TriccSCV(dob.scv()))
-        else:
-            logger.error("basic_demographic unrelated to age not supported")
-            exit(-1)
-        return op
+    if json_node["formula"] == "ToMonth":
+        op = TriccOperation(TriccOperator.AGE_MONTH)
+        op.append(TriccSCV(dob.scv()))
+    elif json_node["formula"] == "ToDay":
+        op = TriccOperation(TriccOperator.AGE_DAY)
+        op.append(TriccSCV(dob.scv()))
+    else:
+        logger.error("basic_demographic unrelated to age not supported")
+        exit(-1)
+    return op
 
 def add_background_calculation_options(json_node, age_day, age_month, dob):
     # in a previous functions basic_demographic node should be identified (How to keep the old id ?) use a filter ? 
