@@ -35,7 +35,7 @@ def get_yesno_options(project, select_node):
 
 
 def process_edges(project):
-    for u, v, attrs in project.graph.edges(data=True):
+    for u, v, attrs in project.graph.out_edges(data=True):
         if u.type_scv == to_scv_type(TriccNodeType.select_yesno):
             process_yesno_edge(project, u, v, attrs)
             

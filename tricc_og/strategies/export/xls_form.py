@@ -1,13 +1,15 @@
 from tricc_og.builders.xls_form import (
     CHOICE_MAP,
     SURVEY_MAP,
-    convert
+    convert,
+    or_join,
+    and_join,
+    negate_term,
 )
 import pandas as pd
 import abc
 import logging
 import os
-from tricc_oo.visitors.tricc import stashed_node_func
 from tricc_og.visitors.tricc_project import walktrhough_tricc_processed_stached, is_ready_to_process
 import datetime
 from .base_export_strategy import BaseExportStrategy
@@ -17,6 +19,7 @@ from tricc_og.models.base import (
     TriccSCV
 )
 from tricc_og.models.ordered_set import OrderedSet
+from tricc_og.models.operators import TriccOperator
 
 logger = logging.getLogger("default")
 
@@ -110,13 +113,14 @@ class XLSFormStrategy(BaseExportStrategy):
         #    self.cur_group,
         # )
         walktrhough_tricc_processed_stached(
-            self.project.impl_graph, 
-            main_start, 
+            self.project.impl_graph,
+            main_start,
             convert,
-            processed_nodes, 
+            processed_nodes,
             stashed_nodes,
-            strategy =self,
-            df_survey=self.df_survey, 
+            strategy=self,
+            node_path=[],
+            df_survey=self.df_survey,
             df_choices=self.df_choice,
         )
         logger.info("dangling nodes")
@@ -155,40 +159,40 @@ class XLSFormStrategy(BaseExportStrategy):
         return and_join([ref_expressions[0], or_join(ref_expressions[1:])])
 
     def tricc_operation_native(self, ref_expressions):
-        return r
+        return ref_expressions
 
     def tricc_operation_istrue(self, ref_expressions):
-        return f"{ref_expressions[0]} > 0"
+        return f"${{{ref_expressions[0]}}} > 0"
 
     def tricc_operation_isfalse(self, ref_expressions):
-        return f"{ref_expressions[0]} = 0"
+        return f"${{{ref_expressions[0]}}} = 0"
 
     def tricc_operation_selected(self, ref_expressions):
         parts = []
         for s in ref_expressions[1:]:
-            parts.append(f"selected({ref_expressions[0]}, r)")
+            parts.append(f"selected(${{{ref_expressions[0]}}}, {s})")
         return self.tricc_operation_or(parts)
 
     def tricc_operation_more_or_equal(self, ref_expressions):
-        return f"{ref_expressions[0]} >= {ref_expressions[1]}"
+        return f"${{{ref_expressions[0]}}} >= {ref_expressions[1]}"
 
     def tricc_operation_less_or_equal(self, ref_expressions):
-        return f"{ref_expressions[0]} <= {ref_expressions[1]}"
+        return f"${{{ref_expressions[0]}}} <= {ref_expressions[1]}"
 
     def tricc_operation_more(self, ref_expressions):
-        return f"{ref_expressions[0]} > {ref_expressions[1]}"
+        return f"${{{ref_expressions[0]}}} > {ref_expressions[1]}"
 
     def tricc_operation_less(self, ref_expressions):
-        return f"{ref_expressions[0]} < {ref_expressions[1]}"
+        return f"${{{ref_expressions[0]}}} < {ref_expressions[1]}"
 
     def tricc_operation_between(self, ref_expressions):
-        return f"{ref_expressions[0]} >= {ref_expressions[1]} and {ref_expressions[0]} < {ref_expressions[2]}"
+        return f"${{{ref_expressions[0]}}} >= {ref_expressions[1]} and ${{{ref_expressions[0]}}} < {ref_expressions[2]}"
 
     def tricc_operation_equal(self, ref_expressions):
-        return f"{ref_expressions[0]} = {ref_expressions[1]}"
+        return f"${{{ref_expressions[0]}}} = {ref_expressions[1]}"
 
     def tricc_operation_not_equal(self, ref_expressions):
-        return f"{ref_expressions[0]} != {ref_expressions[1]}"
+        return f"${{{ref_expressions[0]}}} != {ref_expressions[1]}"
 
     def tricc_operation_case(self, ref_expressions):
         ifs = 0
@@ -213,7 +217,7 @@ class XLSFormStrategy(BaseExportStrategy):
         return self.tricc_operation_case(ref_expressions)
 
     def tricc_operation_contains(self, ref_expressions):
-        return f"contains({ref_expressions[0]}, {ref_expressions[1]})"
+        return f"contains(${{{ref_expressions[0]}}}, {ref_expressions[1]})"
 
     def tricc_operation_exists(self, ref_expressions):
         parts = []
@@ -235,7 +239,7 @@ class XLSFormStrategy(BaseExportStrategy):
         #elif isinstance(r, TriccNodeSelectOption):
         #    return r.name
         #TODO is this also deprecated?
-        #elif issubclass(r.__class__, TriccNodeBaseModel):
+        #elif issubclass(r.__class__, TriccBaseModel):
         #    return f"${{{get_export_name(r)}}}"
         elif isinstance(r, TriccSCV):
             return f"${{{r.value}}}"
@@ -243,3 +247,24 @@ class XLSFormStrategy(BaseExportStrategy):
             raise NotImplementedError(
                 f"This type of node {r.__class__} is not supported within an operation"
             )
+
+    OPERATOR_EXPORT = {
+        TriccOperator.EQUAL: tricc_operation_equal,
+        TriccOperator.AND: tricc_operation_and,
+        TriccOperator.ADD_OR: tricc_operation_or_and,
+        TriccOperator.NOT: tricc_operation_not,
+        TriccOperator.OR: tricc_operation_or,
+        TriccOperator.NOT_EQUAL: tricc_operation_not_equal,
+        TriccOperator.LESS_OR_EQUAL: tricc_operation_less_or_equal,
+        TriccOperator.MORE_OR_EQUAL: tricc_operation_more_or_equal,
+        TriccOperator.BETWEEN: tricc_operation_between,
+        TriccOperator.NATIVE: tricc_operation_native,
+        TriccOperator.IF: tricc_operation_if,
+        TriccOperator.IFS: tricc_operation_if,
+        TriccOperator.ISFALSE: tricc_operation_isfalse,
+        TriccOperator.ISTRUE: tricc_operation_istrue,
+        TriccOperator.EXISTS: tricc_operation_exists,
+        TriccOperator.CONTAINS: tricc_operation_contains,
+        TriccOperator.LESS: tricc_operation_less,
+        TriccOperator.MORE: tricc_operation_more,
+    }  

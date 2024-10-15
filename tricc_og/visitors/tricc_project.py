@@ -70,19 +70,26 @@ def add_flow(
     )
 
 
-def is_ready_to_process(G, node, processed, stashed_nodes):
+def is_ready_to_process(G, node, processed_nodes, stashed_nodes):
     references = []
     if hasattr(node, 'expression') and node.expression:
         references = node.expression.get_references() # gives only triccSCV
-    previous_node_processed = [e[0] in processed for e in list(G.in_edges(node.scv(), keys=True))]
-    if previous_node_processed:
-        stashed_nodes._add_items(
-            e[0] for e, is_processed in 
-                zip(G.in_edges(node.scv(), keys=True), previous_node_processed) 
-            if not is_processed
+    previous_node_processed = [e[0] in processed_nodes and 
+        (
+            not e[3].get('activity', None) or
+            not isinstance(e[3]['activity'], TriccActivity) or
+            e[3]['activity'].scv() in processed_nodes
+            
         )
+        for e in list(G.in_edges(node.scv(), keys=True, data=True))]
+    alarm = [ e[0] in processed_nodes and 
+        isinstance(G.nodes[e[0]]['data'], TriccActivity) and e[3].get('activity', None) != G.nodes[e[0]]['data'] and
+        e[3].get('activity', None) not in processed_nodes
+        for e in list(G.in_edges(node.scv(), keys=True, data=True))
+    ]
+
     calculate_references_processed = (
-            [any(p.startswith(f"{r.value}") for p in processed) for r in references ]
+            [any(p.startswith(f"{r.value}") for p in processed_nodes) for r in references]
                 if references
                 else [True])
     return all([
@@ -90,23 +97,31 @@ def is_ready_to_process(G, node, processed, stashed_nodes):
         *calculate_references_processed
     ])
 
-def add_dangling_node(G, node, stashed_nodes):
+def add_dangling_node(G, node, processed_nodes, stashed_nodes):
     # Check if reference that hasn't been processed has in_nodes, if 
     # it doesn't, stash it 
+    # ies = G.in_edges(node, keys=True, data=True)
+    # for n in [e[0] for e in ies if e[3]['flow_type'] == "ASSOCIATION"]:
+    #     stashed_nodes.insert_at_bottom(G.nodes[n]['data'])
+    
     if hasattr(node, 'expression') and node.expression:
         references = node.expression.get_references()
         for r in references:
+            
             if not G.in_edges(r.value, data=True):
                 element = (get_elements(G, 'questions', r.value.split('_', 1)[1])[-1] if r.value.startswith('questions') else  
                     get_elements(G, 'ActivityEnd', r.value.split('_', 1)[1])[-1] if r.value.startswith('Activity')
                 else get_elements(G, 'diagnose', r.value.split('_', 1)[1])[-1]
                 )
-                stashed_nodes.insert_at_bottom(element.scv())
+                scv = element.scv()
+                if scv not in processed_nodes and scv not in stashed_nodes:
+                    logger.debug("add_dangling_node::{}: stashed({})".format(node.get_name(), len(stashed_nodes)))
+                    stashed_nodes.insert_at_bottom(scv)
 
 
 def walktrhough_tricc_node_processed_stached(G, scv, callback, processed_nodes, stashed_nodes, strategy,
                                              warn=False, node_path=[], **kwargs):
-    logger.debug(f"walkthrough({len(stashed_nodes)})::{callback.__name__}::{scv}")
+    logger.debug(f"walkthrough({len(stashed_nodes)}|{len(processed_nodes)})::{callback.__name__}::{scv}")
     node = G.nodes[scv]['data']
     df_survey = kwargs.get('df_survey')
     df_choices = kwargs.get('df_choices')
@@ -129,11 +144,14 @@ def walktrhough_tricc_node_processed_stached(G, scv, callback, processed_nodes, 
         if scv in stashed_nodes:
             stashed_nodes.remove(scv)
         # reorder_node_list(stashed_nodes, node.group)
-        stashed_nodes._add_items(list(G.successors(scv)))
-        #for el in list(G.successors(scv)):
+        for s in list(G.successors(scv)):
+            if s not in processed_nodes and s not in stashed_nodes:
+                logger.debug("{}::{}: successor stashed({})".format(callback.__name__, node.get_name(), len(stashed_nodes)))
+                stashed_nodes.insert_at_bottom(s)
+        # for el in list(G.successors(scv)):
         #    stashed_nodes.add(el)
     else:
-        add_dangling_node(G, node, stashed_nodes)
+        add_dangling_node(G, node, processed_nodes, stashed_nodes)
         if scv not in processed_nodes and scv not in stashed_nodes:
             stashed_nodes.insert_at_bottom(node.scv())
             logger.debug("{}::{}: stashed({})".format(callback.__name__, node.get_name(), len(stashed_nodes)))
@@ -142,7 +160,7 @@ def walktrhough_tricc_processed_stached(G, start, callback, processed_nodes, sta
                                         warn=False, node_path=[], **kwargs):
     
     walktrhough_tricc_node_processed_stached(G, start, callback, processed_nodes, stashed_nodes, strategy,
-                                             warn=False, node_path=[], **kwargs)
+                                             warn=False, node_path=node_path, **kwargs)
     next_node = None
     prev_node = None
     while stashed_nodes:
@@ -150,7 +168,7 @@ def walktrhough_tricc_processed_stached(G, start, callback, processed_nodes, sta
         if prev_node == next_node:
             logger.error("LOOOOOOOOOOOOOOOOOOOOOP")
         walktrhough_tricc_node_processed_stached(G, next_node, callback, processed_nodes, stashed_nodes, strategy,
-                            warn=False, node_path=[], **kwargs)
+                            warn=False, node_path=node_path, **kwargs)
         prev_node = next_node
 
 #def export_tricc_operation(t_o, orderd_set_available_scv, export_strategy):
@@ -178,7 +196,7 @@ def save_graphml(G, start_node, filename, remove_dandling=True):
             graph.nodes[node]['label'] = tricc_node.label
             del graph.nodes[node]['data']
         
-    for edge in graph.edges(keys=True, data=True):
+    for edge in graph.out_edges(keys=True, data=True):
         edge[3]['flow_type'] = str(edge[3]['flow_type'])
         if edge[3]['activity']:
             edge[3]['activity'] = edge[3]['activity'].scv()
@@ -223,7 +241,7 @@ def import_mc_flow_from_activities(project, start, order):
     for node_id, attr in project.impl_graph.nodes(data=True):
         node = attr['data']
         if isinstance(node, TriccActivity) and node.attributes['expended']==False:
-            attempt_import_mc_flow_from_activity(
+            qs_processed = attempt_import_mc_flow_from_activity(
                 node,
                 project,
                 start,
@@ -240,7 +258,7 @@ def import_mc_flow_from_activities(project, start, order):
                 # we remove the instance to be processed from the list
                 qs_processed[qs_code].remove(instance)
                 # we tried again, if it fail it will be added again on qs_processed
-                attempt_import_mc_flow_from_activity(
+                qs_processed = attempt_import_mc_flow_from_activity(
                     instance,
                     project, start,
                     qs_processed,
@@ -261,15 +279,15 @@ def attempt_import_mc_flow_from_activity(node, project, start, qs_processed, ord
     if node.code not in qs_processed:
         qs_processed[node.code] = []
     if unprocessed:
-        qs_processed[node.code] += unprocessed
+        qs_processed = merge_dict_lists(unprocessed, qs_processed)
     else:
         # adding the activity graph may have created loops
         new_activities = unloop_from_node(project.impl_graph, start, order)
         # new activity from unlooping are not extended so we will need to do that later
-        for act_code, qs_start_list in new_activities.items():
-            if act_code in qs_processed:
-                qs_processed[node.code] += qs_start_list
-
+        if new_activities:
+            qs_processed = merge_dict_lists(qs_processed, new_activities)
+    return qs_processed
+            
 
 def import_mc_flow_from_activity(node, project, start, qs_processed, qs_impl=[]):
     activity_label = node.label + (("::" + str(node.instance)) if node.instance else '')
@@ -278,33 +296,34 @@ def import_mc_flow_from_activity(node, project, start, qs_processed, qs_impl=[])
     
     # for each unextended instance of the question sequence,
     # we extend it by adding the contained node and the ActuvityEnd
-    unprocessed = []
+    unprocessed = {}
     # don't load the QS if the start node is isolated/dangling
     # because when creatin the implementation graph every QS 
     # got at least one instance, it makes no sense to extend it now 
     # and could messup the unlooping
-    if not list(project.impl_graph.in_edges(node.scv())):
-        unprocessed.append(node)
-    else:
-        is_unprocessed = expend_impl_activity(
-            node,
-            project,
-            start,
-            qs_processed
+    unprocessed_from_expend = expend_impl_activity(
+        node,
+        project,
+        start,
+        qs_processed
+    )
+    if unprocessed_from_expend:
+        unprocessed = merge_dict_lists(
+            unprocessed,
+            unprocessed_from_expend
         )
-        if is_unprocessed:
-            unprocessed.append(node)
     return unprocessed
 
 
 def expend_impl_activity(
     node, project, start, qs_processed
 ):
+    new_activity_instances = {}
     if "expended" in node.attributes and node.attributes["expended"]:
         logger.error(f"trying to expend an activity already expended")
         return None
     node_def = node.instantiate
-    output_def = node_def.attributes['output']
+    output_def = node_def.attributes.get('output', None) 
     # avoid expending an activity not connected to main start
     try:
         # will raise an exception if no path found
@@ -314,35 +333,54 @@ def expend_impl_activity(
     # if QS start not attached to start, SHOULD NOT be use
     except NetworkXNoPath:
         print("NOT CONNECTED WITH START:: ", node)
-        return node
+        return {node.code: [node]}
     except Exception as e:
         logger.error(f"unexpected error {e}")
         exit(-1)
     # add node to graph (if any new)
     node.attributes["expended"] = True
-    output = node.attributes['output']
-    if not output:
-        output = output_def.make_instance(instance=node.instance)
-        node.attributes['output'] = output
     i_nodes = [
-        (output.scv(), {"data": output},),
         (node.scv(), {"data": node},)
-        ]
+    ]
+    output = node.attributes.get('output', None)
+    if output:
+        i_nodes.append((output.scv(), {"data": output},))
     qs_nodes = [a['data'] for (n, a) in node_def.graph.nodes(data=True)]
     qs_nodes.remove(node_def)
-    qs_nodes.remove(output_def)
+    if output_def:
+        qs_nodes.remove(output_def)
     # getting the list of the nodes instance that need to be used inside the QS
     i_nodes += [
         get_most_probable_instance(
-            project.impl_graph, paths, n.system, n.code, n.version
+            project.impl_graph,
+            paths,
+            n.system,
+            n.code,
+            n.version,
+            force_new=(node.instance > 1)
         )
         for n in qs_nodes
     ]
     node.graph.add_nodes_from(i_nodes)
-    edges_def = list(node_def.graph.edges(keys=True, data=True))
+    edges_def = list(node_def.graph.out_edges(keys=True, data=True))
     for e in edges_def:
         u = node_def.graph.nodes[e[0]]['data']
         imp_u = get_element(project.impl_graph, u.system, u.code, u.version, white_list=i_nodes)
+        if(
+            isinstance(imp_u, TriccActivity) and
+            imp_u != node
+        ):
+            if imp_u.attributes.get('expended', False):
+                u_output = imp_u.attributes.get('output', None)
+                if u_output:
+                    if u_output.scv() not in node.graph:
+                        node.graph.add_node(u_output.scv(), data=u_output)
+                    imp_u = u_output
+            else:
+                if imp_u.code not in new_activity_instances:
+                    new_activity_instances[str(imp_u.code)] = []
+                new_activity_instances[str(imp_u.code)].append(imp_u)
+        
         v = node_def.graph.nodes[e[1]]['data']
         imp_v = get_element(project.impl_graph, v.system, v.code, v.version, white_list=i_nodes)
         
@@ -354,20 +392,38 @@ def expend_impl_activity(
     # add calculate
     # rebase node following the QS after the result (before adding the internal QS nod
     project.impl_graph = nx.compose(project.impl_graph, node.graph)
-    rebase_edges(project.impl_graph, node, output, black_list=[scv for (scv, n,) in i_nodes])
+    if output:
+        rebase_edges(project.impl_graph, node, output)
+    return new_activity_instances
 
 
 def get_most_probable_instance(
-    graph, paths, system, code, version=None, force_new=False
+    graph, paths, system, code, version=None, start=None, force_new=False
 ):
     nodes = get_elements(graph, system, code)
+    score = {}
     if not force_new:
         # look if the exisitng instance of the inner node are already 
         # in a path leading to the QS start, 
         # if it the case it would for sure lead to a loop
+
         for n in nodes:
-            if not any(n.scv() in path for path in paths):
-                return (n.scv(), {"data": n})
+            score[n] = len(graph.out_edges(n.scv()))
+            if any(n.scv() in path for path in paths):
+                score[n] = 1000
+            if start:
+                try:
+                    # if path found it will lead to a loop
+                    sub_paths = list(
+                        nx.node_disjoint_paths(graph, n.scv(), start.scv())
+                    )
+                    score[n] = 500
+                except:
+                    pass
+        best = min(nodes, key=lambda n: score[n])
+                
+        if score[best] < 1000:
+            return (best.scv(), {"data": best})
     # no instance found that won't lead to a loop
     # then create a new one
     if nodes:
@@ -391,7 +447,7 @@ def make_implementation(project):
                 project.impl_graph_process_start[process] = []
             project.impl_graph_process_start[process].append(start_node.instances[0])
 
-    for u, v, data in project.graph.edges(data=True):
+    for u, v, data in project.graph.out_edges(data=True):
         if (
             project.graph.nodes[u]["data"].code == NODE_ID
             or project.graph.nodes[v]["data"].code == NODE_ID
@@ -408,6 +464,15 @@ def make_implementation(project):
 # case 1: look for an edge that lead to a node that don't have an edge from the same context
 # going back to the loop
 
+def merge_dict_lists(dict1, dict2):
+    result = dict1.copy()
+    for key, value in dict2.items():
+        if key in result:
+            result[key] = result[key] + value
+        else:
+            result[key] = value
+    return result
+
 
 def get_code_from_scv(scvi):
     sc = scvi.split("|")
@@ -416,18 +481,19 @@ def get_code_from_scv(scvi):
 
 
 #unloop scores
-UNLOOP_SCORE_CALCULATE = 1000
-UNLOOP_SCORE_ASSOCIATION = 1000
-UNLOOP_SCORE_ISOLATION = 1000
-UNLOOP_SCORE_ACTIVITY = 80
+UNLOOP_SCORE_CALCULATE = 1007
+UNLOOP_SCORE_ASSOCIATION = 1003
+UNLOOP_SCORE_ISOLATION = 1001
+UNLOOP_SCORE_EXPENDED_ACTIVITY = 477
+UNLOOP_SCORE_ACTIVITY = 493
 UNLOOP_SCORE_INSTANCE_0 = 3
 UNLOOP_SCORE_INSTANCE_1P = 0
-UNLOOP_SCORE_EDGE_MULTIPLE_ACTIVITY = 10
-UNLOOP_SCORE_SUB_EDGE = 80
-UNLOOP_SCORE_TO_OTHER_NODE_OTHER_ACTIVITY = 5
+UNLOOP_SCORE_EDGE_MULTIPLE_ACTIVITY = 11
+UNLOOP_SCORE_SUB_EDGE = 91
+UNLOOP_SCORE_TO_OTHER_NODE_OTHER_ACTIVITY = 7
 UNLOOP_SCORE_TO_OTHER_NODE_SAME_ACTIVITY = 1
 UNLOOP_SCORE_FROM_SAME_ACTIVITY = 5
-UNLOOP_SCORE_REVERSE_ORDER = 4
+UNLOOP_SCORE_REVERSE_ORDER = 3
 UNLOOP_SCORE_NOT_IN_ORDER = 0
 
 def unloop_from_node(graph, start, order):
@@ -455,7 +521,10 @@ def unloop_from_node(graph, start, order):
                 if to_node.type_scv.system == "tricc_type" and to_node.type_scv.code == 'output':
                     scores[e[0]] += UNLOOP_SCORE_CALCULATE
                 if isinstance(to_node, TriccActivity):
-                    scores[e[0]] += UNLOOP_SCORE_ACTIVITY
+                    if to_node.attributes.get('expended', False):
+                        scores[e[0]] += UNLOOP_SCORE_EXPENDED_ACTIVITY
+                    else:
+                        scores[e[0]] += UNLOOP_SCORE_ACTIVITY
                 if all([d["flow_type"] != "SEQUENCE" for k, d in e_data.items()]):
                     scores[e[0]] += UNLOOP_SCORE_ASSOCIATION
                 for oe in out_edge:
@@ -484,7 +553,7 @@ def unloop_from_node(graph, start, order):
                     for ie in in_edge:
                         if ie[:2] == e[:2]:
                             buffer.append(ie)
-                            graph.remove_edge(*ie[:2])
+                            graph.remove_edge(*ie[:3])
                     if not nx.has_path(graph, start, e[1]):
                         scores[e[0]] += UNLOOP_SCORE_ISOLATION
                     for be in buffer:
@@ -502,11 +571,10 @@ def unloop_from_node(graph, start, order):
                         scores[e[0]] += UNLOOP_SCORE_REVERSE_ORDER
                     if not old_edge or scores[old_edge[0]] >= scores[e[0]]:
                         old_edge = e
-            if min(scores.values()) > 90:
+            if min(scores.values()) > 999:
                 logger.warning(f"unloop with high min score {min(scores.values())} for {old_edge}, {max(scores.values())}")
             # find the edge data, it includes activity
             # create another instance of the target node
-
             old_node = graph.nodes[old_edge[1]]["data"]
             new_node = old_node.make_instance(sibling=True)
             if isinstance(old_node, TriccActivity):
@@ -515,25 +583,45 @@ def unloop_from_node(graph, start, order):
                 new_activity_instances[str(old_node.code)].append(new_node)
 
             graph.add_node(new_node.scv(), data=new_node)
-            # replace all edges between those node with the same context (used for select multiple)
-            out_edge = list(graph.edges(old_edge[0], keys=True, data=True))
+            # replace all edges between those node with the same from / to
+            out_edge = list(graph.out_edges(old_edge[0], keys=True, data=True))
+            activities = set()
             for se in out_edge:
                 if se[1] == old_edge[1]:
                     graph.remove_edge(*se[:3])
+                    # save the activity even None
+                    activities.add(se[3].get('activity', None))
                     # create new edge
                     graph.add_edge(se[0], new_node.scv(), **se[3])
+            out_edge = []
+            # we will move the edge from the same activity from the old to the new node
+            if ( 
+                isinstance(old_node, TriccActivity) and
+                old_node.attributes.get('expended', False)
+            ):
+                old_output = old_node.attributes.get('output', None)
+                if old_output:
+                    out_edge = list(graph.out_edges(old_output.scv(), keys=True, data=True))
+            if not out_edge:
+                out_edge = list(graph.out_edges(old_edge[1], keys=True, data=True))
+            for se in out_edge:
+                if se[3].get('activity', None) in activities:
+                    graph.remove_edge(*se[:3])
+                    # create new edge
+                    graph.add_edge(new_node.scv(), se[1], **se[3])
+                   
         except NetworkXNoCycle:
             no_cycle_found = False
     return new_activity_instances
 
 
-def rebase_edges(graph, old_node, new_node, black_list=[]):
+def rebase_edges(graph, old_node, new_node):
     # get all edges from old node
-    node_edges = [e for e in graph.edges(old_node.scv(), keys=True, data=True) if e[1] not in black_list]
+    node_edges = [e for e in graph.out_edges(old_node.scv(), keys=True, data=True) if e[3].get('activity', None ) != old_node]
     # assign each one to the new node
     for e in node_edges:
         graph.remove_edge(*e[:3])
-        data = e[3]
+        data = e[3].copy()
         # update condition
         if "condition" in data and data["condition"]:
             ref = f'"{old_node.instantiate.scv() if old_node.instantiate else old_node.scv()}"'

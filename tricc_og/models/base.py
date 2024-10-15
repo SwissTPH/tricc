@@ -89,6 +89,9 @@ class TriccStatic(BaseModel):
 class TriccSCV(BaseModel):
     value: str
 
+    def scv(self):
+        return self.value
+
     def __hash__(self):
         return hash(self.value)
 

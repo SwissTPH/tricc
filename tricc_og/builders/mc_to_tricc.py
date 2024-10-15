@@ -54,12 +54,6 @@ def import_mc_nodes(json_node, system, project, js_fullorder, start):
             graph=project.graph,
             js_fullorder=js_fullorder,
         )
-        
-    if json_node["category"] in (
-        "background_calculation",
-        "basic_demographic"
-    ):
-        add_background_calculation_options(json_node, node)
 
     return node
 
@@ -71,26 +65,37 @@ def import_mc_flow_from_diagram(js_diagram, system, graph, start):
     for n in dandling:
         add_flow(graph, context, start.scv(), n.scv())
 
+def reference_to_code(node, reference):
+    return [
+        o.code for k, o in node.attributes.items() 
+        if k.startswith('options_') and str(o.reference) == reference
+    ][0]
 
-def import_mc_flow_from_diagnose(json_node, system, project, start):
+
+def code_to_reference(node, code):
+    return [
+        o.reference for k, o in node.attributes.items() 
+        if k.startswith('options_') and str(o.code) == code
+    ][0]
+
+
+def import_mc_flow_to_diagnose(json_node, system, project, start):
     diag = to_activity(json_node, system, project.graph, generate_end=False)
-    diag.attributes['expended'] = True
-    # FIXME answer for the CC must be true reference == 1
+    diag.attributes['expended'] = False
+    project.graph.add_node(diag.scv(), data=diag)
+    diag.graph.add_node(diag.scv(), data=diag)
+    diag = import_qs_inner_flow(json_node, system, project)
     if json_node["complaint_category"]:
         cc = get_element(
             project.graph, QUESTION_SYSTEM, str(json_node["complaint_category"])
         )
-        add_flow(project.graph, diag, cc.scv(), diag.scv())
+        condition = TriccOperation(TriccOperator.EQUAL)
+        condition.append(TriccSCV(cc.scv(with_instance=False)))
+        condition.append(TriccStatic(reference_to_code(cc, '1')))
+        add_flow(project.graph, None, cc.scv(), diag.scv(), condition=condition)
     else:
-        add_flow(project.graph, diag, start.scv(), diag.scv())
-    node_list = get_node_list_from_instance(project.graph, json_node["instances"].values())
-    dandling = add_flow_from_instances(
-        diag.graph, json_node["instances"].values(), diag, white_list=node_list
-    )
-
-    for n in dandling:
-        add_flow(diag.graph, diag, diag.scv(), n.scv())
-    project.graph = nx.compose(project.graph, diag.graph)
+        add_flow(project.graph, None, start.scv(), diag.scv())
+    
 
 
 def add_flow_from_instances(graph, instances, activity, white_list=None):
@@ -169,40 +174,42 @@ def add_flow_from_condition(
 
 
 def import_qs_inner_flow(json_node, QUESTION_SYSTEM, project):
-    qs_start = project.graph.nodes[
+    start = project.graph.nodes[
         to_scv_str(
             QUESTION_SYSTEM,
             json_node['id'],
         )
     ]["data"]
-    if json_node["value_format"] != "Boolean":
-        logger.error(f"value_format {json_node['value_format']} is not supported")
-        exit(-1)
+
     # get node from main graph
     i_nodes = get_node_list_from_instance(project.graph, json_node["instances"].values()) 
     # add node to internal graph
-    qs_start.graph.add_nodes_from(i_nodes)
-    # create expression for output
-    output = qs_start.attributes['output']
-    output.expression = add_expression_from_condition(qs_start.graph, json_node['conditions'])
-    # add flow to output
-    add_flow_from_condition(
-        qs_start.graph,
-        json_node["conditions"],
-        output.scv(),
-        qs_start,
-        flow_type="ASSOCIATION",
-    )
+    start.graph.add_nodes_from(i_nodes)
+    # create expression for output for QS
+    if "conditions" in json_node:
+        if json_node["value_format"] != "Boolean":
+            logger.error(f"value_format {json_node['value_format']} is not supported")
+            exit(-1)
+        output = start.attributes['output']
+        output.expression = add_expression_from_condition(start.graph, json_node['conditions'])
+        # add flow to output
+        add_flow_from_condition(
+            start.graph,
+            json_node["conditions"],
+            output.scv(),
+            start,
+            flow_type="ASSOCIATION",
+        )
     dangling = add_flow_from_instances(
-        qs_start.graph,
+        start.graph,
         json_node["instances"].values(),
-        qs_start,
+        start,
     )
     # attached the node that no "in" edges inside the QS
     # we assume they are the first node inside the QS 
     for n in dangling:
-        add_flow(qs_start.graph, qs_start, qs_start.scv(), n.scv())
-    return qs_start
+        add_flow(start.graph, start, start.scv(), n.scv())
+    return start
 
 
 def add_expression_from_condition(graph, conditions):
@@ -216,6 +223,10 @@ def add_expression_from_condition(graph, conditions):
             graph, QUESTION_SYSTEM, condition['node_id']
         )[-1]
         val = str(ref.attributes[f'options_{condition["answer_id"]}'].reference)
+        if isinstance(ref, TriccActivity):
+            ref_output = ref.attributes.get('output', None)
+            if ref_output:
+                ref = ref_output
         ref = TriccSCV(ref.scv())
         expression.append(ref)
         expression.append(val)
@@ -376,6 +387,10 @@ def get_registration_nodes():
         "category": "patient_data",
         "value_format": "Date",
     }
+    return js_nodes
+
+def get_age_nodes():
+    js_nodes = {}    
     js_nodes["age_day"] = {
         "id": "age_day",
         "label": {"en": "Age in days", "fr": "Age en jours"},
@@ -408,13 +423,13 @@ def get_simple_paths(graph, start, end, paths, current_path, cutoff, max_len=Non
     if max_len and len(paths) > max_len:
         return
     current_path = current_path + (start,)
-    if any(e[1] == end for e in graph.edges(start)):
+    if any(e[1] == end for e in graph.out_edges(start)):
         current_path = current_path + (end,)
         paths.append(current_path)
     elif cutoff > 0:
         map(
             lambda n: get_simple_paths(graph, n, end, paths, current_path, cutoff - 1),
-            graph.edges(start),
+            graph.out_edges(start),
         )
 
 
@@ -467,7 +482,19 @@ def fullorder_to_order(js_fullorder):
 
 #  node_age_day=[], node_age_month=[], node_age_year=[] are mutable, they will be shared between all the calls of the function
 
-def add_background_calculation_options(json_node, node, node_age_day=[], node_age_month=[], node_age_year=[]):
+def add_age_calculation(json_node, dob):
+        if json_node["formula"] == "ToMonth":
+            op = TriccOperation(TriccOperator.AGE_MONTH)
+            op.append(TriccSCV(dob.scv()))
+        elif json_node["formula"] == "ToDay":
+            op = TriccOperation(TriccOperator.AGE_DAY)
+            op.append(TriccSCV(dob.scv()))
+        else:
+            logger.error("basic_demographic unrelated to age not supported")
+            exit(-1)
+        return op
+
+def add_background_calculation_options(json_node, age_day, age_month, dob):
     # in a previous functions basic_demographic node should be identified (How to keep the old id ?) use a filter ? 
     #   toDay -> age_data
     #   toMonth -> age_month
@@ -478,24 +505,12 @@ def add_background_calculation_options(json_node, node, node_age_day=[], node_ag
     if json_node["category"] in (
         "basic_demographic"
     ) and 'formula' in json_node:
-        # the expression must be created to do the proper calcualtion for toYear, ToMonth, ToDay
-        ref = to_scv_str(QUESTION_SYSTEM, "birth_date")
-        if json_node["formula"] == "ToMonth":
-            op = TriccOperation(TriccOperator.AGE_MONTH)
-            op.append(TriccSCV(ref))
-            node_age_month.append(node)
-        elif json_node["formula"] == "ToDay":
-            op = TriccOperation(TriccOperator.AGE_DAY)
-            op.append(TriccSCV(ref))
-            node_age_day.append(node)
-        else:
-            logger.error("basic_demographic unrelated to age not supported")
-            exit(-1)
+        op = add_age_calculation(json_node, dob)    
     else:
         op = TriccOperation(TriccOperator.IFS)
         for a in json_node["answers"].values():
             if "operator" in a:
-                ref = get_formula_ref(json_node, node_age_day, node_age_month, node_age_year)
+                ref = get_formula_ref(json_node, age_day, age_month)
                 if ref:  # Manage slices
                     op.append(get_answer_operation(ref, a))
                     # op.append(TriccStatic(str(a['id'])))
@@ -547,15 +562,15 @@ def add_background_calculation_options(json_node, node, node_age_day=[], node_ag
                         "opertaion not implemented, only slice and tables are"
                     )
                     exit(-1)
-    node.expression = op
+    return op
 
 
-def get_formula_ref(json_node, node_age_day, node_age_month, node_age_year):
+def get_formula_ref(json_node, node_age_day, node_age_month):
     if "formula" in json_node:
         if json_node["formula"] == "ToMonth" and node_age_month:
-            return node_age_month[-1].scv()
+            return node_age_month.scv()
         elif json_node["formula"] == "ToDay" and node_age_day:
-            return node_age_day[-1].scv()
+            return node_age_day.scv()
         elif json_node["formula"][0] == "[" and json_node["formula"][-1] == "]":
             return to_scv_str(QUESTION_SYSTEM, json_node["formula"][1:-1])
         else:

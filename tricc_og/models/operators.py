@@ -8,6 +8,7 @@ class TriccOperator(StrEnum):
     AND = auto()  # and between left and rights
     ADD_OR = auto()  # left and one of the righs
     OR = auto()  # or between left and rights
+    NOT = auto()
     NATIVE = auto()  # default left is native expression
     ISTRUE = auto()  # left is right
     ISFALSE = auto()  # left is false
@@ -18,6 +19,7 @@ class TriccOperator(StrEnum):
     NOT_EQUAL = auto()
     BETWEEN = auto()
     LESS = auto()
+    MORE = auto()
     SWITCH = auto()  # (cond, res), (cond,res)
     IF = auto()  # cond val_true, val_false
     IFS = auto()

@@ -1,6 +1,5 @@
 import abc
 import logging
-from tricc_oo.visitors.tricc import stashed_node_func
 from tricc_og.models.base import TriccOperator
 import datetime
 
@@ -24,7 +23,6 @@ class BaseExportStrategy:
 
     @staticmethod
     def tricc_operation_equal(ref_expressions):
-        return ' = '.join(ref_expressions)
         raise NotImplementedError(f"This type of opreration  is not supported in this strategy")
     
     @staticmethod
@@ -101,8 +99,6 @@ class BaseExportStrategy:
         raise NotImplementedError(f"This type of opreration  is not supported in this strategy")
 
     OPERATOR_EXPORT = {
-        TriccOperator.EQUAL: tricc_operation_equal,
-
     }  
 ## Utils
     def do_clean(self, **kwargs):

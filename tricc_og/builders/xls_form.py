@@ -1,5 +1,5 @@
 import logging
-
+import re
 
 from tricc_og.builders.utils import clean_name, remove_html
 from tricc_og.models.lang import SingletonLangClass
@@ -9,7 +9,8 @@ from tricc_og.models.base import (
     TriccOperation,
     TriccOperator,
     TriccStatic,
-    TriccSCV
+    TriccSCV,
+    TriccBaseModel
     )
 from tricc_og.models.paterns import TriccPaterns
 from tricc_og.strategies.export.base_export_strategy import BaseExportStrategy
@@ -164,50 +165,6 @@ CHOICE_MAP = {"list_name": "list_name", "value": "name", **langs.get_trads_map("
 TRAD_MAP = ["label", "constraint_message", "required_message", "hint", "help"]
 
 
-def generate_xls_form_export2(node, processed_nodes, stashed_nodes, df_survey, df_choice,df_calculate, cur_group, **kargs):
-    # check that all prev nodes were processed
-    if is_ready_to_process(node,processed_nodes):
-        if node not in processed_nodes :
-            if node.group != cur_group and not isinstance(node,TriccNodeSelectOption) : 
-                return False
-            logger.debug("printing node {}".format(node.get_name()))
-            # clean stashed node when processed
-            if node in stashed_nodes:
-                stashed_nodes.remove(node)
-                logger.debug("generate_xls_form_export: unstashing processed node{} ".format(node.get_name()))
-            if issubclass(node.__class__, ( TriccNodeDisplayCalculateBase,TriccNodeDisplayModel)):
-                if isinstance(node, TriccNodeSelectOption):
-                    values = []
-                    for column in CHOICE_MAP:
-                        values.append(get_xfrom_trad(node, column, CHOICE_MAP, True ))
-                    # add only if not existing
-                    if len(df_choice[(df_choice['list_name'] == node.list_name) & (df_choice['value'] == node.name)])  == 0:
-                        df_choice.loc[len(df_choice)] = values
-                elif node.tricc_type in ODK_TRICC_TYPE_MAP and ODK_TRICC_TYPE_MAP[node.tricc_type] is not None:
-                    if ODK_TRICC_TYPE_MAP[node.tricc_type] =='calculate':
-                        values = []
-                        for column in SURVEY_MAP:
-                            if column == 'default' and issubclass(node.__class__, TriccNodeDisplayCalculateBase):
-                                values.append(0)
-                            else:
-                                values.append(get_xfrom_trad(node, column, SURVEY_MAP ))
-                        if len(df_calculate[df_calculate.name == get_export_name(node)])==0:
-                            df_calculate.loc[len(df_calculate)] = values
-                        else:
-                            logger.error("name {} found twice".format(node.name))
-                        
-                    elif  ODK_TRICC_TYPE_MAP[node.tricc_type] !='':
-                        values = []
-                        for column in SURVEY_MAP:
-                            values.append(get_xfrom_trad(node,column,SURVEY_MAP))
-                        df_survey.loc[len(df_survey)] = values
-                    else:
-                        logger.warning("node {} have an unmapped type {}".format(node.get_name(),node.tricc_type))
-                else:
-                    logger.warning("node {} have an unsupported type {}".format(node.get_name(),node.tricc_type))
-            #continue walk °
-            return True
-    return False
 
 def get_xfrom_trad(node, column, maping, clean_html=False):
     arr = column.split("::")
@@ -493,9 +450,9 @@ def simple_and_join(left, right):
     right_issue = right is None or right == ""
     left_neg = left == False or left == 0 or left == "0" or left == "false()"
     right_neg = right == False or right == 0 or right == "0" or right == "false()"
-    if issubclass(left.__class__, TriccNodeBaseModel):
+    if issubclass(left.__class__, (TriccSCV, TriccBaseModel)):
         left = get_export_name(left)
-    if issubclass(right.__class__, TriccNodeBaseModel):
+    if issubclass(right.__class__, (TriccSCV, TriccBaseModel)):
         right = get_export_name(right)
 
     if left_issue and right_issue:
@@ -533,9 +490,9 @@ def nand_join(left, right):
     right_issue = right is None or right == ""
     left_neg = left == False or left == 0 or left == "0" or left == "false()"
     right_neg = right == False or right == 0 or right == "0" or right == "false()"
-    if issubclass(left.__class__, TriccNodeBaseModel):
+    if issubclass(left.__class__, (TriccSCV, TriccBaseModel)):
         left = get_export_name(left)
-    if issubclass(right.__class__, TriccNodeBaseModel):
+    if issubclass(right.__class__, (TriccSCV, TriccBaseModel)):
         right = get_export_name(right)
     if left_issue and right_issue:
         logger.error("and with both terms empty")
@@ -681,46 +638,15 @@ def add_bracket_to_list_elm(list_terms):
 
 
 def get_export_name(node):
-    if isinstance(node, str):
-        return clean_name("id_" + node)
-    if node.export_name is None:
-        node.export_name = clean_name(node.name)
-        if node.name is None:
-            node.export_name = clean_name("id_" + node.id)
-        elif not (INSTANCE_SEPARATOR in node.name or VERSION_SEPARATOR in node.name):
-            if issubclass(node.__class__, TriccNodeCalculateBase):
-                node.gen_name()
-                if node.last == False:
-                    node.export_name = clean_name(
-                        node.name + VERSION_SEPARATOR + str(node.path_len)
-                    )
-                else:
-                    node.export_name = clean_name(node.name)
-            elif issubclass(node.__class__, (TriccNodeDisplayModel)):
-                node.gen_name()
-                if isinstance(node, TriccNodeSelectOption):
-                    node.export_name = node.name
-                elif (
-                    not isinstance(node, TriccNodeSelectOption)
-                    and node.activity.instance != 1
-                ):
-                    node.export_name = clean_name(
-                        node.name + INSTANCE_SEPARATOR + str(node.instance)
-                    )
-            # elif isinstance(node, TriccNodeActivityEnd):
-            #    node.export_name =  clean_name(node.name +  INSTANCE_SEPARATOR + str(node.instance))
-            elif isinstance(node, TriccNodeActivityStart):
-                node.export_name = clean_name(
-                    node.name + INSTANCE_SEPARATOR + str(node.instance)
-                )
-
-    return node.export_name
+    if isinstance(node, (str, TriccSCV)):
+        return clean_name(str(node))
+    return clean_name(node.scv())
 
 
 def get_list_names(list):
     names = []
     for elm in list:
-        if issubclass(elm.__class__, TriccNodeBaseModel):
+        if issubclass(elm.__class__, (TriccSCV, TriccBaseModel)):
             names.append(get_export_name(elm))
         elif isinstance(elm, str):
             names.append(elm)
@@ -732,12 +658,11 @@ def convert_basic(node):
     odk_type = node.type_scv.code
     return (name, label, odk_type)
 
-def convert_note(G, node, processed_nodes, **kwargs):
-    odk_type = ODK_TRICC_TYPE_MAP[node.tricc_type]
-    survey.loc[len(survey)]= convert_basic(odk_type)
-    nodes_dict['type'].append()
-    pass
-
+def convert_note(G, node, processed_nodes, strategy, df_survey, df_choices, **kwargs):
+    df_survey.loc[len(df_survey)] = convert_generic(
+        G, node, processed_nodes, strategy, df_survey,
+        df_choices, **kwargs
+    )
 # Create helper to generate relevance from path in graph 
 # for Activity end the relevance will be the expression if there is no expression 
 
@@ -782,7 +707,6 @@ def convert(
         if node.type_scv and node.type_scv.system + \
             '.'+node.type_scv.code in TRICC_BUILDERS:
             builder=node.type_scv.system +'.'+node.type_scv.code
-            processed_nodes.add(node.scv())
             TRICC_BUILDERS[builder](G, node, processed_nodes, out_strategy, df_survey=df_survey, df_choices=df_choices)
             return True
         elif not node.type_scv:
@@ -805,7 +729,7 @@ def get_value(processed_nodes, ref, strategy):
         return strategy.get_tricc_operation_operand(ref)
 #Move to base export strategy?   
 def convert_expression(expression, activity, G, node, processed_nodes, out_strategy, **kwargs ):
-    if activity:
+    if isinstance(activity, TriccActivity) :
         activity_expression = get_relevance(
             G, activity, processed_nodes, out_strategy, **kwargs
         )
@@ -825,9 +749,9 @@ def convert_expression(expression, activity, G, node, processed_nodes, out_strat
                 TriccOperation
         ) else get_value(processed_nodes, exp, out_strategy) for exp in expression.reference
     ]
-    expression = out_strategy.OPERATOR_EXPORT[expression.operator](references)
+    expression = out_strategy.OPERATOR_EXPORT[expression.operator](out_strategy, references)
     if activity_expression:
-        return out_strategy.OPERATOR_EXPORT[TriccOperator.AND]([activity_expression, expression])
+        return out_strategy.OPERATOR_EXPORT[TriccOperator.AND](out_strategy, [activity_expression, expression])
     else:
         return expression
     #  or f'{OPERATOR_MAP[operator]}' if not isinstance(exp, TriccStatic) else exp.value
@@ -849,10 +773,25 @@ def get_relevance(G, node, processed_nodes, strategy, **kwargs):
             strategy,
             **kwargs) for u, v, data in G.in_edges(node.scv(), data=True) if 'condition' in data
         ]
-    return ' or '.join(
-        expr for expr in expressions
-    )
+    
+    applicability_condition = convert_expression(
+                node.applicability,
+                None,
+                G,
+                node,
+                processed_nodes,
+                strategy,
+                **kwargs
+        ) if node.applicability else None
+    in_condition = or_join(expressions, elm_and=applicability_condition)
+    if applicability_condition and in_condition:
+        return and_join([applicability_condition, in_condition])
+    elif in_condition:
+        return in_condition
+    elif applicability_condition:
+        return applicability_condition
 
+ 
 def convert_generic(
     G, node, processed_nodes, strategy, df_survey,
     df_choices, **kwargs

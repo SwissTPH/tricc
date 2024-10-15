@@ -16,7 +16,7 @@ def create_bpmn_from_dict(graph, keys=False):
 
 
     # Map edges to BPMdN sequence flows
-    for edge in graph.edges(keys=keys, data=True):
+    for edge in graph.out_edges(keys=keys, data=True):
         if edge[0] not in processed_node:
             add_node(graph, bpmn_graph, edge[0], process_id)
         if edge[1] not in processed_node:
