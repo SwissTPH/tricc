@@ -813,7 +813,7 @@ def convert_select_one(G, node, processed_nodes, strategy, df_survey,
         df_choices, **kwargs
     )
     list_name = add_options(node, df_choices)
-    survey_row[0] = f"select_multiple {list_name}"
+    survey_row[0] = f"select_one {list_name}"
     df_survey.loc[len(df_survey)] = survey_row
 
 
