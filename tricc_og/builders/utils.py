@@ -18,7 +18,7 @@ def replace_all(text, list_char, replacement):
 
 
 def clean_str(name):
-    return replace_all(name, ["-", " ", ".", ",",":"], "_")
+    return replace_all(name, ["-", " ", ".", ",", ":", '|'], "_")
 
 
 def clean_name(name, prefix=""):

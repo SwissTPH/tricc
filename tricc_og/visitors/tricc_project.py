@@ -106,13 +106,13 @@ def add_dangling_node(G, node, processed_nodes, stashed_nodes):
     
     if hasattr(node, 'expression') and node.expression:
         references = node.expression.get_references()
+        
         for r in references:
-            
-            if not G.in_edges(r.value, data=True):
-                element = (get_elements(G, 'questions', r.value.split('_', 1)[1])[-1] if r.value.startswith('questions') else  
-                    get_elements(G, 'ActivityEnd', r.value.split('_', 1)[1])[-1] if r.value.startswith('Activity')
-                else get_elements(G, 'diagnose', r.value.split('_', 1)[1])[-1]
-                )
+            scv = r.scv()
+            system = get_system_from_scv(scv)
+            code = get_code_from_scv(scv)
+            if not G.in_edges(r.value, keys=True, data=True):
+                element = get_elements(G, system, code)
                 scv = element.scv()
                 if scv not in processed_nodes and scv not in stashed_nodes:
                     logger.debug("add_dangling_node::{}: stashed({})".format(node.get_name(), len(stashed_nodes)))
@@ -151,7 +151,7 @@ def walktrhough_tricc_node_processed_stached(G, scv, callback, processed_nodes, 
         # for el in list(G.successors(scv)):
         #    stashed_nodes.add(el)
     else:
-        add_dangling_node(G, node, processed_nodes, stashed_nodes)
+        #add_dangling_node(G, node, processed_nodes, stashed_nodes)
         if scv not in processed_nodes and scv not in stashed_nodes:
             stashed_nodes.insert_at_bottom(node.scv())
             logger.debug("{}::{}: stashed({})".format(callback.__name__, node.get_name(), len(stashed_nodes)))
@@ -265,7 +265,6 @@ def import_mc_flow_from_activities(project, start, order):
                     order,
                     qs_impl=instances
                 )
-            
         filtered_qs = dict((k, v) for k, v in qs_processed.items() if v)
 
 
@@ -290,8 +289,6 @@ def attempt_import_mc_flow_from_activity(node, project, start, qs_processed, ord
             
 
 def import_mc_flow_from_activity(node, project, start, qs_processed, qs_impl=[]):
-    activity_label = node.label + (("::" + str(node.instance)) if node.instance else '')
-    logger.info(f"loading Activity {activity_label}")
     # getting node defintion
     
     # for each unextended instance of the question sequence,
@@ -320,8 +317,9 @@ def expend_impl_activity(
 ):
     new_activity_instances = {}
     if "expended" in node.attributes and node.attributes["expended"]:
-        logger.error(f"trying to expend an activity already expended")
-        return None
+        return {}
+    activity_label = node.label + (("::" + str(node.instance)) if node.instance else '')
+    logger.info(f"loading Activity {activity_label}")
     node_def = node.instantiate
     output_def = node_def.attributes.get('output', None) 
     # avoid expending an activity not connected to main start
@@ -332,7 +330,6 @@ def expend_impl_activity(
         )
     # if QS start not attached to start, SHOULD NOT be use
     except NetworkXNoPath:
-        print("NOT CONNECTED WITH START:: ", node)
         return {node.code: [node]}
     except Exception as e:
         logger.error(f"unexpected error {e}")
@@ -479,7 +476,21 @@ def get_code_from_scv(scvi):
     if len(sc) > 1:
         return sc[1].split("::")[0]
 
-
+def get_system_from_scv(scvi):
+    sc = scvi.split("|")
+    if len(sc) > 1:
+        return sc[0]
+    
+def get_instance_from_scv(scvi):
+    sc = scvi.split("::")
+    if len(sc) > 1:
+        return sc[1]
+    
+def get_version_from_scv(scvi):
+    sc = scvi.split("|")
+    if len(sc) > 2:
+        return sc[2].split("::")[0]    
+    
 #unloop scores
 UNLOOP_SCORE_CALCULATE = 1007
 UNLOOP_SCORE_ASSOCIATION = 1003
@@ -512,7 +523,7 @@ def unloop_from_node(graph, start, order):
                 out_edge = list(graph.out_edges(e[0], keys=True, data=True))
                 in_edge = list(graph.in_edges(e[1], keys=True, data=True))
                 # avoid moving instance > 1 of e[1] for e TODO
-                scores[e[0]] = UNLOOP_SCORE_INSTANCE_1P  if graph.nodes[e[1]]["data"].instance > 1 else UNLOOP_SCORE_INSTANCE_0
+                scores[e[0]] = UNLOOP_SCORE_INSTANCE_1P if graph.nodes[e[1]]["data"].instance > 1 else UNLOOP_SCORE_INSTANCE_0
                 # activity end cannot be duplicated
                 to_node = graph.nodes[e[1]]["data"]
                 edges_activities = set(d["activity"] for k, d in e_data.items())

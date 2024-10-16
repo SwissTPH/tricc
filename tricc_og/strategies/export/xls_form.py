@@ -6,6 +6,7 @@ from tricc_og.builders.xls_form import (
     and_join,
     negate_term,
 )
+from tricc_og.builders.utils import clean_name
 import pandas as pd
 import abc
 import logging
@@ -102,16 +103,6 @@ class XLSFormStrategy(BaseExportStrategy):
         if not os.path.exists(self.output_path):
             os.makedirs(self.output_path)
 
-        # generate_xls_form_export(
-        #    self.project.impl_graph,
-        #    main_start,
-        #    processed_nodes,
-        #    stashed_nodes,
-        #    self.df_survey,
-        #    self.df_choice,
-        #    self.df_calculate,
-        #    self.cur_group,
-        # )
         walktrhough_tricc_processed_stached(
             self.project.impl_graph,
             main_start,
@@ -237,7 +228,7 @@ class XLSFormStrategy(BaseExportStrategy):
         elif isinstance(r, (int, float)):
             return r
         elif isinstance(r, TriccSCV):
-            return f"${{{r.value}}}"
+            return clean_name(r.value)
         else:
             raise NotImplementedError(
                 f"This type of node {r.__class__} is not supported within an operation"

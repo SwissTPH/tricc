@@ -4,10 +4,7 @@ from enum import auto
 
 class TriccPaterns(StrEnum):
     # base model
-    abstract_activity = (
-        auto()
-    )  # replace goto = 'goto'  #: start the linked activity within the target activity
-    implemented_activity = auto()
+    activity = auto()  # replace goto = 'goto'  #: start the linked activity within the target activity
 
     # start node
     activity_start = auto()  # THIS is higher that process

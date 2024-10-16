@@ -15,7 +15,7 @@ logger = logging.getLogger("default")
 
 def to_scv_str(system, code, version=None, instance=None, with_instance=True):
     return (
-        f"{system}_{code}" # here it was a pipe but I was getting './tricc_oo/tests/data/tricc|medlacreator.xlsx' so changed. Not sure of other implications so comenting FIXME
+        f"{system}|{code}" # here it was a pipe but I was getting './tricc_oo/tests/data/tricc|medlacreator.xlsx' so changed. Not sure of other implications so comenting FIXME
         + (f"|{version}" if version else "")
         + (f"::{instance}" if instance and with_instance else "")
     )

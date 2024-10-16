@@ -17,7 +17,7 @@ TRICC_YES_LABEL = ['yes', "oui"]
 TRICC_NO_LABEL = ['no', "non"]
 TRICC_FOLOW_LABEL = ['folow', "suivre"]
 NO_LABEL = "NO_LABEL"
-TRICC_LIST_NAME = 'list_{0}'
+TRICC_LIST_NAME = 'l_{0}'
 import logging
 
 logger = logging.getLogger("default")

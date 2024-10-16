@@ -26,9 +26,9 @@ from tricc_og.visitors.tricc_project import (
     add_flow,
 )
 
-QUESTION_SYSTEM = "questions"
-DIAGNOSE_SYSTEM = "diagnose"
-ACTIVITY_END_SYSTEM = "ActivityEnd"
+QUESTION_SYSTEM = "q"
+DIAGNOSE_SYSTEM = "dg"
+ACTIVITY_END_SYSTEM = "ae"
 STAGE_SYSTEM = "step"
 MANDATORY_STAGE = [
     "registration_step",
@@ -123,7 +123,7 @@ def no_forced_link(graph, node):
     return not any(
         [
             "triage" in e[0] and ("conditions" not in e[2] or not e[2]["conditions"])
-            for e in graph.in_edges(node.scv(), data=True)
+            for e in graph.in_edges(node.scv(), keys=True, data=True)
         ]
     )
 
@@ -602,5 +602,5 @@ def generate_cut_off_exp(js_node, node):
             exp.append(ce)
     if exp:
         node.applicability = (
-            TriccOperation(TriccOperator.OR, exp) if len(exp) > 1 else exp[0]
+            TriccOperation(TriccOperator.AND, exp) if len(exp) > 1 else exp[0]
         )
