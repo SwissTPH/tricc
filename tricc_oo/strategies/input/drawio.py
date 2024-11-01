@@ -2,11 +2,16 @@ import logging
 import os
 from copy import copy
 
-from tricc.converters.xml_to_tricc import create_activity
-from tricc.visitors.tricc import process_calculate
-from tricc.models.tricc import *
-from tricc.strategies.input.base_input_strategy import BaseInputStrategy
-from tricc.parsers.xml import read_drawio
+from tricc_oo.converters.xml_to_tricc import create_activity
+from tricc_oo.visitors.tricc import (
+    process_calculate,
+    set_prev_next_node,
+    replace_node,
+    stashed_node_func,
+)
+from tricc_oo.models import *
+from tricc_oo.strategies.input.base_input_strategy import BaseInputStrategy
+from tricc_oo.parsers.xml import read_drawio
 
 logger = logging.getLogger("default")
 
@@ -60,28 +65,28 @@ class DrawioStrategy(BaseInputStrategy):
         # refresh the edges (were remove by previous code)
         return pages
 
-    def execute(self, file_content, media_path):
+    def execute(self, in_filepath, media_path):
+        print("execute drawio")
+        print(in_filepath)
         files = []
         pages = {}
         diagrams = []
         start_pages = {}
         # read all pages
         logger.info("# Create the activities from diagram pages")
-        # if os.path.isdir(in_filepath):
-        #     files = [f for f in os.listdir(in_filepath) if f.endswith('.drawio')]
-        # elif os.path.isfile(in_filepath):
-        #     files = [in_filepath]
-        # else:
-        #     logger.error(f"no input file found at {in_filepath}")
-        #     exit()
-        # for file in files:
-        diagrams += read_drawio(file_content[0])
-        images_diagram = []
+        if os.path.isdir(in_filepath):
+            files = [f for f in os.listdir(in_filepath) if f.endswith(".drawio")]
+        elif os.path.isfile(in_filepath):
+            files = [in_filepath]
+        else:
+            logger.error(f"no input file found at {in_filepath}")
+            exit()
+        for file in files:
+            diagrams += read_drawio(file)
+
         for diagram in diagrams:
             logger.info("Create the activity {0}".format(diagram.attrib.get("name")))
-            page, images = create_activity(diagram, media_path)
-            if images is not None:
-                images_diagram += images
+            page = create_activity(diagram, media_path)
             if page is not None:
                 if page.root is not None:
                     pages[page.id] = page
@@ -108,7 +113,7 @@ class DrawioStrategy(BaseInputStrategy):
             pages[app.id] = app
             pages = self.process_pages(app, pages)
 
-            return start_pages, pages, images_diagram
+            return start_pages, pages
         elif start_pages:
             for process in start_pages:
                 if isinstance(start_pages[process], list):
@@ -116,8 +121,10 @@ class DrawioStrategy(BaseInputStrategy):
                         pages = self.process_pages(page_to_process, pages)
                 else:
                     pages = self.process_pages(start_pages[process], pages)
-            return start_pages, pages, images_diagram
-        return None
+            return start_pages, pages
+
+        else:
+            logger.warning("start page not found")
         # Q. how to handle graph output
         # hardlink with out edge: create a fake node
         # or should we always create that fake node
@@ -126,7 +133,7 @@ class DrawioStrategy(BaseInputStrategy):
 
         # do the calculation, expression ...
 
-    def linking_nodes(self, node, page, pages, processed_nodes=[], path=[]):
+    def linking_nodes(self, node, page, pages, processed_nodes=set(), path=[]):
         # get the edges that have that node as source
 
         node_edge = list(
@@ -212,7 +219,7 @@ class DrawioStrategy(BaseInputStrategy):
                             )
                     if target_node not in processed_nodes:
                         # don't save the link out because the real node is the page
-                        processed_nodes.append(target_node)
+                        processed_nodes.add(target_node)
                     self.linking_nodes(
                         target_node, page, pages, processed_nodes, current_path
                     )
