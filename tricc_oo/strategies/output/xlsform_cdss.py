@@ -47,9 +47,9 @@ class XLSFormCDSSStrategy(XLSFormStrategy):
     def tricc_operation_has_qualifier(self, ref_expressions):
         raise NotImplementedError(f"This type of opreration  is not supported in this strategy")
     def tricc_operation_zscore(self, ref_expressions):
-        l = "instance('z_score')/root/item[gender=${gender} and x_max>"+ ref_expressions[0]+" and x_min<="+ ref_expressions[0]+"]/l" 
-        m = "instance('z_score')/root/item[gender=${gender} and x_max>"+ ref_expressions[0]+" and x_min<="+ ref_expressions[0]+"]/m"
-        s = "instance('z_score')/root/item[gender=${gender} and x_max>"+ ref_expressions[0]+" and x_min<="+ ref_expressions[0]+"]/s"
+        l = "instance('z_score')/root/item[sex=${sex} and x_max>"+ ref_expressions[0]+" and x_min<="+ ref_expressions[0]+"]/l" 
+        m = "instance('z_score')/root/item[sex=${sex} and x_max>"+ ref_expressions[0]+" and x_min<="+ ref_expressions[0]+"]/m"
+        s = "instance('z_score')/root/item[sex=${sex} and x_max>"+ ref_expressions[0]+" and x_min<="+ ref_expressions[0]+"]/s"
         #  return ((Math.pow((y / m), l) - 1) / (s * l));
         return f"(pow({ref_expressions[1]} div ({m}), {l}) -1) div (({s}) div ({l}))"
     

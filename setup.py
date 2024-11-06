@@ -19,7 +19,7 @@ setup(
     install_requires=[
         "lxml",
         "html2text",
-        "pydantic<2",
+        "pydantic>=2",
         "babel",
         "xlsxwriter",
         "pandas",
@@ -27,6 +27,7 @@ setup(
         "networkx",
         "strenum",
         "matplotlib"
+        "fhir.resources"
         ],
     #extras_require={
     #    'test': ['pytest', 'coverage'],

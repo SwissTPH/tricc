@@ -12,15 +12,16 @@ from tricc_og.builders.mc_to_tricc import (
     add_age_calculation,
     add_background_calculation_options,
     import_mc_flow_to_diagnose,
-    fullorder_to_order,
     get_start_node,
     QUESTION_SYSTEM,
     DIAGNOSE_SYSTEM,
     MANDATORY_STAGE,
     import_mc_flow_from_diagram,
     import_qs_inner_flow,
+    load_villages_options,
 )
 from tricc_og.models.base import TriccBaseModel, TriccProject
+from tricc_og.models.tricc import TriccNodeType
 from tricc_og.strategies.input.base_input_strategy import BaseInputStrategy
 from tricc_og.parsers.xml import read_drawio
 from tricc_og.visitors.tricc_project import (
@@ -32,6 +33,7 @@ from tricc_og.visitors.tricc_project import (
     import_mc_flow_from_activities,
     make_implementation,
 )
+from tricc_og.builders.mc_data_dictionnary import CodeSystemBuilder
 from tricc_og.builders.tricc_to_bpmn import create_bpmn_from_dict
 from bpmn_python.bpmn_diagram_export import BpmnDiagramGraphExport
 logger = logging.getLogger("default")
@@ -57,17 +59,45 @@ class MedalCStrategy(BaseInputStrategy):
             exit(-1)
         logger.info("# creating the project")
         project = TriccProject(
-            code=Path(in_filepath).stem,
-            label=Path(in_filepath).stem,
+            code=str(js_full['id']),
+            display=js_full['name'],
         )
+        project.code_system = CodeSystemBuilder(project.code, project.display, js_full).code_system
         logger.info("# loading the nodes")
         js_nodes = js_full["medal_r_json"]["nodes"]
         js_diagram = js_full["medal_r_json"]["diagram"]
         js_fullorder = js_full['medal_r_json']['config']['full_order']
-
+        # load key nodes:
+        # "basic_questions": {
+        #         "weight_question_id": 7805,
+        #         "gender_question_id": 7852,
+        #         "general_cc_id": 8341,
+        #         "yi_general_cc_id": 8352
+        #     },
+        #     "optional_basic_questions": {
+        #         "village_question_id": 8062
+        #     },
+        # load on questions
+        village_q_id = js_full["medal_r_json"]['config'][
+            'optional_basic_questions'
+        ].get('village_question_id', None)
+        js_basic_questions =  js_full["medal_r_json"]["config"]["basic_questions"]
+        yi_cc_id =js_basic_questions["general_cc_id"]
+        child_cc_id = js_basic_questions["yi_general_cc_id"]
+        weight_question_id = js_basic_questions["weight_question_id"]
+        gender_question_id = js_basic_questions["gender_question_id"]
         # generate and add generic nodes
+        
+        start = get_start_node(project)        
+        sex = import_mc_nodes(js_nodes[str(gender_question_id)], QUESTION_SYSTEM, project, js_fullorder, start)
+        js_node_loaded = [str(gender_question_id)]
+        if village_q_id:
+            village = import_mc_nodes(js_nodes[str(village_q_id)], QUESTION_SYSTEM, project, js_fullorder, start)
+            load_villages_options(village, js_full["medal_r_json"]["village_json"])
+            js_node_loaded.append(str(village_q_id))
+            
+        
         std_nodes = get_registration_nodes()
-        start = get_start_node(project)
         for node_id in std_nodes:
             n = import_mc_nodes(std_nodes[node_id], QUESTION_SYSTEM, project, js_fullorder, start)
             add_flow(project.graph,
@@ -91,33 +121,37 @@ class MedalCStrategy(BaseInputStrategy):
         age_day = get_element(
             project.graph,
             QUESTION_SYSTEM,
-            'birth_date'
+            'age_day'
         )
         age_month = get_element(
             project.graph,
             QUESTION_SYSTEM,
-            'birth_date'
+            'age_month'
         )
-        # load on questions
+
         for node_id in js_nodes:
-            n = import_mc_nodes(js_nodes[node_id], QUESTION_SYSTEM, project, js_fullorder, start)
-            if js_nodes[node_id]["category"] in (
-                "background_calculation",
-                "basic_demographic"
-            ):
-                n.expression = add_background_calculation_options(
-                    js_nodes[node_id],
-                    age_day,
-                    age_month,
-                    dob
-                )
-                bases = n.expression.get_references()
-                for b in bases:
-                    add_flow(project.graph,
-                        None,
-                        b,
-                        n,
-                        flow_type="ASSOCIATION")
+            if node_id not in js_node_loaded:
+                n = import_mc_nodes(js_nodes[node_id], QUESTION_SYSTEM, project, js_fullorder, start)
+                if js_nodes[node_id]["category"] in (
+                    "background_calculation",
+                    "basic_demographic"
+                ) and 'formula' in js_nodes[node_id] :
+                    n.expression = add_background_calculation_options(
+                        js_nodes[node_id],
+                        age_day,
+                        age_month,
+                        dob,
+                        sex
+                    )
+                    if n.expression:
+                        n.type_scv.code = TriccNodeType.calculate 
+                    bases = n.expression.get_references()
+                    for b in bases:
+                        add_flow(project.graph,
+                            None,
+                            b,
+                            n,
+                            flow_type="ASSOCIATION")
             
         # then build the internal qs graph
         for node_id in js_nodes:
@@ -125,10 +159,7 @@ class MedalCStrategy(BaseInputStrategy):
                 node = import_qs_inner_flow(js_nodes[node_id], QUESTION_SYSTEM, project)
         
         js_diagnoses = js_full["medal_r_json"]["diagnoses"]
-        yi_cc_id = js_full["medal_r_json"]["config"]["basic_questions"]["general_cc_id"]
-        child_cc_id = js_full["medal_r_json"]["config"]["basic_questions"][
-            "yi_general_cc_id"
-        ]
+
         for node_id in js_diagnoses:
             import_mc_flow_to_diagnose(
                 js_diagnoses[node_id], DIAGNOSE_SYSTEM, project, start
@@ -145,47 +176,6 @@ class MedalCStrategy(BaseInputStrategy):
         import_mc_flow_from_diagram(
                 js_diagram, QUESTION_SYSTEM, project.graph, start
             )
-
-
-        order = fullorder_to_order(js_fullorder)
-
-        ### TRANSFORM
-        make_implementation(project)
-        logger.info(f"implementing graph have {project.impl_graph.number_of_edges()} edges")
-        start_impl = start.instances[0]
-        save_graphml(project.graph, start.scv(), "graph")
-        # image
-        #self.save_simple_graph(project.impl_graph, start_impl, "loaded.png")
-        
-        new_activities = unloop_from_node(project.impl_graph, start_impl, order)
-        
-        logger.info(f"Unlooped graph has {project.impl_graph.number_of_edges()} edges")
-        # image
-        #self.save_simple_graph(project.impl_graph, start_impl, "unlooped.png")
-        # make QS
-        # 1- create QS flow
-        # 2- attached named output (conditionnal flow or calculate)
-        # 3- "inject" qs as question list / or activity abstract + implementation
-        import_mc_flow_from_activities(
-                project, start_impl, order
-            )
-        # image
-        # self.save_simple_graph(project.impl_graph, start_impl, "qs_loaded.png")
-        # self.save_simple_tree(project.impl_graph, start_impl.scv(), "tree.png")
-        # save_graphml(project.impl_graph, start_impl.scv(), "decisiontree.graphml")
-        logger.info(f"Final graph has {project.impl_graph.number_of_edges()} edges")
-
-        # add calculate ?  how to design activity outcome ?
-
-        # named ends with a default one (None)
-
-        # build the question sequences
-
-        # implement activity by generating new question instance
-
-        # Merge questions when possible
-
-        logger.info("extending the diagrams")
         
         return project
 

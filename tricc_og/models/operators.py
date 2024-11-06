@@ -27,8 +27,8 @@ class TriccOperator(StrEnum):
     EXISTS = auto()
     # CDSS Specific
     HAS_QUALIFIER = auto()
-    ZSCORE = auto()  # left table_name, right Y, gender give Z
-    IZSCORE = auto()  # left table_name, right Z, gender give Y
+    ZSCORE = auto()  # table, sex, x(age), Y(weight), give Z
+    IZSCORE = auto()  # table, sex,x(age), Z, give Y(weight)
     AGE_DAY = auto()  # age from dob
     AGE_MONTH = auto()  # age from dob
     AGE_YEAR = auto()  # age from dob

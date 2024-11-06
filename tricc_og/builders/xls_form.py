@@ -210,7 +210,7 @@ def get_attr_if_exists(node, column, map_array):
 
 
 def get_diagnostic_line(node):
-    label = langs.get_trads(node.label, force_dict=True)
+    label = langs.get_trads(node.display, force_dict=True)
     empty = langs.get_trads("", force_dict=True)
     return [
         "select_one yes_no",
@@ -262,7 +262,7 @@ def get_diagnostic_add_line(diags, df_choice):
         df_choice.loc[len(df_choice)] = [
             "tricc_diag_add",
             get_export_name(diag),
-            *list(langs.get_trads(diag.label, True).values()),
+            *list(langs.get_trads(diag.display, True).values()),
         ]
     label = langs.get_trads("Add a missing diagnostic", force_dict=True)
     empty = langs.get_trads("", force_dict=True)
@@ -600,7 +600,7 @@ def get_list_names(list):
 
 def convert_basic(node):
     name = clean_name(node.scv())
-    label = node.label
+    label = node.display
     odk_type = ODK_TRICC_TYPE_MAP[node.type_scv.code]
     return (name, label, odk_type)
 
@@ -790,7 +790,7 @@ def add_options(node, df_choices):
         df_choices.loc[len(df_choices)] = [
             list_name,  # "list_name"
             o.code,  # "name"
-            o.label,  # "label"
+            o.display,  # "label"
         ]
 
     return list_name

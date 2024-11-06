@@ -38,7 +38,6 @@ MANDATORY_STAGE = [
 ]
 
 
-
 def import_mc_nodes(json_node, system, project, js_fullorder, start):
     if json_node["type"] == "QuestionsSequence":
         node = to_activity(json_node, system, project.graph)
@@ -58,17 +57,33 @@ def import_mc_nodes(json_node, system, project, js_fullorder, start):
 
 
 def import_mc_flow_from_diagram(js_diagram, system, graph, start):
-    context = TriccContext(label="basic questions", code="main", system=system)
+    context = TriccContext(display="basic questions", code="main", system=system)
     dandling = add_flow_from_instances(graph, js_diagram["instances"].values(), context)
 
     for n in dandling:
         add_flow(graph, context, start.scv(), n.scv())
+
 
 def reference_to_code(node, reference):
     return [
         o.code for k, o in node.attributes.items() 
         if k.startswith('options_') and str(o.reference) == reference
     ][0]
+
+
+def load_villages_options(node, villages_json):
+    node.type_scv = TriccMixinRef(system="tricc_type", code=str(TriccNodeType.select_one))
+    for v in villages_json:
+        for key, label in v.items():   
+            option = TriccBaseModel(
+                    code=key,
+                    system=node.system,
+                    type_scv=TriccMixinRef(
+                        system="tricc_type", code=str(TriccNodeType.select_option)
+                    ),
+                    display=label
+            )
+            node.attributes[f"options_{key}"] = option
 
 
 def code_to_reference(node, code):
@@ -104,7 +119,6 @@ def add_flow_from_instances(graph, instances, activity, white_list=None):
         _to_activity_end = None
         if isinstance(_to, TriccActivity) and _to == activity:
             _to_activity_end = get_element(graph, ACTIVITY_END_SYSTEM, instance["id"], white_list=white_list)
-
         _to = _to_activity_end if _to_activity_end else _to
         if no_forced_link(graph, _to):
             # if activity is a real activity then we add the edges on the activity level
@@ -122,7 +136,7 @@ def add_flow_from_instances(graph, instances, activity, white_list=None):
 def no_forced_link(graph, node):
     return not any(
         [
-            "triage" in e[0] and ("conditions" not in e[2] or not e[2]["conditions"])
+            "registration" in e[0] and ("conditions" not in e[2] or not e[2]["conditions"])
             for e in graph.in_edges(node.scv(), keys=True, data=True)
         ]
     )
@@ -217,7 +231,9 @@ def add_expression_from_condition(graph, conditions):
         ref = get_elements(
             graph, QUESTION_SYSTEM, condition['node_id']
         )[-1]
-        val = str(ref.attributes[f'options_{condition["answer_id"]}'].reference)
+        val = condition["answer_id"]
+        # TODO use val_ref
+        val_ref = str(ref.attributes[f'options_{condition["answer_id"]}'].reference)
         if isinstance(ref, TriccActivity):
             ref_output = ref.attributes.get('output', None)
             if ref_output:
@@ -232,9 +248,9 @@ def add_expression_from_condition(graph, conditions):
 
 def get_start_node(project):
     start = TriccBaseModel(
-        code="triage",
+        code="registration",
         system="cpg-common-processes",
-        label="Start",
+        display="Start",
         type_scv=TriccMixinRef(system="tricc_type", code=str(TriccNodeType.start)),
     )
     project.graph.add_node(start.scv(), data=start)
@@ -246,7 +262,7 @@ def to_activity(json_node, system, graph, generate_end=True):
     node = TriccActivity(
         code=get_mc_name(json_node["id"]),
         system=system,
-        label=json_node["label"][list(json_node["label"].keys())[0]],
+        display=json_node["label"][list(json_node["label"].keys())[0]],
         type_scv=TriccMixinRef(system="tricc_type", code=str(TriccNodeType.activity)),
     )
     graph.add_node(node.scv(), data=node)
@@ -256,7 +272,7 @@ def to_activity(json_node, system, graph, generate_end=True):
         end = TriccBaseModel(
             code=get_mc_name(json_node["id"]),
             system=ACTIVITY_END_SYSTEM,
-            label=json_node["label"][list(json_node["label"].keys())[0]],
+            display=json_node["label"][list(json_node["label"].keys())[0]],
             type_scv=TriccMixinRef(system="tricc_type", code="output"),
         )
         node.attributes['output'] = end
@@ -268,18 +284,21 @@ def to_activity(json_node, system, graph, generate_end=True):
 def get_mc_tricc_type(json_node):
     tricc_type = json_node.get("type", None)
     if tricc_type == "Question":
-        if json_node["value_format"] == "Integer":
-            tricc_type = TriccNodeType.integer
-        elif json_node["value_format"] == "String":
-            tricc_type = TriccNodeType.text
-        elif json_node["value_format"] == "Date":
-            tricc_type = TriccNodeType.date
-        elif json_node["value_format"] == "Float":
-            tricc_type = TriccNodeType.decimal
-        elif "formula" in json_node and (
-            "anwers" not in json_node or not json_node["anwers"]
-        ):
+        if json_node["display_format"] == "Input":
+            if json_node["value_format"] == "Integer":
+                tricc_type = TriccNodeType.integer
+            elif json_node["value_format"] == "String":
+                tricc_type = TriccNodeType.text
+            elif json_node["value_format"] == "Date":
+                tricc_type = TriccNodeType.date
+            elif json_node["value_format"] == "Float":
+                tricc_type = TriccNodeType.decimal
+        elif json_node["display_format"] == "Formula":
             tricc_type = TriccNodeType.calculate
+        elif json_node["display_format"] in ("RadioButton", "DropDownList", "Autocomplete"):
+            tricc_type = TriccNodeType.select_one
+        elif json_node["display_format"] in ("Reference", "String"):
+            tricc_type = TriccNodeType.note
         else:
             tricc_type = TriccNodeType.select_one
     return tricc_type
@@ -289,7 +308,7 @@ def to_node(json_node, tricc_type, system, project, graph, js_fullorder):
     node = TriccBaseModel(
         code=get_mc_name(json_node["id"]),
         system=system,
-        label=json_node["label"][list(json_node["label"].keys())[0]],
+        display=json_node["label"][list(json_node["label"].keys())[0]],
         type_scv=TriccMixinRef(system="tricc_type", code=str(tricc_type)),
     )
     generate_cut_off_exp(json_node, node)
@@ -298,7 +317,7 @@ def to_node(json_node, tricc_type, system, project, graph, js_fullorder):
         json_node,
         ["is_mandatory", "type", "id", "description", "formula"],
     )
-    context_code = get_context_from_fullorder(json_node["id"], js_fullorder)
+    context_code = get_context_from_fullorder(json_node["id"], project)
     if not context_code:
         if "category" in json_node and json_node["category"]:
             context_code = json_node["category"]
@@ -318,13 +337,13 @@ def get_options(json_node, select_node, tricc_type, system):
         for key, elm in json_node["answers"].items():
             label = elm['label']['en'] if isinstance(elm['label'], dict) else elm['label']
             option = TriccBaseModel(
-                code=key,
+                code=str(key),
                 system=select_node.system,
                 type_scv=TriccMixinRef(
                     system="tricc_type", code=str(TriccNodeType.select_option)
                 ),
-                label=label,
-                reference=elm['reference']
+                display=label,
+                reference=str(elm['reference'])
             )
             set_additional_attributes(
                 option,
@@ -351,12 +370,25 @@ def get_mc_name(name):
     return f"{name}"
 
 
-def get_context_from_fullorder(js_id, js_fullorder):
-    return walkthrough_fullorder(
-        js_fullorder,
-        lambda data, context, value: context if str(data) == str(value) else None,
-        value=js_id,
-    )
+def get_context_from_fullorder(node_id, project):
+    # First, check if the node exists in the CodeSystem
+    node = next((c for c in project.code_system.concept if c.code == node_id), None)
+    if not node:
+        return None  # Node not found
+
+    # Check if the node has a "context" property (which represents the parent)
+    context_property = next((p for p in node.property if p.code == "context"), None)
+    if context_property:
+        return context_property.valueCode
+
+    # If no context property, search through all concepts to find a parent
+    for concept in project.code_system.concept:
+        order_property = next((p for p in concept.property if p.code == "order"), None)
+        if order_property and node_id in order_property.valueString.split(','):
+            return concept.code
+
+    # If we reach here, the node is either a top-level node or not found in any parent's order
+    return None
 
 
 def get_registration_nodes():
@@ -367,6 +399,7 @@ def get_registration_nodes():
         "type": "Question",
         "category": "patient_data",
         "value_format": "String",
+        "display_format": 'Input',
     }
     js_nodes["last_name"] = {
         "id": "last_name",
@@ -374,6 +407,7 @@ def get_registration_nodes():
         "type": "Question",
         "category": "patient_data",
         "value_format": "String",
+        "display_format": 'Input',
     }
     js_nodes["birth_date"] = {
         "id": "birth_date",
@@ -381,6 +415,7 @@ def get_registration_nodes():
         "type": "Question",
         "category": "patient_data",
         "value_format": "Date",
+        "display_format": 'Input',
     }
     return js_nodes
 
@@ -392,7 +427,8 @@ def get_age_nodes():
         "type": "Question",
         "category": "basic_demographic",
         "value_format": "Float",
-        "formula":"ToDay"
+        "formula":"ToDay",
+        "display_format": 'Formula',
     }
     js_nodes["age_month"] = {
         "id": "age_month",
@@ -400,7 +436,8 @@ def get_age_nodes():
         "type": "Question",
         "category": "basic_demographic",
         "value_format": "Float",
-        "formula":"ToMonth"
+        "formula":"ToMonth",
+        "display_format": 'Formula',
     }
     return js_nodes
 
@@ -487,7 +524,7 @@ def add_age_calculation(json_node, dob):
         exit(-1)
     return op
 
-def add_background_calculation_options(json_node, age_day, age_month, dob):
+def add_background_calculation_options(json_node, age_day, age_month, dob, sex):
     # in a previous functions basic_demographic node should be identified (How to keep the old id ?) use a filter ? 
     #   toDay -> age_data
     #   toMonth -> age_month
@@ -506,7 +543,7 @@ def add_background_calculation_options(json_node, age_day, age_month, dob):
                 ref = get_formula_ref(json_node, age_day, age_month)
                 if ref:  # Manage slices
                     op.append(get_answer_operation(ref, a))
-                    # op.append(TriccStatic(str(a['id'])))
+                    op.append(TriccStatic(str(a['id'])))
                 elif "reference_table_x_id" in json_node:  # manage ZScore
                     x_node = None
                     y_node = None
@@ -542,10 +579,14 @@ def add_background_calculation_options(json_node, age_day, age_month, dob):
                     opa_v = None
                     if x_node and z_node:
                         opa_v = TriccOperation("izscore")
+                        opa_v.append(TriccStatic('ageforweight'))
+                        opa_v.append(TriccSCV(sex.scv()))
                         opa_v.append(TriccSCV(x_node))
                         opa_v.append(TriccSCV(z_node))
                     elif x_node and y_node:
                         opa_v = TriccOperation("zscore")
+                        opa_v.append(TriccStatic('ageforweight'))
+                        opa_v.append(TriccSCV(sex.scv()))
                         opa_v.append(TriccSCV(x_node))
                         opa_v.append(TriccSCV(y_node))
                     if opa_v:
@@ -555,6 +596,7 @@ def add_background_calculation_options(json_node, age_day, age_month, dob):
                         "opertaion not implemented, only slice and tables are"
                     )
                     exit(-1)
+
     return op
 
 

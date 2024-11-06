@@ -41,7 +41,7 @@ def get_element(graph, system, code, version=None, instance=None, white_list=Non
 
 
 def get_elements(graph, system, code, version=None):
-    ref = TriccMixinRef(code=code, system=system, version=version).scv()
+    ref = TriccMixinRef(code=str(code), system=str(system), version=version).scv()
     return [n[1]['data'] for n in filter(lambda node:  node[0].startswith(ref), graph.nodes(data=True))]
 
 
@@ -193,7 +193,7 @@ def save_graphml(G, start_node, filename, remove_dandling=True):
             #graph.nodes[node]['viz'] = {'position': {'x': pos[node][0], 'y': pos[node][1]}}
             graph.nodes[node]['x'] = pos[node][0]
             graph.nodes[node]['y'] = pos[node][1]
-            graph.nodes[node]['label'] = tricc_node.label
+            graph.nodes[node]['label'] = tricc_node.display
             del graph.nodes[node]['data']
         
     for edge in graph.out_edges(keys=True, data=True):
@@ -318,10 +318,6 @@ def expend_impl_activity(
     new_activity_instances = {}
     if "expended" in node.attributes and node.attributes["expended"]:
         return {}
-    activity_label = node.label + (("::" + str(node.instance)) if node.instance else '')
-    logger.info(f"loading Activity {activity_label}")
-    node_def = node.instantiate
-    output_def = node_def.attributes.get('output', None) 
     # avoid expending an activity not connected to main start
     try:
         # will raise an exception if no path found
@@ -334,6 +330,10 @@ def expend_impl_activity(
     except Exception as e:
         logger.error(f"unexpected error {e}")
         exit(-1)
+    activity_label = node.display + (("::" + str(node.instance)) if node.instance else '')
+    node_def = node.instantiate
+    output_def = node_def.attributes.get('output', None)
+    logger.info(f"loading Activity {activity_label}")
     # add node to graph (if any new)
     node.attributes["expended"] = True
     i_nodes = [
@@ -354,7 +354,8 @@ def expend_impl_activity(
             n.system,
             n.code,
             n.version,
-            force_new=(node.instance > 1)
+            start=node,
+            #force_new=(node.instance > 1)
         )
         for n in qs_nodes
     ]
@@ -399,7 +400,7 @@ def get_most_probable_instance(
 ):
     nodes = get_elements(graph, system, code)
     score = {}
-    if not force_new:
+    if nodes and not force_new:
         # look if the exisitng instance of the inner node are already 
         # in a path leading to the QS start, 
         # if it the case it would for sure lead to a loop
@@ -414,9 +415,9 @@ def get_most_probable_instance(
                     sub_paths = list(
                         nx.node_disjoint_paths(graph, n.scv(), start.scv())
                     )
-                    score[n] = 500
+                    score[n] = 1000
                 except:
-                    pass
+                    score[n] += len(graph.in_edges(n.scv()))
         best = min(nodes, key=lambda n: score[n])
                 
         if score[best] < 1000:
@@ -425,6 +426,7 @@ def get_most_probable_instance(
     # then create a new one
     if nodes:
         new = nodes[0].make_instance(sibling=True)
+        graph.add_node(new.scv(), data=new)
         return (new.scv(), {"data": new})
     else:
         logger.error(f"node not found {to_scv_str(system, code, version)}")

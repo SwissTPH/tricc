@@ -15,6 +15,7 @@ langs = SingletonLangClass()
 
 from tricc_og.strategies.input.drawio import DrawioStrategy
 from tricc_og.strategies.input.medalcreator import MedalCStrategy
+from tricc_og.strategies.transform.unlooped import UnlooopStrategy
 
 # from tricc_oo.serializers.medalcreator import execute
 
@@ -82,10 +83,11 @@ if __name__ == "__main__":
     main_lang_code = "en"
     input_strategy = "DrawioStrategy"
     output_strategy = "XLSFormStrategy"
+    transform_strategy = "UnlooopStrategy"
     try:
         opts, args = getopt.getopt(
             sys.argv[1:],
-            "hti:o:s:I:O:l:d:L:",
+            "hti:o:s:I:O:l:d:L:T:",
             ["input=", "output=", "lang=", "help", "trads"],
         )
     except getopt.GetoptError:
@@ -103,6 +105,8 @@ if __name__ == "__main__":
             input_strategy = arg
         elif opt == "-O":
             output_strategy = arg
+        elif opt == "-T":
+            transform_strategy = arg
         elif opt == "-d":
             form_id = arg
         elif opt == "-l":
@@ -129,15 +133,18 @@ if __name__ == "__main__":
         # if output file path not specified, just chagne the extension
         out_path = os.path.dirname(pre)
     strategy = globals()[input_strategy](in_filepath)
-    logger.info(f"build the graph from strategy {input_strategy}")
+    logger.info("Using import strategy {}".format(strategy.__class__))
     media_path = os.path.join(out_path, "media-tmp")
     #try:
     project = strategy.execute(in_filepath, media_path)
     #except Exception as e:
     #    logger.error(f"in strategy {input_strategy} failed with {e}")
     #    exit(-1)
+    strategy = globals()[transform_strategy](project)
+    logger.info("Using Transform strategy {}".format(strategy.__class__))
+    strategy.execute()
     strategy = globals()[output_strategy](project, out_path, input_strategy)
-    logger.info("Using strategy {}".format(strategy.__class__))
+    logger.info("Using export strategy {}".format(strategy.__class__))
     logger.info("update the node with basic information")
     # create constraints, clean name
 

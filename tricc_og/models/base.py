@@ -1,5 +1,6 @@
 from typing import Dict, ForwardRef, List, Optional, Union, Set
-from pydantic import BaseModel, constr, validator
+from fhir.resources.codesystem import CodeSystem
+from pydantic import BaseModel, constr, validator, Field
 from .operators import TriccOperator
 import logging
 from networkx import MultiDiGraph
@@ -7,9 +8,9 @@ from strenum import StrEnum
 from enum import auto
 from tricc_og.models.tricc import TriccNodeType
 
-TriccCode = constr(regex="^.+$")
-TriccSystem = constr(regex="^.+$")
-TriccVersion = constr(regex="^.+$")
+TriccCode = constr(pattern="^.+$")
+TriccSystem = constr(pattern="^.+$")
+TriccVersion = constr(pattern="^.+$")
 logger = logging.getLogger("default")
 
 
@@ -24,9 +25,9 @@ def to_scv_str(system, code, version=None, instance=None, with_instance=True):
 class TriccMixinRef(BaseModel):
     system: TriccSystem = "tricc"
     code: TriccCode
-    version: TriccVersion = None
+    version: Union[TriccVersion, None] = None
     instance: int = None
-    
+    display: str = None
     def get_name(self):
         return self.scv()
     
@@ -171,16 +172,16 @@ class AttributesMixin(BaseModel):
 SelfTriccMixinContext = ForwardRef("TriccContext")
 
 
-class TriccContext(TriccMixinRef, TriccTypeMixIn, AttributesMixin):
+class TriccContext(TriccMixinRef, AttributesMixin):
     # context: SelfTriccMixinContext = None
-    label: str
+    ...
 
 
 class TriccBaseModel(TriccMixinRef, AttributesMixin, TriccTypeMixIn):
     def __str__(self):
         return self.scv()
     def __repr__(self):
-        return f"{self.scv()}: {self.label} ({self.context.scv() if self.context else ''}) ; expression:{self.expression}"
+        return f"{self.scv()}: {self.display} ({self.context.scv() if self.context else ''}) ; expression:{self.expression}"
     # def scv(self):
     #     return f"{self.type_scv.get_name()}:{self.get_name()}"
 
@@ -189,7 +190,7 @@ class TriccBaseModel(TriccMixinRef, AttributesMixin, TriccTypeMixIn):
     context: TriccContext = None
     applicability: TriccOperation = None
     expression: TriccOperation = None
-    label: str = ""
+    display: str = ""
     reference: str = ""
     
     class Config:
@@ -220,7 +221,7 @@ class TriccDataModel(TriccBaseAbstractModel):
 
 
 class TriccDataInputModel(TriccDataModel):
-    criteria = TriccOperation  # search criteria
+    criteria: TriccOperation = None  # search criteria
 
 
 class FlowType(StrEnum):
@@ -243,7 +244,7 @@ class TriccActivity(TriccBaseModel):
     # rules that should be used for conformance
     conformance_rules: Set[TriccOperation] = set()
     elements: Set[TriccBaseModel] = set()
-    graph: MultiDiGraph = MultiDiGraph()
+    graph: MultiDiGraph = Field(default_factory=MultiDiGraph)
 
     class Config:
         # Allow arbitrary types for validation
@@ -256,8 +257,8 @@ class TriccActivity(TriccBaseModel):
     def make_instance(self, sibling=False, **kwargs):
         instance = super(TriccActivity, self).make_instance(sibling=sibling, **kwargs)
         # the base instance might be already expended
-        if sibling or len(self.instances) > 1:
-            instance.attributes['expended'] = False
+        #if sibling or len(self.instances) > 1:
+        instance.attributes["expended"] = False
         instance.graph = MultiDiGraph()
         if 'output' in self.attributes and self.attributes['output']:
             instance.attributes['output'] = self.attributes['output'].make_instance(sibling=sibling)
@@ -295,14 +296,12 @@ class TriccProject(TriccBaseAbstractModel, TriccContext):
     # TODO manage trad properly
     def get_keyword_trad(keyword):
         return keyword
-
+    code_system: CodeSystem = None
     class Config:
         # Allow arbitrary types for validation
         arbitrary_types_allowed = True
 
-    @validator("graph", allow_reuse=True)
-    @validator("impl_graph", allow_reuse=True)
-    @validator("abs_graph", allow_reuse=True)
+    @validator('graph', 'impl_graph', 'abs_graph', allow_reuse=True)
     def validate_graph(cls, value):
         validate_graph(value)
     
@@ -313,14 +312,14 @@ class TriccProject(TriccBaseAbstractModel, TriccContext):
                 system == context.system and
                 version == context.version
             ):
-                return context 
+                return context
         context = TriccContext(
                 code=code,
                 system=system,
-                version=version,
-                label=code,
-                type_scv=TriccMixinRef(system="tricc_type", code=str(TriccNodeType.context)),
+                display=code,
             )
+        if version:
+            context.version = version,
         self.contexts.add(context)
         return context
 

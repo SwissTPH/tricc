@@ -2,7 +2,7 @@ from bpmn_python import bpmn_diagram_rep as diagram
 
 def add_node(graph, bpmn_graph, scv, process_id):
     node = graph.nodes[scv]['data']
-    label = node.label
+    label = node.display
     bpmn_graph.add_task_to_diagram(process_id, task_name=label, node_id=scv)
 
       

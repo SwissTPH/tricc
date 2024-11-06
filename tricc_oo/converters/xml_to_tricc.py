@@ -308,10 +308,10 @@ def get_select_options(diagram, select_node, nodes):
         )
         set_additional_attributes(['save'], elm, option)
         options[i]=option
-        nodes[id]=option
+        nodes[id]= option
         i += 1
-    if len(list)== 0:
-        logger.error("select {} does not have any option".format(select_node.label))
+    if len(list) == 0:
+        logger.error("select {} does not have any option".format(select_node.display))
     else:
         return options
     

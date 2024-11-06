@@ -21,23 +21,7 @@ logger = logging.getLogger("default")
 
 
 class DrawioStrategy(BaseInputStrategy):
-    processes = [
-        "triage",
-        "registration",
-        "emergency-care",
-        "local-urgent-care",
-        "actue-tertiary-care",
-        "history-and-physical",
-        "diagnostic-testing",
-        "determine-diagnosis",
-        "provide-counseling",
-        "dispense-medications",
-        "monitor-and-follow-up-of-patient",
-        "alerts-reminders-education",
-        "discharge-referral-of-patient",
-        "charge-for-service",
-        "record-and-report",
-    ]
+
 
     def execute(self, in_filepath, media_path):
         # reading input file

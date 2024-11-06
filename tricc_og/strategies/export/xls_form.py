@@ -215,6 +215,57 @@ class XLSFormStrategy(BaseExportStrategy):
         for ref in ref_expressions:
             parts.append(self.tricc_operation_not_equal([ref, "''"]))
         return self.tricc_operation_and(parts)
+    
+    #table, sex, x(age), Y(weight), give Z
+    def get_zscore_params(self, ref_expressions):
+        table = ref_expressions[0]
+        sex = f"${{{clean_name(ref_expressions[1])}}}"
+        x = f"${{{clean_name(ref_expressions[2])}}}"
+        yz = f"${{{clean_name(ref_expressions[3])}}}"
+        ll = (
+            f"instance('{table}')/root/item[sex={sex} and x_max>"
+            + x
+            + " and x_min<="
+            + x
+            + "]/l"
+        )
+        m = (
+            f"instance({table})/root/item[sex={sex} and x_max>"
+            + x
+            + " and x_min<="
+            + x
+            + "]/m"
+        )
+        s = (
+            f"instance({table})/root/item[sex={sex} and x_max>"
+            + x
+            + " and x_min<="
+            + x
+            + "]/s"
+        )
+        return yz, ll, m, s 
+    
+    
+    def tricc_operation_zscore(self, ref_expressions):
+        y, ll, m, s = self.get_zscore_params(ref_expressions)
+        #  return ((Math.pow((y / m), l) - 1) / (s * l));
+        return f"(pow({y} div ({m}), {ll}) -1) div (({s}) div ({ll}))"
+   
+    
+    def tricc_operation_izscore(self, ref_expressions):
+        z, ll, m, s = self.get_zscore_params(ref_expressions)
+        #  return  (m * (z*s*l-1)^(1/l));
+        return f"pow({m} * ({z} * {s} * {ll} -1), 1 div {ll})"
+    
+    def tricc_operation_age_day(self, ref_expressions):
+        dob_node_name = ref_expressions[0] if ref_expressions else 'birth_date'
+        return f'int((today()-date(${{{dob_node_name}}})))'
+    
+    def tricc_operation_age_month(self, ref_expressions):
+        return f'int( ${{{ref_expressions[0]}}} div 30.5)'
+    
+    def tricc_operation_age_year(self, ref_expressions):
+        return f'int( ${{{ref_expressions[0]}}} div 365.25)'
 
     # function transform an object to XLSFORM value
     # @param r reference to be translated
@@ -253,4 +304,9 @@ class XLSFormStrategy(BaseExportStrategy):
         TriccOperator.CONTAINS: tricc_operation_contains,
         TriccOperator.LESS: tricc_operation_less,
         TriccOperator.MORE: tricc_operation_more,
+        TriccOperator.AGE_DAY: tricc_operation_age_day,
+        TriccOperator.AGE_MONTH: tricc_operation_age_month,
+        TriccOperator.AGE_YEAR: tricc_operation_age_year,
+        TriccOperator.ZSCORE: tricc_operation_zscore,
+        TriccOperator.IZSCORE: tricc_operation_izscore,
     }  
