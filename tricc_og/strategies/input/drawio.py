@@ -26,9 +26,6 @@ class DrawioStrategy(BaseInputStrategy):
     def execute(self, in_filepath, media_path):
         # reading input file
         files = []
-        pages = {}
-        diagrams = []
-        start_pages = {}
         # read all pages
         logger.info("# Reading the input file")
         if os.path.isdir(in_filepath):

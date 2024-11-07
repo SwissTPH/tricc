@@ -17,7 +17,7 @@ from tricc_og.parsers.xml import (
     get_mxcell_parent_list,
     get_tricc_type_list,
 )
-
+from tricc_og.models.trigger import TriccTriggers
 from tricc_og.visitors.tricc_project import add_flow
 
 
@@ -31,28 +31,31 @@ TRICC_LIST_NAME = "l_{0}"
 logger = logging.getLogger("default")
 
 
+
+
 def create_activity(project, diagram, media_path):
     drawio_id = diagram.attrib.get("id")
     # root = create_root_node(diagram)
     name = diagram.attrib.get("name")
     form_id = diagram.attrib.get("name", None)
-    abs_activity = TriccActivity(
-        code=clean_str(name), system=project.code, label=name, attributes={}
+    activity = TriccActivity(
+        code=clean_str(name), system=project.code, display=name
     )
-    nodes, graph = get_nodes(diagram, abs_activity)
-    if nodes:
-        activity = TriccActivity(
-            instantiate=abs_activity,
-            code=get_drawio_name(diagram),
-            system=project.code,
-            label=name,
-            attributes={"form_id": form_id, "id": drawio_id},
-            elements=nodes,
-            graph=graph,
-        )
-
-        get_edges(diagram, activity)
-        project.graph = union(project.graph, activity.graph)
+    activity.graph = get_nodes(diagram)
+    activated_trigger = [
+        TriccMixinRef(
+            code=str(trigger),
+            system="cpg-common-processes"
+        ).scv() in activity.graph.nodes
+        for trigger in TriccTriggers
+    ]
+    if any(activated_trigger):
+        trigger = [trigger for trigger, active in zip(TriccTriggers, activated_trigger) if active][0]
+        ref = TriccMixinRef(
+            code=str(trigger),
+            system="cpg-common-processes"
+        ).scv()
+        project.graph.add(ref, activity.graph.nodes[ref]['data'])
     else:
         logger.warning(f"no processable element found in {name}")
 
@@ -60,35 +63,25 @@ def create_activity(project, diagram, media_path):
 def get_nodes(diagram, activity):
     graph = MultiDiGraph()
     for tricc_type in TYPE_MAP:
-        list = get_tricc_type_list(diagram, TYPE_MAP[tricc_type]["objects"], tricc_type)
+        elm_list = get_tricc_type_list(diagram, TYPE_MAP[tricc_type]["objects"], tricc_type)
         add_tricc_base_node(
             graph,
             tricc_type,
-            list,
+            elm_list,
             activity,
             attributes=TYPE_MAP[tricc_type]["attributes"],
             mandatory_attributes=TYPE_MAP[tricc_type]["mandatory_attributes"],
         )
-
         if (
             "has_options" in TYPE_MAP[tricc_type]
             and TYPE_MAP[tricc_type]["has_options"]
         ):
-            for elm in list:
-                drawio_id = elm.attrib.get("id")
-                node = get_node_by_attibute(nodes, "id", drawio_id)
+            for elm in elm_list:
+                code = get_drawio_name(elm)
+                node = graph.nodes(TriccMixinRef(system="tricc", code=code))['data']
                 if node:
-                    options = get_select_options(diagram, node, nodes)
-                    for i in options:
-                        nodes.add(options[i])
-                        add_flow(
-                            graph,
-                            activity,
-                            node,
-                            options[i],
-                            label=i,
-                            flow_type=FlowType("OPTION"),
-                        )
+                    options = get_select_options(diagram, node)
+ 
                 else:
                     logger.error(f"node with id {drawio_id} not found")
     return nodes, graph
@@ -125,7 +118,7 @@ def set_additional_attributes(node, elm, attribute_names):
                 node.attributes[attributename] = attribute
 
 
-def get_select_options(diagram, select_node, nodes):
+def get_select_options(diagram, select_node):
     options = {}
     i = 0
     list = get_mxcell_parent_list(
@@ -149,7 +142,7 @@ def get_select_options(diagram, select_node, nodes):
             type_scv=TriccMixinRef(
                 system="tricc_type", code=str(TriccNodeType.select_option)
             ),
-            label=elm.attrib.get("label"),
+            display=elm.attrib.get("label"),
             attributes={
                 "id": drawio_id,
             },
@@ -176,11 +169,9 @@ def add_tricc_base_node(
         node = TriccBaseModel(
             code=get_drawio_name(elm),
             type_scv=TriccMixinRef(system="tricc_type", code=str(type_code)),
-            system=group.system if group else "drawio",
-            context=group,
+            system="tricc",
             attributes={"parent": parent, "id": drawio_id},
         )
-
         set_mandatory_attribute(node, elm, mandatory_attributes)
         set_additional_attributes(node, elm, attributes)
         graph.add_node(node.scv(), data=node)
