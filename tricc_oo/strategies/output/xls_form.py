@@ -559,13 +559,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
         # calcualte the expression only for select muzltiple and fake calculate
         if node.reference is not None and issubclass(node.reference.__class__, list):
             if node.expression_reference is None and len(node.reference) == 1:
-                if node.label is not None:
-                    for operation in OPERATION_LIST:
-                        left_term = process_rhumbus_expression(node.label, operation)
-                        if left_term is not None:
-                            break
-                if left_term is None:
-                    left_term = '>0'
+                left_term = '>0'
                 ref = node.reference[0]
                 if issubclass(ref.__class__, TriccNodeBaseModel):
                     if isinstance(ref, TriccNodeActivity):

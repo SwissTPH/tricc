@@ -24,7 +24,6 @@ langs = SingletonLangClass()
 # langs.add_trad('en', en)
 
 from tricc_oo.strategies.input.drawio import DrawioStrategy
-from tricc_oo.strategies.input.medalcreator import MedalCStrategy
 
 # from tricc_oo.serializers.medalcreator import execute
 
@@ -87,7 +86,7 @@ if __name__ == "__main__":
     form_id = None
     debug_level = None
     trad = False
-
+    download_dir = None
     input_strategy = "DrawioStrategy"
     output_strategy = "XLSFormStrategy"
     try:
@@ -121,6 +120,8 @@ if __name__ == "__main__":
         print_help()
         sys.exit(2)
 
+    if not download_dir:
+        download_dir = out_path
     debug_path = os.fspath(out_path + "/debug.log")
     debug_path = os.path.abspath(debug_path)
 
@@ -169,7 +170,7 @@ if __name__ == "__main__":
     output = strategy.execute(start_page, pages=pages)
 
     # compress the output folder to a zip archieve and place it in the download directory
-    shutil.make_archive(os.path.join(download_dir), "zip", os.path.join(out_path))
+    # shutil.make_archive(os.path.join(download_dir), "zip", os.path.join(out_path))
 
     # print the content of debug.log
     with open(debug_file_path, "r") as f:

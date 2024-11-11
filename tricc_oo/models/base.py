@@ -32,9 +32,12 @@ END_NODE_FORMAT = "end_{}"
 class TriccNodeType(StrEnum):
     #replace with auto ? 
     note = 'note'
-    calculate = 'calculate'
+    calculate = 'calculate',
+    output = 'output',
     select_multiple = 'select_multiple'
     select_one = 'select_one'
+    select_yesno = 'select_one yesno'
+    select_option = 'select_option'
     decimal = 'decimal'
     integer = 'integer'
     text = 'text'
@@ -49,20 +52,26 @@ class TriccNodeType(StrEnum):
     add = 'add'  # add counts
     container_hint_media = 'container_hint_media'  # DEPRECATED
     activity = 'activity'
-    select_yesno = 'select_one yesno'  # NOT YET SUPPORTED
-    select_option = 'select_option'
-    hint = 'hint-message'
     help = 'help-message'
+    hint = 'hint-message'
     exclusive = 'not'
     end = 'end'
     activity_end = 'activity_end'
     edge = 'edge'
-    page = 'page'
+    page = 'container_page'
     not_available = 'not_available'
     quantity = 'quantity'
     bridge = 'bridge'
     wait = 'wait'
     operation = 'operation'
+    context = 'context'
+    diagnostic = 'diagnostic'
+
+    def __iter__(self):
+        return iter(self.__members__.values())
+
+    def __next__(self):
+        return next(iter(self))
 
 
 

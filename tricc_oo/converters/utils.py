@@ -5,7 +5,7 @@ import hashlib
 import html2text
 
 
-OPERATION_LIST = [ '>=', '<=', '==','=','>','<']
+OPERATION_LIST = ['>=', '<=', '==', '=', '>', '<']
 
 
 logger = logging.getLogger("default")

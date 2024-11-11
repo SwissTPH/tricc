@@ -73,12 +73,11 @@ def and_join(argv):
 # @param right part
 def simple_and_join(left, right):
     expression = None
-
     # no term is considered as True
     left_issue = left is None or left == ''
     right_issue = right is None or right == ''
-    left_neg = left == False or left ==0 or left =='0' or left =='false()'
-    right_neg = right == False or right ==0 or right =='0' or right =='false()'
+    left_neg = left is False or left == 0 or left == '0' or left == 'false()'
+    right_neg = right is False or right == 0 or right == '0' or right == 'false()'
     if issubclass(left.__class__, TriccNodeBaseModel):
         left = get_export_name(left)
     if issubclass(right.__class__, TriccNodeBaseModel):
@@ -103,7 +102,7 @@ def simple_and_join(left, right):
 
 def or_join(list_or, elm_and=None):
     cleaned_list  = clean_list_or(list_or, elm_and)
-    if len(cleaned_list)==1:
+    if len(cleaned_list) == 1:
         return cleaned_list[0]
     if len(cleaned_list)>1: 
         return '(' + ' or '.join(cleaned_list) + ')'
@@ -117,8 +116,8 @@ def nand_join(left, right):
     # no term is considered as True
     left_issue = left is None or left == ''
     right_issue = right is None or right == ''
-    left_neg = left == False or left ==0 or left =='0' or left =='false()'
-    right_neg = right == False or right ==0 or right =='0' or right =='false()'
+    left_neg = left == False or left == 0 or left == '0' or left == 'false()'
+    right_neg = right == False or right == 0 or right == '0' or right == 'false()'
     if issubclass(left.__class__, TriccNodeBaseModel):
         left = get_export_name(left)
     if issubclass(right.__class__, TriccNodeBaseModel):
@@ -163,9 +162,9 @@ def safe_to_bool_logic(expression):
 
 def has_overall_brace(expression):
     expression=expression.strip()
-    if not expression[0]=='(':
+    if not expression[0] == '(':
         return False
-    if not expression[-1]==')':
+    if not expression[-1] == ')':
         return False    
     count_braces = 1
     # ensure that the start brace don't close before the end
@@ -199,18 +198,6 @@ def is_single_fct(name,expression):
             return False
     return True
 
-#TODO need to be move in in strategy and generate TriccOpperation instead
-# function that parse expression for rhombus
-# @param list_or
-# @param and elm use upst
-def process_rhumbus_expression(label, operation):
-    if operation in label:
-        terms = label.split(operation)
-        if len(terms) == 2:
-            if operation == '==':
-                operation = operation[0]
-            # TODO check if number
-            return operation + terms[1].replace('?', '').strip()
         
 # function that generate remove unsure condition
 # @param list_or
@@ -239,14 +226,17 @@ def clean_list_or(list_or, elm_and=None):
                 # we remove x and not X
                 list_or.remove(negate_term(elm_and))
             else:
-                    if re.search(exp_prev, ' and ')  in list_or and exp_prev.replace('and ', 'and not') in list_or:
-                        right = exp_prev.split(' and ')[0]
-                        list_or.remove(exp_prev)
-                        list_or.remove(exp_prev.replace('and ', 'and not'))
-                        list_or.append(right)
+                if (
+                    re.search(exp_prev, ' and ') in list_or
+                    and exp_prev.replace('and ', 'and not') in list_or
+                ):
+                    right = exp_prev.split(' and ')[0]
+                    list_or.remove(exp_prev)
+                    list_or.remove(exp_prev.replace('and ', 'and not'))
+                    list_or.append(right)
 
-                    if negate_term(exp_prev) == elm_and or exp_prev == elm_and:
-                        list_or.remove(exp_prev)
+                if negate_term(exp_prev) == elm_and or exp_prev == elm_and:
+                    list_or.remove(exp_prev)
    
     return add_bracket_to_list_elm(list_or)
 

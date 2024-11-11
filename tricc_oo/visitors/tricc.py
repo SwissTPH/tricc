@@ -1,9 +1,11 @@
 import re
+import logging
 
 from tricc_oo.converters.utils import *
 from tricc_oo.models import *
 from tricc_oo.visitors.tricc import *
 
+logger = logging.getLogger(__name__)
 
 def merge_node(from_node,to_node):
     if from_node.activity != to_node.activity:
@@ -251,55 +253,90 @@ def add_calculate(calculates, calc_node):
             calculates[calc_node.name]= {}
         calculates[calc_node.name][calc_node.id] = calc_node
 
-def process_reference(node,  calculates ,used_calculates,processed_nodes, warn = False ):
-    #global last_unfound_ref
+def get_option_code_from_label(node, option_label):
+    if hasattr(node, 'options'):
+        for i in node.options:
+            if node.options[i].label.strip() == option_label.strip():
+                return node.options[i].name
+        logger.error(f"option with label {option_label} not found in {node.get_name()}")
+    else:
+        logger.error(f"node {node.get_name()} has no options")
+
+
+
+def process_reference(node, calculates, used_calculates, processed_nodes, warn=False):
     reference = []
     expression_reference = None
+    
     if issubclass(node.__class__, TriccRhombusMixIn):
-        if isinstance(node.reference, str) :
-            logger.debug("process_reference:{}: {} ".format(node.get_name(), node.reference))
-            ref_pattern=r'(\$\{[^\}]+\})'
-            lookup = re.findall(ref_pattern, node.reference)
-            if lookup and len(lookup)>0:
-                ref_list = [x[2:-1] for x in lookup]
-                expression_reference = re.sub(ref_pattern,r"${{{}}}", node.reference )
+        if isinstance(node.reference, str):
+            logger.debug(f"process_reference:{node.get_name()}: {node.reference}")
+            
+            # New pattern to match both ${ref} and ${ref} = [label]
+            ref_pattern = r'\$\{([^\}]+)\}(?:\s*=\s*\[([^\]]+)\])?'
+            matches = re.findall(ref_pattern, node.reference)
+            
+            if matches:
+                ref_list = []
+                label_dict = {}
+                expression_reference = node.reference
+                
+                for match in matches:
+                    ref = match[0]# Remove ${ and }
+                    label = match[1] if match[1] else None
+                    
+                    ref_list.append(ref)
+                    if label:
+                        label_dict[ref] = label
+                    expression_reference = expression_reference.replace(
+                        f"${{{ref}}}",
+                        "${{{}}}"
+                    )
             else:
-                ref_list= [node.reference]
+                ref_list = [node.reference.strip()]
+                label_dict = {}
+            
             for ref in ref_list:
-                ref = ref.strip()
                 last_found = get_prev_node_by_name(processed_nodes, ref, node)
-                # ref is still a string here
-                if last_found is None  or issubclass(last_found.__class__, TriccNodeCalculateBase):
-                    if ref in calculates and len(calculates[ref])>0 :
-                        # issue is that it can be further in another path
+                
+                if last_found is None or issubclass(last_found.__class__, TriccNodeCalculateBase):
+                    if ref in calculates and len(calculates[ref]) > 0:
                         last_found = get_last_version(calculates, ref)
+                
                 if last_found is None:
                     if warn:
-                        logger.warning("reference {} not found for a calculate {}".format(ref, node.get_name()))
+                        logger.warning(f"reference {ref} not found for a calculate {node.get_name()}")
                     else:
-                        logger.debug("reference {} not found for a calculate {}".format(ref, node.get_name()))
-                    #if last_unfound_ref == node:
-                    #    logger.warning("reference not found for a calculate twice in a row {}".format(node.get_name()))
-                    #last_unfound_ref = node
+                        logger.debug(f"reference {ref} not found for a calculate {node.get_name()}")
                     return False
                 else:
-                    reference.append(last_found) 
+                    reference.append(last_found)
+                    if ref in label_dict:
+                        # Resolve human-readable label
+                        option_code = get_option_code_from_label(last_found, label_dict[ref])
+                        if option_code:
+                            expression_reference = expression_reference.replace(f"[{label_dict[ref]}]", f"'{option_code}'")
+                        else:
+                            logger.warning(f"Could not resolve label '{label_dict[ref]}' for reference {ref}")
+                            return False
                     set_prev_next_node(last_found, node)
-                    node.path_len = max(node.path_len,last_found.path_len )
+                    node.path_len = max(node.path_len, last_found.path_len)
+            
             for ref in reference:
                 add_used_calculate(node, ref, calculates, used_calculates, processed_nodes)
+            
             node.reference = reference
             node.expression_reference = expression_reference
-        elif isinstance(node.reference,list):
+        
+        elif isinstance(node.reference, list):
             for ref in node.reference:
-                #add_calculate(calculates,ref )
-                add_used_calculate(ref, node,calculates, used_calculates, processed_nodes)
+                add_used_calculate(ref, node, calculates, used_calculates, processed_nodes)
+        
         elif node.reference is None:
-            logger.error("process_calculate_version_requirement:reference is None for {0} ".format(node.get_name()))
-            exit()             
-            
+            logger.error(f"process_calculate_version_requirement:reference is None for {node.get_name()}")
+            exit()
+    
     return True
-
 
 #add_used_calculate(node, calc_node, calculates, used_calculates, processed_nodes)
 
@@ -372,7 +409,7 @@ def get_select_yes_no_options(node, group):
                 label="Yes",
                 select = node,
                 group = group,
-                list_name =  node.list_name
+                list_name = node.list_name
             )
     no = TriccNodeSelectOption(
                 id = generate_id(),
