@@ -49,7 +49,7 @@ class TriccNodeCalculateBase(TriccNodeBaseModel):
             self.reference =  self.expression_reference.get_references()
             return self.reference
         elif self.reference:
-            raise NotImplementedError("Cannot get reference from a sting")
+            logger.error("Cannot get reference from a sting")
 
 
 class TriccNodeActivity(TriccNodeBaseModel):
@@ -111,18 +111,18 @@ class TriccNodeActivity(TriccNodeBaseModel):
             for node in list(filter(lambda p_node: p_node != self.root and not isinstance(p_node, (TriccNodeDisplayBridge,TriccNodeBridge)),list(self.nodes.values()) )):
                 instance_node = instance.update_nodes(node)
                 if node in self.calculates and instance_node:
-                    instance.calulates.append(instance_node)
+                    instance.calculates.append(instance_node)
 
-            for group in self.groups:
+            for group in self.groups.values():
                 instance.update_groups(group)
                 # update parent group
-            for group in self.groups:
+            for group in self.groups.values():
                 instance.update_groups_group(group)
 
             return instance
 
     def update_groups_group(self, group):
-        for instance_group in self.groups:
+        for instance_group in self.groups.values():
             if instance_group.group == group:
                 instance_group.group == instance_group
             elif instance_group.group == self.base_instance:

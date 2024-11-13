@@ -145,17 +145,25 @@ if __name__ == "__main__":
         out_path = os.path.dirname(pre)
 
     file_content = []
+    files = []
     if os.path.isdir(in_filepath):
-        files = [f for f in os.listdir(in_filepath) if f.endswith(".drawio")]
-    elif os.path.isfile(in_filepath):
-        with open(in_filepath, "r") as f:
-            file_content = f.read()
-            file_content = [file_content]
+        files = [
+            os.path.join(in_filepath, f) 
+            for f in os.listdir(in_filepath) 
+            if f.endswith(".drawio")
+        ]
+    elif os.path.isfile(in_filepath) and in_filepath.endswith(".drawio"):
+        files = [in_filepath]
+        
+    for f in files:
+        with open(f, 'r') as s:
+            file_content.append(s.read())
+    if not file_content:
+        logger.error(f"{in_filepath} is neither a drawio file nor a directory containing drawio files")
+        exit(-1)
 
-    if file_content.__len__ == 0:  # if the file is not a directory
-        print("File cannot be read")
 
-    strategy = globals()[input_strategy](file_content)
+    strategy = globals()[input_strategy](files)
     logger.info(f"build the graph from strategy {input_strategy}")
     media_path = os.path.join(out_path, "media-tmp")
     start_page, pages, images = strategy.execute(file_content, media_path)

@@ -65,7 +65,7 @@ class TriccNodeType(StrEnum):
     wait = 'wait'
     operation = 'operation'
     context = 'context'
-    diagnostic = 'diagnostic'
+    diagnosis = 'diagnosis'
 
     def __iter__(self):
         return iter(self.__members__.values())
@@ -168,7 +168,7 @@ class TriccNodeBaseModel(TriccBaseModel):
     path_len: int = 0
     group: Optional[Union[TriccGroup, FwTriccNodeBaseModel]] = None
     name: Optional[str] = None
-    export_name:Optional[str] = None
+    export_name: Optional[str] = None
     label: Optional[Union[str, Dict[str,str]]] = None
     next_nodes: Set[TriccNodeBaseModel] = set()
     prev_nodes: Set[TriccNodeBaseModel] = set()

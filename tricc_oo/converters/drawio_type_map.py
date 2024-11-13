@@ -194,7 +194,7 @@ TYPE_MAP = {
         "mandatory_attributes": [],
         "model": TriccNodeBridge
     },
-    TriccNodeType.diagnostic: {
+    TriccNodeType.diagnosis: {
         "objects": ["UserObject", "object"],
         "attributes": [],
         "mandatory_attributes": ["name","label"],

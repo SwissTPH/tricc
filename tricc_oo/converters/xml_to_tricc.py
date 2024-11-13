@@ -177,8 +177,30 @@ def process_edges(diagram, media_path, activity, nodes):
                     )
                 )
     if not end_found:
-        logger.error("the activity {} has no end node".format(activity.get_name()))
-        exit()
+        fake_end = TriccNodeActivityEnd(activity=activity, group=activity)
+        last_nodes = [
+            n for n in list(activity.nodes.values())
+            if (
+                issubclass(
+                    n.__class__, 
+                    (
+                        TriccNodeInputModel, 
+                        TriccNodeText, 
+                        TriccNodeNote,
+                    )
+                ) and (
+                    not any([n.id == e.source for e in activity.edges])
+                )
+            )
+        ]
+        if last_nodes:
+            for n in last_nodes:
+                set_prev_next_node(n, fake_end, edge_only=True)
+            activity.nodes[fake_end.id] = fake_end
+        else:
+            logger.error(f"cannot guess end for {activity.get_name()}")
+            exit(-1)
+    
     return images
 
 def _get_name(name, id):

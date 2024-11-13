@@ -25,7 +25,7 @@
         "PYTHONPATH": "${workspaceFolder}${pathSeparator}${env:PYTHONPATH}"
 
       }
-    }
+    },
     {
       "name": "Demo",
       "type": "python",
@@ -37,7 +37,26 @@
         "-l",
         "d",
         "-o",
-        "/home/delcpa/Downloads",
+        "./tests/output/demo",
+        "-t",
+        "-O",
+        "XLSFormStrategy"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": false
+    },
+    {
+      "name": "Libya",
+      "type": "python",
+      "request": "launch",
+      "program": "tests/build.py",
+      "args": [
+        "-i",
+        "./tests/data/libya",
+        "-l",
+        "d",
+        "-o",
+        "./tests/output/libya",
         "-t",
         "-O",
         "XLSFormStrategy"

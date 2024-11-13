@@ -21,49 +21,55 @@ class BaseInputStrategy:
     def execute_linked_process(self, start_pages, pages):
         # create an overall activity only if not specified
         if "main" not in start_pages:
-            # set the first proess as the first form the list
-            if not self.processes[0] in start_pages:
-                logger.error(
-                    f"MainStart without process or process in (None, main, {self.processes[0]}) mandatory or this strategy {self.__class__.__name__}"
-                )
-            # copie the first root process data to use it on the app level
-            root_process = start_pages[self.processes[0]][0].root
+            page_processes = [(p.root.process, p,) for p in list(pages.values()) if getattr(p.root, 'process', None)]
+            sorted_pages = {}
+            for process in self.processes:
+                if process in [p[0] for p in page_processes]:
+                    sorted_pages[process] = [
+                        p[1] for p in page_processes if p[0] == process
+                    ]
+            root_process = sorted_pages[list(sorted_pages.keys())[0]][0].root
             root = TriccNodeMainStart(
-                id=generate_id(), form_id=root_process.form_id, label=root_process.label
+                id=generate_id(),
+                form_id=root_process.form_id,
+                label=root_process.label
             )
-            # first sets of activities don't require wait node
-            root.next_nodes = set(start_pages[self.processes[0]])
-
-            nodes = {page.id: page for x in start_pages for page in start_pages[x]}
+            nodes = {}
             nodes[root.id] = root
             app = TriccNodeActivity(
-                id=generate_id(), name=root_process.name, root=root, nodes=nodes
+                id=generate_id(),
+                name=root_process.name,
+                root=root,
+                nodes=nodes
             )
             root.activity = app
             # loop back to app to avoid None
             app.activity = app
             app.group = app
             # setting the activity/group to main
-            for n in nodes.values():
-                n.activity = app
-                n.group = app
-            # put a wait between group pf activities
-            prev_process = start_pages[self.processes[0]]
-            for p in prev_process:
-                set_prev_next_node(root, p, edge_only=True)
-            for process in self.processes[1:]:
-                if process in start_pages:
-                    wait = get_activity_wait(
-                        app.root,
+            prev_bridge = root
+            prev_process = None
+            for process in sorted_pages:
+                nodes = {page.id: page for page in sorted_pages[process]}
+                for n in nodes.values():
+                    n.activity = app
+                    n.group = app
+                    set_prev_next_node(
+                        prev_bridge,
+                        n,
+                        edge_only=True
+                    )
+                    app.nodes[n.id] = n
+                if prev_process:
+                    prev_bridge = get_activity_wait(
+                        prev_bridge,
                         prev_process,
-                        start_pages[process],
+                        sorted_pages[process],
                         edge_only=True,
                         activity=app,
-                    )
-                    app.nodes[wait.id] = wait
-                    prev_process = start_pages[process]
-                    # for p in prev_process:
-                    #    set_prev_next_node(root,p)
+                    )    
+                app.nodes[prev_bridge.id] = prev_bridge
+                prev_process = sorted_pages[process]
 
             return app
         else:
