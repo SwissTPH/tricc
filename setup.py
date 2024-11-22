@@ -18,6 +18,10 @@ setup(
         "pandas",
         "polib",
         "StrEnum",
+        "fhir.resources",
+        "antlr4-python3-runtime",
+        "antlr-ast",
+        "antlr-tools"        
     ],
     # extras_require={
     #    'test': ['pytest', 'coverage'],

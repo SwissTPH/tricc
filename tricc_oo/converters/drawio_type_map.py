@@ -86,12 +86,7 @@ TYPE_MAP = {
         "mandatory_attributes": ["label", "name"],
         "model": TriccNodeInteger
     },
-    # TriccNodeType.number: {
-    #     "objects": ["UserObject", "object"],
-    #     "attributes": ["constraint", "save", "constraint_message", "required"],
-    #     "mandatory_attributes": [],
-    #     "model": TriccNodeNumber
-    # },
+
     TriccNodeType.text: {
         "objects": ["UserObject", "object"],
         "attributes": [],
@@ -200,4 +195,10 @@ TYPE_MAP = {
         "mandatory_attributes": ["name","label"],
         "model": TriccNodeBridge
     },
+        # TriccNodeType.number: {
+    #     "objects": ["UserObject", "object"],
+    #     "attributes": ["constraint", "save", "constraint_message", "required"],
+    #     "mandatory_attributes": [],
+    #     "model": TriccNodeNumber
+    # },
 }

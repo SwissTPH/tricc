@@ -18,6 +18,7 @@ Expression = constr(pattern="^[^\\/]+$")
 
 triccId = constr(pattern="^.+$")
 triccIdList = constr(pattern="^.+$")
+triccName = constr(pattern="^.+$")
 
 b64 = constr(pattern="[^-A-Za-z0-9+/=]|=[^=]|={3,}$")
 
@@ -229,10 +230,12 @@ class TriccOperator(StrEnum):
     MORE_OR_EQUAL = 'more_or_equal'
     LESS_OR_EQUAL = 'less_or_equal'
     EQUAL = 'equal'
+    MORE = 'more'
     NOT_EQUAL = 'not_equal'
     BETWEEN = 'between'
     LESS = 'less'
-    CASE = 'case' #(cond, res), (cond,res)
+    CASE = 'case' # ref (equal value, res), (equal value,res)
+    IFS = 'ifs' #(cond, res), (cond,res)
     IF = 'if' # cond val_true, val_false
     CONTAINS = 'contains' # ref, txt Does CONTAINS make sense, like Select with wildcard
     EXISTS = 'exists'
@@ -240,17 +243,29 @@ class TriccOperator(StrEnum):
     HAS_QUALIFIER = 'has_qualifier'
     ZSCORE = 'zscore' # left table_name, right Y, gender give Z
     IZSCORE = 'izscore' #left table_name, right Z, gender give Y
+    DRUG_DOSAGE = 'drug_dosage' # drug name, *param1 (ex: weight, age)
     AGE_DAY = 'age_day' # age from dob
     AGE_MONTH = 'age_month' # age from dob
     AGE_YEAR = 'age_year' # age from dob
+    NOT = 'not'
+    DIVIDED = 'div'
+    MULTIPLIED = 'multiplied'
+    COALESCE = 'coalesce'
+    ISNULL = 'isnull'
     
-    
+
 class TriccOperation(BaseModel):
     tricc_type: TriccNodeType = TriccNodeType.operation
     operator: TriccOperator = TriccOperator.NATIVE
-    reference: List[Union[TriccStatic,TriccNodeBaseModel]] = []
-    def __init__(self, tricc_operator):
-        super().__init__(operator = tricc_operator)
+    reference: List[
+        Union[
+            TriccStatic, TriccNodeBaseModel, TriccOperation, triccName,
+            List[Union[TriccStatic, TriccNodeBaseModel, TriccOperation, triccName]]
+        ]
+    ] = []
+    
+    def __init__(self, operator, reference=[]):
+        super().__init__(operator=operator, reference=reference)
         
     def get_references(self):
         predecessor = set()
@@ -277,6 +292,8 @@ class TriccOperation(BaseModel):
                         self.replace_node(self.reference[key].select ,new_node.select)
         elif self.reference is not None:
             raise NotImplementedError(f"cannot manage {self.reference.__class__}")
+
+
 
 TriccGroup.update_forward_refs()
 TriccEdge.update_forward_refs()
