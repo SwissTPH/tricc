@@ -1,7 +1,7 @@
 import unittest
 
 from tricc_oo.converters.cql_to_operation import cqlToXlsFormVisitor, transform_cql_to_operation
-from tricc_oo.models.base import  TriccOperator, TriccOperation, TriccStatic
+from tricc_oo.models.base import  TriccOperator, TriccOperation, TriccStatic, TriccReference
 
 class TestCql(unittest.TestCase):
     def test_and(self):
@@ -15,14 +15,14 @@ class TestCql(unittest.TestCase):
                     reference=[
                         TriccOperation(
                             operator=TriccOperator.ISNULL,
-                            reference=["${p_weight}"]
+                            reference=[TriccReference("p_weight")]
                         )
                     ]
                 ),
                 TriccOperation(
                     operator=TriccOperator.MORE,
                     reference=[
-                        "${p_age}",
+                        TriccReference("p_age"),
                         TriccStatic(
                             value=2.0
                         )
@@ -40,8 +40,8 @@ class TestCql(unittest.TestCase):
             operator=TriccOperator.DRUG_DOSAGE,
             reference=[
                 TriccStatic(value='paracetamol'),
-                "${p_weight}",
-                "${p_age}"
+                TriccReference("p_weight"),
+                TriccReference("p_age")
             ]
         )
         self.assertEqual(str(dg_operation), str(dg_expected))

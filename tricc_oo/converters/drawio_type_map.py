@@ -113,7 +113,7 @@ TYPE_MAP = {
     },
     TriccNodeType.calculate: {
         "objects": ["UserObject", "object"],
-        "attributes": ["save", "expression"],
+        "attributes": ["save", "reference"],
         "mandatory_attributes": [ "name", 'label'],
         "model": TriccNodeCalculate
     },
@@ -193,7 +193,7 @@ TYPE_MAP = {
         "objects": ["UserObject", "object"],
         "attributes": [],
         "mandatory_attributes": ["name","label"],
-        "model": TriccNodeBridge
+        "model": TriccNodeCalculate
     },
         # TriccNodeType.number: {
     #     "objects": ["UserObject", "object"],

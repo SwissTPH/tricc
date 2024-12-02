@@ -3,7 +3,7 @@ from tricc_oo.converters.cql.cqlLexer import cqlLexer
 from tricc_oo.converters.cql.cqlParser import cqlParser
 from tricc_oo.converters.cql.cqlVisitor import cqlVisitor
 from tricc_oo.converters.utils import clean_name
-from tricc_oo.models.base import  TriccOperator, TriccOperation, TriccStatic
+from tricc_oo.models.base import  TriccOperator, TriccOperation, TriccStatic, TriccReference
 
 EXPRESSION = 0
 STRING = 1
@@ -20,7 +20,10 @@ FUNCTION_MAP = {
     'DrugDosage':  TriccOperator.DRUG_DOSAGE,
     'HasQualifier': TriccOperator.HAS_QUALIFIER,
 }
-
+# TODO
+# Min
+# Max
+# Round
 
 class cqlToXlsFormVisitor(cqlVisitor):
     def __init__(self):
@@ -33,7 +36,11 @@ class cqlToXlsFormVisitor(cqlVisitor):
         # look for the code in the system
         # if no code or not found return None
         # if code found, return f"${{{clean_name(arg)}}}"
-        return f"${{{clean_name(arg[1:-1].lower())}}}"
+        if arg.startswith('"') and arg.endswith('"'):
+            return TriccReference(arg[1:-1])
+        else:
+            return TriccReference(arg)
+        #return f"${{{clean_name(arg[1:-1].lower())}}}"
         
     def translate(self, arg, type=ANY):
         return self.resolve_scv(arg) or str(arg)
@@ -47,17 +54,27 @@ class cqlToXlsFormVisitor(cqlVisitor):
             'calculation': expression
         })
         return expression
-    
+        
     def visitIdentifier(self, arg):
         return self.translate(arg.getText(), 1)
 
     def visitChildren(self, ctx):
-        if 'Term' not in type(ctx).__name__:
-            print(f"Visiting unknown node type: {type(ctx).__name__}")
         return super().visitChildren(ctx)
 
+    def aggregateResult(self, aggregate, nextResult):
+        if aggregate is not None:
+            if nextResult is None:
+                return aggregate
+            else:
+                aggregate = aggregate if isinstance(aggregate, list) else [aggregate]
+                return [
+                    *aggregate,
+                    nextResult
+                ]
+        else:
+            return nextResult
+
     def visitExpression(self, ctx):
-        print(f"Visiting expression: {ctx.getText()}")
         return self.visitChildren(ctx)
     
     def visitFunctionInvocation(self, ctx, operator=TriccOperator.NATIVE):
@@ -88,6 +105,9 @@ class cqlToXlsFormVisitor(cqlVisitor):
             *args
         ]
 
+    def visitParenthesizedTerm(self, ctx):
+        return TriccOperation(TriccOperator.PARENTHESIS, [self.visitChildren(ctx)])
+    
     def visitMemberInvocation(self, ctx):
         return self.visitChildren(ctx)
 
@@ -150,8 +170,12 @@ class cqlToXlsFormVisitor(cqlVisitor):
         return self.__std_operator(TriccOperator.OR, ctx)
     
     def __std_operator(self, operator, ctx):
-        left = self.visit(ctx.expression(0))
-        right = self.visit(ctx.expression(1))
+        if hasattr(ctx, 'expression'):
+            left = self.visit(ctx.expression(0))
+            right = self.visit(ctx.expression(1))
+        elif hasattr(ctx, 'expressionTerm'):
+            left = self.visit(ctx.expressionTerm(0))
+            right = self.visit(ctx.expressionTerm(1))
         op = TriccOperation(operator)
         op.reference = [left, right]
         return op
@@ -172,7 +196,9 @@ class cqlToXlsFormVisitor(cqlVisitor):
         return self.visitExpressionComparison(ctx)
 
     def visitNumberLiteral(self, ctx):
-        return TriccStatic(value=float(ctx.getText()))
+        value = float(ctx.getText())
+        value_int = int(value)
+        return TriccStatic(value=value_int if value == value_int else value)
 
     def visitStringLiteral(self, ctx):
         return TriccStatic(value=ctx.getText().strip("'"))
@@ -197,18 +223,36 @@ class cqlToXlsFormVisitor(cqlVisitor):
         raise NotImplementedError('Invocation not supported')
     
     def visitIndexerExpression(self, ctx):
-        raise NotImplementedError('Indexer not supported')    
-    
-    def visitPolarityExpression(self, ctx):
-        raise NotImplementedError('Polarity not supported')
-    
-    def visitMultiplicativeExpression(self, ctx):
-        # TODO
         raise NotImplementedError('Indexer not supported')
     
-    def visitAdditiveExpression(self, ctx):
+    def visitCastExpression(self, ctx):
         # TODO
-        raise NotImplementedError('Indexer not supported')
+        raise NotImplementedError('Cast not supported')
+    
+    def visitPolarityExpressionTerm(self, ctx):
+        if ctx.getChild(0).getText() == '-':
+            return TriccOperation(TriccOperator.MINUS, [self.visit(ctx.getChild(1))])
+    
+    def visitMultiplicationExpressionTerm(self, ctx):
+        op_text = ctx.getChild(1).getText()
+        op_map = {
+            '*': TriccOperator.MULTIPLIED,
+            'div': TriccOperator.DIVIDED,
+            '/': TriccOperator.DIVIDED,
+            '%': TriccOperator.MODULO,
+            'mod': TriccOperator.MODULO,
+        }
+        return self.__std_operator(op_map.get(op_text), ctx)
+    
+    def visitAdditionExpressionTerm(self, ctx):
+        op_text = ctx.getChild(1).getText()
+        op_map = {
+            '+': TriccOperator.PLUS,
+            '-': TriccOperator.MINUS,
+            '&': TriccOperator.AND
+        }
+        return self.__std_operator(op_map.get(op_text), ctx)
+
     
     def visitTypeExpression(self, ctx):
         raise NotImplementedError('cast not supported')
@@ -271,18 +315,46 @@ class cqlToXlsFormVisitor(cqlVisitor):
         return op
     
     
-def transform_cql_to_operation(cql_input):
+from antlr4.error.ErrorListener import ErrorListener
+
+class CQLErrorListener(ErrorListener):
+    context = None
+    def __init__(self, context=None):
+        super(CQLErrorListener, self).__init__()
+        self.errors = []
+        self.context = context
+
+    def syntaxError(self, recognizer, offendingSymbol, line, column, msg, e):
+        error = f"{self.context} \n" if self.context else ''
+        error += f"Line {line}:{column} - {msg}"
+        self.errors.append(error)
+
+def transform_cql_to_operation(cql_input, context=None):
     cql_input = f"""
     library runner
     
     define "calc":
         {cql_input}
     """
-    input_stream = InputStream(cql_input)
+    input_stream = InputStream(chr(10).join(cql_input.split('\n')))
     lexer = cqlLexer(input_stream)
     stream = CommonTokenStream(lexer)
     parser = cqlParser(stream)
+
+    # Remove default error listeners and add custom listener
+    parser.removeErrorListeners()
+    error_listener = CQLErrorListener(context)
+    parser.addErrorListener(error_listener)
+
     tree = parser.library()
+
+    # Check for errors
+    if error_listener.errors:
+        for error in error_listener.errors:
+            print(f"CQL Grammar Error: {error}")
+        return None  # Or handle errors as appropriate for your use case
+
+    # If no errors, proceed with visitor
     visitor = cqlToXlsFormVisitor()
     visitor.visit(tree)
     return visitor.xlsform_rows[0]['calculation']

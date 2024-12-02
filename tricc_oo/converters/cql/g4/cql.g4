@@ -306,8 +306,6 @@ expression
     | expression ('or' | 'xor') expression                                                          #orExpression
     | expression 'implies' expression                                                               #impliesExpression
     | expression ('|' | 'union' | 'intersect' | 'except') expression                                #inFixSetExpression
-    | 'Coalesce' '(' expression (',' expression)* ')'                                               #coalesceExpression
-    | 'Coalesce' '(' '{' expression (',' expression)* '}' ')'                                       #coalesceListExpression
     ;
 
 dateTimePrecision
@@ -345,7 +343,6 @@ expressionTerm
     | expressionTerm ('*' | '/' | 'div' | 'mod') expressionTerm                     #multiplicationExpressionTerm
     | expressionTerm ('+' | '-' | '&') expressionTerm                               #additionExpressionTerm
     | 'if' expression 'then' expression 'else' expression                           #ifThenElseExpressionTerm
-    | 'case' caseExpressionItem+ 'else' expression 'end'                            #caseWhenExpressionTerm
     | 'case' expression caseExpressionItem+ 'else' expression 'end'                 #caseExpressionTerm
     | ('distinct' | 'flatten') expression                                           #aggregateExpressionTerm
     | ('expand' | 'collapse') expression ('per' (dateTimePrecision | expression))?  #setAggregateExpressionTerm
@@ -355,10 +352,6 @@ caseExpressionItem
     : 'when' expression 'then' expression
     ;
 
-coalesceExpression : 
-    'Coalesce' '(' expression (',' expression)* ')'
-    | 'Coalesce' '(' '{' expression (',' expression)* '}' ')'
-    ;
 
 
 dateTimePrecisionSpecifier

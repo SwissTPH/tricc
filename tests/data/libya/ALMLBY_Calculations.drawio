@@ -1,0 +1,328 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/24.7.17 Chrome/128.0.6613.36 Electron/32.0.1 Safari/537.36" version="24.7.17">
+  <diagram name="calculation" id="_xgCMfGNiI2laPeYz8rJ">
+    <mxGraphModel dx="1434" dy="835" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="850" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="NuzFfZ_v7NcCZYilb7cy-1" style="edgeStyle=none;html=1;" edge="1" parent="1" source="NuzFfZ_v7NcCZYilb7cy-2" target="NuzFfZ_v7NcCZYilb7cy-64">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object label="Calc" odk_type="start" form_id="Libya" process="dispense-medications" id="NuzFfZ_v7NcCZYilb7cy-2">
+          <mxCell style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fontColor=default;" vertex="1" parent="1">
+            <mxGeometry x="104" y="40" width="80" height="80" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="days_fup" odk_type="calculate" reference="min(&quot;fup_pneumonia&quot;)" name="days_fup" id="NuzFfZ_v7NcCZYilb7cy-3">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="224" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="dr_pack_rutf" odk_type="calculate" reference="min(&#xa;  if ((&quot;p_weight&quot;*175 div 500.0) * 2) mod 1 = 0&#xa;    then (&quot;p_weight&quot;*175 div 500.0)&#xa;    else int((&quot;p_weight&quot;*175 div 500.0) * 2 + 1) div 2,&#xa;  4.5&#xa;)" name="dr_pack_rutf" id="NuzFfZ_v7NcCZYilb7cy-4">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="224" y="80" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="dr_packs_needed" odk_type="calculate" reference="&quot;p_weight&quot; *175 div 500" name="dr_packs_needed" id="NuzFfZ_v7NcCZYilb7cy-5">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="224" y="160" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="dr_week_pack_rutf" odk_type="calculate" reference="min(&quot;dr_pack_rutf&quot; * 7, 32)" name="dr_week_pack_rutf" id="NuzFfZ_v7NcCZYilb7cy-6">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="374" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_amoxiclavsyr400" odk_type="calculate" reference="min(round(&quot;p_weight&quot;*40.0 div 400.0 * 5.0,1),12.5)" name="ds_amoxiclavsyr400" id="NuzFfZ_v7NcCZYilb7cy-7">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="374" y="80" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_amoxiclavsyr400_25" odk_type="calculate" reference="min(round(&quot;p_weight&quot;*25.0 div 400.0 * 5.0 div 0.5) * 0.5,12.5)" name="ds_amoxiclavsyr400_25" id="NuzFfZ_v7NcCZYilb7cy-8">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="374" y="160" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_amoxisyr" odk_type="calculate" reference="min(round(&quot;p_weight&quot;*40.0 div 125.0 * 5.0,1),40.0)" name="ds_amoxisyr" id="NuzFfZ_v7NcCZYilb7cy-9">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="524" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_amoxisyr_lowdose" odk_type="calculate" reference="min(round(&quot;p_weight&quot;*25.0 div 125.0 * 5.0,1),40.0)&#xa;" name="ds_amoxisyr_lowdose" id="NuzFfZ_v7NcCZYilb7cy-10">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="524" y="80" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_amoxitab250_tab" odk_type="calculate" reference="GetChoiceName(int(&quot;ds_amoxitab250_weight&quot;),&#39;&quot;hiden_tab_4&quot;&#39;)&#xa;" name="ds_amoxitab250_tab" id="NuzFfZ_v7NcCZYilb7cy-11">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="524" y="160" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_amoxitab250_rawdose" odk_type="calculate" reference="min(40 * &quot;p_weight&quot; div 250,4)&#xa;" name="ds_amoxitab250_rawdose" id="NuzFfZ_v7NcCZYilb7cy-12">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="674" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_amoxitab250_weight" odk_type="calculate" reference="case &#xa;when &quot;ds_amoxitab250_rawdose&quot; &gt;= &quot;ds_amoxitab250_lower_bound&quot; and &quot;ds_amoxitab250_rawdose&quot; &lt; (&quot;ds_amoxitab250_lower_bound&quot; + &quot;ds_amoxitab250_inc&quot;)&#xa;then 4*&quot;ds_amoxitab250_lower_bound&quot;&#xa;when &quot;ds_amoxitab250_rawdose&quot; &gt;= (&quot;ds_amoxitab250_lower_bound&quot; + &quot;ds_amoxitab250_inc&quot;) and &quot;ds_amoxitab250_rawdose&quot; &lt; (&quot;ds_amoxitab250_lower_bound&quot; + 2*&quot;ds_amoxitab250_inc&quot;)&#xa;then 4*(&quot;ds_amoxitab250_lower_bound&quot;+2*&quot;ds_amoxitab250_inc&quot;)&#xa;when &quot;ds_amoxitab250_rawdose&quot; &gt;= (&quot;ds_amoxitab250_lower_bound&quot;+2 * &quot;ds_amoxitab250_inc&quot;) and &quot;ds_amoxitab250_rawdose&quot; &lt; (&quot;ds_amoxitab250_lower_bound&quot; + 3 * &quot;ds_amoxitab250_inc&quot;)&#xa;then  4*(&quot;ds_amoxitab250_lower_bound&quot; + 2 * &quot;ds_amoxitab250_inc&quot;)&#xa;else 4*(&quot;ds_amoxitab250_lower_bound&quot; + 4 * &quot;ds_amoxitab250_inc&quot;)&#xa;end&#xa;" name="ds_amoxitab250_weight" id="NuzFfZ_v7NcCZYilb7cy-13">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="674" y="160" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_amoxitab250_lower_bound" odk_type="calculate" reference="int(&quot;ds_amoxitab250_rawdose&quot;)" name="ds_amoxitab250_lower_bound" id="NuzFfZ_v7NcCZYilb7cy-14">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="224" y="240" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_cefiximesyr" odk_type="calculate" reference="min(round(&quot;p_weight&quot;*8.0 div 100.0 * 5.0 div 0.5) * 0.5,10.0)" name="ds_cefiximesyr" id="NuzFfZ_v7NcCZYilb7cy-15">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="224" y="320" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_ciprofloxacin250_tab" odk_type="calculate" reference="GetChoiceName(int(&quot;ds_ciprofloxacin250_weight&quot;),&#39;&quot;hiden_tab_4&quot;&#39;)" name="ds_ciprofloxacin250_tab" id="NuzFfZ_v7NcCZYilb7cy-16">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="224" y="400" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_amoxitab250_inc" odk_type="calculate" reference="0.25" name="ds_amoxitab250_inc" id="NuzFfZ_v7NcCZYilb7cy-17">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="374" y="240" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_ceftriaxone" odk_type="calculate" reference="round(min(round(&quot;p_weight&quot;*100.0 div 1000.0 * 4.0 div 0.01) * 0.01,8.00),1)" name="ds_ceftriaxone" id="NuzFfZ_v7NcCZYilb7cy-18">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="374" y="320" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_ciprofloxacin250_weight" odk_type="calculate" reference="4*min(round(&quot;p_weight&quot;*15.0 div 250.0 * 1.0 div 0.5) * 0.5,3)" name="ds_ciprofloxacin250_weight" id="NuzFfZ_v7NcCZYilb7cy-19">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="374" y="400" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_ampicillin500" odk_type="calculate" reference="min(round(&quot;p_weight&quot;*50.0 div 500.0 * 2.5, 1),15.0)" name="ds_ampicillin500" id="NuzFfZ_v7NcCZYilb7cy-20">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="524" y="240" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_ciprofloxacin500_tab" odk_type="calculate" reference="GetChoiceName(int(&quot;ds_ciprofloxacin500_weight&quot;),&#39;&quot;hiden_tab_4&quot;&#39;)&#xa;" name="ds_ciprofloxacin500_tab" id="NuzFfZ_v7NcCZYilb7cy-21">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="524" y="320" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_diazepam" odk_type="calculate" reference="case &#xa;when &quot;p_weight&quot;&lt;5 then &#39;0.5&#39;&#xa;when &quot;p_weight&quot;&lt;10 and &quot;p_weight&quot;&gt;=5 then &#39;1&#39;&#xa;when &quot;p_weight&quot;&lt;14 and &quot;p_weight&quot;&gt;=10 then &#39;1.5&#39;&#xa;when &quot;p_weight&quot;&gt;= 14 then &#39;2&#39;&#xa;when &quot;p_age&quot;&lt;6 then &#39;0.5&#39;&#xa;when &quot;p_age&quot;&lt;12 and &quot;p_age&quot;&gt;6 then &#39;1&#39;&#xa;when &quot;p_age&quot;&gt;=12 and &quot;p_age&quot;&lt;36 then &#39;1.5&#39;&#xa;when &quot;p_age&quot;&gt;= 36 and &quot;p_age&quot;&lt;60 then&#39;2&#39;&#xa;else 0&#xa;end" name="ds_diazepam" id="NuzFfZ_v7NcCZYilb7cy-22">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="524" y="400" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_azythrosyr_10" odk_type="calculate" reference="min(round(&quot;p_weight&quot;*10.0 div 100.0 * 5.0 div 0.5) * 0.5,50.0)" name="ds_azythrosyr_10" id="NuzFfZ_v7NcCZYilb7cy-23">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="674" y="240" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_ciprofloxacin500_weight" odk_type="calculate" reference="4*min(round(&quot;p_weight&quot;*15.0 div 500.0 * 1.0 div 0.5) * 0.5,1.5)" name="ds_ciprofloxacin500_weight" id="NuzFfZ_v7NcCZYilb7cy-24">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="674" y="320" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_diazepam_dosage_mg" odk_type="calculate" reference="case when &quot;p_weight&quot;&lt;5 then 2.5 &#xa;when &quot;p_weight&quot;&lt;10 and &quot;p_weight&quot;&gt;=5 then  5&#xa;when &quot;p_weight&quot;&lt;14 and &quot;p_weight&quot;&gt;=10 then 7.5&#xa;when &quot;p_weight&quot;&gt;= 14 then 10&#xa;when &quot;p_age&quot;&lt;6 then 2.5&#xa;when &quot;p_age&quot;&lt;12 and &quot;p_age&quot;&gt;6 then 5&#xa;when &quot;p_age&quot;&gt;=12 and &quot;p_age&quot;&lt;36 then 7.5&#xa;when &quot;p_age&quot;&gt;= 36 and &quot;p_age&quot;&lt;60 then 10&#xa;else 0&#xa;end" name="ds_diazepam_dosage_mg" id="NuzFfZ_v7NcCZYilb7cy-25">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="674" y="400" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_erythrosyr" odk_type="calculate" reference="min(round(&quot;p_weight&quot;*20.0 div 125.0 * 5.0 div 0.5) * 0.5,40.0)" name="ds_erythrosyr" id="NuzFfZ_v7NcCZYilb7cy-26">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="224" y="480" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_erythrotab250_lower_bound" odk_type="calculate" reference="int(20 * &quot;p_weight&quot; div 250)" name="ds_erythrotab250_lower_bound" id="NuzFfZ_v7NcCZYilb7cy-27">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="224" y="560" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_erythrotab250_tab" odk_type="calculate" reference="GetChoiceName(int(&quot;ds_erythrotab250_weight&quot;),&#39;&quot;hiden_tab_4&quot;&#39;)" name="ds_erythrotab250_tab" id="NuzFfZ_v7NcCZYilb7cy-28">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="374" y="480" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_erythrotab250_inc" odk_type="calculate" reference="0.25" name="ds_erythrotab250_inc" id="NuzFfZ_v7NcCZYilb7cy-29">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="374" y="560" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_erythrotab250_rawdose" odk_type="calculate" reference="20 * &quot;p_weight&quot; div 250" name="ds_erythrotab250_rawdose" id="NuzFfZ_v7NcCZYilb7cy-30">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="524" y="480" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_gentamicin" odk_type="calculate" reference="min(round(&quot;p_weight&quot;*7.5 div 80.0 * 2.0,1),8)" name="ds_gentamicin" id="NuzFfZ_v7NcCZYilb7cy-31">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="524" y="560" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_erythrotab250_weight" odk_type="calculate" reference="case &#xa;when &quot;ds_erythrotab250_rawdose&quot; &gt;= &quot;ds_erythrotab250_lower_bound&quot; and &quot;ds_erythrotab250_rawdose&quot; &lt; (&quot;ds_erythrotab250_lower_bound&quot; + &quot;ds_erythrotab250_inc&quot;)&#xa;then  4*&quot;ds_erythrotab250_lower_bound&quot;&#xa;when &quot;ds_erythrotab250_rawdose&quot; &gt;= (&quot;ds_erythrotab250_lower_bound&quot; + &quot;ds_erythrotab250_inc&quot;) and &quot;ds_erythrotab250_rawdose&quot; &lt; (&quot;ds_erythrotab250_lower_bound&quot; + 2*&quot;ds_erythrotab250_inc&quot;)&#xa;then 4*(&quot;ds_erythrotab250_lower_bound&quot;+2*&quot;ds_erythrotab250_inc&quot;)&#xa;when &quot;ds_erythrotab250_rawdose&quot; &gt;= (&quot;ds_erythrotab250_lower_bound&quot;+2 * &quot;ds_erythrotab250_inc&quot;) and &quot;ds_erythrotab250_rawdose&quot; &lt; (&quot;ds_erythrotab250_lower_bound&quot; + 3 * &quot;ds_erythrotab250_inc&quot; )&#xa;then 4*( &quot;ds_erythrotab250_lower_bound&quot; + 2 * &quot;ds_erythrotab250_inc&quot;)&#xa;else  4*(&quot;ds_erythrotab250_lower_bound&quot; + 4 * &quot;ds_erythrotab250_inc&quot;)&#xa;end" name="ds_erythrotab250_weight" id="NuzFfZ_v7NcCZYilb7cy-32">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="674" y="480" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_hydration_c_vol_30" odk_type="calculate" reference="round(&quot;p_weight&quot;*30 div 10.0) * 10.0" name="ds_hydration_c_vol_30" id="NuzFfZ_v7NcCZYilb7cy-33">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="674" y="560" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_hydration_c_vol_30_time" odk_type="calculate" reference="if &quot;p_age&quot;&lt;12 then &#39;1 hour&#39; else &#39;30 minutes&#39;" name="ds_hydration_c_vol_30_time" id="NuzFfZ_v7NcCZYilb7cy-34">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="224" y="640" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_iron_tab_60" odk_type="calculate" reference="GetChoiceName(int(&quot;ds_iron_tab_60_weight&quot;),&#39;&quot;hiden_tab_4&quot;&#39;)" name="ds_iron_tab_60" id="NuzFfZ_v7NcCZYilb7cy-35">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="224" y="720" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_hydration_c_vol_70" odk_type="calculate" reference="round(&quot;p_weight&quot;*70 div 10.0) * 10.0" name="ds_hydration_c_vol_70" id="NuzFfZ_v7NcCZYilb7cy-36">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="374" y="640" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_iron_tab_60_weight" odk_type="calculate" reference="4* 5 * &quot;p_weight&quot; div 60" name="ds_iron_tab_60_weight" id="NuzFfZ_v7NcCZYilb7cy-37">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="374" y="720" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_hydration_c_vol_70_time" odk_type="calculate" reference="if &quot;p_age&quot;&lt;12 then &#39;5 hours&#39; else &#39;2.5 hours&#39;" name="ds_hydration_c_vol_70_time" id="NuzFfZ_v7NcCZYilb7cy-38">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="524" y="640" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_ORS" odk_type="calculate" reference="round(5*&quot;p_weight&quot;,1)" name="ds_ORS" id="NuzFfZ_v7NcCZYilb7cy-39">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="524" y="720" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_iron_syr_45" odk_type="calculate" reference="min(round(&quot;p_weight&quot;*5.0 div 45.0 * 5.0 div 0.5) * 0.5,22.0)" name="ds_iron_syr_45" id="NuzFfZ_v7NcCZYilb7cy-40">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="674" y="640" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_ORSplanB" odk_type="calculate" reference="case &#xa;when &quot;p_age&quot;&lt;=4 and &quot;p_weight&quot;&lt;6 then &#39;200-450&#39;&#xa;when &quot;p_age&quot;&lt;=12 and &quot;p_age&quot;&gt;4 and &quot;p_weight&quot;&gt;=6 and &quot;p_weight&quot;&lt;10 then &#39;450-800&#39;&#xa;when &quot;p_age&quot;&lt;=24 and &quot;p_age&quot;&gt;12 and &quot;p_weight&quot;&gt;=10 and &quot;p_weight&quot;&lt;12 then &#39;800-960&#39;&#xa;when &quot;p_age&quot;&lt;=60 and &quot;p_age&quot;&gt;24 and &quot;p_weight&quot;&gt;=12 and &quot;p_weight&quot;&lt;20 then &#39;960-1600&#39; &#xa;else &#39;-&#39; &#xa;end" name="ds_ORSplanB" id="NuzFfZ_v7NcCZYilb7cy-41">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="674" y="720" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_penicillinv_weight" odk_type="calculate" reference="4*min(round(&quot;p_weight&quot;*15.0 div 250.0 div 0.5) * 0.5,27)" name="ds_penicillinv_weight" id="NuzFfZ_v7NcCZYilb7cy-42">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="224" y="960" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_vitA" odk_type="calculate" reference="case&#xa;when &quot;p_age&quot;&lt;6 then &#39;50.000 UI (2 drops)&#39;&#xa;when &quot;p_age&quot;&lt;12 then &#39;100.000 UI (4 drops)&#39;&#xa;else &#39;200.000 UI (1 capsule)&#39;&#xa;end" name="ds_vitA" id="NuzFfZ_v7NcCZYilb7cy-43">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="374" y="960" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_zinc" odk_type="calculate" reference="if &quot;p_age&quot;&lt;6 then 0.5 else 1" name="ds_zinc" id="NuzFfZ_v7NcCZYilb7cy-44">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="524" y="960" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="fup_pneumonia" odk_type="calculate" reference="&quot;d_pneumonia&quot;*1" name="fup_pneumonia" id="NuzFfZ_v7NcCZYilb7cy-45">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="674" y="960" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_pcm" odk_type="calculate" reference="min(round(&quot;p_weight&quot;*15.0 div 120.0 * 5.0 div 0.5) * 0.5,41.5)" name="ds_pcm" id="NuzFfZ_v7NcCZYilb7cy-46">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="224" y="880" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_pcm_tab" odk_type="calculate" reference="case &#xa;when &quot;p_weight&quot;&lt;5 or &quot;p_age&quot;&lt;6 then 0.8 * &quot;p_weight&quot;&#xa;when &quot;p_weight&quot;&lt;10 and &quot;p_weight&quot;&gt;5 or( &quot;p_age&quot;&lt;12 and &quot;p_age&quot;&gt;6) &#xa;then 1*&quot;p_weight&quot;&#xa;when &quot;p_weight&quot;&lt;14 and &quot;p_weight&quot;&gt;10 or (&quot;p_age&quot;&gt;12 and &quot;p_age&quot;&lt;36) &#xa;then 0.75 * &quot;p_weight&quot;&#xa;when &quot;p_weight&quot;&gt;= 14 or (&quot;p_age&quot;&gt; 36 and &quot;p_age&quot;&lt;60) then 0.71* &quot;p_weight&quot; &#xa;else 0&#xa;end" name="ds_pcm_tab" id="NuzFfZ_v7NcCZYilb7cy-47">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="374" y="880" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_penicillinv" odk_type="calculate" reference="GetChoiceName(int(&quot;ds_penicillinv_weight&quot;),&#39;&quot;hiden_tab_4&quot;&#39;)" name="ds_penicillinv" id="NuzFfZ_v7NcCZYilb7cy-48">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="524" y="880" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_penicillinv_syr" odk_type="calculate" reference="round(15 div 125 * 5 *&quot;p_weight&quot;,1)" name="ds_penicillinv_syr" id="NuzFfZ_v7NcCZYilb7cy-49">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="674" y="880" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_paracetamol500_tab" odk_type="calculate" reference="GetChoiceName(int(&quot;ds_paracetamol500_weight&quot;),&#39;&quot;hiden_tab_4&quot;&#39;)" name="ds_paracetamol500_tab" id="NuzFfZ_v7NcCZYilb7cy-50">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="224" y="800" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_paracetamol500_weight" odk_type="calculate" reference="4*round(15 div 500 *&quot;p_weight&quot;,1)" name="ds_paracetamol500_weight" id="NuzFfZ_v7NcCZYilb7cy-51">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="374" y="800" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_paracetamolsyr" odk_type="calculate" reference="round(15 div 120 * 5 *&quot;p_weight&quot;,1)" name="ds_paracetamolsyr" id="NuzFfZ_v7NcCZYilb7cy-52">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="524" y="800" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="ds_paracetamoltab500" odk_type="calculate" reference="case &#xa;when &quot;p_weight&quot;&lt;6 then &#39;&#39;&#xa;when &quot;p_weight&quot;&lt;15 then &#39;1/4&#39;&#xa;else &#39;1/2&#39;&#xa;end" name="ds_paracetamoltab500" id="NuzFfZ_v7NcCZYilb7cy-53">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="674" y="800" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="iv_fluids" odk_type="calculate" reference="round(&quot;p_weight&quot;*100.0 div 10.0) * 10.0" name="iv_fluids" id="NuzFfZ_v7NcCZYilb7cy-54">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="224" y="1040" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="diag_soothe_relieve_remedy" odk_type="calculate" reference="concat(&quot;text_possible_streptococcal&quot;, &quot;text_streptococcal&quot;, &quot;text_viral_sore_throat&quot;)" name="diag_soothe_relieve_remedy" id="NuzFfZ_v7NcCZYilb7cy-55">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="84" y="400" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="diag_soothe_relieve_remedy_cough" odk_type="calculate" reference="concat(&quot;text_pneumonia&quot;, &quot;text_urti&quot;)" name="diag_prereferral_tetracycline" id="NuzFfZ_v7NcCZYilb7cy-56">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="84" y="480" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="text_measles_with_complications" odk_type="calculate" reference="if &quot;d_measles_with_complications&quot;=1 then &#39;Measles with eye or mouth complications,&#39; else &#39;&#39;" name="text_measles_with_complications" id="NuzFfZ_v7NcCZYilb7cy-57">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="84" y="1040" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="text_severe_complicated_measles" odk_type="calculate" reference="if &quot;d_measles_with_complications&quot;=1 then &#39;Measles with eye or mouth complications,&#39; else &#39;&#39;" name="text_severe_complicated_measles" id="NuzFfZ_v7NcCZYilb7cy-58">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="84" y="960" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="text_streptococcal" odk_type="calculate" reference="if &quot;d_streptococcal&quot;=1 then &#39;Streptococcal sore throat,&#39; else &#39;&#39;" name="text_streptococcal" id="NuzFfZ_v7NcCZYilb7cy-59">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="84" y="880" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="text_urti" odk_type="calculate" reference="if &quot;d_urti&quot;=1 then &#39;Upper respiratory tract infection,&#39; else &#39;&#39;" name="text_urti" id="NuzFfZ_v7NcCZYilb7cy-60">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="84" y="640" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="text_pneumonia" odk_type="calculate" reference="if &quot;d_pneumonia&quot;=1 then &#39;Pneumonia &#39; else  &#39;&#39;" name="text_pneumonia" id="NuzFfZ_v7NcCZYilb7cy-61">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="84" y="560" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="text_possible_streptococcal" odk_type="calculate" reference="if &quot;d_possible_strepotcoccal&quot;=1 then &#39;Possible streptococcal sore throat,&#39; else &#39;&#39;" name="text_possible_streptococcal" id="NuzFfZ_v7NcCZYilb7cy-62">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="84" y="800" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="text_viral_sore_throat" odk_type="calculate" reference="if  &quot;d_viral_sore_throat&quot;=1 then &#39;Viral sore throat,&#39; else &#39;&#39;" name="text_viral_sore_throat" id="NuzFfZ_v7NcCZYilb7cy-63">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="84" y="720" width="120" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="&lt;span style=&quot;font-family: helvetica; font-size: 12px; font-style: normal; font-weight: 400; letter-spacing: normal; text-align: center; text-indent: 0px; text-transform: none; word-spacing: 0px; background-color: rgb(255, 255, 255); display: inline; float: none;&quot;&gt;activity end&lt;/span&gt;" name="lki_" odk_type="activity_end" id="NuzFfZ_v7NcCZYilb7cy-64">
+          <mxCell style="shape=mxgraph.bpmn.event;html=1;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;align=center;outlineConnect=0;aspect=fixed;outline=end;symbol=terminate2;fontColor=default;points=[[0.145,0.145,0],[0.5,0,0],[0.855,0.145,0],[1,0.5,0],[0.855,0.855,0],[0.5,1,0],[0.145,0.855,0],[0,0.5,0]];perimeter=ellipsePerimeter;" vertex="1" parent="1">
+            <mxGeometry x="119" y="160" width="50" height="50" as="geometry" />
+          </mxCell>
+        </object>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

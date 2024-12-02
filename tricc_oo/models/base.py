@@ -120,6 +120,9 @@ class TriccBaseModel(BaseModel):
 
     def get_name(self):
         return id
+    
+    def __str__(self):
+        return f"{self.tricc_type}:{self.get_name()}({self.id})"
 
 
 class TriccEdge(TriccBaseModel):
@@ -182,8 +185,7 @@ class TriccNodeBaseModel(TriccBaseModel):
         use_enum_values = True  # <--
 
     # to be updated while processing because final expression will be possible to build$
-    # #only the last time the script will go through the node (all prev node expression would be created
-
+    # #only the last time the script will go through the node (all prev node expression would be created    
     def get_name(self):
         if self.label is not None:
             name = next(iter(self.label.values())) if isinstance(self.label, Dict) else self.label
@@ -214,10 +216,34 @@ class TriccNodeBaseModel(TriccBaseModel):
     def gen_name(self):
         if self.name is None:
             self.name = ''.join(random.choices(string.ascii_lowercase, k=8))
+
 class TriccStatic(BaseModel):
-    value: Union[str, float, int]
+    value: Union[str, float, int, bool]
     def __init__(self,value):
         super().__init__(value = value)
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            return self.value == other.value
+        else:
+            return False
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __hash__(self):
+        hash_value = hash(self.value)
+        return hash_value
+    def get_name(self):
+        return self.value
+    
+    def __str__(self):
+        return str(self.value)
+
+
+class TriccReference(TriccStatic):
+    value: str
+    
+
 
 class TriccOperator(StrEnum):    
     AND = 'and' # and between left and rights
@@ -248,21 +274,44 @@ class TriccOperator(StrEnum):
     AGE_MONTH = 'age_month' # age from dob
     AGE_YEAR = 'age_year' # age from dob
     NOT = 'not'
-    DIVIDED = 'div'
+    DIVIDED = 'divided'
     MULTIPLIED = 'multiplied'
     COALESCE = 'coalesce'
     ISNULL = 'isnull'
-    
+    PLUS = 'plus'
+    MINUS = 'minus'
+    MODULO = 'modulo'
+    COUNT = 'count'
+    CAST_NUMBER = 'cast_number'
+    CAST_INTEGER = 'cast_integer'
+    CAST_DATE = 'cast_date'
+    PARENTHESIS = 'parenthesis'
+
+OPERATION_LIST = {
+    '>=': TriccOperator.MORE_OR_EQUAL,
+    '<=': TriccOperator.LESS_OR_EQUAL,
+    '==': TriccOperator.EQUAL,
+    '=': TriccOperator.EQUAL,
+    '>': TriccOperator.MORE,
+    '<': TriccOperator.LESS
+}  
 
 class TriccOperation(BaseModel):
     tricc_type: TriccNodeType = TriccNodeType.operation
     operator: TriccOperator = TriccOperator.NATIVE
     reference: List[
         Union[
-            TriccStatic, TriccNodeBaseModel, TriccOperation, triccName,
-            List[Union[TriccStatic, TriccNodeBaseModel, TriccOperation, triccName]]
+            TriccStatic, TriccNodeBaseModel, TriccOperation, TriccReference, Expression,
+            List[Union[TriccStatic, TriccNodeBaseModel, TriccOperation, TriccReference, Expression]]
         ]
     ] = []
+    
+    def __str__(self):
+        str_ref = map(str, self.reference)
+        return f"{self.operator}({', '.join(map(str, str_ref))})"
+    
+    def __eq__(self, other):
+        return self.__str__() == str(other)
     
     def __init__(self, operator, reference=[]):
         super().__init__(operator=operator, reference=reference)
@@ -271,28 +320,43 @@ class TriccOperation(BaseModel):
         predecessor = set()
         if isinstance(self.reference, list):
             for reference in self.reference:
-                if isinstance(reference, TriccOperation):
-                    predecessor = predecessor | reference.get_references()
-                elif issubclass(reference.__class__, TriccNodeBaseModel):
-                    predecessor.add(reference)
+                self._process_reference(reference, predecessor)
         else:
             raise NotImplementedError("cannot find predecessor of a str")
         return predecessor
+    
+    def _process_reference(self, reference, predecessor):
+        if isinstance(reference, list):
+            for e in reference:
+                self._process_reference(e, predecessor)
+        elif isinstance(reference, TriccOperation):
+            subs = reference.get_references()
+            for s in subs:
+                predecessor.add(s)
+        elif issubclass(reference.__class__, (TriccNodeBaseModel, TriccReference)):
+            predecessor.add(reference)
+
     def append(self, value):
         self.reference.append(value)
     def replace_node(self, old_node ,new_node):
         if isinstance(self.reference, list):
             for key in [i for i, x in enumerate(self.reference)]:
-                if isinstance(self.reference[key], TriccOperation):
-                    self.reference[key].replace_node(old_node ,new_node)
-                elif issubclass(self.reference[key].__class__, TriccNodeBaseModel )  and  self.reference[key] == old_node:
-                    self.reference[key] = new_node
-                    # to cover the options
-                    if hasattr(self.reference[key], 'select') and hasattr(new_node, 'select') and issubclass(self.reference[key].select.__class__, TriccNodeBaseModel ) :
-                        self.replace_node(self.reference[key].select ,new_node.select)
+                self.reference[key] = self._replace_reference(self.reference[key], new_node, old_node) 
         elif self.reference is not None:
             raise NotImplementedError(f"cannot manage {self.reference.__class__}")
 
+    def _replace_reference(self, reference, new_node, old_node):
+        if isinstance(reference, list):
+            for key in [i for i, x in enumerate(reference)]:
+                reference[key] = self._replace_reference(reference[key], new_node, old_node)
+        if isinstance(reference, TriccOperation):
+            reference.replace_node(old_node ,new_node)
+        elif issubclass(reference.__class__, (TriccNodeBaseModel, TriccReference)) and reference == old_node:
+            reference = new_node
+            # to cover the options
+            if hasattr(reference, 'select') and hasattr(new_node, 'select') and issubclass(reference.select.__class__, TriccNodeBaseModel ) :
+                self.replace_node(reference.select ,new_node.select)
+        return reference
 
 
 TriccGroup.update_forward_refs()
