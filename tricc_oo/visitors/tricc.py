@@ -25,11 +25,13 @@ def get_max_version(dict):
             max_version = sim_node
     return max_version
 
-def get_last_version(dict, name):
+def get_last_version(dict, name, processed_nodes):
     max_version = None
     if name in dict:
         for  sim_node in dict[name].values():
-            if max_version is None or  max_version.path_len < sim_node.path_len :
+            # get the max version while not taking a node that have a next node before next calc
+            if (max_version is None or  max_version.path_len < sim_node.path_len 
+                and (processed_nodes is None or all(p in processed_nodes for p in sim_node.next_nodes))):
                 max_version = sim_node
     return max_version
 
@@ -98,12 +100,14 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
                 
                 generate_calculates(node,calculates, used_calculates,processed_nodes)
             
-            if issubclass(node.__class__, (TriccNodeDisplayCalculateBase )) and node.name is not None:
+            if (
+                issubclass(node.__class__, (TriccNodeDisplayCalculateBase )) and node.name is not None
+            ):
                 # generate the calc node version by looking in the processed calculate
-                last_calc = get_last_version(calculates, node.name)
+                last_calc = get_last_version(calculates, node.name, processed_nodes)
                 # get max version used 
                 #last_used_version =  get_max_named_version(used_calculates, node.name)
-                last_used_calc = get_last_version(used_calculates, node.name)
+                last_used_calc = get_last_version(used_calculates, node.name, processed_nodes )
                 # add calculate is added after the version collection so it is 0 in case there is no calc found
                 add_calculate(calculates,node)  
                 # merge is there is unused version ->
@@ -386,7 +390,7 @@ def process_reference(node, processed_nodes, calculates, used_calculates=None,  
             last_found = get_prev_node_by_name(processed_nodes, ref, node)
             if last_found is None or issubclass(last_found.__class__, TriccNodeCalculateBase):
                 if ref in calculates and len(calculates[ref]) > 0:
-                    last_found = get_last_version(calculates, ref)
+                    last_found = get_last_version(calculates, ref, processed_nodes)
             if last_found is None:
                 logger.debug(f"reference {ref} not found for a calculate {node.get_name()}")
                 return False
@@ -472,8 +476,8 @@ def merge_calculate(node, calculates, last_used_calc):
                         set_prev_next_node(prev_node, remaining, to_remove)
                     
                     # Merge attributes
-                    remaining.expression = remaining.expression or to_remove.expression
                     remaining.reference = remaining.reference or to_remove.reference
+                    remaining.expression = remaining.expression or to_remove.expression
                     remaining.expression_reference = remaining.expression_reference or to_remove.expression_reference
                     
                     node_to_delete.append(to_remove)
@@ -855,7 +859,6 @@ def check_stashed_loop(stashed_nodes, prev_stashed_nodes, processed_nodes, len_p
 
         
 def get_all_dependant(loop, stashed_nodes, processed_nodes, depth=0, waited=[] , looped=[]):
-    # TODO fix the prev node of bridge, both instnance have the 2 nd b in enxt
     logger.error("LOOP detected")
     for n in loop:
         dependant = set()
@@ -1163,10 +1166,26 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
             expression = node.relevance     
     if expression is None:
             expression = get_prev_node_expression(node, processed_nodes, is_calculate)
-    if isinstance(node, TriccNodeActivity) and is_prev:
-        end_nodes = node.get_end_nodes()
-        if all([end in processed_nodes for end in end_nodes]):
-            expression = and_join([expression, get_activity_end_terms(node,processed_nodes)])
+    if isinstance(node, TriccNodeActivity):
+        if is_prev:
+            end_nodes = node.get_end_nodes()
+            if all([end in processed_nodes for end in end_nodes]):
+                expression = and_join([expression, get_activity_end_terms(node,processed_nodes)])
+        elif node.base_instance is not None:
+            activity = node
+            expression_inputs = []
+            #exclude base node only if the defaulf instance number is not 0
+            if activity.base_instance.instance >1:
+                add_sub_expression(expression_inputs, get_node_expression(activity.base_instance, processed_nodes, False, True))
+            # relevance of the previous instance must be false to display this activity
+            for past_instance in activity.base_instance.instances.values():
+                if int(past_instance.path_len) < int(activity.path_len) and past_instance in processed_nodes:
+                    add_sub_expression(expression_inputs, get_node_expression(past_instance, processed_nodes, False))         
+            expression_activity = or_join(expression_inputs)
+            if expression and expression_activity:
+                expression = nand_join(expression, expression_activity)
+            elif expression_activity:
+                expression = negate_term(expression_activity)
     if negate:
         if negate_expression is not None:
             return negate_expression
@@ -1209,25 +1228,10 @@ def get_prev_node_expression( node, processed_nodes, is_calculate=False, exclude
             TriccOperator.OR,
             expression_inputs
         )
-    expression_inputs = None
         # if isinstance(node,  TriccNodeExclusive):
         #    expression =  TRICC_NEGATE.format(expression)
     # only used for activityStart 
-    if isinstance(node, TriccNodeActivity) and node.base_instance is not None:
-        activity = node
-        expression_inputs = []
-        #exclude base node only if the defaulf instance number is not 0
-        if activity.base_instance.instance >1:
-            add_sub_expression(expression_inputs, get_node_expression(activity.base_instance, processed_nodes, False, True))
-        # relevance of the previous instance must be false to display this activity
-        for past_instance in activity.base_instance.instances.values():
-            if int(past_instance.root.path_len) < int(activity.root.path_len) and past_instance in processed_nodes:
-                add_sub_expression(expression_inputs, get_node_expression(past_instance, processed_nodes, False))         
-        expression_activity = or_join(expression_inputs)
-        if expression and expression_activity:
-            expression = nand_join(expression, expression_activity)
-        elif expression_activity:
-            expression = negate_term(expression_activity)
+    
     return expression
 
 def get_activity_end_terms( node, processed_nodes):
