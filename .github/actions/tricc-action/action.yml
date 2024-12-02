@@ -20,7 +20,7 @@ runs:
     
     - name: Install tricc-oo
       run: |
-        pip install tricc-oo lxml html2text pydantic babel xlsxwriter pandas polib StrEnum fhir.resources antlr4-python3-runtime antlr-ast antlr-tools  
+        pip install tricc-oo lxml html2text pydantic babel xlsxwriter pandas polib StrEnum fhir.resources antlr4-python3-runtime antlr-ast
       shell: bash
 
     - name: Run TRICC
