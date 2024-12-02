@@ -32,9 +32,9 @@ runs:
         import os
 
         langs = SingletonLangClass()
-        input_strategy = DrawioStrategy('${{ inputs.input_path }}')
+        input_strategy = DrawioStrategy('${{ inputs.input_strategy }}')
         output_strategy = XLSFormStrategy('${{ inputs.output_strategy }}')
-
+        in_filepath = '${{ inputs.input_path }}'
         file_content = []
         files = []
         if os.path.isdir(in_filepath):
