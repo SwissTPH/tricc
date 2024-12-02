@@ -40,7 +40,7 @@ runs:
             files = [
                 os.path.join(in_filepath, f) 
                 for f in os.listdir(in_filepath) 
-                if f.endswith(".drawio")
+                if f.endswith('.drawio')
             ]
         elif os.path.isfile(in_filepath) and in_filepath.endswith(".drawio"):
             files = [in_filepath]
@@ -49,7 +49,7 @@ runs:
             with open(f, 'r') as s:
                 file_content.append(s.read())
         if not file_content:
-            print(f"{in_filepath} is neither a drawio file nor a directory containing drawio files")
+            print(f'{in_filepath} is neither a drawio file nor a directory containing drawio files')
             exit(-1)
 
         media_path = os.path.join('${{ inputs.output_strategy }}', 'media-tmp')
