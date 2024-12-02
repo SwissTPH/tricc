@@ -60,7 +60,7 @@ class TriccRhombusMixIn():
         # shallow copy
         reference = []
         instance.path = None
-        if isinstance(self.reference, str):
+        if isinstance(self.reference, (str, TriccOperation)):
             reference = self.reference
         elif isinstance(self.reference, list):
             for ref in self.reference:
@@ -90,7 +90,7 @@ class TriccRhombusMixIn():
 class TriccNodeRhombus(TriccNodeCalculateBase,TriccRhombusMixIn):
     tricc_type: TriccNodeType = TriccNodeType.rhombus
     path: Optional[TriccNodeBaseModel] = None
-    reference: Union[List[TriccNodeBaseModel], Expression]
+    reference: Union[List[TriccNodeBaseModel], Expression, TriccOperation]
     
     def make_instance(self, instance_nb, activity, **kwargs):
         instance = super(TriccNodeRhombus, self).make_instance(instance_nb, activity, **kwargs)
@@ -128,7 +128,7 @@ def get_node_from_id(activity, node, edge_only):
 class TriccNodeWait(TriccNodeFakeCalculateBase, TriccRhombusMixIn):
     tricc_type: TriccNodeType = TriccNodeType.wait
     path: Optional[TriccNodeBaseModel] = None
-    reference: Union[List[TriccNodeBaseModel], Expression]
+    reference: Union[List[TriccNodeBaseModel], Expression, TriccOperation]
     
     def make_instance(self, instance_nb, activity, **kwargs):
         instance = super(TriccNodeWait, self).make_instance(instance_nb, activity, **kwargs)

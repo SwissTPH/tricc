@@ -24,7 +24,6 @@ langs = SingletonLangClass()
 # langs.add_trad('en', en)
 
 from tricc_oo.strategies.input.drawio import DrawioStrategy
-from tricc_oo.strategies.input.medalcreator import MedalCStrategy
 
 # from tricc_oo.serializers.medalcreator import execute
 
@@ -87,7 +86,7 @@ if __name__ == "__main__":
     form_id = None
     debug_level = None
     trad = False
-
+    download_dir = None
     input_strategy = "DrawioStrategy"
     output_strategy = "XLSFormStrategy"
     try:
@@ -121,6 +120,8 @@ if __name__ == "__main__":
         print_help()
         sys.exit(2)
 
+    if not download_dir:
+        download_dir = out_path
     debug_path = os.fspath(out_path + "/debug.log")
     debug_path = os.path.abspath(debug_path)
 
@@ -144,17 +145,25 @@ if __name__ == "__main__":
         out_path = os.path.dirname(pre)
 
     file_content = []
+    files = []
     if os.path.isdir(in_filepath):
-        files = [f for f in os.listdir(in_filepath) if f.endswith(".drawio")]
-    elif os.path.isfile(in_filepath):
-        with open(in_filepath, "r") as f:
-            file_content = f.read()
-            file_content = [file_content]
+        files = [
+            os.path.join(in_filepath, f) 
+            for f in os.listdir(in_filepath) 
+            if f.endswith(".drawio")
+        ]
+    elif os.path.isfile(in_filepath) and in_filepath.endswith(".drawio"):
+        files = [in_filepath]
+        
+    for f in files:
+        with open(f, 'r') as s:
+            file_content.append(s.read())
+    if not file_content:
+        logger.error(f"{in_filepath} is neither a drawio file nor a directory containing drawio files")
+        exit(-1)
 
-    if file_content.__len__ == 0:  # if the file is not a directory
-        print("File cannot be read")
 
-    strategy = globals()[input_strategy](file_content)
+    strategy = globals()[input_strategy](files)
     logger.info(f"build the graph from strategy {input_strategy}")
     media_path = os.path.join(out_path, "media-tmp")
     start_page, pages, images = strategy.execute(file_content, media_path)
@@ -169,7 +178,7 @@ if __name__ == "__main__":
     output = strategy.execute(start_page, pages=pages)
 
     # compress the output folder to a zip archieve and place it in the download directory
-    shutil.make_archive(os.path.join(download_dir), "zip", os.path.join(out_path))
+    # shutil.make_archive(os.path.join(download_dir), "zip", os.path.join(out_path))
 
     # print the content of debug.log
     with open(debug_file_path, "r") as f:

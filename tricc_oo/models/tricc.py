@@ -13,7 +13,7 @@ from tricc_oo.converters.utils import generate_id
 
 class TriccNodeCalculateBase(TriccNodeBaseModel):
     #input: Dict[TriccOperation, TriccNodeBaseModel] = {}
-    reference: Union[List[Union[TriccNodeBaseModel,TriccStatic]], Expression] = None
+    reference: Union[List[Union[TriccNodeBaseModel,TriccStatic]], Expression, TriccStatic] = None
     expression_reference: Union[str, TriccOperation] = None
     version: int = 1
     last: bool = True
@@ -28,7 +28,12 @@ class TriccNodeCalculateBase(TriccNodeBaseModel):
         #input = {}
         #instance.input = input
         expression = self.expression.copy() if self.expression is not None else None
-        instance.expression = expression
+        if self.reference:
+            instance.reference = self.reference.copy()
+        if self.reference:
+            instance.reference = self.reference.copy()
+        if self.expression_reference:
+            instance.expression_reference = self.expression_reference.copy()
         version = 1
         instance.version = version
         return instance
@@ -48,8 +53,12 @@ class TriccNodeCalculateBase(TriccNodeBaseModel):
         elif isinstance(self.expression_reference, TriccOperation):
             self.reference =  self.expression_reference.get_references()
             return self.reference
+        elif isinstance(self.reference, TriccOperation):
+            return self.reference.get_references()
+        
         elif self.reference:
-            raise NotImplementedError("Cannot get reference from a sting")
+            return self.reference
+            logger.error("Cannot get reference from a sting")
 
 
 class TriccNodeActivity(TriccNodeBaseModel):
@@ -111,18 +120,18 @@ class TriccNodeActivity(TriccNodeBaseModel):
             for node in list(filter(lambda p_node: p_node != self.root and not isinstance(p_node, (TriccNodeDisplayBridge,TriccNodeBridge)),list(self.nodes.values()) )):
                 instance_node = instance.update_nodes(node)
                 if node in self.calculates and instance_node:
-                    instance.calulates.append(instance_node)
+                    instance.calculates.append(instance_node)
 
-            for group in self.groups:
+            for group in self.groups.values():
                 instance.update_groups(group)
                 # update parent group
-            for group in self.groups:
+            for group in self.groups.values():
                 instance.update_groups_group(group)
 
             return instance
 
     def update_groups_group(self, group):
-        for instance_group in self.groups:
+        for instance_group in self.groups.values():
             if instance_group.group == group:
                 instance_group.group == instance_group
             elif instance_group.group == self.base_instance:
@@ -165,7 +174,8 @@ class TriccNodeActivity(TriccNodeBaseModel):
                     for n in node_instance.activity.nodes.values():
                         if n.base_instance.id == old_path.id:
                             node_instance.path = n
-                    if node_instance.path is None:
+                    # test next_nodes to check that the instance has already prev/next 
+                    if node_instance.path is None and node_instance.next_nodes:
                         logger.error("new path not found")
                 elif not (len(node_instance.reference)== 1  and issubclass(node_instance.reference[0].__class__, TriccNodeInputModel)):
                     logger.warning("Rhombus without a path")

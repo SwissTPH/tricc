@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name="tricc-oo",
-    version="1.0.2",
+    version="1.1.0",
     author="DHU SwissTPH httu.admin@swisstph.ch",
     description="Python library that converts XLS to Fhir SDC ressource.",
     long_description="Python library that converts XLS to Fhir SDC ressource.",
@@ -18,6 +18,10 @@ setup(
         "pandas",
         "polib",
         "StrEnum",
+        "fhir.resources",
+        "antlr4-python3-runtime",
+        "antlr-ast",
+        "antlr-tools"        
     ],
     # extras_require={
     #    'test': ['pytest', 'coverage'],

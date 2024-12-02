@@ -80,7 +80,8 @@ class DrawioStrategy(BaseInputStrategy):
         #     logger.error(f"no input file found at {in_filepath}")
         #     exit()
         # for file in files:
-        diagrams += read_drawio(file_content)
+        for f in file_content:
+            diagrams += read_drawio(f)
         images_diagram = []
         for diagram in diagrams:
             logger.info("Create the activity {0}".format(diagram.attrib.get("name")))
@@ -170,7 +171,6 @@ class DrawioStrategy(BaseInputStrategy):
                         node.get_name(), page.label, current_path
                     )
                 )
-                exit()
         for edge in node_edge:
             # get target node
             if edge.target in page.nodes:

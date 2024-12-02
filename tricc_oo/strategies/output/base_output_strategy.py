@@ -16,6 +16,8 @@ class BaseOutPutStrategy:
     def __init__(self, output_path):
         self.output_path = output_path
     
+    def get_tricc_operation_expression(self, operation):
+        raise NotImplemented("get_tricc_operation_expression not implemented")
     
     def execute(self, start_pages, pages):
         
@@ -32,9 +34,7 @@ class BaseOutPutStrategy:
         
         
         # create relevance Expression
-        self.process_relevance(start_pages, pages=pages)
-        logger.info("generate the calculate based on edges")
-        
+
         # create calculate Expression
         self.process_calculate(start_pages, pages=pages)
         logger.info("generate the export format")

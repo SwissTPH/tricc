@@ -5,8 +5,11 @@ from curses.ascii import isalnum, isalpha, isdigit
 
 from numpy import isnan
 
-from tricc_oo.converters.utils import OPERATION_LIST, clean_name, remove_html
+from tricc_oo.converters.utils import clean_name, remove_html
+from tricc_oo.converters.cql_to_operation import transform_cql_to_operation
 from tricc_oo.models.tricc import *
+from tricc_oo.models.base import TriccNodeType, OPERATION_LIST
+from tricc_oo.converters.drawio_type_map import TYPE_MAP
 from tricc_oo.parsers.xml import (
     get_edges_list,
     get_mxcell,
@@ -19,13 +22,31 @@ from tricc_oo.visitors.tricc import *
 
 TRICC_YES_LABEL = ["yes", "oui"]
 TRICC_NO_LABEL = ["no", "non"]
-TRICC_FOLOW_LABEL = ["folow", "suivre"]
+TRICC_FOLLOW_LABEL = ["follow", "suivre"]
 NO_LABEL = "NO_LABEL"
 TRICC_LIST_NAME = "list_{0}"
 import logging
 
 logger = logging.getLogger("default")
 
+
+
+def get_all_nodes(diagram, activity, nodes):
+    for tricc_type in TYPE_MAP:
+        if TYPE_MAP[tricc_type]["model"]:
+            list = get_tricc_type_list(diagram, TYPE_MAP[tricc_type]["objects"], tricc_type)
+            add_tricc_base_node(
+                diagram,
+                nodes,
+                TYPE_MAP[tricc_type]["model"],
+                list,
+                activity,
+                attributes=TYPE_MAP[tricc_type]["attributes"],
+                mandatory_attributes=TYPE_MAP[tricc_type]["mandatory_attributes"],
+                has_options=TYPE_MAP[tricc_type].get('has_options', None)
+            )
+
+    return nodes
 
 def create_activity(diagram, media_path):
     id = diagram.attrib.get("id")
@@ -126,7 +147,7 @@ def process_edges(diagram, media_path, activity, nodes):
             calc = None
             if (
                 isinstance(nodes[edge.source], TriccNodeRhombus)
-                and label.lower() in TRICC_FOLOW_LABEL
+                and label.lower() in TRICC_FOLLOW_LABEL
             ):
                 edge.source = nodes[edge.source].path.id
                 processed = True
@@ -157,19 +178,44 @@ def process_edges(diagram, media_path, activity, nodes):
                     )
                 )
     if not end_found:
-        logger.error("the activity {} has no end node".format(activity.get_name()))
-        exit()
+        fake_end = TriccNodeActivityEnd(activity=activity, group=activity)
+        last_nodes = [
+            n for n in list(activity.nodes.values())
+            if (
+                issubclass(
+                    n.__class__, 
+                    (
+                        TriccNodeInputModel, 
+                        TriccNodeText, 
+                        TriccNodeNote,
+                    )
+                ) and (
+                    not any([n.id == e.source for e in activity.edges])
+                )
+            )
+        ]
+        if last_nodes:
+            for n in last_nodes:
+                set_prev_next_node(n, fake_end, edge_only=True)
+            activity.nodes[fake_end.id] = fake_end
+        else:
+            logger.error(f"cannot guess end for {activity.get_name()}")
+            exit(-1)
+    
     return images
 
+def _get_name(name, id):
+    if (
+        name is not None
+        and (name.endswith(("_", ".")))
+    ):
+        return name + id
+    return name
+   
 
 def get_nodes(diagram, activity):
     nodes = {activity.root.id: activity.root}
-    add_note_nodes(nodes, diagram, activity)
-    add_calculate_nodes(nodes, diagram, activity)
-    add_select_nodes(nodes, diagram, activity)
-    add_input_nodes(nodes, diagram, activity)
-    add_link_nodes(nodes, diagram, activity)
-    get_hybride_node(nodes, diagram, activity)
+    get_all_nodes(diagram, activity, nodes)
     new_nodes = {}
     node_to_remove = []
     activity_end_node = None
@@ -178,10 +224,8 @@ def get_nodes(diagram, activity):
         # clean name
         if (
             hasattr(node, "name")
-            and node.name is not None
-            and (node.name.endswith(("_", ".")))
         ):
-            node.name = node.name + node.id
+            node.name = _get_name(node.name, node.id)
         if issubclass(node.__class__, TriccRhombusMixIn) and node.path is None:
             # generate rhombuse path
             calc = inject_bridge_path(node, nodes)
@@ -200,6 +244,8 @@ def get_nodes(diagram, activity):
                     path, [node], next_nodes_id, node, edge_only=True
                 )
                 new_nodes[calc.id] = calc
+                for goto_next_node in next_nodes_id:
+                    remove_prev_next(node, goto_next_node, activity) 
         elif isinstance(node, TriccNodeEnd):
             if not end_node:
                 end_node = node
@@ -274,133 +320,6 @@ def set_additional_attributes(attribute_names, elm, node):
             setattr(node, attributename, attribute)
 
 
-def add_note_nodes(nodes, diagram, group):
-    list = get_tricc_type_list(diagram, ["UserObject", "object"], TriccNodeType.note)
-    add_tricc_nodes(nodes, TriccNodeNote, list, group, ["relevance"])
-
-
-def add_select_nodes(nodes, diagram, group=None):
-    list = get_tricc_type_list(
-        diagram, ["UserObject", "object"], TriccNodeType.select_one
-    )
-    add_tricc_select_nodes(
-        diagram,
-        nodes,
-        TriccNodeSelectOne,
-        list,
-        group,
-        ["required", "save", "filter", "constraint", "constraint_message"],
-    )
-    # list = get_tricc_type_list(diagram, 'UserObject', TriccNodeType.select_yesno)
-    # add_tricc_nodes(nodes, TriccNodeSelectYesNo, list, ['constraint','save','constraint_message','required'])
-    list = get_tricc_type_list(
-        diagram, ["UserObject", "object"], TriccNodeType.select_multiple
-    )
-    add_tricc_select_nodes(
-        diagram,
-        nodes,
-        TriccNodeSelectMultiple,
-        list,
-        group,
-        ["required", "save", "filter", "constraint", "constraint_message"],
-    )
-
-
-def add_input_nodes(nodes, diagram, group=None):
-    list = get_tricc_type_list(diagram, ["object", "UserObject"], TriccNodeType.decimal)
-    add_tricc_nodes(
-        nodes,
-        TriccNodeDecimal,
-        list,
-        group,
-        ["min", "max", "constraint", "save", "constraint_message", "required"],
-    )
-    list = get_tricc_type_list(diagram, ["object", "UserObject"], TriccNodeType.integer)
-    add_tricc_nodes(
-        nodes,
-        TriccNodeInteger,
-        list,
-        group,
-        ["min", "max", "constraint", "save", "constraint_message", "required"],
-    )
-    list = get_tricc_type_list(diagram, ["object", "UserObject"], TriccNodeType.text)
-    add_tricc_nodes(
-        nodes,
-        TriccNodeText,
-        list,
-        group,
-        ["constraint", "save", "constraint_message", "required"],
-    )
-    list = get_tricc_type_list(diagram, ["object", "UserObject"], TriccNodeType.date)
-    add_tricc_nodes(
-        nodes,
-        TriccNodeDate,
-        list,
-        group,
-        ["constraint", "save", "constraint_message", "required"],
-    )
-
-
-def add_calculate_nodes(nodes, diagram, group=None):
-    list = get_tricc_type_list(
-        diagram, ["UserObject", "object"], TriccNodeType.calculate
-    )
-    add_tricc_nodes(
-        nodes, TriccNodeCalculate, list, group, ["save", "expression", "help", "hint"]
-    )
-    list = get_tricc_type_list(diagram, ["UserObject", "object"], TriccNodeType.add)
-    add_tricc_nodes(nodes, TriccNodeAdd, list, group, ["save", "expression"])
-    list = get_tricc_type_list(diagram, ["UserObject", "object"], TriccNodeType.count)
-    add_tricc_nodes(nodes, TriccNodeCount, list, group, ["save", "expression"])
-    list = get_tricc_type_list(diagram, ["UserObject", "object"], TriccNodeType.rhombus)
-    add_tricc_nodes(
-        nodes, TriccNodeRhombus, list, group, ["save", "expression"], ["reference"]
-    )
-    list = get_tricc_type_list(
-        diagram, ["UserObject", "object"], TriccNodeType.exclusive
-    )
-    add_tricc_base_node(nodes, TriccNodeExclusive, list, group)
-    list = get_tricc_type_list(diagram, ["UserObject", "object"], TriccNodeType.wait)
-    add_tricc_nodes(
-        nodes, TriccNodeWait, list, group, ["save", "expression"], ["reference"]
-    )
-
-
-def get_hybride_node(nodes, diagram, group=None):
-    list = get_tricc_type_list(
-        diagram, ["UserObject", "object"], TriccNodeType.not_available
-    )
-    add_tricc_hybrid_select_nodes(nodes, TriccNodeSelectNotAvailable, list, group, [])
-    list = get_tricc_type_list(
-        diagram, ["UserObject", "object"], TriccNodeType.select_yesno
-    )
-    add_tricc_hybrid_select_nodes(
-        nodes,
-        TriccNodeSelectYesNo,
-        list,
-        group,
-        ["required", "save", "filter", "constraint", "constraint_message"],
-    )
-    # to do generate option
-
-
-def add_link_nodes(nodes, diagram, group=None):
-    list = get_tricc_type_list(
-        diagram, ["UserObject", "object"], TriccNodeType.link_out
-    )
-    add_tricc_nodes(nodes, TriccNodeLinkOut, list, group, [], ["reference"])
-    list = get_tricc_type_list(diagram, ["UserObject", "object"], TriccNodeType.link_in)
-    add_tricc_nodes(nodes, TriccNodeLinkIn, list, group)
-    list = get_tricc_type_list(diagram, ["UserObject", "object"], TriccNodeType.goto)
-    add_tricc_nodes(nodes, TriccNodeGoTo, list, group, ["instance"], ["link"])
-    list = get_tricc_type_list(
-        diagram, ["UserObject", "object"], TriccNodeType.activity_end
-    )
-    add_tricc_base_node(nodes, TriccNodeActivityEnd, list, group)
-    list = get_tricc_type_list(diagram, ["UserObject", "object"], TriccNodeType.end)
-    add_tricc_base_node(nodes, TriccNodeEnd, list, group)
-    list = get_tricc_type_list(diagram, ["UserObject", "object"], TriccNodeType.bridge)
-    add_tricc_base_node(nodes, TriccNodeBridge, list, group)
 
 
 def get_select_options(diagram, select_node, nodes):
@@ -425,6 +344,7 @@ def get_select_options(diagram, select_node, nodes):
             name=name,
             select=select_node,
             list_name=select_node.list_name,
+            activity=select_node.activity,
             group=select_node.group,
         )
         set_additional_attributes(["save"], elm, option)
@@ -456,87 +376,6 @@ def get_last_version(dict, name):
     return max_version
 
 
-def process_calculate(
-    node,
-    processed_nodes,
-    stashed_nodes,
-    calculates,
-    used_calculates,
-    warn=False,
-    **kwargs,
-):
-    # used_calculates dict[name, Dict[id, node]]
-    # processed_nodes Dict[id, node]
-    # calculates  dict[name, Dict[id, node]]
-    if node not in processed_nodes:
-        # generate condition
-        if is_ready_to_process(node, processed_nodes, False) and process_reference(
-            node, calculates, used_calculates, processed_nodes, warn=warn
-        ):
-            if is_rhombus_ready_to_process(node, processed_nodes):
-                generate_calculates(node, calculates, used_calculates, processed_nodes)
-                if (
-                    issubclass(node.__class__, (TriccNodeDisplayCalculateBase))
-                    and node.name is not None
-                ):
-                    # generate the calc node version by looking in the processed calculate
-                    last_calc = get_last_version(calculates, node.name)
-                    # get max version used
-                    # last_used_version =  get_max_named_version(used_calculates, node.name)
-                    last_used_calc = get_last_version(used_calculates, node.name)
-                    # add calculate is added after the version collection so it is 0 in case there is no calc found
-                    add_calculate(calculates, node)
-                    # merge is there is unused version ->
-                    # current node not yet in the list so 1 item is enough
-                    if last_calc is not None:
-                        if (
-                            last_used_calc is None
-                            or last_calc.path_len > last_used_calc.path_len
-                        ):
-                            node.version = last_calc.version + 1
-                            node_to_delete = merge_calculate(
-                                node, calculates[node.name], last_used_calc
-                            )
-                            if node_to_delete is not None:
-                                for d_node in node_to_delete:
-                                    del calculates[d_node.name][d_node.id]
-
-                                    if d_node.name in used_calculates:
-                                        if d_node.id in used_calculates[d_node.name]:
-                                            logger.error(
-                                                "node {} used but deleted".format(
-                                                    d_node.get_name()
-                                                )
-                                            )
-                                    if d_node.id in d_node.activity.nodes:
-                                        # mostly for end nodes
-                                        if isinstance(
-                                            d_node, (TriccNodeEnd, TriccNodeActivityEnd)
-                                        ):
-                                            del d_node.activity.nodes[d_node.id]
-                                    if d_node in stashed_nodes:
-                                        logger.error(
-                                            "node {} not porcessed but deleted".format(
-                                                d_node.get_name()
-                                            )
-                                        )
-                        # chaining the calculate, this is needed each time there is a last used version
-                        if last_used_calc is not None:
-                            logger.debug(
-                                "set last to false for node {}  and add its link it to next one".format(
-                                    last_used_calc.get_name()
-                                )
-                            )
-                            set_prev_next_node(last_used_calc, node)
-                            last_used_calc.last = False
-                        update_calc_version(calculates, node.name)
-                # if hasattr(node, 'next_nodes'):
-                # node.next_nodes=reorder_node_list(node.next_nodes, node.group)
-                return True
-        # not ready to process or already processed
-
-    return False
-
 
 def update_calc_version(calculates, name):
     if name in calculates and len(calculates[name]) > 1:
@@ -557,18 +396,6 @@ def get_max_named_version(calculates, name):
                 max = node.version
     return max
 
-
-def get_count_node(node):
-    count_id = generate_id()
-    count_name = "cnt_" + count_id
-    return TriccNodeCount(
-        id=count_id,
-        group=node.group,
-        activity=node.activity,
-        label="count: " + node.get_name(),
-        name=count_name,
-        path_len=node.path_len,
-    )
 
 
 def inject_bridge_path(node, nodes):
@@ -652,62 +479,10 @@ def enrich_node(diagram, media_path, edge, node):
             return None, None
 
 
-def add_tricc_hybrid_select_nodes(nodes, type, list, group, attributes):
-    for elm in list:
-        id = elm.attrib.get("id")
-        label = elm.attrib.get("label")
-        name = elm.attrib.get("name")
-        if name is None:
-            name = elm.attrib.get("id")
-        node = type(
-            id=id,
-            parent=elm.attrib.get("parent"),
-            label=label if type != TriccNodeSelectNotAvailable else NO_LABEL,
-            name=name,
-            required='1',
-            group=group,
-            activity=group,
-            list_name=(
-                "yes_no" if type == TriccNodeSelectYesNo else TRICC_LIST_NAME.format(id)
-            ),
-        )
-        if type == TriccNodeSelectNotAvailable:
-            node.options = get_select_not_available_options(node, group, label)
-            nodes[node.options[0].id] = node.options[0]
-        elif type == TriccNodeSelectYesNo:
-            node.options = get_select_yes_no_options(node, group)
-            nodes[node.options[0].id] = node.options[0]
-            nodes[node.options[1].id] = node.options[1]
-        set_additional_attributes(attributes, elm, node)
-        nodes[id] = node
-
-
-def add_tricc_select_nodes(diagram, nodes, type, list, group, attributes):
-    for elm in list:
-        id = elm.attrib.get("id")
-        node = type(
-            id=id,
-            parent=elm.attrib.get("parent"),
-            label=elm.attrib.get("label"),
-            name=elm.attrib.get("name"),
-            required='1',
-            group=group,
-            activity=group,
-            list_name=TRICC_LIST_NAME.format(id),
-        )
-        node.options = get_select_options(diagram, node, nodes)
-        set_additional_attributes(attributes, elm, node)
-
-        nodes[id] = node
-
-
-def add_tricc_nodes(nodes, type, list, group, attributes=[], mandatory_attributes=[]):
-    mandatory_attributes += ["label", "name"]
-    add_tricc_base_node(nodes, type, list, group, attributes, mandatory_attributes)
 
 
 def add_tricc_base_node(
-    nodes, type, list, group, attributes=[], mandatory_attributes=[]
+    diagram, nodes, type, list, group, attributes=[], mandatory_attributes=[], has_options=None
 ):
     for elm in list:
         id = elm.attrib.get("id")
@@ -719,14 +494,103 @@ def add_tricc_base_node(
             activity=group,
             **set_mandatory_attribute(elm, mandatory_attributes, group.name),
         )
+        if has_options:
+            node.options = get_select_options(diagram, node, nodes)
+            for o in node.options:
+                nodes[node.options[o].id] = node.options[o]
+        elif type == TriccNodeSelectNotAvailable:
+            node.options = get_select_not_available_options(node, group, node.label)
+            node.label = NO_LABEL
+            nodes[node.options[0].id] = node.options[0]
+        elif type == TriccNodeSelectYesNo:
+            node.list_name = "yes_no"
+            node.options = get_select_yes_no_options(node, group)
+            nodes[node.options[0].id] = node.options[0]
+            nodes[node.options[1].id] = node.options[1]
+                
         set_additional_attributes(attributes, elm, node)
+        load_expressions(node)
         nodes[id] = node
 
+
+def load_expressions(node):
+    source = None
+    expression = None
+    if getattr(node, 'expression', None):
+        expression = node.expression
+        source = 'expression'
+    elif getattr(node, 'reference', None):
+        expression = node.reference
+        source = 'reference'
+    if expression:
+        setattr(node, source, parse_expression(node.label, expression))
+        
+
+def parse_expression(label=None, expression=None):
+    label = label or getattr(node, 'label', None)
+    if expression:
+        ref_pattern = r'(\$\{[^\}]+\})'
+            # only if simple ref
+        if not re.search(ref_pattern, expression):
+            operation = transform_cql_to_operation(expression, label)
+            if isinstance(operation, TriccReference):
+                if label:
+                    if label[0] == '[' and label[-1] == ']':
+                        operation = TriccOperation(
+                            operator=TriccOperator.SELECTED,
+                            reference=[
+                                operation,
+                                TriccReference(operation.value + label)
+                            ]
+                        )
+                    else:
+                        for operator in OPERATION_LIST:
+                            if operator in label:
+                                if operator == '==':
+                                    operator = '='
+                                terms = label.split(operator)
+                                operation = transform_cql_to_operation(
+                                    f"{expression} {operator} {terms[1].replace('?', '').strip()}",
+                                    label
+                                )
+                                break
+                # implied is true
+                if isinstance(operation, TriccReference):
+                     operation = TriccOperation(
+                            operator=TriccOperator.ISTRUE,
+                            reference=[
+                                operation,
+                            ]
+                        )
+                    
+            else:
+                pass
+
+        else:
+            operation = transform_cql_to_operation(
+                expression.replace('${', '"').replace('}', '"'),
+                label
+            )
+        
+    if operation is None:
+        logger.warning(f"unable to parse: {expression} ")
+        return expression
+    return operation
+        
 
 def set_mandatory_attribute(elm, mandatory_attributes, groupname=None):
     param = {}
     for attributes in mandatory_attributes:
-        attribute_value = elm.attrib.get(attributes)
+        if attributes == 'name':
+            name = elm.attrib.get("name")
+            id = elm.attrib.get("id")
+            attribute_value = _get_name(name, id)
+        elif attributes == 'list_name':
+            name = elm.attrib.get("name")
+            id = elm.attrib.get("id")
+            attribute_value = TRICC_LIST_NAME.format(_get_name(name, id))
+        else:   
+            attribute_value = elm.attrib.get(attributes)
         if attribute_value is None:
             if elm.attrib.get("label") is not None:
                 display_name = elm.attrib.get("label")
@@ -734,21 +598,23 @@ def set_mandatory_attribute(elm, mandatory_attributes, groupname=None):
                 display_name = elm.attrib.get("name")
             else:
                 display_name = elm.attrib.get("id")
-            logger.error(
-                "the attibute {} is mandatory but not found in {} within group {}".format(
-                    attributes, display_name, groupname if groupname is not None else ""
-                )
-            )
-            if mandatory_attributes == "source":
+                 
+            if attributes == "source":
                 if elm.attrib.get("target") is not None:
                     logger.error(
                         "the attibute target is ".format(elm.attrib.get("target"))
                     )
-            elif mandatory_attributes == "target":
+            elif attributes == "target":
                 if elm.attrib.get("source") is not None:
                     logger.error(
                         "the attibute target is ".format(elm.attrib.get("source"))
                     )
+            else:
+                logger.error(
+                    "the attibute {} is mandatory but not found in {} within group {}".format(
+                        attributes, display_name, groupname if groupname is not None else ""
+                    )
+                )
             exit()
         if attributes == "link":
             param[attributes] = clean_link(attribute_value)
@@ -897,7 +763,7 @@ def process_factor_edge(edge, nodes):
     if factor != 1:
         return TriccNodeCalculate(
             id=edge.id,
-            expression_reference="number(${{{}}}) * {}".format("", factor),
+            expression_reference=TriccOperation(TriccOperator.MULTIPLIED, [nodes[edge.source],TriccStatic(factor)]),
             reference=[nodes[edge.source]],
             activity=nodes[edge.source].activity,
             group=nodes[edge.source].group,
@@ -908,18 +774,22 @@ def process_factor_edge(edge, nodes):
 
 def process_condition_edge(edge, nodes):
     label = edge.value.strip()
-    for op in OPERATION_LIST:
-        if op in label:
-            # insert rhombus
-            return TriccNodeRhombus(
-                id=edge.id,
-                reference=[nodes[edge.source]],
-                path=nodes[edge.source],
-                activity=nodes[edge.source].activity,
-                group=nodes[edge.source].group,
-                label=label,
-            )
+    node = nodes[edge.source]
+    operation = parse_expression(label, expression=str(nodes[edge.source].name))
+    if operation and isinstance(operation, TriccOperation):
+        # insert rhombus
+        return TriccNodeRhombus(
+            id=edge.id,
+            reference=operation,
+            path=nodes[edge.source],
+            activity=nodes[edge.source].activity,
+            group=nodes[edge.source].group,
+            label=label
+        )
 
+
+
+        
 
 def process_exclusive_edge(edge, nodes):
     error = None
@@ -963,7 +833,7 @@ def process_yesno_edge(edge, nodes):
             yes_option = option
         else:
             no_option = option
-    if label.lower() in TRICC_FOLOW_LABEL:
+    if label.lower() in TRICC_FOLLOW_LABEL:
         pass
     elif label.lower() in TRICC_YES_LABEL:
         edge.source = yes_option.id

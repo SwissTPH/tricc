@@ -2,18 +2,19 @@
 
 import logging
 
-from tricc_oo.converters.tricc_to_xls_form import (TRICC_CALC_EXPRESSION,
-                                                negate_term, VERSION_SEPARATOR,INSTANCE_SEPARATOR,  get_export_name)
+from tricc_oo.converters.tricc_to_xls_form import (
+        negate_term, VERSION_SEPARATOR,INSTANCE_SEPARATOR,  get_export_name)
 from tricc_oo.converters.utils import clean_name, remove_html
 from tricc_oo.models.lang import SingletonLangClass
 from tricc_oo.models import *
-from tricc_oo.visitors.tricc import is_ready_to_process
+import re
+from tricc_oo.visitors.tricc import is_ready_to_process, process_reference, add_calculate
 logger = logging.getLogger('default')
 
 langs = SingletonLangClass()
+TRICC_CALC_EXPRESSION = "${{{0}}}>0"
 
-
-def start_group( cur_group, groups, df_survey, df_calculate, relevance = False, **kargs):
+def start_group( strategy, cur_group, groups, df_survey, df_calculate, relevance = False, **kargs):
     name = get_export_name(cur_group)
     
     if name in groups:
@@ -24,6 +25,7 @@ def start_group( cur_group, groups, df_survey, df_calculate, relevance = False, 
         groups[name] = 0
     is_activity = isinstance(cur_group,TriccNodeActivity)
     relevance = relevance and  cur_group.relevance is not None and cur_group.relevance != '' 
+
     group_calc_required = False and relevance and not is_activity and len(relevance)> 100
     
     
@@ -31,10 +33,15 @@ def start_group( cur_group, groups, df_survey, df_calculate, relevance = False, 
     relevance_expression = cur_group.relevance
     if not relevance:
         relevance_expression = ''
+    elif isinstance(relevance_expression, TriccOperation):
+        relevance_expression = strategy.get_tricc_operation_expression(relevance_expression)
+    elif isinstance(relevance_expression, TriccStatic):
+        relevance_expression = str(relevance.value)
+    
     #elif is_activity:
     #    relevance_expression = TRICC_CALC_EXPRESSION.format(get_export_name(cur_group.root))
     elif group_calc_required:
-        relevance_expression = TRICC_CALC_EXPRESSION.format("gcalc_" + name)
+            relevance_expression = TRICC_CALC_EXPRESSION.format("gcalc_" + name)
         
 ## group
     values = []
@@ -46,9 +53,13 @@ def start_group( cur_group, groups, df_survey, df_calculate, relevance = False, 
         elif  column == 'appearance':
             values.append('field-list')
         elif column == 'relevance':
-            values.append(relevance_expression)
+            if relevance_expression is True:
+                values.append('')
+            else:
+                values.append(relevance_expression)
+            
         else:
-            values.append(get_xfrom_trad(cur_group,column,SURVEY_MAP))
+            values.append(get_xfrom_trad(strategy, cur_group,column,SURVEY_MAP))
     df_survey.loc[len(df_survey)] = values
 
     ### calc
@@ -61,17 +72,17 @@ def start_group( cur_group, groups, df_survey, df_calculate, relevance = False, 
                 value =  "gcalc_" + name
                 calc_values.append(value)   
             elif column == 'calculation':
-                calc_values.append(get_attr_if_exists(cur_group,'relevance',SURVEY_MAP))
+                calc_values.append(get_attr_if_exists(strategy, cur_group,'relevance',SURVEY_MAP))
             elif column == 'relevance':
                 calc_values.append('')
             else:
-                calc_values.append(get_xfrom_trad(cur_group,column,SURVEY_MAP))
+                calc_values.append(get_xfrom_trad(strategy, cur_group,column,SURVEY_MAP))
 
         df_calculate.loc[len(df_calculate)] = calc_values
     
     
 
-def end_group( cur_group, groups, df_survey, **kargs):
+def end_group( strategy, cur_group, groups, df_survey, **kargs):
     
     values = []
     for column in SURVEY_MAP:
@@ -80,13 +91,13 @@ def end_group( cur_group, groups, df_survey, **kargs):
         elif column == 'relevance':
              values.append('')
         elif column in ('name'):
-            value = (get_attr_if_exists(cur_group,column,SURVEY_MAP))
+            value = (get_attr_if_exists(strategy, cur_group,column,SURVEY_MAP))
             
             if get_export_name(cur_group) in groups:
                 value = (value + "_" + str(groups[get_export_name(cur_group)]))
             values.append(value)
         else:
-            values.append(get_xfrom_trad(cur_group,column,SURVEY_MAP))
+            values.append(get_xfrom_trad(strategy, cur_group,column,SURVEY_MAP))
     df_survey.loc[len(df_survey)] = values
 
 
@@ -145,16 +156,21 @@ SURVEY_MAP = {
     **langs.get_trads_map('required_message'), 'read only':'read only', 
     'calculation':'expression','repeat_count':'repeat_count','media::image':'image'
 }
-CHOICE_MAP = {'list_name':'list_name', 'value':'name', **langs.get_trads_map('label') }
+CHOICE_MAP = {'list_name':'list_name', 'value':'name', **langs.get_trads_map('label'), 'y_min':'', 'y_max':'', 'l':'', 's':'', 'm':'' }
      
      
 TRAD_MAP = ['label','constraint_message', 'required_message', 'hint', 'help']  
 
-def get_xfrom_trad(node, column, maping, clean_html = False ):
+def get_xfrom_trad(strategy, node, column, mapping, clean_html = False ):
     arr = column.split('::')
     column = arr[0]
     trad =  arr[1] if len(arr)==2 else None
-    value = get_attr_if_exists(node, column, maping)
+    value = get_attr_if_exists(strategy, node, column, mapping)
+    if (
+        issubclass(node.__class__, TriccNodeDisplayCalculateBase) 
+        and column == 'calculation' and isinstance(value, str) and not value.startswith('number')
+    ):
+        value = f"number({value})"
     if clean_html and isinstance(value, str):
         value = remove_html(value)
     if column in TRAD_MAP:
@@ -165,7 +181,7 @@ def get_xfrom_trad(node, column, maping, clean_html = False ):
     
 
 
-def get_attr_if_exists(node,column, map_array):
+def get_attr_if_exists(strategy, node, column, map_array):
     if column in map_array:
         mapping = map_array[column]
         if isinstance(mapping, Dict) and node.tricc_type in map_array[column]:
@@ -181,8 +197,10 @@ def get_attr_if_exists(node,column, map_array):
                     return get_export_name(value)
                 else:
                     return get_export_name(node)
+            elif isinstance(value, (TriccOperation, TriccStatic, TriccReference)):
+                return strategy.get_tricc_operation_expression(value)
             elif value is not None:
-                return str(value) if not isinstance(value,dict) else value
+                return str(value) if not isinstance(value, dict) else value
             else:
                 return ''
         else:
@@ -194,10 +212,11 @@ def get_attr_if_exists(node,column, map_array):
         return ''
 
  
-def generate_xls_form_export(node, processed_nodes, stashed_nodes, df_survey, df_choice,df_calculate, cur_group, **kargs):
+def generate_xls_form_export(strategy, node, processed_nodes, stashed_nodes, df_survey, df_choice,df_calculate, cur_group, calculates, **kargs):
     # check that all prev nodes were processed
-    if is_ready_to_process(node,processed_nodes):
+    if is_ready_to_process(node,processed_nodes, strict=True) and process_reference(node, processed_nodes, calculates, replace_reference=True) :
         if node not in processed_nodes :
+            add_calculate(calculates,node)  
             if node.group != cur_group and not isinstance(node,TriccNodeSelectOption) : 
                 return False
             logger.debug("printing node {}".format(node.get_name()))
@@ -209,7 +228,7 @@ def generate_xls_form_export(node, processed_nodes, stashed_nodes, df_survey, df
                 if isinstance(node, TriccNodeSelectOption):
                     values = []
                     for column in CHOICE_MAP:
-                        values.append(get_xfrom_trad(node, column, CHOICE_MAP, True ))
+                        values.append(get_xfrom_trad(strategy, node, column, CHOICE_MAP, True ))
                     # add only if not existing
                     if len(df_choice[(df_choice['list_name'] == node.list_name) & (df_choice['value'] == node.name)])  == 0:
                         df_choice.loc[len(df_choice)] = values
@@ -220,7 +239,7 @@ def generate_xls_form_export(node, processed_nodes, stashed_nodes, df_survey, df
                             if column == 'default' and issubclass(node.__class__, TriccNodeDisplayCalculateBase):
                                 values.append(0)
                             else:
-                                values.append(get_xfrom_trad(node, column, SURVEY_MAP ))
+                                values.append(get_xfrom_trad(strategy, node, column, SURVEY_MAP ))
                         if len(df_calculate[df_calculate.name == get_export_name(node)])==0:
                             df_calculate.loc[len(df_calculate)] = values
                         else:
@@ -229,7 +248,7 @@ def generate_xls_form_export(node, processed_nodes, stashed_nodes, df_survey, df
                     elif  ODK_TRICC_TYPE_MAP[node.tricc_type] !='':
                         values = []
                         for column in SURVEY_MAP:
-                            values.append(get_xfrom_trad(node,column,SURVEY_MAP))
+                            values.append(get_xfrom_trad(strategy, node,column,SURVEY_MAP))
                         df_survey.loc[len(df_survey)] = values
                     else:
                         logger.warning("node {} have an unmapped type {}".format(node.get_name(),node.tricc_type))

@@ -15,11 +15,14 @@ from tricc_oo.models import (
     TriccNodeActivity,
     TriccGroup,
 )
+from tricc_oo.models.lang import SingletonLangClass
 
 from tricc_oo.visitors.tricc import (
     check_stashed_loop,
     walktrhough_tricc_node_processed_stached,
     is_ready_to_process,
+    process_reference,
+    get_node_expressions
 )
 from tricc_oo.serializers.xls_form import (
     CHOICE_MAP,
@@ -52,13 +55,14 @@ logger = logging.getLogger("default")
     generate_xls_form_export
     
 """
+langs = SingletonLangClass()
 
 
 class XLSFormStrategy(BaseOutPutStrategy):
     df_survey = pd.DataFrame(columns=SURVEY_MAP.keys())
     df_calculate = pd.DataFrame(columns=SURVEY_MAP.keys())
     df_choice = pd.DataFrame(columns=CHOICE_MAP.keys())
-
+    calculates = {}
     # add save nodes and merge nodes
 
     def generate_base(self, node, **kwargs):
@@ -83,10 +87,14 @@ class XLSFormStrategy(BaseOutPutStrategy):
             "df_survey": self.df_survey,
             "df_choice": self.df_choice,
             "df_calculate": self.df_calculate,
+            "calculates": self.calculates
         }
 
     def generate_export(self, node, **kwargs):
-        return generate_xls_form_export(node, **kwargs)
+        self.add_tab_breaks_choice()
+        self.add_wfx_choice()
+        return generate_xls_form_export(self, node, **kwargs)
+
 
     def export(self, start_pages, version):
         if start_pages["main"].root.form_id is not None:
@@ -143,7 +151,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
         groups[activity.id] = 0
         path_len = 0
         # keep the vesrions on the group id, max version
-        start_group(cur_group=cur_group, groups=groups, **self.get_kwargs())
+        start_group(self, cur_group=cur_group, groups=groups, **self.get_kwargs())
         walktrhough_tricc_node_processed_stached(
             activity.root,
             self.generate_export,
@@ -153,7 +161,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
             cur_group=activity.root.group,
             **self.get_kwargs()
         )
-        end_group(cur_group=activity, groups=groups, **self.get_kwargs())
+        end_group(self, cur_group=activity, groups=groups, **self.get_kwargs())
         # we save the survey data frame
         df_survey_final = pd.DataFrame(columns=SURVEY_MAP.keys())
         if len(self.df_survey) > (2 + skip_header):
@@ -191,6 +199,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
                         "ERROR group is none for node {}".format(s_node.get_name())
                     )
                 start_group(
+                    self,
                     cur_group=s_node.group,
                     groups=groups,
                     relevance=True,
@@ -208,7 +217,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
                     **self.get_kwargs()
                 )
                 # add end group if new node where added OR if the previous end group was removed
-                end_group(cur_group=s_node.group, groups=groups, **self.get_kwargs())
+                end_group(self, cur_group=s_node.group, groups=groups, **self.get_kwargs())
                 # if two line then empty grou
                 if len(self.df_survey) > (2 + skip_header):
                     if cur_group == s_node.group:
@@ -311,11 +320,27 @@ class XLSFormStrategy(BaseOutPutStrategy):
 
     def get_tricc_operation_expression(self, operation):
         ref_expressions = []
+        if not hasattr(operation, 'reference'):
+            return self.get_tricc_operation_operand(operation) 
         for r in operation.reference:
-            r_expr = self.get_tricc_operation_operand(r)
-            if isinstance(r_expr, str):
-                    r_expr = safe_to_bool_logic(r_expr)
+            if isinstance(r, list):
+                r_expr = [
+                    self.get_tricc_operation_expression(sr) if isinstance(sr, TriccOperation)
+                    else self.get_tricc_operation_operand(sr) 
+                    for sr in r
+                ]
+            elif isinstance(r, TriccOperation):
+                r_expr = self.get_tricc_operation_expression(r)
+            else:
+                r_expr = self.get_tricc_operation_operand(r)
+            if isinstance(r_expr, TriccStatic):
+                r_expr = r.value
+            if isinstance(r_expr, bool) or r_expr == 'True' or r_expr == 'False':
+                r_expr = 1 if r_expr is True or r_expr == 'True' else 0
+            if isinstance(r_expr, TriccReference):
+                r_expr = self.get_tricc_operation_operand(r_expr)
             ref_expressions.append(r_expr)
+        
         # build lower level
         if hasattr(self,f"tricc_operation_{operation.operator}"):
             callable = getattr(self,f"tricc_operation_{operation.operator}")
@@ -323,347 +348,190 @@ class XLSFormStrategy(BaseOutPutStrategy):
         else:
             raise NotImplementedError(f"This type of opreation '{operation.operator}' is not supported in this strategy")
         
-
+    def tricc_operation_multiplied(self, ref_expressions):
+        return '*'.join(ref_expressions)
+    def tricc_operation_divided(self, ref_expressions):
+        return f"{ref_expressions[0]} div {ref_expressions[1]}"
+    def tricc_operation_modulo(self, ref_expressions):
+        return f"{ref_expressions[0]} mod {ref_expressions[1]}"
+    def tricc_operation_coalesce(self, ref_expressions):
+        return f"coalesce({','.join(ref_expressions)})"
+    def tricc_operation_module(self, ref_expressions):
+        return f"{ref_expressions[0]} mod {ref_expressions[1]}"
+    def tricc_operation_minus(self, ref_expressions):
+        if len(ref_expressions)>1:
+            return '-'.join(ref_expressions)
+        elif len(ref_expressions)==1:
+            return f'-{ref_expressions[0]}'
+    def tricc_operation_plus(self, ref_expressions):
+        return '+'.join(ref_expressions)
     def tricc_operation_not(self, ref_expressions):
-        return negate_term(ref_expressions[0])
+        return f"not({ref_expressions[0]})"
     def tricc_operation_and(self, ref_expressions):
-        return and_join(ref_expressions)
+        if len(ref_expressions) == 1:
+            return ref_expressions[0]
+        if len(ref_expressions)>1: 
+            ref_expressions = [f"({r})" if isinstance(r, str) and any(op in r for op in [' and ','+','-'])else r for r in ref_expressions]
+            return ' and '.join(map(str, ref_expressions))
+        else:
+            return '1'
+
     def tricc_operation_or(self, ref_expressions):
-        return or_join(ref_expressions)
-    def tricc_operation_or_and(self, ref_expressions):
-        return and_join([ref_expressions[0], or_join(ref_expressions[1:])])
+        if len(ref_expressions) == 1:
+            return ref_expressions[0]
+        if len(ref_expressions)>1: 
+            ref_expressions = [f"({r})" if isinstance(r, str) and any(op in r for op in [' or ','+','-'])else r for r in ref_expressions]
+            return ' or '.join(map(str, ref_expressions))
+        else:
+            return '1'
+
+
+
     def tricc_operation_native(self, ref_expressions):
-        return r
+        if len(ref_expressions)>0:
+            if ref_expressions[0] =='GetChoiceName':
+                return f"jr:choice-name({ref_expressions[1]}, ${ref_expressions[2][2:-2]})"
+            elif ref_expressions[0] =='GetFacilityParam':
+                return '0'
+                #return f"jr:choice-name({','.join(ref_expressions[1:])})"
+            else: 
+                return f"{ref_expressions[0]}({','.join(ref_expressions[1:])})"
+        
     def tricc_operation_istrue(self, ref_expressions):
-        return f"{ref_expressions[0]} > 0"
+        return f"{ref_expressions[0]}>0"
     def tricc_operation_isfalse(self, ref_expressions):
-        return f"{ref_expressions[0]} = 0"
+        return f"{ref_expressions[0]}=0"
+    def tricc_operation_parenthesis(self, ref_expressions):
+        return f"({ref_expressions[0]})"
     def tricc_operation_selected(self, ref_expressions):
         parts = []
         for s in ref_expressions[1:]:
-            parts.append(f"selected({ref_expressions[0]}, r)")
-        return self.tricc_operation_or(parts)
+            parts.append(f"selected({ref_expressions[0]}, {s})")
+        if len(parts) == 1:
+            return parts[0]
+        else:
+            return self.tricc_operation_or(parts)
     def tricc_operation_more_or_equal(self, ref_expressions):
-        return f"{ref_expressions[0]} >= {ref_expressions[1]}"
+        return f"{ref_expressions[0]}>={ref_expressions[1]}"
     def tricc_operation_less_or_equal(self, ref_expressions):
-        return f"{ref_expressions[0]} <= {ref_expressions[1]}"
+        return f"{ref_expressions[0]}<={ref_expressions[1]}"
     def tricc_operation_more(self, ref_expressions):
-        return f"{ref_expressions[0]} > {ref_expressions[1]}"
+        return f"{ref_expressions[0]}>{ref_expressions[1]}"
     def tricc_operation_less(self, ref_expressions):
-        return f"{ref_expressions[0]} < {ref_expressions[1]}"
+        return f"{ref_expressions[0]}<{ref_expressions[1]}"
     def tricc_operation_between(self, ref_expressions):
-        return  f"{ref_expressions[0]} >= {ref_expressions[1]} and {ref_expressions[0]} < {ref_expressions[2]}"
+        return  f"{ref_expressions[0]}>={ref_expressions[1]} and {ref_expressions[0]} < {ref_expressions[2]}"
     def tricc_operation_equal(self, ref_expressions):
-        return f"{ref_expressions[0]} = {ref_expressions[1]}"
+        return f"{ref_expressions[0]}={ref_expressions[1]}"
     def tricc_operation_not_equal(self, ref_expressions):
-        return f"{ref_expressions[0]} != {ref_expressions[1]}"
+        return f"{ref_expressions[0]}!={ref_expressions[1]}"
     def tricc_operation_case(self, ref_expressions):
         ifs = 0
         parts = []
-        for i in range(int(len(ref_expressions)/2)):
-            if i*2+1 <= len(ref_expressions):
-                parts.append(f"if({ref_expressions[i*2]},{ref_expressions[i*2+1]}")
+        else_found = False
+        if not isinstance(ref_expressions[0], list):
+            return self.tricc_operation_ifs(ref_expressions)
+        for i in range(int(len(ref_expressions))):
+            if isinstance(ref_expressions[i], list):
+                parts.append(f"if({ref_expressions[i][0]},{ref_expressions[i][1]}")
                 ifs += 1
             else:
-                parts.append(ref_expressions[i*2])
+                else_found = True
+                parts.append(ref_expressions[i])
         #join the if
         exp = ','.join(parts)
         # in case there is no default put ''
-        if len(ref_expressions)%2 == 0 :
+        if not else_found:
             exp += ",''"
         #add the closing )
         for i in range(ifs):
             exp += ")"
         return exp
+    
+    def tricc_operation_ifs(self, ref_expressions):
+        ifs = 0
+        parts = []
+        else_found = False
+        for i in range(int(len(ref_expressions[1:]))):
+            if isinstance(ref_expressions[i+1], list):
+                parts.append(f"if({ref_expressions[0]}={ref_expressions[i+1][0]},{ref_expressions[i+1][1]}")
+                ifs += 1
+            else:
+                else_found = True
+                parts.append(ref_expressions[i+1])
+        #join the if
+        exp = ','.join(parts)
+        # in case there is no default put ''
+        if not else_found:
+            exp += ",''"
+        #add the closing )
+        for i in range(ifs):
+            exp += ")"
+        return exp
+    
     def tricc_operation_if(self, ref_expressions):
-        return self.tricc_operation_case( ref_expressions)
+        return f"if({ref_expressions[0]},{ref_expressions[1]},{ref_expressions[2]})"
+    
     def tricc_operation_contains(self, ref_expressions):
         return f"contains({ref_expressions[0]}, {ref_expressions[1]})"
+    
     def tricc_operation_exists(self, ref_expressions):
         parts = []
         for ref in ref_expressions:
-            parts.append(self.tricc_operation_not_equal([ref, "''"]))
+            parts.append(self.tricc_operation_not_equal([self.tricc_operation_coalesce([ref, "''"]), "''"]))
         return self.tricc_operation_and(parts)
-    # calculate or retrieve a node expression
-    def get_node_expression(self, in_node, processed_nodes, is_calculate=False, is_prev=False, negate=False):
-        # in case of calculate we only use the select multiple if none is not selected
-        expression = None
-        negate_expression = None
-        node = in_node
-        if is_prev and is_calculate and isinstance(node, TriccNodeActivityStart):
-            expression = self.get_node_expression(node.activity, processed_nodes, is_calculate, is_prev, negate )
-        elif hasattr(node, 'expression_reference') and isinstance(node.expression_reference, TriccOperation):
-            expression = self.get_tricc_operation_expression(node.expression_reference)
-        elif hasattr(node, 'relevance') and isinstance(node.relevance, TriccOperation):
-            expression = self.get_tricc_operation_expression(node.relevance)   
-        elif is_prev and isinstance(node, TriccNodeSelectOption):
-            if negate:
-                negate_expression = get_selected_option_expression(node, negate)
-            else:
-                expression = get_selected_option_expression(node, negate)
-            #TODO remove that and manage it on the "Save" part
-        elif is_prev and isinstance(in_node, TriccNodeSelectNotAvailable):
-            expression =  TRICC_SELECTED_EXPRESSION.format(get_export_name(node), 'true()')
-        elif is_prev and isinstance(node, TriccNodeRhombus):
-            if node.path is not None: 
-                left = self.get_node_expression(node.path, processed_nodes, is_calculate, is_prev)
-            else:
-                left = 'true()'
-            r_ref = self.get_rhombus_terms(node, processed_nodes)  # if issubclass(node.__class__, TricNodeDisplayCalulate) else TRICC_CALC_EXPRESSION.format(get_export_name(node)) #
-            expression = and_join([left, r_ref])
-            negate_expression = nand_join(left, r_ref)        
-        elif isinstance(node, TriccNodeWait):
-            if is_prev:
-                # the wait don't do any calculation with the reference it is only use to wait until the reference are valid
-                return self.get_node_expression(node.path, processed_nodes, is_calculate, is_prev)
-            else:
-                #it is a empty calculate
-                return ''
-        elif is_prev and issubclass(node.__class__, TriccNodeDisplayCalculateBase):
-            expression = TRICC_CALC_EXPRESSION.format(get_export_name(node))
-        elif issubclass(node.__class__, TriccNodeCalculateBase):
-            if negate:
-                negate_expression = self.get_calculation_terms(node, processed_nodes, is_calculate, negate=True)
-            else:
-                expression = self.get_calculation_terms(node, processed_nodes, is_calculate)
-        elif is_prev and hasattr(node, 'required') and node.required:
-            expression = get_required_node_expression(node)
-        elif is_prev and hasattr(node, 'relevance') and node.relevance is not None and node.relevance != '':
-                expression = node.relevance     
-        if expression is None:
-                expression = self.get_prev_node_expression(node, processed_nodes, is_calculate)
-        if isinstance(node, TriccNodeActivity) and is_prev:
-            end_nodes = node.get_end_nodes()
-            if all([end in processed_nodes for end in end_nodes]):
-                expression = and_join([expression, self.get_activity_end_terms(node,processed_nodes)])
-        if negate:
-            if negate_expression is not None:
-                return negate_expression
-            elif expression is not None:
-                return negate_term(expression)
-            else:
-                logger.error("exclusive can not negate None from {}".format(node.get_name()))
-                # exit()
-        else:
-            return expression
-        
-    # main function to retrieve the expression from the tree
-    # node is the node to calculate
-    # processed_nodes are the list of processed nodes
-    def get_node_expressions(self, node, processed_nodes):
-        is_calculate = issubclass(node.__class__, TriccNodeCalculateBase)
-        expression = None
-        # in case of recursive call processed_nodes will be None
-        if processed_nodes is None or is_ready_to_process(node, processed_nodes):
-            expression = self.get_node_expression(node, processed_nodes, is_calculate)
-            
-        if is_calculate:
-            if expression is not None and expression != '':
-                expression = TRICC_NUMBER.format(expression)
-            else:
-                expression = ''
-        if issubclass(node.__class__, TriccNodeCalculateBase) and expression == '' and not isinstance(node, (TriccNodeWait, TriccNodeActivityEnd, TriccNodeActivityStart)):
-            logger.warning("Calculate {0} returning no calculations".format(node.get_name()))
-            expression = 'true()'
-        return expression
     
-    def get_prev_node_expression(self, node, processed_nodes, is_calculate=False, excluded_name=None):
-        expression = None
-        if node is None:
-            pass
-        # when getting the prev node, we calculate the
-        if hasattr(node, 'expression_inputs') and len(node.expression_inputs) > 0:
-            expression_inputs = node.expression_inputs
-            expression_inputs = clean_list_or(expression_inputs)
+    def tricc_operation_cast_number(self, ref_expressions):
+        if isinstance(ref_expressions[0], (int, float,)):
+            return f"{ref_expressions[0]}"
+        elif not ref_expressions or ref_expressions[0] == '':
+            logger.warning("empty cast number")
+            return '0'
+        elif ref_expressions[0] == 'True' or ref_expressions[0] is True:
+            return '1'
         else:
-            expression_inputs = []
-        if isinstance(node, TriccNodeBridge) and node.label=='path: signe de danger >0  ?':
-            logger.debug('hre')
-        for prev_node in node.prev_nodes:
-            if excluded_name is None or prev_node != excluded_name or (
-                    isinstance(excluded_name, str) and hasattr(prev_node, 'name') and prev_node.name != excluded_name): # or isinstance(prev_node, TriccNodeActivityEnd):
-                # the rhombus should calculate only reference
-                add_sub_expression(expression_inputs, self.get_node_expression(prev_node, processed_nodes, is_calculate, True))
-                # avoid void is there is not conditions to avoid looping too much itme
-        expression_inputs = clean_list_or(expression_inputs)
-        
-        expression = or_join(expression_inputs)
-        expression_inputs = None
-            # if isinstance(node,  TriccNodeExclusive):
-            #    expression =  TRICC_NEGATE.format(expression)
-        # only used for activityStart 
-        if isinstance(node, TriccNodeActivity) and node.base_instance is not None:
-            activity = node
-            expression_inputs = []
-            #exclude base node only if the defaulf instance number is not 0
-            if activity.base_instance.instance >1:
-                add_sub_expression(expression_inputs, self.get_node_expression(activity.base_instance, processed_nodes, False, True))
-            # relevance of the previous instance must be false to display this activity
-            for past_instance in activity.base_instance.instances.values():
-                if int(past_instance.root.path_len) < int(activity.root.path_len) and past_instance in processed_nodes:
-                    add_sub_expression(expression_inputs, self.get_node_expression(past_instance, processed_nodes, False))         
-            expression_activity = or_join(expression_inputs)
-            if expression and expression_activity:
-                expression = nand_join(expression, expression_activity)
-            elif expression_activity:
-                expression = negate_term(expression_activity)
-        return expression
-
-    def get_activity_end_terms(self, node, processed_nodes):
-        end_nodes = node.get_end_nodes()
-        expression_inputs = []
-        for end_node in end_nodes:
-            add_sub_expression(expression_inputs,
-                            self.get_node_expression(end_node, processed_nodes, is_calculate=False, is_prev=True))
-
-        return  or_join(expression_inputs)
-
-    def get_count_terms(self, node, processed_nodes, is_calculate, negate=False):
-        terms = []
-        for prev_node in node.prev_nodes:
-            if isinstance(prev_node, TriccNodeSelectMultiple):
-                if negate:
-                    terms.append(TRICC_SELECT_MULTIPLE_CALC_NONE_EXPRESSION.format(get_export_name(prev_node)))
-                else:
-                    terms.append(TRICC_SELECT_MULTIPLE_CALC_EXPRESSION.format(get_export_name(prev_node)))
-            elif isinstance(prev_node, (TriccNodeSelectYesNo, TriccNodeSelectNotAvailable)):
-                terms.append(TRICC_SELECTED_EXPRESSION.format(get_export_name(prev_node), '1'))
-            elif isinstance(prev_node, TriccNodeSelectOption):
-                terms.append(get_selected_option_expression(prev_node, negate))
-            else:
-                if negate:
-                    terms.append("number(number({0})=0)".format(
-                        self.get_node_expression(prev_node, processed_nodes, is_calculate=False, is_prev=True)))
-                else:
-                    terms.append("number({0})".format(
-                        self.get_node_expression(prev_node, processed_nodes, is_calculate=False, is_prev=True)))
-        if len(terms) > 0:
-            return ' + '.join(terms)
-        
-    def get_add_terms(self, node, processed_nodes, is_calculate=False, negate=False):
-        if negate:
-            logger.warning("negate not supported for Add node {}".format(node.get_name()))
-        terms = []
-        for prev_node in node.prev_nodes:
-            if issubclass(prev_node, TriccNodeNumber) or isinstance(node, TriccNodeCount):
-                terms.append("coalesce(${{{0}}},0)".format(get_export_name(prev_node)))
-            else:
-                terms.append(
-                    "number({0})".format(self.get_node_expression(prev_node, processed_nodes, is_calculate=False, is_prev=True)))
-        if len(terms) > 0:
-            return ' + '.join(terms)
-        
-    def get_rhombus_terms(self, node, processed_nodes, is_calculate=False, negate=False):
-        expression = None
-        left_term = None
-        # calcualte the expression only for select muzltiple and fake calculate
-        if node.reference is not None and issubclass(node.reference.__class__, list):
-            if node.expression_reference is None and len(node.reference) == 1:
-                if node.label is not None:
-                    for operation in OPERATION_LIST:
-                        left_term = process_rhumbus_expression(node.label, operation)
-                        if left_term is not None:
-                            break
-                if left_term is None:
-                    left_term = '>0'
-                ref = node.reference[0]
-                if issubclass(ref.__class__, TriccNodeBaseModel):
-                    if isinstance(ref, TriccNodeActivity):
-                        expression = self.get_activity_end_terms(ref, processed_nodes)
-                    elif issubclass(ref.__class__, TriccNodeFakeCalculateBase):
-                        expression = self.get_node_expression(ref, processed_nodes, is_calculate=True, is_prev=True)
-                    else:
-                        expression = TRICC_REF_EXPRESSION.format(get_export_name(ref))
-                else:
-                    # expression = TRICC_REF_EXPRES
-                    # SION.format(node.reference)
-                    # expression = "${{{}}}".format(node.reference)
-                    logger.error('reference {0} was not found in the previous nodes of node {1}'.format(node.reference,
-                                                                                                        node.get_name()))
-                    exit()
-            elif node.expression_reference is not None and node.expression_reference != '':
-                left_term = ''
-                expression = node.expression_reference.format(*get_list_names(node.reference))
-            else:
-                logger.warning("missing epression for node {}".format(node.get_name()))
-        else:
-            logger.error('reference {0} is not a list {1}'.format(node.reference, node.get_name()))
-            exit()
-
-        if expression is not None:
-
-            if left_term is not None and re.search(" (\+)|(\-)|(or)|(and) ", expression):
-                expression = "({0}){1}".format(expression, left_term)
-            else:
-                expression = "{0}{1}".format(expression, left_term)
-        else:
-            logger.error("Rhombus reference was not found for node {}, reference {}".format(
-                node.get_name(),
-                node.reference
-            ))
-            exit()
-
-        return expression
-    # function that generate the calculation terms return by calculate node
-    # @param node calculate node to assess
-    # @param processed_nodes list of node already processed, importnat because only processed node could be use
-    # @param is_calculate used when this funciton is called in the evaluation of another calculate
-    # @param negate use to retriece the negation of a calculation
-    def get_calculation_terms(self, node, processed_nodes, is_calculate=False, negate=False):
-        # returns something directly only if the negate is managed
-        expression = None
-        if isinstance(node, TriccNodeAdd):
-            return self.get_add_terms(node, False, negate)
-        elif isinstance(node, TriccNodeCount):
-            return self.get_count_terms(node, False, negate)
-        elif isinstance(node, TriccNodeRhombus):
-            return self.get_rhombus_terms(node, processed_nodes, False, negate)
-        elif isinstance(node, ( TriccNodeWait)):
-            # just use to force order of question
-            expression = None
-        # in case of calulate expression evaluation, we need to get the relevance of the activity 
-        # because calculate are not the the activity group
-        elif isinstance(node, (TriccNodeActivityStart)) and is_calculate:
-            expression =  self.get_prev_node_expression(node.activity, processed_nodes, is_calculate)
-        elif isinstance(node, (TriccNodeActivityStart, TriccNodeActivityEnd)):
-            # the group have the relevance for the activity, not needed to replicate it
-            expression = None#return get_prev_node_expression(node.activity, processed_nodes, is_calculate=False, excluded_name=None)
-        elif isinstance(node, TriccNodeExclusive):
-            if len(node.prev_nodes) == 1:
-                iterator = iter(node.prev_nodes)
-                node_to_negate = next(iterator)
-                if isinstance(node_to_negate, TriccNodeExclusive):
-                    logger.error("2 exclusives cannot be on a row")
-                    exit()
-                elif issubclass(node_to_negate.__class__, TriccNodeCalculateBase):
-                    return self.get_node_expression(node_to_negate, processed_nodes, is_prev=True, negate=True)
-                elif isinstance(node_to_negate, TriccNodeActivity):
-                    return self.get_node_expression(node_to_negate, processed_nodes, is_calculate=False, is_prev=True,
-                                            negate=True)
-                else:
-                    logger.error(f"exclusive node {node.get_name()}\
-                        does not depend of a calculate but on\
-                            {node_to_negate.__class__}::{node_to_negate.get_name()}")
-
-            else:
-                logger.error("exclusive node {} has no ou too much parent".format(node.get_name()))
-        
-        if node.reference is not None and node.expression_reference is not None :
-            expression = self.get_prev_node_expression(node, processed_nodes, is_calculate)
-            ref_expression = node.expression_reference.format(*[get_export_name(ref) for ref in node.reference])
-            if expression is not None and expression != '':
-                expression =  and_join([expression,ref_expression])
-            else:
-                expression = ref_expression
-        else:
-            expression =  self.get_prev_node_expression(node, processed_nodes, is_calculate)
-        
-        # manage the generic negation
-        if negate:
-            
-            return negate_term(expression)
-        else:
-            return expression
+            return f"number({ref_expressions[0]})"
+    
+    def tricc_operation_zscore(self, ref_expressions):
+        y, ll, m, s = self.get_zscore_params(ref_expressions)
+        #  return ((Math.pow((y / m), l) - 1) / (s * l));
+        return f"(pow({y} div ({m}), {ll}) -1) div (({s}) div ({ll}))"
+   
+    
+    def tricc_operation_izscore(self, ref_expressions):
+        z, ll, m, s = self.get_zscore_params(ref_expressions)
+        #  return  (m * (z*s*l-1)^(1/l));
+        return f"pow({m} * ({z} * {s} * {ll} -1), 1 div {ll})"
+    
+    def get_zscore_params(self, ref_expressions):
+        table = ref_expressions[0]
+        sex = clean_name(ref_expressions[1])
+        x = clean_name(ref_expressions[2])
+        yz = clean_name(ref_expressions[3])
+        ll = (
+            f"number(instance({table})/root/item[sex={sex} and x_max>"
+            + x
+            + " and x_min<="
+            + x
+            + "]/l)"
+        )
+        m = (
+            f"number(instance({table})/root/item[sex={sex} and x_max>"
+            + x
+            + " and x_min<="
+            + x
+            + "]/m)"
+        )
+        s = (
+            f"number(instance({table})/root/item[sex={sex} and x_max>"
+            + x
+            + " and x_min<="
+            + x
+            + "]/s)"
+        )
+        return yz, ll, m, s 
+    
+    
         
     # function update the calcualte in the XLSFORM format
     # @param left part
@@ -673,7 +541,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
             if node not in processed_nodes:
                 logger.debug("generation of calculate for node {}".format(node.get_name()))
                 if hasattr(node, 'expression') and (node.expression is None) and issubclass(node.__class__,TriccNodeCalculateBase):
-                    node.expression = self.get_node_expressions(node, processed_nodes)
+                    node.expression = get_node_expressions(node, processed_nodes)
                     # continue walk
                 return True
         return False
@@ -686,17 +554,19 @@ class XLSFormStrategy(BaseOutPutStrategy):
             if node not in processed_nodes:
                 logger.debug('Processing relevance for node {0}'.format(node.get_name()))
                 # if has prev, create condition
-                if hasattr(node, 'relevance') and (node.relevance is None or isinstance(node.relevance, TriccOperation)):
-                    node.relevance = self.get_node_expressions(node, processed_nodes)
+                if (
+                    hasattr(node, 'relevance') 
+                    and (node.relevance is None or isinstance(node.relevance, TriccOperation))
+                ):
+                    node.relevance = get_node_expressions(node, processed_nodes)
                     # manage not Available
                     if isinstance(node, TriccNodeSelectNotAvailable):
                         # update the checkbox
                         if len(node.prev_nodes) == 1:
                             iterator = iter(node.prev_nodes)
                             parent_node = next(iterator)
-                            parent_empty = "${{{0}}}=''".format(get_export_name(parent_node))
+                            parent_empty = TriccOperation(TriccOperator.ISNULL, [parent_node])
                             node.relevance  = and_join([parent_node.relevance, parent_empty])
-
                             node.required = parent_empty
                             node.constraint = parent_empty
                             node.constraint_message = "Cannot be selected with a value entered above"
@@ -711,8 +581,8 @@ class XLSFormStrategy(BaseOutPutStrategy):
     # function update the select node in the XLSFORM format
     # @param left part
     # @param right part
-    def generate_xls_form_condition(self, node, processed_nodes, stashed_nodes, **kwargs):
-        if is_ready_to_process(node, processed_nodes,   strict=False):
+    def generate_xls_form_condition(self, node, processed_nodes, stashed_nodes, calculates, **kwargs):
+        if is_ready_to_process(node, processed_nodes, strict=False) and process_reference(node, processed_nodes, calculates, replace_reference=False):
             if node not in processed_nodes:
                 if issubclass(node.__class__, TriccRhombusMixIn) and isinstance(node.reference, str):
                     logger.warning("node {} still using the reference string".format(node.get_name()))
@@ -745,15 +615,161 @@ class XLSFormStrategy(BaseOutPutStrategy):
     def get_tricc_operation_operand(self,r):
         if isinstance(r, TriccOperation):
             return self.get_tricc_operation_expression(r) 
+        elif isinstance(r, TriccReference):
+            logger.warning(f"reference still used in the calculate {r.value}")
+            return f"${{{get_export_name(r.value)}}}" 
         elif isinstance(r, TriccStatic):
-            return f"'{r.value}'" 
+            if isinstance(r.value, str):
+                return f"'{r.value}'"
+            if isinstance(r.value, bool):
+                return 1 if r.value else 0
+            else:
+                return str(r.value)
         elif isinstance(r, str):
-            return f"'{r}'" 
+            return f"{r}" 
         elif isinstance(r, (int, float)):
-            return r
+            return str(r)
         elif isinstance(r, TriccNodeSelectOption):
-            return r.name
+            return f"'{r.name}'"
         elif issubclass(r.__class__, TriccNodeBaseModel):
             return f"${{{get_export_name(r)}}}" 
         else:
             raise NotImplementedError(f"This type of node {r.__class__} is not supported within an operation")
+        
+    def add_wfx_choice(self):
+        new_rows = [
+            ['wfl', 'y45_0', 'f', 0, 110, -0.3833, 0.09029, 2.4607],
+            ['wfa', 'y45_1', 'f', 0, 18500, -0.3833, 0.0903, 2.4777],
+            ['wfh', 'y45_2', 'f', 0, 125, -0.3833, 0.0903, 2.4947],
+        ]
+        
+        for row in new_rows:
+            self.df_choice.loc[len(self.df_choice)] = row
+            
+        label = langs.get_trads('hidden', force_dict =True)
+        empty = langs.get_trads('', force_dict =True)
+        self.df_survey.loc[len(self.df_survey)] = [
+            'select_one wfl',
+            "wfl",
+            *list(label.values()) ,
+            *list(empty.values()) ,#hint
+            *list(empty.values()) ,#help
+            '',#default
+            '',#'appearance', clean_name
+            '',#'constraint', 
+            *list(empty.values()) ,#'constraint_message'
+            '0',#'relevance'
+            '',#'disabled'
+            '1',#'required'
+            *list(empty.values()) ,#'required message'
+            '',#'read only'
+            '',#'expression'
+            '',#'repeat_count'
+            ''#'image'  
+        ]
+        self.df_survey.loc[len(self.df_survey)] = [
+            'select_one wfa',
+            "wfa",
+            *list(label.values()) ,
+            *list(empty.values()) ,#hint
+            *list(empty.values()) ,#help
+            '',#default
+            '',#'appearance', clean_name
+            '',#'constraint', 
+            *list(empty.values()) ,#'constraint_message'
+            '0',#'relevance'
+            '',#'disabled'
+            '1',#'required'
+            *list(empty.values()) ,#'required message'
+            '',#'read only'
+            '',#'expression'
+            '',#'repeat_count'
+            ''#'image'  
+        ]
+        self.df_survey.loc[len(self.df_survey)] = [
+            'select_one wfh',
+            "wfh",
+            *list(label.values()) ,
+            *list(empty.values()) ,#hint
+            *list(empty.values()) ,#help
+            '',#default
+            '',#'appearance', clean_name
+            '',#'constraint', 
+            *list(empty.values()) ,#'constraint_message'
+            '0',#'relevance'
+            '',#'disabled'
+            '1',#'required'
+            *list(empty.values()) ,#'required message'
+            '',#'read only'
+            '',#'expression'
+            '',#'repeat_count'
+            ''#'image'  
+        ]
+    
+    def add_tab_breaks_choice(self):
+        label = langs.get_trads('hidden', force_dict =True)
+        empty = langs.get_trads('', force_dict =True)
+        self.df_survey.loc[len(self.df_survey)] = [
+            'select_one tab-label-4',
+            "tab_label_4",
+            *list(label.values()) ,
+            *list(empty.values()) ,#hint
+            *list(empty.values()) ,#help
+            '',#default
+            '',#'appearance', clean_name
+            '',#'constraint', 
+            *list(empty.values()) ,#'constraint_message'
+            '0',#'relevance'
+            '',#'disabled'
+            '1',#'required'
+            *list(empty.values()) ,#'required message'
+            '',#'read only'
+            '',#'expression'
+            '',#'repeat_count'
+            ''#'image'  
+        ]
+        new_rows = [
+            ['tab-label-4', 0, langs.get_trads('--'),'','','','',''],
+            ['tab-label-4', 1, langs.get_trads('--'),'','','','',''],
+            ['tab-label-4', 2, langs.get_trads('1/2'),'','','','',''],
+            ['tab-label-4', 3, langs.get_trads('1/2'),'','','','',''],
+            ['tab-label-4', 4, langs.get_trads('1'),'','','','',''],
+            ['tab-label-4', 5, langs.get_trads('1'),'','','','',''],
+            ['tab-label-4', 6, langs.get_trads('1 and 1/2'),'','','','',''],
+            ['tab-label-4', 7, langs.get_trads('1 and 1/2'),'','','','',''],
+            ['tab-label-4', 8, langs.get_trads('2'),'','','','',''],
+            ['tab-label-4', 9, langs.get_trads('2'),'','','','',''],
+            ['tab-label-4', 10, langs.get_trads('2 and 1/2'),'','','','',''],
+            ['tab-label-4', 11, langs.get_trads('2 and 1/2'),'','','','',''],
+            ['tab-label-4', 12, langs.get_trads('3'),'','','','',''],
+            ['tab-label-4', 13, langs.get_trads('3'),'','','','',''],
+            ['tab-label-4', 14, langs.get_trads('3 and 1/2'),'','','','',''],
+            ['tab-label-4', 15, langs.get_trads('3 and 1/2'),'','','','',''],
+            ['tab-label-4', 16, langs.get_trads('4'),'','','','',''],
+            ['tab-label-4', 17, langs.get_trads('4'),'','','','',''],
+            ['tab-label-4', 18, langs.get_trads('4 and 1/2'),'','','','',''],
+            ['tab-label-4', 19, langs.get_trads('4 and 1/2'),'','','','',''],
+            ['tab-label-4', 20, langs.get_trads('5'),'','','','',''],
+            ['tab-label-4', 21, langs.get_trads('5'),'','','','',''],
+            ['tab-label-4', 22, langs.get_trads('5 and 1/2'),'','','','',''],
+            ['tab-label-4', 23, langs.get_trads('5 and 1/2'),'','','','',''],
+            ['tab-label-4', 24, langs.get_trads('6'),'','','','',''],
+            ['tab-label-4', 25, langs.get_trads('6'),'','','','',''],
+            ['tab-label-4', 26, langs.get_trads('6 and 1/2'),'','','','',''],
+            ['tab-label-4', 27, langs.get_trads('6 and 1/2'),'','','','',''],
+            ['tab-label-4', 28, langs.get_trads('7'),'','','','',''],
+            ['tab-label-4', 29, langs.get_trads('7'),'','','','',''],
+            ['tab-label-4', 30, langs.get_trads('7 and 1/2'),'','','','',''],
+            ['tab-label-4', 31, langs.get_trads('7 and 1/2'),'','','','',''],
+            ['tab-label-4', 32, langs.get_trads('8'),'','','','',''],
+            ['tab-label-4', 33, langs.get_trads('8'),'','','','',''],
+            ['tab-label-4', 34, langs.get_trads('8 and 1/2'),'','','','',''],
+            ['tab-label-4', 35, langs.get_trads('8 and 1/2'),'','','','',''],
+            ['tab-label-4', 36, langs.get_trads('9'),'','','','',''],
+            ['tab-label-4', 37, langs.get_trads('9'),'','','','',''],
+            ['tab-label-4', 38, langs.get_trads('9 and 1/2'),'','','','',''],
+            ['tab-label-4', 39, langs.get_trads('9 and 1/2'),'','','','',''],
+            ['tab-label-4', 40, langs.get_trads('10'),'','','','','']
+        ]
+        for row in new_rows:
+            self.df_choice.loc[len(self.df_choice)] = row

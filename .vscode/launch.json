@@ -1,6 +1,7 @@
 {
   "version": "0.2.0",
   "configurations": [
+  {"name":"Python Debugger: Current File","type":"debugpy","request":"launch","program":"${file}","console":"integratedTerminal"},
     {
       "name": "Main",
       "type": "python",
@@ -27,63 +28,42 @@
       }
     },
     {
-      "name": "TEST",
-      "type": "python",
-      "request": "launch",
-      "program": "main.py",
-      "args": [
-        "-i",
-        "/home/delcpa/Documents/adult_v30.drawio",
-        "-l",
-        "d",
-        "-o",
-        "/home/delcpa/Development/cht-chad/forms/app",
-        "-t",
-        "-O",
-        "XLSFormCHTStrategy"
-      ],
-      "console": "integratedTerminal",
-      "justMyCode": true
-    },
-    {
-      "name": "Medal creator",
-      "type": "python",
-      "request": "launch",
-      "program": "main.py",
-      "args": [
-        "-i",
-        "/home/delcpa/Downloads/medlacreator.json",
-        "-l",
-        "w",
-        "-o",
-        "/home/delcpa/Downloads",
-        "-t",
-        "-I",
-        "MedalCStrategy",
-        "-O",
-        "XLSFormCDSSStrategy"
-      ],
-      "console": "integratedTerminal",
-      "justMyCode": true
-    },
-    {
       "name": "Demo",
       "type": "python",
       "request": "launch",
-      "program": "main.py",
+      "program": "tests/build.py",
       "args": [
         "-i",
-        "/home/delcpa/Documents/demo.drawio",
+        "./tests/data/demo.drawio",
         "-l",
-        "w",
+        "d",
         "-o",
-        "/home/delcpa/Downloads",
+        "./tests/output/demo",
         "-t",
         "-O",
         "XLSFormStrategy"
       ],
       "console": "integratedTerminal",
-      "justMyCode": true
+      "justMyCode": false
+    },
+    {
+      "name": "Libya",
+      "type": "python",
+      "request": "launch",
+      "program": "tests/build.py",
+      "args": [
+        "-i",
+        "./tests/data/libya",
+        "-l",
+        "d",
+        "-o",
+        "./tests/output/libya",
+        "-t",
+        "-O",
+        "XLSFormStrategy"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": false
     }
   ]
 }

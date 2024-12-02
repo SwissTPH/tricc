@@ -1,0 +1,195 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/24.7.17 Chrome/128.0.6613.36 Electron/32.0.1 Safari/537.36" version="24.7.17" pages="2">
+  <diagram name="Page-1" id="aJ8MWjX5gSV-QbW_ORv6">
+    <mxGraphModel dx="2074" dy="1239" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="850" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="ohl9Rrx2-dCzlsjSCRpC-5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="ohl9Rrx2-dCzlsjSCRpC-1" target="ohl9Rrx2-dCzlsjSCRpC-4" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object label="Demo Tricc" odk_type="start" form_id="demo_tricc" id="ohl9Rrx2-dCzlsjSCRpC-1">
+          <mxCell style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fontColor=default;" parent="1" vertex="1">
+            <mxGeometry x="61" y="50" width="80" height="80" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="ohl9Rrx2-dCzlsjSCRpC-2" value="yes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;fillColor=#F8CECC;" parent="1" source="ohl9Rrx2-dCzlsjSCRpC-4" target="ohl9Rrx2-dCzlsjSCRpC-24" edge="1">
+          <mxGeometry x="0.007" relative="1" as="geometry">
+            <mxPoint x="440" y="100" as="targetPoint" />
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ohl9Rrx2-dCzlsjSCRpC-3" value="no" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;fillColor=#F8CECC;" parent="1" source="ohl9Rrx2-dCzlsjSCRpC-4" target="ohl9Rrx2-dCzlsjSCRpC-7" edge="1">
+          <mxGeometry x="0.0092" relative="1" as="geometry">
+            <mxPoint x="300" y="200" as="targetPoint" />
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <UserObject label="Are you happy" name="ask_" odk_type="select_one yesno" id="ohl9Rrx2-dCzlsjSCRpC-4">
+          <mxCell style="html=1;whiteSpace=wrap;fillColor=none;rounded=0;strokeColor=default;align=left;" parent="1" vertex="1">
+            <mxGeometry x="230" y="70" width="120" height="40" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="ohl9Rrx2-dCzlsjSCRpC-29" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" parent="1" source="ohl9Rrx2-dCzlsjSCRpC-8" target="ohl9Rrx2-dCzlsjSCRpC-59" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="650" y="330" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="440" y="250" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <UserObject label="Why ?" name="select_why" odk_type="select_multiple" filter="" id="ohl9Rrx2-dCzlsjSCRpC-7">
+          <mxCell style="swimlane;fontStyle=0;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;fontColor=#000000;rounded=0;fillColor=none;align=left;strokeColor=#F19C99;" parent="1" vertex="1">
+            <mxGeometry x="158" y="210" width="282" height="180" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="Bad presentation" name="opt_1" odk_type="select_option" id="ohl9Rrx2-dCzlsjSCRpC-8">
+          <mxCell style="text;strokeColor=default;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;fontColor=#000000;rounded=0;dashed=1;" parent="ohl9Rrx2-dCzlsjSCRpC-7" vertex="1">
+            <mxGeometry y="30" width="282" height="30" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="Hungry" name="opt_2" odk_type="select_option" id="ohl9Rrx2-dCzlsjSCRpC-9">
+          <mxCell style="text;strokeColor=default;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;fontColor=#000000;rounded=0;dashed=1;" parent="ohl9Rrx2-dCzlsjSCRpC-7" vertex="1">
+            <mxGeometry y="60" width="282" height="30" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="Bored" name="opt_3" odk_type="select_option" id="ohl9Rrx2-dCzlsjSCRpC-10">
+          <mxCell style="text;strokeColor=default;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;fontColor=#000000;rounded=0;dashed=1;" parent="ohl9Rrx2-dCzlsjSCRpC-7" vertex="1">
+            <mxGeometry y="90" width="282" height="30" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="Angy" name="opt_4" odk_type="select_option" id="ohl9Rrx2-dCzlsjSCRpC-11">
+          <mxCell style="text;strokeColor=default;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;dashed=1;" parent="ohl9Rrx2-dCzlsjSCRpC-7" vertex="1">
+            <mxGeometry y="120" width="282" height="30" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="None of the above" name="opt_none" odk_type="select_option" id="ohl9Rrx2-dCzlsjSCRpC-14">
+          <mxCell style="text;strokeColor=default;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;dashed=1;" parent="ohl9Rrx2-dCzlsjSCRpC-7" vertex="1">
+            <mxGeometry y="150" width="282" height="30" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <object label="Fin Activité" name="next_" odk_type="activity_end" id="ohl9Rrx2-dCzlsjSCRpC-22">
+          <mxCell style="points=[[0.145,0.145,0],[0.5,0,0],[0.855,0.145,0],[1,0.5,0],[0.855,0.855,0],[0.5,1,0],[0.145,0.855,0],[0,0.5,0]];shape=mxgraph.bpmn.event;html=1;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;align=center;perimeter=ellipsePerimeter;outlineConnect=0;aspect=fixed;outline=end;symbol=terminate2;strokeColor=default;" parent="1" vertex="1">
+            <mxGeometry x="630" y="63.5" width="50" height="50" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="ohl9Rrx2-dCzlsjSCRpC-30" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="ohl9Rrx2-dCzlsjSCRpC-24" target="ohl9Rrx2-dCzlsjSCRpC-22" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object label="&lt;font style=&quot;font-size: 12px&quot;&gt;We are happy for you&lt;/font&gt;" odk_type="note" name="label_" id="ohl9Rrx2-dCzlsjSCRpC-24">
+          <mxCell style="rounded=0;whiteSpace=wrap;html=1;align=left;fillColor=none;fontSize=12;strokeColor=default;" parent="1" vertex="1">
+            <mxGeometry x="420" y="70" width="145" height="37" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="ohl9Rrx2-dCzlsjSCRpC-32" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="ohl9Rrx2-dCzlsjSCRpC-59" target="OpVMdwVIotnL9WYsCLml-1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="655" y="330" as="sourcePoint" />
+            <mxPoint x="800" y="250" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <object label="Other page" odk_type="goto" name="lko_ds_c" link="data:page/id,4d3QH9IUq_qOAPruCqUX" id="ohl9Rrx2-dCzlsjSCRpC-59">
+          <mxCell style="shape=offPageConnector;whiteSpace=wrap;html=1;rounded=0;fontSize=12;strokeColor=default;fillColor=none;fontColor=default;" parent="1" vertex="1">
+            <mxGeometry x="650" y="230" width="50" height="50" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="&lt;font style=&quot;font-size: 12px&quot;&gt;Sorry for the bad presentiation&lt;/font&gt;" odk_type="note" name="label_" id="OpVMdwVIotnL9WYsCLml-1">
+          <mxCell style="rounded=0;whiteSpace=wrap;html=1;align=left;fillColor=none;fontSize=12;strokeColor=default;" parent="1" vertex="1">
+            <mxGeometry x="810" y="230" width="145" height="37" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="SswGKVnOzA38xykHgvfB-4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="SswGKVnOzA38xykHgvfB-1" target="SswGKVnOzA38xykHgvfB-3" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object label="Other page" odk_type="goto" name="lko_ds_c" link="data:page/id,4d3QH9IUq_qOAPruCqUX" id="SswGKVnOzA38xykHgvfB-1">
+          <mxCell style="shape=offPageConnector;whiteSpace=wrap;html=1;rounded=0;fontSize=12;strokeColor=default;fillColor=none;fontColor=default;" parent="1" vertex="1">
+            <mxGeometry x="650" y="300" width="50" height="50" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="SswGKVnOzA38xykHgvfB-2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="ohl9Rrx2-dCzlsjSCRpC-9" target="SswGKVnOzA38xykHgvfB-1" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object label="&lt;font style=&quot;font-size: 12px&quot;&gt;Now eat !&amp;nbsp;&lt;/font&gt;" odk_type="note" name="label_" id="SswGKVnOzA38xykHgvfB-3">
+          <mxCell style="rounded=0;whiteSpace=wrap;html=1;align=left;fillColor=none;fontSize=12;strokeColor=default;" parent="1" vertex="1">
+            <mxGeometry x="810" y="300" width="145" height="37" as="geometry" />
+          </mxCell>
+        </object>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="4d3QH9IUq_qOAPruCqUX" name="Page-2">
+    <mxGraphModel dx="2074" dy="1239" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="850" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <object label="Fin Activité" name="next_" odk_type="activity_end" id="7xMmi0a_TE2HJhYVjW24-1">
+          <mxCell style="points=[[0.145,0.145,0],[0.5,0,0],[0.855,0.145,0],[1,0.5,0],[0.855,0.855,0],[0.5,1,0],[0.145,0.855,0],[0,0.5,0]];shape=mxgraph.bpmn.event;html=1;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;align=center;perimeter=ellipsePerimeter;outlineConnect=0;aspect=fixed;outline=end;symbol=terminate2;strokeColor=default;" parent="1" vertex="1">
+            <mxGeometry x="760" y="114" width="50" height="50" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="r4Js015B8uJdMtSu4jlG-2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="7xMmi0a_TE2HJhYVjW24-2" target="r4Js015B8uJdMtSu4jlG-1" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object label="&lt;span style=&quot;color: rgb(0 , 0 , 0) ; font-family: &amp;#34;helvetica&amp;#34; ; font-size: 12px ; font-style: normal ; font-weight: 400 ; letter-spacing: normal ; text-align: center ; text-indent: 0px ; text-transform: none ; word-spacing: 0px ; background-color: rgb(255 , 255 , 255) ; display: inline ; float: none&quot;&gt;Depart activité&lt;/span&gt;" name="lki_fever" odk_type="activity_start" id="7xMmi0a_TE2HJhYVjW24-2">
+          <mxCell style="points=[[0.145,0.145,0],[0.5,0,0],[0.855,0.145,0],[1,0.5,0],[0.855,0.855,0],[0.5,1,0],[0.145,0.855,0],[0,0.5,0]];shape=mxgraph.bpmn.event;html=1;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;align=center;perimeter=ellipsePerimeter;outlineConnect=0;aspect=fixed;outline=throwing;symbol=general;" parent="1" vertex="1">
+            <mxGeometry x="40" y="110" width="60" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="r4Js015B8uJdMtSu4jlG-5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="r4Js015B8uJdMtSu4jlG-1" target="mMOQrxQqf7DwH8kXFMJP-1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="403" y="250" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <object label="&lt;font style=&quot;font-size: 12px&quot;&gt;We will discuss how we could make it better&lt;/font&gt;" odk_type="note" name="label_" id="r4Js015B8uJdMtSu4jlG-1">
+          <mxCell style="rounded=0;whiteSpace=wrap;html=1;align=left;fillColor=none;fontSize=12;strokeColor=default;" parent="1" vertex="1">
+            <mxGeometry x="180" y="122" width="145" height="37" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="r4Js015B8uJdMtSu4jlG-3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#F19C99;fillColor=#F8CECC;" parent="1" source="r4Js015B8uJdMtSu4jlG-4" target="7xMmi0a_TE2HJhYVjW24-1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="620" y="139" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <UserObject label="Please tell us Why" name="label_" odk_type="text" id="r4Js015B8uJdMtSu4jlG-4">
+          <mxCell style="html=1;whiteSpace=wrap;fillColor=none;align=left;strokeColor=#F19C99;" parent="1" vertex="1">
+            <mxGeometry x="560" y="122" width="120" height="40" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="6xoD8eKaRb6k0O6PRZWF-16" value="Yes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;fillColor=#F8CECC;" parent="1" source="6xoD8eKaRb6k0O6PRZWF-18" target="r4Js015B8uJdMtSu4jlG-4" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="550" y="300" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="6xoD8eKaRb6k0O6PRZWF-17" value="No" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;fillColor=#F8CECC;" parent="1" source="6xoD8eKaRb6k0O6PRZWF-18" target="6xoD8eKaRb6k0O6PRZWF-21" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="410" y="400" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <UserObject label="Do you agree to discuss ?&amp;nbsp;" name="ask_" odk_type="select_one yesno" id="6xoD8eKaRb6k0O6PRZWF-18">
+          <mxCell style="html=1;whiteSpace=wrap;fillColor=none;rounded=0;strokeColor=default;align=left;" parent="1" vertex="1">
+            <mxGeometry x="373" y="200" width="120" height="40" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <object label="&lt;font style=&quot;font-size: 12px&quot;&gt;Sorry to hear that, but without your feedback we cannot improve ...&amp;nbsp;&lt;br&gt;&lt;/font&gt;" odk_type="note" name="label_" id="6xoD8eKaRb6k0O6PRZWF-21">
+          <mxCell style="rounded=0;whiteSpace=wrap;html=1;align=left;fillColor=none;fontSize=12;strokeColor=default;" parent="1" vertex="1">
+            <mxGeometry x="348" y="420" width="145" height="37" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="B_ZlT-ww64VhCHJImcwK-1" value="no" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="mMOQrxQqf7DwH8kXFMJP-1" target="6xoD8eKaRb6k0O6PRZWF-18">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="B_ZlT-ww64VhCHJImcwK-3" value="yes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="mMOQrxQqf7DwH8kXFMJP-1" target="B_ZlT-ww64VhCHJImcwK-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object label="[&lt;span style=&quot;text-align: left; text-wrap: nowrap;&quot;&gt;Hungry&lt;/span&gt;]" reference="select_why" name="r_" odk_type="rhombus" id="mMOQrxQqf7DwH8kXFMJP-1">
+          <mxCell style="rhombus;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+            <mxGeometry x="390" y="70" width="80" height="80" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="&lt;font style=&quot;font-size: 12px&quot;&gt;Next time we could present with a snack&lt;br&gt;&lt;/font&gt;" odk_type="note" name="label_" id="B_ZlT-ww64VhCHJImcwK-2">
+          <mxCell style="rounded=0;whiteSpace=wrap;html=1;align=left;fillColor=none;fontSize=12;strokeColor=default;" vertex="1" parent="1">
+            <mxGeometry x="547.5" y="33" width="145" height="37" as="geometry" />
+          </mxCell>
+        </object>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
