@@ -19,7 +19,9 @@ runs:
         python-version: '3.10'
     
     - name: Install tricc-oo
-      run: pip install tricc-oo
+      run: |
+        pip install -r requirements.txt 
+        pip install tricc-oo
       shell: bash
 
     - name: Run TRICC
