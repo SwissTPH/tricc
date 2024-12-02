@@ -1,0 +1,59 @@
+name: 'TRICC Action'
+description: 'Run TRICC operations'
+inputs:
+  input_path:
+    description: 'Input path for TRICC'
+    required: true
+  output_strategy:
+    description: 'Output strategy for TRICC'
+    required: true
+  input_strategy:
+    description: 'Input strategy for TRICC'
+    required: true
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Install tricc-oo
+      run: pip install tricc-oo
+      shell: bash
+
+    - name: Run TRICC
+      run: |
+        python -c "
+        from tricc_oo.strategies.input.drawio import DrawioStrategy
+        from tricc_oo.strategies.output.xls_form import XLSFormStrategy
+        from tricc_oo.models.lang import SingletonLangClass
+        import os
+
+        langs = SingletonLangClass()
+        input_strategy = DrawioStrategy('${{ inputs.input_path }}')
+        output_strategy = XLSFormStrategy('${{ inputs.output_strategy }}')
+
+        file_content = []
+        files = []
+        if os.path.isdir(in_filepath):
+            files = [
+                os.path.join(in_filepath, f) 
+                for f in os.listdir(in_filepath) 
+                if f.endswith(".drawio")
+            ]
+        elif os.path.isfile(in_filepath) and in_filepath.endswith(".drawio"):
+            files = [in_filepath]
+            
+        for f in files:
+            with open(f, 'r') as s:
+                file_content.append(s.read())
+        if not file_content:
+            print(f"{in_filepath} is neither a drawio file nor a directory containing drawio files")
+            exit(-1)
+
+        media_path = os.path.join('${{ inputs.output_strategy }}', 'media-tmp')
+        start_page, pages, images = input_strategy.execute(file_content, media_path)
+        output = output_strategy.execute(start_page, pages=pages)
+        "
+      shell: bash
