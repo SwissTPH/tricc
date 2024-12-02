@@ -28,6 +28,7 @@ runs:
 
     - name: Run TRICC
       run: |
+        mkdir -p ./${{ inputs.output_path }}
         python -c "
         from tricc_oo.strategies.input.drawio import DrawioStrategy
         from tricc_oo.strategies.output.xls_form import XLSFormStrategy
