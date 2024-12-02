@@ -30,6 +30,17 @@ runs:
         from tricc_oo.strategies.output.xls_form import XLSFormStrategy
         from tricc_oo.models.lang import SingletonLangClass
         import os
+        import logging
+        logging.basicConfig(
+          level=logging.INFO,
+          format='%(asctime)s - %(levelname)s - %(message)s',
+          handlers=[
+              logging.StreamHandler(),
+              logging.FileHandler('${{ github.workspace }}/logs/tricc.log')
+            ]
+        )
+        
+        logger = logging.getLogger('default')
 
         langs = SingletonLangClass()
         in_filepath = '${{ inputs.input_path }}'
@@ -52,7 +63,7 @@ runs:
             print(f'{in_filepath} is neither a drawio file nor a directory containing drawio files')
             exit(-1)
         input_strategy = DrawioStrategy(file_content)
-        output_strategy = XLSFormStrategy('./')
+        output_strategy = XLSFormStrategy('./output')
         media_path = os.path.join('${{ inputs.output_strategy }}', 'media-tmp')
         start_page, pages, images = input_strategy.execute(file_content, media_path)
         output = output_strategy.execute(start_page, pages=pages)
