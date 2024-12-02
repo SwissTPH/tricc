@@ -4,6 +4,9 @@ inputs:
   input_path:
     description: 'Input path for TRICC'
     required: true
+  output_path:
+    description: 'output path for TRICC'
+    required: true
   output_strategy:
     description: 'Output strategy for TRICC'
     required: true
@@ -62,7 +65,7 @@ runs:
             print(f'{in_filepath} is neither a drawio file nor a directory containing drawio files')
             exit(-1)
         input_strategy = DrawioStrategy(file_content)
-        output_strategy = XLSFormStrategy('./output')
+        output_strategy = XLSFormStrategy('./${{ inputs.output_path }}')
         media_path = os.path.join('${{ inputs.output_strategy }}', 'media-tmp')
         start_page, pages, images = input_strategy.execute(file_content, media_path)
         output = output_strategy.execute(start_page, pages=pages)
