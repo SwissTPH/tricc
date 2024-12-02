@@ -65,3 +65,5 @@ class XLSFormCDSSStrategy(XLSFormStrategy):
     def tricc_operation_age_year(self, ref_expressions):
         dob_node_name=  ref_expressions[0].value if not ref_expressions else 'birthday'
         return f'int((today()-date(${{{dob_node_name}}})) div 365.25)'
+    
+    

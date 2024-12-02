@@ -112,11 +112,13 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
                 add_calculate(calculates,node)  
                 # merge is there is unused version ->
                 # current node not yet in the list so 1 item is enough
+                node_to_delete = None
                 if last_calc is not None:
-                    if last_used_calc is None or last_calc.path_len > last_used_calc.path_len:
+                    if last_used_calc is None:
                         node.version = last_calc.version + 1
-                        node_to_delete = merge_calculate(node, calculates[node.name],last_used_calc)
-                        if node_to_delete is not None:  
+                        # node_to_delete = merge_calculate(node, calculates[node.name],last_used_calc)
+                        # TODO reactivate merges
+                        if None:# node_to_delete is not None:  
                             for d_node in node_to_delete:
                                 if d_node in processed_nodes:
                                     processed_nodes.remove(d_node)
@@ -136,7 +138,7 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
                                     logger.error("node {} not porcessed but deleted".format(d_node.get_name()))
                                 ## need to update all nodes calc 
                     # chaining the calculate, this is needed each time there is a last used version       
-                    if last_used_calc is not None :
+                    elif not node_to_delete:
                         logger.debug("set last to false for node {}  and add its link it to next one".format(last_used_calc.get_name()))
                         set_prev_next_node(last_used_calc,node)
                         last_used_calc.last = False
