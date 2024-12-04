@@ -615,7 +615,7 @@ def set_mandatory_attribute(elm, mandatory_attributes, groupname=None):
                         attributes, display_name, groupname if groupname is not None else ""
                     )
                 )
-            exit()
+            exit(-1)
         if attributes == "link":
             param[attributes] = clean_link(attribute_value)
         elif attributes in ("parent", "id", "source", "target"):
@@ -824,7 +824,7 @@ def process_yesno_edge(edge, nodes):
         logger.error(
             "yesNo {} node with labelless edges".format(nodes[edge.source].get_name())
         )
-        exit()
+        exit(-1)
     label = edge.value.strip().lower()
     yes_option = None
     no_option = None

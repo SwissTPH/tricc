@@ -65,7 +65,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             form_id= str(start_pages[self.processes[0]].root.form_id )
         else:
             logger.error("form id required in the first start node")
-            exit()
+            exit(-1)
         title = start_pages[self.processes[0]].root.label
         file_name = form_id + ".xlsx"
         # make a 'settings' tab

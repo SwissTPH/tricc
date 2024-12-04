@@ -79,7 +79,7 @@ class TriccRhombusMixIn():
                     reference.append(ref)
                 else:
                     logger.error("unexpected reference in node node {}".format(ref, self.get_name()))
-                    exit()
+                    exit(-1)
         instance.reference = reference
         instance.name = get_rand_name(8)
         return instance
@@ -115,14 +115,14 @@ def get_node_from_id(activity, node, edge_only):
     node_id = getattr(node,'id',node)
     if not isinstance(node_id, str):
         logger.error("can set prev_next only with string or node")
-        exit()
+        exit(-1)
     if issubclass(node.__class__, TriccBaseModel):
         return node_id, node
     elif node_id in activity.nodes:
         node = activity.nodes[node_id]
     elif not edge_only:
         logger.error(f"cannot find {node_id} in  {activiy.get_name()}")
-        exit()
+        exit(-1)
     return node_id, node
 
 class TriccNodeWait(TriccNodeFakeCalculateBase, TriccRhombusMixIn):

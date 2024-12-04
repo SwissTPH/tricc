@@ -78,7 +78,7 @@ class DrawioStrategy(BaseInputStrategy):
         #     files = [in_filepath]
         # else:
         #     logger.error(f"no input file found at {in_filepath}")
-        #     exit()
+        #     exit(-1)
         # for file in files:
         for f in file_content:
             diagrams += read_drawio(f)

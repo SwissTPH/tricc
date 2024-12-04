@@ -91,8 +91,6 @@ class XLSFormStrategy(BaseOutPutStrategy):
         }
 
     def generate_export(self, node, **kwargs):
-        self.add_tab_breaks_choice()
-        self.add_wfx_choice()
         return generate_xls_form_export(self, node, **kwargs)
 
 
@@ -101,7 +99,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
             form_id = str(start_pages["main"].root.form_id)
         else:
             logger.error("form id required in the first start node")
-            exit()
+            exit(-1)
         title = start_pages["main"].root.label
         file_name = form_id + ".xlsx"
         # make a 'settings' tab
@@ -206,6 +204,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
                     **self.get_kwargs()
                 )
                 # arrange empty group
+                
                 walktrhough_tricc_node_processed_stached(
                     s_node,
                     self.generate_export,
@@ -253,7 +252,8 @@ class XLSFormStrategy(BaseOutPutStrategy):
                     cur_group = s_node.group
 
         # add the calulate
-
+        self.add_tab_breaks_choice()
+        self.add_wfx_choice()
         self.df_calculate = self.df_calculate.dropna(axis=0, subset=["calculation"])
         df_empty_calc = self.df_calculate[self.df_calculate["calculation"] == ""]
         self.df_calculate = self.df_calculate.drop(df_empty_calc.index)
