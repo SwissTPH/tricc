@@ -200,7 +200,7 @@ def process_edges(diagram, media_path, activity, nodes):
             activity.nodes[fake_end.id] = fake_end
         else:
             logger.error(f"cannot guess end for {activity.get_name()}")
-            exit(-1)
+            exit(1)
     
     return images
 
@@ -615,7 +615,7 @@ def set_mandatory_attribute(elm, mandatory_attributes, groupname=None):
                         attributes, display_name, groupname if groupname is not None else ""
                     )
                 )
-            exit(-1)
+            exit(1)
         if attributes == "link":
             param[attributes] = clean_link(attribute_value)
         elif attributes in ("parent", "id", "source", "target"):
@@ -824,7 +824,7 @@ def process_yesno_edge(edge, nodes):
         logger.error(
             "yesNo {} node with labelless edges".format(nodes[edge.source].get_name())
         )
-        exit(-1)
+        exit(1)
     label = edge.value.strip().lower()
     yes_option = None
     no_option = None

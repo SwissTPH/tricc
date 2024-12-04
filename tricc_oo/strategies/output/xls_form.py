@@ -99,7 +99,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
             form_id = str(start_pages["main"].root.form_id)
         else:
             logger.error("form id required in the first start node")
-            exit(-1)
+            exit(1)
         title = start_pages["main"].root.label
         file_name = form_id + ".xlsx"
         # make a 'settings' tab
@@ -252,8 +252,6 @@ class XLSFormStrategy(BaseOutPutStrategy):
                     cur_group = s_node.group
 
         # add the calulate
-        self.add_tab_breaks_choice()
-        self.add_wfx_choice()
         self.df_calculate = self.df_calculate.dropna(axis=0, subset=["calculation"])
         df_empty_calc = self.df_calculate[self.df_calculate["calculation"] == ""]
         self.df_calculate = self.df_calculate.drop(df_empty_calc.index)
@@ -636,140 +634,3 @@ class XLSFormStrategy(BaseOutPutStrategy):
         else:
             raise NotImplementedError(f"This type of node {r.__class__} is not supported within an operation")
         
-    def add_wfx_choice(self):
-        new_rows = [
-            ['wfl', 'y45_0', 'f', 0, 110, -0.3833, 0.09029, 2.4607],
-            ['wfa', 'y45_1', 'f', 0, 18500, -0.3833, 0.0903, 2.4777],
-            ['wfh', 'y45_2', 'f', 0, 125, -0.3833, 0.0903, 2.4947],
-        ]
-        
-        for row in new_rows:
-            self.df_choice.loc[len(self.df_choice)] = row
-            
-        label = langs.get_trads('hidden', force_dict =True)
-        empty = langs.get_trads('', force_dict =True)
-        self.df_survey.loc[len(self.df_survey)] = [
-            'select_one wfl',
-            "wfl",
-            *list(label.values()) ,
-            *list(empty.values()) ,#hint
-            *list(empty.values()) ,#help
-            '',#default
-            '',#'appearance', clean_name
-            '',#'constraint', 
-            *list(empty.values()) ,#'constraint_message'
-            '0',#'relevance'
-            '',#'disabled'
-            '1',#'required'
-            *list(empty.values()) ,#'required message'
-            '',#'read only'
-            '',#'expression'
-            '',#'repeat_count'
-            ''#'image'  
-        ]
-        self.df_survey.loc[len(self.df_survey)] = [
-            'select_one wfa',
-            "wfa",
-            *list(label.values()) ,
-            *list(empty.values()) ,#hint
-            *list(empty.values()) ,#help
-            '',#default
-            '',#'appearance', clean_name
-            '',#'constraint', 
-            *list(empty.values()) ,#'constraint_message'
-            '0',#'relevance'
-            '',#'disabled'
-            '1',#'required'
-            *list(empty.values()) ,#'required message'
-            '',#'read only'
-            '',#'expression'
-            '',#'repeat_count'
-            ''#'image'  
-        ]
-        self.df_survey.loc[len(self.df_survey)] = [
-            'select_one wfh',
-            "wfh",
-            *list(label.values()) ,
-            *list(empty.values()) ,#hint
-            *list(empty.values()) ,#help
-            '',#default
-            '',#'appearance', clean_name
-            '',#'constraint', 
-            *list(empty.values()) ,#'constraint_message'
-            '0',#'relevance'
-            '',#'disabled'
-            '1',#'required'
-            *list(empty.values()) ,#'required message'
-            '',#'read only'
-            '',#'expression'
-            '',#'repeat_count'
-            ''#'image'  
-        ]
-    
-    def add_tab_breaks_choice(self):
-        label = langs.get_trads('hidden', force_dict =True)
-        empty = langs.get_trads('', force_dict =True)
-        self.df_survey.loc[len(self.df_survey)] = [
-            'select_one tab-label-4',
-            "tab_label_4",
-            *list(label.values()) ,
-            *list(empty.values()) ,#hint
-            *list(empty.values()) ,#help
-            '',#default
-            '',#'appearance', clean_name
-            '',#'constraint', 
-            *list(empty.values()) ,#'constraint_message'
-            '0',#'relevance'
-            '',#'disabled'
-            '1',#'required'
-            *list(empty.values()) ,#'required message'
-            '',#'read only'
-            '',#'expression'
-            '',#'repeat_count'
-            ''#'image'  
-        ]
-        new_rows = [
-            ['tab-label-4', 0, langs.get_trads('--'),'','','','',''],
-            ['tab-label-4', 1, langs.get_trads('--'),'','','','',''],
-            ['tab-label-4', 2, langs.get_trads('1/2'),'','','','',''],
-            ['tab-label-4', 3, langs.get_trads('1/2'),'','','','',''],
-            ['tab-label-4', 4, langs.get_trads('1'),'','','','',''],
-            ['tab-label-4', 5, langs.get_trads('1'),'','','','',''],
-            ['tab-label-4', 6, langs.get_trads('1 and 1/2'),'','','','',''],
-            ['tab-label-4', 7, langs.get_trads('1 and 1/2'),'','','','',''],
-            ['tab-label-4', 8, langs.get_trads('2'),'','','','',''],
-            ['tab-label-4', 9, langs.get_trads('2'),'','','','',''],
-            ['tab-label-4', 10, langs.get_trads('2 and 1/2'),'','','','',''],
-            ['tab-label-4', 11, langs.get_trads('2 and 1/2'),'','','','',''],
-            ['tab-label-4', 12, langs.get_trads('3'),'','','','',''],
-            ['tab-label-4', 13, langs.get_trads('3'),'','','','',''],
-            ['tab-label-4', 14, langs.get_trads('3 and 1/2'),'','','','',''],
-            ['tab-label-4', 15, langs.get_trads('3 and 1/2'),'','','','',''],
-            ['tab-label-4', 16, langs.get_trads('4'),'','','','',''],
-            ['tab-label-4', 17, langs.get_trads('4'),'','','','',''],
-            ['tab-label-4', 18, langs.get_trads('4 and 1/2'),'','','','',''],
-            ['tab-label-4', 19, langs.get_trads('4 and 1/2'),'','','','',''],
-            ['tab-label-4', 20, langs.get_trads('5'),'','','','',''],
-            ['tab-label-4', 21, langs.get_trads('5'),'','','','',''],
-            ['tab-label-4', 22, langs.get_trads('5 and 1/2'),'','','','',''],
-            ['tab-label-4', 23, langs.get_trads('5 and 1/2'),'','','','',''],
-            ['tab-label-4', 24, langs.get_trads('6'),'','','','',''],
-            ['tab-label-4', 25, langs.get_trads('6'),'','','','',''],
-            ['tab-label-4', 26, langs.get_trads('6 and 1/2'),'','','','',''],
-            ['tab-label-4', 27, langs.get_trads('6 and 1/2'),'','','','',''],
-            ['tab-label-4', 28, langs.get_trads('7'),'','','','',''],
-            ['tab-label-4', 29, langs.get_trads('7'),'','','','',''],
-            ['tab-label-4', 30, langs.get_trads('7 and 1/2'),'','','','',''],
-            ['tab-label-4', 31, langs.get_trads('7 and 1/2'),'','','','',''],
-            ['tab-label-4', 32, langs.get_trads('8'),'','','','',''],
-            ['tab-label-4', 33, langs.get_trads('8'),'','','','',''],
-            ['tab-label-4', 34, langs.get_trads('8 and 1/2'),'','','','',''],
-            ['tab-label-4', 35, langs.get_trads('8 and 1/2'),'','','','',''],
-            ['tab-label-4', 36, langs.get_trads('9'),'','','','',''],
-            ['tab-label-4', 37, langs.get_trads('9'),'','','','',''],
-            ['tab-label-4', 38, langs.get_trads('9 and 1/2'),'','','','',''],
-            ['tab-label-4', 39, langs.get_trads('9 and 1/2'),'','','','',''],
-            ['tab-label-4', 40, langs.get_trads('10'),'','','','','']
-        ]
-        for row in new_rows:
-            self.df_choice.loc[len(self.df_choice)] = row

@@ -10,6 +10,7 @@ from tricc_oo.serializers.xls_form import SURVEY_MAP
 from tricc_oo.strategies.output.xlsform_cdss import XLSFormCDSSStrategy
 
 langs = SingletonLangClass()
+logger = logging.getLogger("default")
 
 class XLSFormCHTStrategy(XLSFormCDSSStrategy):
     def process_export(self, start_pages,  **kwargs):
@@ -18,7 +19,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
         cht_header = pd.DataFrame(columns=SURVEY_MAP.keys())
         
         
-        self.df_survey = pd.concat([self.get_cht_input(),self.df_survey[~self.df_survey['name'].isin(['select_sex','id.age_day','p_age_month','p_age_year','p_name','dob'])],self.get_cht_summary() ], ignore_index=True)
+        self.df_survey = pd.concat([self.get_cht_input(),self.df_survey[~self.df_survey['name'].isin(['p_sex', 'p_age', 'p_age_days','p_age_month','p_age_year','p_name','p_dob'])],self.get_cht_summary() ], ignore_index=True)
  
     def get_cht_input(self):
         df_input = pd.DataFrame(columns=SURVEY_MAP.keys())
@@ -39,11 +40,11 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
         df_input.loc[len(df_input)] = [  'calculate', 'patient_uuid' ,*list(langs.get_trads('label', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', '',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()), '',  '../inputs/contact/patient_id', '', '' ]
         df_input.loc[len(df_input)] = [  'calculate', 'p_name' ,*list(langs.get_trads('label', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', '',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()), '', '../inputs/contact/patient_name', '', '' ]
 
-        df_input.loc[len(df_input)] = [  'calculate', 'id.age_day' ,*list(langs.get_trads('label', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', '',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()), '', 'int((today()-date(${date_of_birth})))', '', '' ]
-        df_input.loc[len(df_input)] = [  'calculate', 'p_age_month' ,*list(langs.get_trads('label', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', '',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()), '', 'int(${id.age_day} div 30.4)', '', '' ]
-        df_input.loc[len(df_input)] = [  'calculate', 'p_age_year' ,*list(langs.get_trads('label', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', '',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()), '', 'int(${p_age_month} div 12)', '', '' ]
-        df_input.loc[len(df_input)] = [  'calculate', 'select_sex' ,*list(langs.get_trads('label', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', '',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()), '', '../inputs/contact/sex', '', '' ]
-        df_input.loc[len(df_input)] = [  'calculate', 'dob',*list(langs.get_trads('Date of birth', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', '',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()), '', 'date(../inputs/contact/date_of_birth)',  '','' ]
+        df_input.loc[len(df_input)] = [  'calculate', 'p_age_days' ,*list(langs.get_trads('label', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', '',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()), '', 'int((today()-date(${date_of_birth})))', '', '' ]
+        df_input.loc[len(df_input)] = [  'calculate', 'p_age_months' ,*list(langs.get_trads('label', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', '',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()), '', 'int(${id.age_day} div 30.4)', '', '' ]
+        df_input.loc[len(df_input)] = [  'calculate', 'p_age_years' ,*list(langs.get_trads('label', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', '',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()), '', 'int(${p_age_month} div 12)', '', '' ]
+        df_input.loc[len(df_input)] = [  'calculate', 'p_sex' ,*list(langs.get_trads('label', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', '',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()), '', '../inputs/contact/sex', '', '' ]
+        df_input.loc[len(df_input)] = [  'calculate', 'p_dob',*list(langs.get_trads('Date of birth', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', '',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()), '', 'date(../inputs/contact/date_of_birth)',  '','' ]
 
         
         return df_input
@@ -65,7 +66,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             form_id= str(start_pages[self.processes[0]].root.form_id )
         else:
             logger.error("form id required in the first start node")
-            exit(-1)
+            exit(1)
         title = start_pages[self.processes[0]].root.label
         file_name = form_id + ".xlsx"
         # make a 'settings' tab

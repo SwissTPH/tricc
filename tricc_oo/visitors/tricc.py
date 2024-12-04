@@ -382,7 +382,7 @@ def process_reference(node, processed_nodes, calculates, used_calculates=None,  
                 
             if reference is None and expression_reference is None:
                 logger.error(f"process_calculate_version_requirement:reference is None for {node.get_name()}")
-                exit(-1)
+                exit(1)
         else:
             expression_reference = node.expression or node.expression_reference
             ref_list = [r.value for r in node.reference if isinstance(r, TriccReference)]
@@ -635,7 +635,7 @@ def walkthrough_tricc_next_nodes(node, callback, processed_nodes, stashed_nodes,
             else:
                 logger.error(
                     "{}::end node of {} has a next node".format(callback.__name__, node.activity.get_name()))
-                exit(-1)
+                exit(1)
 
 
 def walkthrough_tricc_option(node, callback, processed_nodes, stashed_nodes, path_len, recursive, warn = False,node_path = [], **kwargs):
@@ -773,7 +773,7 @@ def print_trace(node, prev_node, processed_nodes, stashed_nodes, history = []):
         elif node in history:
             logger.error("print trace :: CYCLE node {} found in history ({})".format(
                 get_data_for_log(prev_node), ">".join(history)))
-            exit(-1)
+            exit(1)
         elif node in stashed_nodes:
             #            logger.debug("print trace :: node {}::{} in stashed".format(node.__class__,node.get_name()))
             return False
@@ -852,7 +852,7 @@ def check_stashed_loop(stashed_nodes, prev_stashed_nodes, processed_nodes, len_p
                                                                     es_node.get_name(), es_node.instance))
                         #reverse_walkthrough(es_node, es_node, print_trace, processed_nodes, stashed_nodes)
                     if len(stashed_nodes) == len(prev_stashed_nodes):
-                        exit(-1)
+                        exit(1)
             else:
                 loop_count = 0
     else:
@@ -1195,7 +1195,7 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
             return negate_term(expression)
         else:
             logger.error("exclusive can not negate None from {}".format(node.get_name()))
-            # exit(-1)
+            # exit(1)
     else:
         return expression
     
@@ -1388,7 +1388,7 @@ def get_rhombus_terms( node, processed_nodes, is_calculate=False, negate=False):
             else:
                 logger.error('reference {0} was not found in the previous nodes of node {1}'.format(node.reference,
                                                                                                     node.get_name()))
-                exit(-1)
+                exit(1)
         elif node.expression_reference is not None and node.expression_reference != '':
             if isinstance(node.expression_reference, TriccOperation):
                 return node.expression_reference
@@ -1398,7 +1398,7 @@ def get_rhombus_terms( node, processed_nodes, is_calculate=False, negate=False):
             logger.warning("missing expression for node {}".format(node.get_name()))
     else:
         logger.error('reference {0} is not a list {1}'.format(node.reference, node.get_name()))
-        exit(-1)
+        exit(1)
 
     if expression is not None:
         if isinstance(expression, TriccOperation):
@@ -1430,7 +1430,7 @@ def get_rhombus_terms( node, processed_nodes, is_calculate=False, negate=False):
             node.get_name(),
             node.reference
         ))
-        exit(-1)
+        exit(1)
 
     return expression
 # function that generate the calculation terms return by calculate node
@@ -1463,7 +1463,7 @@ def get_calculation_terms( node, processed_nodes, is_calculate=False, negate=Fal
             node_to_negate = next(iterator)
             if isinstance(node_to_negate, TriccNodeExclusive):
                 logger.error("2 exclusives cannot be on a row")
-                exit(-1)
+                exit(1)
             elif issubclass(node_to_negate.__class__, TriccNodeCalculateBase):
                 return get_node_expression(node_to_negate, processed_nodes, is_prev=True, negate=True)
             elif isinstance(node_to_negate, TriccNodeActivity):

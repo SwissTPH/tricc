@@ -95,7 +95,7 @@ if __name__ == "__main__":
         )
     except getopt.GetoptError:
         print_help()
-        sys.exit(-1)
+        sys.exit(1)
     for opt, arg in opts:
         if opt in ("-h", "--help"):
             print_help()
@@ -160,7 +160,7 @@ if __name__ == "__main__":
             file_content.append(s.read())
     if not file_content:
         logger.error(f"{in_filepath} is neither a drawio file nor a directory containing drawio files")
-        exit(-1)
+        exit(1)
 
 
     strategy = globals()[input_strategy](files)
