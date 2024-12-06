@@ -839,20 +839,26 @@ def check_stashed_loop(stashed_nodes, prev_stashed_nodes, processed_nodes, len_p
             if set(stashed_nodes) == set(prev_stashed_nodes) and len(processed_nodes) == len_prev_processed_nodes:
                 loop_count += 1
                 if loop_count > max(MIN_LOOP_COUNT, 11 * len(prev_stashed_nodes) + 1):
-                    logger.error("Stashed node list was unchanged: loop likely or a cyclic redundancy")
+                    logger.error("Stashed node list was unchanged: loop likely or unresolved dependence")
                     waited, looped =  get_all_dependant(stashed_nodes, stashed_nodes, processed_nodes)               
                     logger.debug(f"{len(looped)} nodes waiting stashed nodes")
-                    logger.debug(f"{len(waited)} nodes waited but not in stashed nodes")
-                    for es_node in stashed_nodes:
-                        
-                        logger.error("Stashed node {}:{}|{} {}:{}".format(
-                                                                    es_node.group.get_name() if es_node.group is not None else es_node.activity.get_name() ,
-                                                                    es_node.group.instance if es_node.group is not None else es_node.activity.instance ,
-                                                                    es_node.__class__, 
-                                                                    es_node.get_name(), es_node.instance))
+                    logger.info("looped nodes")
+                    for es_node in looped:
+                        logger.info("Stashed node {}:{}|{} {}".format(
+                            es_node.activity.get_name() if hasattr(es_node,'activity') else '' ,
+                            es_node.activity.instance if hasattr(es_node,'activity') else '',
+                            es_node.__class__, 
+                            es_node.get_name()))
                         #reverse_walkthrough(es_node, es_node, print_trace, processed_nodes, stashed_nodes)
+                    logger.info("waited nodes")
+                    for es_node in waited:
+                        logger.info("Stashed node {}:{}|{} {}".format(
+                            es_node.activity.get_name() if hasattr(es_node,'activity') else '' ,
+                            es_node.activity.instance if hasattr(es_node,'activity') else '',
+                            es_node.__class__, 
+                            es_node.get_name()))
                     if len(stashed_nodes) == len(prev_stashed_nodes):
-                        exit(1)
+                        exit(-1)
             else:
                 loop_count = 0
     else:
@@ -861,11 +867,10 @@ def check_stashed_loop(stashed_nodes, prev_stashed_nodes, processed_nodes, len_p
 
         
 def get_all_dependant(loop, stashed_nodes, processed_nodes, depth=0, waited=[] , looped=[]):
-    logger.error("LOOP detected")
     for n in loop:
         dependant = set()
         i=0
-        logger.error(f"{i}: {n.__class__}::{n.get_name()}::{n.instance}::{process_reference(n, processed_nodes, [])}")
+        logger.error(f"{i}: {n.__class__}::{n.get_name()}::{getattr(n,'instance','')}::{process_reference(n, processed_nodes, [])}")
         i += 1
         if hasattr(n, 'prev_nodes') and n.prev_nodes:
             dependant =  dependant | n.prev_nodes
@@ -877,7 +882,15 @@ def get_all_dependant(loop, stashed_nodes, processed_nodes, depth=0, waited=[] ,
             if isinstance(d, TriccNodeSelectOption):
                 d = d.select
             if d not in waited and d not in looped:
-                if d  not in processed_nodes:
+                if isinstance(d, TriccReference):
+                    if not any(n.name == d.value for n in processed_nodes):
+                        if not any(n.name == d.value for n in stashed_nodes):
+                            waited.append(d)
+                        else :
+                            looped.append(d)
+                
+                elif d  not in processed_nodes:
+                    
                     if d not in stashed_nodes:
                         waited.append(d)
                     else :
@@ -1063,7 +1076,7 @@ def reorder_node_list(list_node, group):
         logger.debug("reorder list init len: {}, group : {} group.group: {} other: {}".format(len(list_node), len(list_out), len(list_out_group), len(list_out_other)))
 
 def loop_info(loop, **kwargs):
-    logger.error("LOOP detected")
+    logger.error("dependency details")
     for n in loop:
         i=0
         logger.error(f"{i}: {n.__class__}::{n.get_name()}")

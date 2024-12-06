@@ -78,7 +78,7 @@ class TriccRhombusMixIn():
                     logger.debug("passing raw reference {} on node {}".format(ref, self.get_name()))
                     reference.append(ref)
                 else:
-                    logger.error("unexpected reference in node node {}".format(ref, self.get_name()))
+                    logger.error("unexpected reference {} in node {}".format(ref, self.get_name()))
                     exit(1)
         instance.reference = reference
         instance.name = get_rand_name(8)
