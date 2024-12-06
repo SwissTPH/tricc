@@ -423,6 +423,8 @@ class XLSFormStrategy(BaseOutPutStrategy):
         return f"{ref_expressions[0]}={ref_expressions[1]}"
     def tricc_operation_not_equal(self, ref_expressions):
         return f"{ref_expressions[0]}!={ref_expressions[1]}"
+    def tricc_operation_isnull(self, ref_expressions):
+        return f"{ref_expressions[0]}=''"
     def tricc_operation_case(self, ref_expressions):
         ifs = 0
         parts = []
@@ -489,7 +491,17 @@ class XLSFormStrategy(BaseOutPutStrategy):
             return '1'
         else:
             return f"number({ref_expressions[0]})"
-    
+        
+    def tricc_operation_cast_integer(self, ref_expressions):
+        if isinstance(ref_expressions[0], (int, float,)):
+            return f"{ref_expressions[0]}"
+        elif not ref_expressions or ref_expressions[0] == '':
+            logger.warning("empty cast number")
+            return '0'
+        elif ref_expressions[0] == 'True' or ref_expressions[0] is True:
+            return '1'
+        else:
+            return f"int({ref_expressions[0]})"   
     def tricc_operation_zscore(self, ref_expressions):
         y, ll, m, s = self.get_zscore_params(ref_expressions)
         #  return ((Math.pow((y / m), l) - 1) / (s * l));

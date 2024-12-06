@@ -112,7 +112,7 @@ class cqlToXlsFormVisitor(cqlVisitor):
         return self.visitChildren(ctx)
 
     def visitMembershipExpression(self, ctx):
-        function_name = ctx.getChild(0).getText()
+        function_name = ctx.getChild(1).getText()
         left = self.visit(ctx.expression(0))
         right = self.visit(ctx.expression(1))
         if function_name == 'in':
@@ -255,7 +255,16 @@ class cqlToXlsFormVisitor(cqlVisitor):
 
     
     def visitTypeExpression(self, ctx):
-        raise NotImplementedError('cast not supported')
+        to_type = ctx.getChild(2).getText()
+        expression = self.visit(ctx.getChild(0))
+        if to_type == 'int' or to_type == 'integer':
+            return TriccOperation(TriccOperator.CAST_INTEGER, [expression])
+        elif to_type == 'float' or to_type == 'number':
+            return TriccOperation(TriccOperator.CAST_NUMBER, [expression])
+        elif to_type == 'date':
+            return TriccOperation(TriccOperator.CAST_DATE, [expression])
+        else:
+            raise NotImplementedError(f'cast {to_type} not supported')
     
     def visitUnionExpression(self, ctx):
         raise NotImplementedError('union not supported')
