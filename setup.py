@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name="tricc-oo",
-    version="1.1.2",
+    version="1.1.3",
     author="DHU SwissTPH httu.admin@swisstph.ch",
     description="Python library that converts XLS to Fhir SDC ressource.",
     long_description="Python library that converts XLS to Fhir SDC ressource.",
