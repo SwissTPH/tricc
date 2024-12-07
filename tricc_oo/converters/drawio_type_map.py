@@ -173,7 +173,7 @@ TYPE_MAP = {
     },
     TriccNodeType.end: {
         "objects": ["UserObject", "object"],
-        "attributes": [],
+        "attributes": ['process'],
         "mandatory_attributes": [],
         "model": TriccNodeEnd
     },

@@ -148,16 +148,18 @@ class TriccNodeActivityEnd(TriccNodeFakeCalculateBase):
         self.name = ACTIVITY_END_NODE_FORMAT.format(self.activity.id)
 
 
-class TriccNodeEnd(TriccNodeCalculate):
+class TriccNodeEnd(TriccNodeDisplayCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.end
-
+    process: str = None
     def __init__(self, **data):
         super().__init__(**data)
         # FOR END
+        
         self.set_name()
 
     def set_name(self):
-        self.name = END_NODE_FORMAT.format(self.activity.id)
+        self.name = 'tricc_end'
+        #self.name = END_NODE_FORMAT.format(self.activity.id)
 
 
 class TriccNodeActivityStart(TriccNodeFakeCalculateBase):

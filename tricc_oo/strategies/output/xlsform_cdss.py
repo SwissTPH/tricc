@@ -37,9 +37,7 @@ class XLSFormCDSSStrategy(XLSFormStrategy):
         #TODO inject the TT flow
         self.add_tab_breaks_choice()
         self.add_wfx_choice()
-        
-                
-
+    
     def export_diag(self, activity, diags = [], **kwargs):
         for node in activity.nodes.values():
             if isinstance(node, TriccNodeActivity):

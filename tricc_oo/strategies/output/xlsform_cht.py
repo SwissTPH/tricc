@@ -8,6 +8,7 @@ import pandas as pd
 from tricc_oo.models.lang import SingletonLangClass
 from tricc_oo.serializers.xls_form import SURVEY_MAP
 from tricc_oo.strategies.output.xlsform_cdss import XLSFormCDSSStrategy
+from tricc_oo.visitors.xform_pd import make_breakpoints, get_tasksstrings
 
 langs = SingletonLangClass()
 logger = logging.getLogger("default")
@@ -89,12 +90,43 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
         self.df_survey.to_excel(writer, sheet_name='survey',index=False)
         self.df_choice.to_excel(writer, sheet_name='choices',index=False)
         df_settings.to_excel(writer, sheet_name='settings',index=False)
-
-        #close the Pandas Excel writer and output the Excel file
-        #writer.save()
-
-        # run this on a windows python instance because if not then the generated xlsx file remains open
         writer.close()
+        # pause
+        ends = self.calculates['tricc_end'].values()
+        # TODO get loc
+        ends_prev = []
+        for e in ends:
+            latest = None
+            for p in e.prev_nodes:
+                if not latest or latest.path_len < p.path_len:
+                    latest = p
+            if hasattr(latest, 'select'):
+                latest = latest.select 
+            ends_prev.append(
+                int(self.df_survey[self.df_survey.name == latest.export_name].index.values[0])
+            )
+        for e in ends_prev:
+            newfilename = f"{form_id}_{e}.xlsx"
+            newpath = os.path.join(self.output_path, newfilename)
+            settings={'form_title':title,'form_id':f"{form_id}_{e}",'version':version,'default_language':'English (en)','style':'pages'}
+            df_settings=pd.DataFrame(settings,index=indx)
+            df_settings.head()
+            task_df, hidden_name = make_breakpoints(self.df_survey, e)
+            writer = pd.ExcelWriter(newpath, engine='xlsxwriter')
+            task_df.to_excel(writer, sheet_name='survey',index=False)
+            self.df_choice.to_excel(writer, sheet_name='choices',index=False)
+            df_settings.to_excel(writer, sheet_name='settings',index=False)
+            writer.close()
+            newfilename = f"{form_id}_{e}.js"
+            newpath = os.path.join(self.output_path, newfilename)
+            with open(newpath, 'w') as f:
+                strings = get_tasksstrings(hidden_name, task_df)
+                for s in strings:
+                    f.write(s)
+                f.close()
+            
+            
+            
         media_path_tmp = os.path.join(self.output_path, 'media-tmp')
         if (os.path.isdir(media_path_tmp)):
             if os.path.isdir(media_path): # check if it exists, because if it does, error will be raised 

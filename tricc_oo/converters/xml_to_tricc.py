@@ -247,8 +247,12 @@ def get_nodes(diagram, activity):
                 for goto_next_node in next_nodes_id:
                     remove_prev_next(node, goto_next_node, activity) 
         elif isinstance(node, TriccNodeEnd):
+            
+            node.name = "tricc_end"
+            if node.process:
+                node.name += f"_{node.process}"
             if not end_node:
-                end_node = node
+                end_node = node                    
             else:
                 merge_node(node, end_node)
                 node_to_remove.append(node.id)

@@ -25,15 +25,20 @@ def get_max_version(dict):
             max_version = sim_node
     return max_version
 
-def get_last_version(dict, name, processed_nodes):
+def get_last_version(_list, name, processed_nodes):
     max_version = None
-    if name in dict:
-        for  sim_node in dict[name].values():
+    if isinstance(_list, dict):
+        _list = _list[name].values() if name in _list else []
+    if _list is None:
+        _list = [n for n in processed_nodes if n.name == name]
+    if _list:
+        for  sim_node in _list:
             # get the max version while not taking a node that have a next node before next calc
             if (max_version is None or  max_version.path_len < sim_node.path_len 
                 and (processed_nodes is None or all(p in processed_nodes for p in sim_node.next_nodes))):
                 max_version = sim_node
     return max_version
+
 
 # main function to retrieve the expression from the tree
 # node is the node to calculate
@@ -104,7 +109,8 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
                 issubclass(node.__class__, (TriccNodeDisplayCalculateBase )) and node.name is not None
             ):
                 # generate the calc node version by looking in the processed calculate
-                last_calc = get_last_version(calculates, node.name, processed_nodes)
+                # TODO the calculates should not be required with the latest version of get_last_version
+                last_calc = get_last_version(None, node.name, processed_nodes)
                 # get max version used 
                 #last_used_version =  get_max_named_version(used_calculates, node.name)
                 last_used_calc = get_last_version(used_calculates, node.name, processed_nodes )
@@ -903,6 +909,12 @@ def get_all_dependant(loop, stashed_nodes, processed_nodes, depth=0, waited=[] ,
 
 MAX_DRILL = 1
 
+def get_last_end_node(processed_nodes, process=None):
+    end_name = 'tricc_end'
+    if process:
+        end_name += f"_{process}"
+    return get_last_version(None, end_name, processed_nodes)
+
 # Set the source next node to target and clean  next nodes of replace node
 def set_prev_next_node(source_node, target_node, replaced_node=None, edge_only = False, activity=None):
     activity = activity or source_node.activity
@@ -1182,6 +1194,16 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
     if expression is None:
             expression = get_prev_node_expression(node, processed_nodes, is_calculate)
     if isinstance(node, TriccNodeActivity):
+        end_node = get_last_end_node(processed_nodes)
+        if end_node:
+            expression = TriccOperation(
+                TriccOperator.AND, [
+                    TriccOperation(
+                        TriccOperator.NOT, [end_node]
+                    ),
+                        expression
+                ]
+            )
         if is_prev:
             end_nodes = node.get_end_nodes()
             if all([end in processed_nodes for end in end_nodes]):
@@ -1201,6 +1223,7 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
                 expression = nand_join(expression, expression_activity)
             elif expression_activity:
                 expression = negate_term(expression_activity)
+            
     if negate:
         if negate_expression is not None:
             return negate_expression
