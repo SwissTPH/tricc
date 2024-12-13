@@ -14,6 +14,8 @@ from tricc_oo.converters.tricc_to_xls_form import *
 from tricc_oo.models import (
     TriccNodeActivity,
     TriccGroup,
+    TriccOperation,
+    TriccOperator
 )
 from tricc_oo.models.lang import SingletonLangClass
 
@@ -600,21 +602,34 @@ class XLSFormStrategy(BaseOutPutStrategy):
                     # we don't overright if define in the diagram
                     if node.constraint is None:
                         if isinstance(node, TriccNodeSelectMultiple):
-                            node.constraint = '.=\'opt_none\' or not(selected(.,\'opt_none\'))'
+                            node.constraint = TriccOperation(
+                                TriccOperator.OR,
+                                [
+                                    TriccOperation(TriccOperator.EQUAL, ['$this', TriccStatic('opt_none')]),
+                                    TriccOperation(TriccOperator.NOT, [
+                                        TriccOperation(TriccOperator.SELECTED,
+                                            [
+                                                '$this', TriccStatic('opt_none')
+                                            ])
+                                ])
+                                 ]
+                                )#'.=\'opt_none\' or not(selected(.,\'opt_none\'))'
                             node.constraint_message = '**None** cannot be selected together with choice.'
                     elif node.tricc_type in (TriccNodeType.integer, TriccNodeType.decimal):
                         constraints = []
-                        constraints_min = None
-                        constraints_max = None
+                        constraints_min = ''
+                        constraints_max = ''
                         if node.min is not None:
-                            constraints.append('.>=' + node.min) 
+                            constraints.append(TriccOperation(TriccOperator.MORE_OR_EQUAL, [TriccReference('$this'), none.min])) 
                             constraints_min= "The minimun value is {0}.".format(node.min)
                         if node.max is not None:
-                            constraints.append('.>=' + node.max)
+                            constraints.append(TriccOperation(TriccOperator.LESS_OR_EQUAL, [TriccReference('$this'), none.min])) 
                             constraints_max="The maximum value is {0}.".format(node.max)
-                        if len(constraints) > 0:
-                            constraints = add_bracket_to_list_elm(constraints)
-                            node.constraint = ' and '.join(constraints)
+                        if len(constraints) > 1:
+                            node.constraint = TriccOperation(TriccOperator.AND, constraints)
+                            node.constraint_message = (constraints_min + " "  + constraints_max).strip()
+                        elif len(constraints) == 1:
+                            node.constraint = constraints[0]
                             node.constraint_message = (constraints_min + " "  + constraints_max).strip()
                 # continue walk
                 return True

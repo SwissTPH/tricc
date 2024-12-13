@@ -198,7 +198,8 @@ def get_attr_if_exists(strategy, node, column, map_array):
                 else:
                     return get_export_name(node)
             elif isinstance(value, (TriccOperation, TriccStatic, TriccReference)):
-                return strategy.get_tricc_operation_expression(value)
+                expression =  strategy.get_tricc_operation_expression(value)
+                return expression.replace('$this', '.') if isinstance(expression, str) else expression
             elif value is not None:
                 return str(value) if not isinstance(value, dict) else value
             else:

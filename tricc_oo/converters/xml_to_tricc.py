@@ -779,7 +779,11 @@ def process_factor_edge(edge, nodes):
 def process_condition_edge(edge, nodes):
     label = edge.value.strip()
     node = nodes[edge.source]
-    operation = parse_expression(label, expression=str(nodes[edge.source].name))
+    node_ref = f'"{nodes[edge.source].name}"'
+    if '$this' in label:
+        operation = parse_expression('', expression=label.replace('$this', node_ref ))
+    else:
+        operation = parse_expression(label, expression=node_ref)
     if operation and isinstance(operation, TriccOperation):
         # insert rhombus
         return TriccNodeRhombus(
