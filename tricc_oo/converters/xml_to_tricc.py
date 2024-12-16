@@ -22,7 +22,7 @@ from tricc_oo.visitors.tricc import *
 
 TRICC_YES_LABEL = ["yes", "oui"]
 TRICC_NO_LABEL = ["no", "non"]
-TRICC_FOLLOW_LABEL = ["follow", "suivre"]
+TRICC_FOLLOW_LABEL = ["follow", "suivre", "continue"]
 NO_LABEL = "NO_LABEL"
 TRICC_LIST_NAME = "list_{0}"
 import logging
@@ -606,12 +606,12 @@ def set_mandatory_attribute(elm, mandatory_attributes, groupname=None):
             if attributes == "source":
                 if elm.attrib.get("target") is not None:
                     logger.error(
-                        "the attibute target is ".format(elm.attrib.get("target"))
+                        "the attibute target is {}".format(elm.attrib.get("target"))
                     )
             elif attributes == "target":
                 if elm.attrib.get("source") is not None:
                     logger.error(
-                        "the attibute target is ".format(elm.attrib.get("source"))
+                        "the attibute target is {}".format(elm.attrib.get("source"))
                     )
             else:
                 logger.error(
