@@ -32,6 +32,8 @@ runs:
         python -c "
         from tricc_oo.strategies.input.drawio import DrawioStrategy
         from tricc_oo.strategies.output.xls_form import XLSFormStrategy
+        from tricc_oo.strategies.output.xlsform_cdss import XLSFormCDSSStrategy
+        from tricc_oo.strategies.output.xlsform_cht import XLSFormCHTStrategy
         from tricc_oo.models.lang import SingletonLangClass
         import os
         import logging
@@ -65,9 +67,9 @@ runs:
         if not file_content:
             print(f'{in_filepath} is neither a drawio file nor a directory containing drawio files')
             exit(-1)
-        input_strategy = DrawioStrategy(file_content)
-        output_strategy = XLSFormStrategy('./${{ inputs.output_path }}')
-        media_path = os.path.join('${{ inputs.output_strategy }}', 'media-tmp')
+        input_strategy = ${{ inputs.input_strategy }}(file_content)
+        output_strategy = ${{ inputs.output_strategy }}('./${{ inputs.output_path }}')
+        media_path = os.path.join('${{ inputs.output_path }}', 'media-tmp')
         start_page, pages, images = input_strategy.execute(file_content, media_path)
         output = output_strategy.execute(start_page, pages=pages)
         "
