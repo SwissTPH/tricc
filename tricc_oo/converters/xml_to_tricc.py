@@ -613,12 +613,12 @@ def set_mandatory_attribute(elm, mandatory_attributes, groupname=None):
                     logger.error(
                         "the attibute target is {}".format(elm.attrib.get("source"))
                     )
-            else:
-                logger.error(
-                    "the attibute {} is mandatory but not found in {} within group {}".format(
-                        attributes, display_name, groupname if groupname is not None else ""
-                    )
+            
+            logger.error(
+                "the attibute {} is mandatory but not found in {} within group {}".format(
+                    attributes, display_name, groupname if groupname is not None else ""
                 )
+            )
             exit(1)
         if attributes == "link":
             param[attributes] = clean_link(attribute_value)

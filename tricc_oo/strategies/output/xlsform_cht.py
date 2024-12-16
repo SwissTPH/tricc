@@ -92,39 +92,40 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
         df_settings.to_excel(writer, sheet_name='settings',index=False)
         writer.close()
         # pause
-        ends = self.calculates['tricc_end'].values()
-        # TODO get loc
-        ends_prev = []
-        for e in ends:
-            latest = None
-            for p in e.prev_nodes:
-                if not latest or latest.path_len < p.path_len:
-                    latest = p
-            if hasattr(latest, 'select'):
-                latest = latest.select 
-            ends_prev.append(
-                int(self.df_survey[self.df_survey.name == latest.export_name].index.values[0])
-            )
-        for e in ends_prev:
-            newfilename = f"{form_id}_{e}.xlsx"
-            newpath = os.path.join(self.output_path, newfilename)
-            settings={'form_title':title,'form_id':f"{form_id}_{e}",'version':version,'default_language':'English (en)','style':'pages'}
-            df_settings=pd.DataFrame(settings,index=indx)
-            df_settings.head()
-            task_df, hidden_name = make_breakpoints(self.df_survey, e)
-            writer = pd.ExcelWriter(newpath, engine='xlsxwriter')
-            task_df.to_excel(writer, sheet_name='survey',index=False)
-            self.df_choice.to_excel(writer, sheet_name='choices',index=False)
-            df_settings.to_excel(writer, sheet_name='settings',index=False)
-            writer.close()
-            newfilename = f"{form_id}_{e}.js"
-            newpath = os.path.join(self.output_path, newfilename)
-            with open(newpath, 'w') as f:
-                strings = get_tasksstrings(hidden_name, task_df)
-                for s in strings:
-                    f.write(s)
-                f.close()
-            
+        if "tricc_end" in self.calculates:
+            ends = self.calculates['tricc_end'].values()
+            # TODO get loc
+            ends_prev = []
+            for e in ends:
+                latest = None
+                for p in e.prev_nodes:
+                    if not latest or latest.path_len < p.path_len:
+                        latest = p
+                if hasattr(latest, 'select'):
+                    latest = latest.select 
+                ends_prev.append(
+                    int(self.df_survey[self.df_survey.name == latest.export_name].index.values[0])
+                )
+            for e in ends_prev:
+                newfilename = f"{form_id}_{e}.xlsx"
+                newpath = os.path.join(self.output_path, newfilename)
+                settings={'form_title':title,'form_id':f"{form_id}_{e}",'version':version,'default_language':'English (en)','style':'pages'}
+                df_settings=pd.DataFrame(settings,index=indx)
+                df_settings.head()
+                task_df, hidden_name = make_breakpoints(self.df_survey, e)
+                writer = pd.ExcelWriter(newpath, engine='xlsxwriter')
+                task_df.to_excel(writer, sheet_name='survey',index=False)
+                self.df_choice.to_excel(writer, sheet_name='choices',index=False)
+                df_settings.to_excel(writer, sheet_name='settings',index=False)
+                writer.close()
+                newfilename = f"{form_id}_{e}.js"
+                newpath = os.path.join(self.output_path, newfilename)
+                with open(newpath, 'w') as f:
+                    strings = get_tasksstrings(hidden_name, task_df)
+                    for s in strings:
+                        f.write(s)
+                    f.close()
+                
             
             
         media_path_tmp = os.path.join(self.output_path, 'media-tmp')
