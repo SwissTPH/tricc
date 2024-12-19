@@ -195,6 +195,12 @@ TYPE_MAP = {
         "mandatory_attributes": ["name","label"],
         "model": TriccNodeCalculate
     },
+    TriccNodeType.input: {
+        "objects": ["UserObject", "object"],
+        "attributes": [],
+        "mandatory_attributes": ["name","label"],
+        "model": TriccNodeCalculate
+    },
         # TriccNodeType.number: {
     #     "objects": ["UserObject", "object"],
     #     "attributes": ["constraint", "save", "constraint_message", "required"],
