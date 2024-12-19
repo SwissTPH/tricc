@@ -94,7 +94,7 @@ def end_group( strategy, cur_group, groups, df_survey, **kargs):
             value = (get_attr_if_exists(strategy, cur_group,column,SURVEY_MAP))
             
             if get_export_name(cur_group) in groups:
-                value = (value + "_" + str(groups[get_export_name(cur_group)]))
+                value = (value + "_" + str(groups[get_export_name(cur_group)]) + "_end" )
             values.append(value)
         else:
             values.append(get_xfrom_trad(strategy, cur_group,column,SURVEY_MAP))

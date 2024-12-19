@@ -139,3 +139,14 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             for file_name in file_names:
                 shutil.move(os.path.join(media_path_tmp, file_name), media_path)
             shutil.rmtree(media_path_tmp)
+            
+    def tricc_operation_zscore(self, ref_expressions):
+        y, ll, m, s = self.get_zscore_params(ref_expressions)
+        #  return ((Math.pow((y / m), l) - 1) / (s * l));
+        return f"cht:extension-lib('{ref_expressions[0]}.js',{ref_expressions[1]} ,{ref_expressions[2]} ,{ref_expressions[3]}  )"
+   
+    
+    def tricc_operation_izscore(self, ref_expressions):
+        z, ll, m, s = self.get_zscore_params(ref_expressions)
+        #  return  (m * (z*s*l-1)^(1/l));
+        return f"cht:extension-lib('{ref_expressions[0]}.js',{ref_expressions[1]} ,{ref_expressions[2]} ,{ref_expressions[3]}  )"

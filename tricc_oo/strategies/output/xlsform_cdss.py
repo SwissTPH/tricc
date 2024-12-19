@@ -23,11 +23,11 @@ class XLSFormCDSSStrategy(XLSFormStrategy):
 
         diags += self.export_diag( start_pages[self.processes[0]],  **kwargs)
 
-        # add the diag
-        self.df_survey.loc[len(self.df_survey)] = get_diagnostic_start_group_line()
-        # TODO inject flow driven diag list, the folowing fonction will fill the missing ones
-        
+           
         if len(diags)>0:
+             # add the diag
+            self.df_survey.loc[len(self.df_survey)] = get_diagnostic_start_group_line()
+            # TODO inject flow driven diag list, the folowing fonction will fill the missing ones
             for diag in diags:
                 self.df_survey.loc[len(self.df_survey)] = get_diagnostic_line(diag)
             self.df_survey.loc[len(self.df_survey)] = get_diagnostic_none_line(diags)

@@ -316,6 +316,12 @@ class XLSFormStrategy(BaseOutPutStrategy):
                 self.df_survey[~self.df_survey["name"] == c["name"]].replace(
                     real_calc, "\$\{" + c["name"] + "\}"
                 )
+        
+        df_duplicate = self.df_survey[
+            self.df_survey.duplicated(subset=["name"], keep="first")
+        ]
+        for index, duplicate in df_duplicate.iterrows(): 
+            logger.error(f"duplicate survey name: {duplicate['name']}")
         return processed_nodes
 
     def get_tricc_operation_expression(self, operation):
