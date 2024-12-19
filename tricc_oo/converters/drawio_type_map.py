@@ -191,15 +191,15 @@ TYPE_MAP = {
     },
     TriccNodeType.diagnosis: {
         "objects": ["UserObject", "object"],
-        "attributes": [],
-        "mandatory_attributes": ["name","label"],
-        "model": TriccNodeCalculate
+        "attributes": ["save", "reference"],
+        "mandatory_attributes": [ "name", 'label'],
+        "model": TriccNodeDiagnosis
     },
     TriccNodeType.input: {
         "objects": ["UserObject", "object"],
-        "attributes": [],
-        "mandatory_attributes": ["name","label"],
-        "model": TriccNodeCalculate
+        "attributes": ["save", "reference"],
+        "mandatory_attributes": [ "name", 'label'],
+        "model": TriccNodeInput
     },
         # TriccNodeType.number: {
     #     "objects": ["UserObject", "object"],

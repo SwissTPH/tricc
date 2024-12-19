@@ -42,6 +42,11 @@ class TriccNodeAdd(TriccNodeDisplayCalculateBase):
 class TriccNodeCount(TriccNodeDisplayCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.count
 
+class TriccNodeInput(TriccNodeDisplayCalculateBase):
+    tricc_type: TriccNodeType = TriccNodeType.input
+
+class TriccNodeDiagnosis(TriccNodeCalculateBase):
+    tricc_type: TriccNodeType = TriccNodeType.diagnosis
 
 class TriccNodeFakeCalculateBase(TriccNodeCalculateBase):
     id: triccId = generate_id()
