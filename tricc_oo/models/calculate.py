@@ -42,12 +42,17 @@ class TriccNodeAdd(TriccNodeDisplayCalculateBase):
 class TriccNodeCount(TriccNodeDisplayCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.count
 
-class TriccNodeInput(TriccNodeDisplayCalculateBase):
-    tricc_type: TriccNodeType = TriccNodeType.input
 
-class TriccNodeDiagnosis(TriccNodeCalculateBase):
+class TriccNodeDiagnosis(TriccNodeDisplayCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.diagnosis
+    def gen_name(self):
+        super(TriccNodeDiagnosis, self).gen_name()
+        if not self.name.startswith('final.'):
+            self.name = f"final.{self.name}"
 
+class TriccNodeProposedDiagnosis(TriccNodeDisplayCalculateBase):
+    tricc_type: TriccNodeType = TriccNodeType.proposed_diagnosis
+    
 class TriccNodeFakeCalculateBase(TriccNodeCalculateBase):
     id: triccId = generate_id()
 

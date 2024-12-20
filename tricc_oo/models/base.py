@@ -67,6 +67,7 @@ class TriccNodeType(StrEnum):
     operation = 'operation'
     context = 'context'
     diagnosis = 'diagnosis'
+    proposed_diagnosis = 'proposed_diagnosis'
     input = 'input'
 
     def __iter__(self):

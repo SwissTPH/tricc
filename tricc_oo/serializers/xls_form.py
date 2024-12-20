@@ -244,7 +244,7 @@ def get_more_info_choice(strategy):
     for column in CHOICE_MAP:
         if column == 'list_name':
             values.append('more_info')
-        elif column == 'name':
+        elif column == 'value':
             values.append('1')
         elif column.startswith('label'):
             arr = column.split('::')
@@ -311,7 +311,7 @@ def get_diagnostic_line(node):
     empty = langs.get_trads('', force_dict =True)
     return [
         'select_one yes_no',
-        "cond_"+get_export_name(node),
+        clean_name("final.")+get_export_name(node),
         *list(label.values()) ,
         *list(empty.values()) ,#hint
         *list(empty.values()) ,#help
