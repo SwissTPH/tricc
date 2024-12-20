@@ -111,3 +111,59 @@ def get_tasksstrings(hidden_names, df_survey):
     tasks_strings = list(d.values())
     
     return tasks_strings
+
+
+def get_task_js(name, title, form_types, hidden_names, df_survey):
+    lines = get_tasksstrings(hidden_names, df_survey)
+    indented_lines = '\n          '.join(lines)
+    
+    return f"""
+    
+const extras = require('./nools-extras');
+
+const {{ addDays, getField}} = extras;
+
+var task_title = 'id: '+getField(report, 'g_registration.p_id')+'; age: '+getField(report, 'p_age')+getField(report, 'g_registration.p_gender')+' months; '+getField(report, 'p_weight') + 'kg; ' + getField(report, 'g_fever.p_temp')+'°'
+
+module.exports = [
+  {{
+    name: '{name}',
+    icon: 'icon-followup-general',
+    title: '{title}',
+    appliesTo: 'reports',
+    appliesToType: ['{"','".join(form_types)}'],
+    contactLabel: (contact, report) =>
+      task_title,
+    appliesIf: function (contact, report) {{
+      return getField(report, 'source_id') === '' && getField(report, 'continue_afterlab') === '1';
+   }},
+    actions: [
+      {{
+        type: 'report',
+        form: '{name}',
+        modifyContent: function (content, contact, report) {{
+          {indented_lines}
+       }},
+     }},
+    ],
+    events: [
+      {{
+        id: '{name}',
+        days: 1,
+        start: 1,
+        end: 0,
+     }},
+    ],
+    resolvedIf: function (contact, report, event, dueDate) {{
+      const startTime = Math.max(addDays(dueDate, -event.start).getTime(), report.reported_date);
+      const endTime = addDays(dueDate, event.end + 1).getTime();
+      const forms = ['reverse_alm_label_form_pause'];
+      const matchingReports = contact.reports
+        .filter((c_report) => forms.includes(c_report.form))
+        .filter((c_report) => c_report.reported_date >= startTime && c_report.reported_date <= endTime)
+        .filter((c_report) => getField(c_report, 'source_id') === report._id);
+      return matchingReports.length > 0;
+   }},
+ }},
+];
+"""

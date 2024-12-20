@@ -8,7 +8,8 @@ import pandas as pd
 from tricc_oo.models.lang import SingletonLangClass
 from tricc_oo.serializers.xls_form import SURVEY_MAP, get_input_line
 from tricc_oo.strategies.output.xlsform_cdss import XLSFormCDSSStrategy
-from tricc_oo.visitors.xform_pd import make_breakpoints, get_tasksstrings
+from tricc_oo.converters.tricc_to_xls_form import get_export_name
+from tricc_oo.visitors.xform_pd import make_breakpoints, get_task_js
 
 langs = SingletonLangClass()
 logger = logging.getLogger("default")
@@ -108,27 +109,31 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
                 if hasattr(latest, 'select'):
                     latest = latest.select 
                 ends_prev.append(
-                    int(self.df_survey[self.df_survey.name == latest.export_name].index.values[0])
+                    (int(self.df_survey[self.df_survey.name == latest.export_name].index.values[0]), e,)
                 )
-            for e in ends_prev:
-                newfilename = f"{form_id}_{e}.xlsx"
+            forms = [form_id]
+            for i, e in ends_prev:
+                new_form_id = f"{form_id}_{i}"
+                newfilename = f"{new_form_id}.xlsx"
                 newpath = os.path.join(self.output_path, newfilename)
-                settings={'form_title':title,'form_id':f"{form_id}_{e}",'version':version,'default_language':'English (en)','style':'pages'}
+                settings={'form_title':title,'form_id':f"{new_form_id}",'version':version,'default_language':'English (en)','style':'pages'}
                 df_settings=pd.DataFrame(settings,index=indx)
                 df_settings.head()
-                task_df, hidden_name = make_breakpoints(self.df_survey, e)
+                task_df, hidden_names = make_breakpoints(self.df_survey, i)
+                # deactivate the end node
+                task_df.loc[task_df['name'] == get_export_name(e), 'calculate'] = 0
+                #print fileds
                 writer = pd.ExcelWriter(newpath, engine='xlsxwriter')
                 task_df.to_excel(writer, sheet_name='survey',index=False)
                 self.df_choice.to_excel(writer, sheet_name='choices',index=False)
                 df_settings.to_excel(writer, sheet_name='settings',index=False)
                 writer.close()
-                newfilename = f"{form_id}_{e}.js"
+                newfilename = f"{new_form_id}.js"
                 newpath = os.path.join(self.output_path, newfilename)
                 with open(newpath, 'w') as f:
-                    strings = get_tasksstrings(hidden_name, task_df)
-                    for s in strings:
-                        f.write(s)
+                    f.write(get_task_js(new_form_id, f"continue {title}", forms, hidden_names, self.df_survey))
                     f.close()
+                forms.append(new_form_id)
                 
             
             
