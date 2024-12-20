@@ -621,22 +621,22 @@ class XLSFormStrategy(BaseOutPutStrategy):
                                  ]
                                 )#'.=\'opt_none\' or not(selected(.,\'opt_none\'))'
                             node.constraint_message = '**None** cannot be selected together with choice.'
-                    elif node.tricc_type in (TriccNodeType.integer, TriccNodeType.decimal):
-                        constraints = []
-                        constraints_min = ''
-                        constraints_max = ''
-                        if node.min is not None:
-                            constraints.append(TriccOperation(TriccOperator.MORE_OR_EQUAL, [TriccReference('$this'), none.min])) 
-                            constraints_min= "The minimun value is {0}.".format(node.min)
-                        if node.max is not None:
-                            constraints.append(TriccOperation(TriccOperator.LESS_OR_EQUAL, [TriccReference('$this'), none.min])) 
-                            constraints_max="The maximum value is {0}.".format(node.max)
-                        if len(constraints) > 1:
-                            node.constraint = TriccOperation(TriccOperator.AND, constraints)
-                            node.constraint_message = (constraints_min + " "  + constraints_max).strip()
-                        elif len(constraints) == 1:
-                            node.constraint = constraints[0]
-                            node.constraint_message = (constraints_min + " "  + constraints_max).strip()
+                        elif node.tricc_type in (TriccNodeType.integer, TriccNodeType.decimal):
+                            constraints = []
+                            constraints_min = ''
+                            constraints_max = ''
+                            if node.min is not None and node.min != '':
+                                constraints.append(TriccOperation(TriccOperator.MORE_OR_EQUAL, ['$this', node.min])) 
+                                constraints_min= "The minimun value is {0}.".format(node.min)
+                            if node.max is not None and node.max != '':
+                                constraints.append(TriccOperation(TriccOperator.LESS_OR_EQUAL, ['$this', node.max])) 
+                                constraints_max="The maximum value is {0}.".format(node.max)
+                            if len(constraints) > 1:
+                                node.constraint = TriccOperation(TriccOperator.AND, constraints)
+                                node.constraint_message = (constraints_min + " "  + constraints_max).strip()
+                            elif len(constraints) == 1:
+                                node.constraint = constraints[0]
+                                node.constraint_message = (constraints_min + " "  + constraints_max).strip()
                 # continue walk
                 return True
         return False

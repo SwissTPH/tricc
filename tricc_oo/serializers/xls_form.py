@@ -156,7 +156,7 @@ SURVEY_MAP = {
     **langs.get_trads_map('required_message'), 'read only':'read only', 
     'calculation':'expression','repeat_count':'repeat_count','media::image':'image'
 }
-CHOICE_MAP = {'list_name':'list_name', 'value':'name', **langs.get_trads_map('label'), 'y_min':'', 'y_max':'', 'l':'', 's':'', 'm':'' }
+CHOICE_MAP = {'list_name':'list_name', 'value':'name', **langs.get_trads_map('label'), 'filter':'', 'y_min':'', 'y_max':'', 'l':'', 's':'', 'm':'' }
      
      
 TRAD_MAP = ['label','constraint_message', 'required_message', 'hint', 'help']  
@@ -237,10 +237,10 @@ def generate_xls_form_export(strategy, node, processed_nodes, stashed_nodes, df_
                     if ODK_TRICC_TYPE_MAP[node.tricc_type] =='calculate':
                         values = []
                         for column in SURVEY_MAP:
-                            if column == 'default' and issubclass(node.__class__, TriccNodeDisplayCalculateBase):
-                                values.append(0)
-                            else:
-                                values.append(get_xfrom_trad(strategy, node, column, SURVEY_MAP ))
+                            value = get_xfrom_trad(strategy, node, column, SURVEY_MAP )
+                            if column == 'default' and issubclass(node.__class__, TriccNodeDisplayCalculateBase) and value == '':
+                                    value = 0
+                            values.append(value)
                         if len(df_calculate[df_calculate.name == get_export_name(node)])==0:
                             df_calculate.loc[len(df_calculate)] = values
                         else:
@@ -311,7 +311,15 @@ def get_diagnostic_add_line(diags, df_choice):
         df_choice.loc[len(df_choice)] =  [
             "tricc_diag_add",
             get_export_name(diag),
-            *list(langs.get_trads(diag.label, True).values())
+            *list(langs.get_trads(diag.label, True).values()),
+            '', # filter
+            '', # min y
+            '', # max Y
+            '', # l
+            '', # m
+            '' # s
+            
+            
         ]
     label = langs.get_trads('Add a missing diagnostic', force_dict =True)
     empty = langs.get_trads('', force_dict =True)
@@ -351,7 +359,7 @@ def get_diagnostic_none_line(diags):
         '',#'appearance', 
         '',#'constraint', 
         *list(empty.values()) ,
-        negate_term(relevance[:-4]),#'relevance'
+        f'not({relevance[:-4]})',#'relevance'
         '',#'disabled'
         '',#'required'
         *list(empty.values()) ,
