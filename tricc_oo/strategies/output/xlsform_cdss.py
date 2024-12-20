@@ -1,5 +1,6 @@
 import logging
 from tricc_oo.models.tricc import TriccNodeActivity
+from tricc_oo.models.calculate import TriccNodeDiagnosis
 from tricc_oo.serializers.xls_form import (get_diagnostic_add_line,
                                         get_diagnostic_line,
                                         get_diagnostic_none_line,
@@ -42,8 +43,8 @@ class XLSFormCDSSStrategy(XLSFormStrategy):
         for node in activity.nodes.values():
             if isinstance(node, TriccNodeActivity):
                 diags = self.export_diag(node, diags, **kwargs)
-            if hasattr(node, 'name') and node.name is not None:
-                if node.name.startswith('diag') and node.last\
+            if isinstance(node, TriccNodeDiagnosis):
+                if node.last\
                     and not any([get_export_name(diag)  == get_export_name(node) for diag in diags]):
                         diags.append(node)
         return diags
@@ -61,10 +62,11 @@ class XLSFormCDSSStrategy(XLSFormStrategy):
     
     
     def add_wfx_choice(self):
+        empty = langs.get_trads('', force_dict =True)
         new_rows = [
-            ['wfl', 'y45_0', 'f', 0, 110, -0.3833, 0.09029, 2.4607],
-            ['wfa', 'y45_1', 'f', 0, 18500, -0.3833, 0.0903, 2.4777],
-            ['wfh', 'y45_2', 'f', 0, 125, -0.3833, 0.0903, 2.4947],
+            ['wfl', 'y45_0', *list(empty.values()), 'f', 0, 110, -0.3833, 0.09029, 2.4607],
+            ['wfa', 'y45_1', *list(empty.values()), 'f', 0, 18500, -0.3833, 0.0903, 2.4777],
+            ['wfh', 'y45_2', *list(empty.values()), 'f', 0, 125, -0.3833, 0.0903, 2.4947],
         ]
         
         for row in new_rows:
@@ -153,47 +155,47 @@ class XLSFormCDSSStrategy(XLSFormStrategy):
             ''#'image'  
         ]
         new_rows = [
-            ['tab-label-4', 0, langs.get_trads('--'),'','','','',''],
-            ['tab-label-4', 1, langs.get_trads('--'),'','','','',''],
-            ['tab-label-4', 2, langs.get_trads('1/2'),'','','','',''],
-            ['tab-label-4', 3, langs.get_trads('1/2'),'','','','',''],
-            ['tab-label-4', 4, langs.get_trads('1'),'','','','',''],
-            ['tab-label-4', 5, langs.get_trads('1'),'','','','',''],
-            ['tab-label-4', 6, langs.get_trads('1 and 1/2'),'','','','',''],
-            ['tab-label-4', 7, langs.get_trads('1 and 1/2'),'','','','',''],
-            ['tab-label-4', 8, langs.get_trads('2'),'','','','',''],
-            ['tab-label-4', 9, langs.get_trads('2'),'','','','',''],
-            ['tab-label-4', 10, langs.get_trads('2 and 1/2'),'','','','',''],
-            ['tab-label-4', 11, langs.get_trads('2 and 1/2'),'','','','',''],
-            ['tab-label-4', 12, langs.get_trads('3'),'','','','',''],
-            ['tab-label-4', 13, langs.get_trads('3'),'','','','',''],
-            ['tab-label-4', 14, langs.get_trads('3 and 1/2'),'','','','',''],
-            ['tab-label-4', 15, langs.get_trads('3 and 1/2'),'','','','',''],
-            ['tab-label-4', 16, langs.get_trads('4'),'','','','',''],
-            ['tab-label-4', 17, langs.get_trads('4'),'','','','',''],
-            ['tab-label-4', 18, langs.get_trads('4 and 1/2'),'','','','',''],
-            ['tab-label-4', 19, langs.get_trads('4 and 1/2'),'','','','',''],
-            ['tab-label-4', 20, langs.get_trads('5'),'','','','',''],
-            ['tab-label-4', 21, langs.get_trads('5'),'','','','',''],
-            ['tab-label-4', 22, langs.get_trads('5 and 1/2'),'','','','',''],
-            ['tab-label-4', 23, langs.get_trads('5 and 1/2'),'','','','',''],
-            ['tab-label-4', 24, langs.get_trads('6'),'','','','',''],
-            ['tab-label-4', 25, langs.get_trads('6'),'','','','',''],
-            ['tab-label-4', 26, langs.get_trads('6 and 1/2'),'','','','',''],
-            ['tab-label-4', 27, langs.get_trads('6 and 1/2'),'','','','',''],
-            ['tab-label-4', 28, langs.get_trads('7'),'','','','',''],
-            ['tab-label-4', 29, langs.get_trads('7'),'','','','',''],
-            ['tab-label-4', 30, langs.get_trads('7 and 1/2'),'','','','',''],
-            ['tab-label-4', 31, langs.get_trads('7 and 1/2'),'','','','',''],
-            ['tab-label-4', 32, langs.get_trads('8'),'','','','',''],
-            ['tab-label-4', 33, langs.get_trads('8'),'','','','',''],
-            ['tab-label-4', 34, langs.get_trads('8 and 1/2'),'','','','',''],
-            ['tab-label-4', 35, langs.get_trads('8 and 1/2'),'','','','',''],
-            ['tab-label-4', 36, langs.get_trads('9'),'','','','',''],
-            ['tab-label-4', 37, langs.get_trads('9'),'','','','',''],
-            ['tab-label-4', 38, langs.get_trads('9 and 1/2'),'','','','',''],
-            ['tab-label-4', 39, langs.get_trads('9 and 1/2'),'','','','',''],
-            ['tab-label-4', 40, langs.get_trads('10'),'','','','','']
+            ['tab-label-4', 0, langs.get_trads('--'),'','','','','',''],
+            ['tab-label-4', 1, langs.get_trads('--'),'','','','','',''],
+            ['tab-label-4', 2, langs.get_trads('1/2'),'','','','','',''],
+            ['tab-label-4', 3, langs.get_trads('1/2'),'','','','','',''],
+            ['tab-label-4', 4, langs.get_trads('1'),'','','','','',''],
+            ['tab-label-4', 5, langs.get_trads('1'),'','','','','',''],
+            ['tab-label-4', 6, langs.get_trads('1 and 1/2'),'','','','','',''],
+            ['tab-label-4', 7, langs.get_trads('1 and 1/2'),'','','','','',''],
+            ['tab-label-4', 8, langs.get_trads('2'),'','','','','',''],
+            ['tab-label-4', 9, langs.get_trads('2'),'','','','','',''],
+            ['tab-label-4', 10, langs.get_trads('2 and 1/2'),'','','','','',''],
+            ['tab-label-4', 11, langs.get_trads('2 and 1/2'),'','','','','',''],
+            ['tab-label-4', 12, langs.get_trads('3'),'','','','','',''],
+            ['tab-label-4', 13, langs.get_trads('3'),'','','','','',''],
+            ['tab-label-4', 14, langs.get_trads('3 and 1/2'),'','','','','',''],
+            ['tab-label-4', 15, langs.get_trads('3 and 1/2'),'','','','','',''],
+            ['tab-label-4', 16, langs.get_trads('4'),'','','','','',''],
+            ['tab-label-4', 17, langs.get_trads('4'),'','','','','',''],
+            ['tab-label-4', 18, langs.get_trads('4 and 1/2'),'','','','','',''],
+            ['tab-label-4', 19, langs.get_trads('4 and 1/2'),'','','','','',''],
+            ['tab-label-4', 20, langs.get_trads('5'),'','','','','',''],
+            ['tab-label-4', 21, langs.get_trads('5'),'','','','','',''],
+            ['tab-label-4', 22, langs.get_trads('5 and 1/2'),'','','','','',''],
+            ['tab-label-4', 23, langs.get_trads('5 and 1/2'),'','','','','',''],
+            ['tab-label-4', 24, langs.get_trads('6'),'','','','','',''],
+            ['tab-label-4', 25, langs.get_trads('6'),'','','','','',''],
+            ['tab-label-4', 26, langs.get_trads('6 and 1/2'),'','','','','',''],
+            ['tab-label-4', 27, langs.get_trads('6 and 1/2'),'','','','','',''],
+            ['tab-label-4', 28, langs.get_trads('7'),'','','','','',''],
+            ['tab-label-4', 29, langs.get_trads('7'),'','','','','',''],
+            ['tab-label-4', 30, langs.get_trads('7 and 1/2'),'','','','','',''],
+            ['tab-label-4', 31, langs.get_trads('7 and 1/2'),'','','','','',''],
+            ['tab-label-4', 32, langs.get_trads('8'),'','','','','',''],
+            ['tab-label-4', 33, langs.get_trads('8'),'','','','','',''],
+            ['tab-label-4', 34, langs.get_trads('8 and 1/2'),'','','','','',''],
+            ['tab-label-4', 35, langs.get_trads('8 and 1/2'),'','','','','',''],
+            ['tab-label-4', 36, langs.get_trads('9'),'','','','','',''],
+            ['tab-label-4', 37, langs.get_trads('9'),'','','','','',''],
+            ['tab-label-4', 38, langs.get_trads('9 and 1/2'),'','','','','',''],
+            ['tab-label-4', 39, langs.get_trads('9 and 1/2'),'','','','','',''],
+            ['tab-label-4', 40, langs.get_trads('10'),'','','','','','']
         ]
         for row in new_rows:
             self.df_choice.loc[len(self.df_choice)] = row

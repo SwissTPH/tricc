@@ -1609,7 +1609,7 @@ def negate_term(expression):
                 operator=TriccOperator.NOT,
                 reference=[expression]
             )
-        if issubclass(expression.__class__, TriccNodeDisplayBase):
+        if issubclass(expression.__class__, TriccNodeDisplayModel):
             return TriccOperation(
                 operator=TriccOperator.NOT,
                 reference=[TriccOperation(
