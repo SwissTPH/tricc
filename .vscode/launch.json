@@ -11,12 +11,12 @@
         "-i",
         "/home/delcpa/Development/global-almanach/L2",
         "-l",
-        "d",
+        "i",
         "-o",
         "/home/delcpa/Development/global-almanach/output",
         "-t",
         "-O",
-        "XLSFormCHTStrategy",
+        "XLSFormCHTHFStrategy",
         "-D",
         "/home/delcpa/Development/tricc-mage/output"
       ],
@@ -59,6 +59,25 @@
       "args": [
         "-i",
         "./tests/data/demo.drawio",
+        "-l",
+        "d",
+        "-o",
+        "./tests/output/demo",
+        "-t",
+        "-O",
+        "XLSFormStrategy"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": false
+    },
+    {
+      "name": "Medtronic TB",
+      "type": "python",
+      "request": "launch",
+      "program": "tests/build.py",
+      "args": [
+        "-i",
+        "./tests/data/medtronic.drawio",
         "-l",
         "d",
         "-o",

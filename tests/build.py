@@ -30,7 +30,7 @@ from tricc_oo.strategies.input.drawio import DrawioStrategy
 from tricc_oo.strategies.output.xls_form import XLSFormStrategy
 from tricc_oo.strategies.output.xlsform_cdss import XLSFormCDSSStrategy
 from tricc_oo.strategies.output.xlsform_cht import XLSFormCHTStrategy
-
+from tricc_oo.strategies.output.xlsform_cht_hf import XLSFormCHTHFStrategy
 
 def setup_logger(
     logger_name,
