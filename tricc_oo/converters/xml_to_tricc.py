@@ -123,6 +123,10 @@ def process_edges(diagram, media_path, activity, nodes):
             enriched, image = enrich_node(diagram, media_path, edge, nodes[edge.target])
             if enriched is None:
                 activity.unused_edges.append(edge)
+            elif issubclass(enriched.__class__, TriccBaseModel):
+                bridge = inject_bridge_path(nodes[edge.target], nodes)
+                activity.nodes[enriched.id] = enriched
+                set_prev_next_node(bridge, enriched, activity=activity) 
             if image is not None:
                 images.append({"file_path": enriched, "image_content": image})
 
@@ -458,6 +462,13 @@ def enrich_node(diagram, media_path, edge, node):
         # get node and process type
         type, message = get_message(diagram, edge.source)
         if type is not None:
+            if type == 'help':
+                return TriccNodeMoreInfo(
+                    id=generate_id(),
+                    name=f"{node.name}.more_info",
+                    label=message
+                ), None
+            
             if type in (TriccNodeType.start, TriccNodeType.activity_start):
                 return True
             elif hasattr(node, type):

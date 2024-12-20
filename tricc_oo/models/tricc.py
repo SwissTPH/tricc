@@ -345,3 +345,5 @@ class TriccNodeInteger(TriccNodeNumber):
 class TriccNodeText(TriccNodeInputModel):
     tricc_type: TriccNodeType = TriccNodeType.text
 
+class TriccNodeMoreInfo(TriccNodeInputModel):
+    tricc_type: TriccNodeType = TriccNodeType.help
