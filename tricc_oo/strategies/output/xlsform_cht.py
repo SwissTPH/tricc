@@ -121,7 +121,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
                 df_settings.head()
                 task_df, hidden_names = make_breakpoints(self.df_survey, i)
                 # deactivate the end node
-                task_df.loc[task_df['name'] == get_export_name(e), 'calculate'] = 0
+                task_df.loc[task_df['name'] == get_export_name(e), 'calculation'] = 0
                 #print fileds
                 writer = pd.ExcelWriter(newpath, engine='xlsxwriter')
                 task_df.to_excel(writer, sheet_name='survey',index=False)
