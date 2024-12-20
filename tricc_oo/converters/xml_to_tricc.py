@@ -80,7 +80,7 @@ def create_activity(diagram, media_path):
         images = process_edges(diagram, media_path, activity, nodes)
         # link back the activity
         activity.root.activity = activity
-        manage_dandling_calculate(activity)
+        manage_dangling_calculate(activity)
 
         return activity, images
     else:
@@ -88,8 +88,8 @@ def create_activity(diagram, media_path):
         logger.warning("root not found for page {0}".format(name))
 
 
-def manage_dandling_calculate(activity):
-    dandling = {}
+def manage_dangling_calculate(activity):
+    dangling = {}
     for node in activity.nodes.values():
         prev_nodes = [
             activity.nodes[n.source]
@@ -104,12 +104,12 @@ def manage_dandling_calculate(activity):
                 )
             )
         ]
-        if len(prev_nodes) == 0 and issubclass(node.__class__, TriccNodeCalculate):
-            dandling[node.id] = node
-    if len(dandling) > 0:
-        activity.calculates += list(dandling.values())
-        # wait = get_activity_wait([activity.root], [activity.root], dandling.values(), edge_only=True)
-        # activity.nodes.update(dandling)
+        if len(prev_nodes) == 0 and issubclass(node.__class__, TriccNodeCalculateBase):
+            dangling[node.id] = node
+    if len(dangling) > 0:
+        activity.calculates += list(dangling.values())
+        # wait = get_activity_wait([activity.root], [activity.root], dangling.values(), edge_only=True)
+        # activity.nodes.update(dangling)
 
 
 def process_edges(diagram, media_path, activity, nodes):

@@ -78,7 +78,7 @@ class TriccNodeActivity(TriccNodeBaseModel):
     relevance: Optional[Union[Expression, TriccOperation]] = None
     #caclulate that are not part of the any skip logic:
     # - inputs
-    # - dandling calculate
+    # - dangling calculate
     # - case definition
     calculates: List[TriccNodeCalculateBase] = []
 
