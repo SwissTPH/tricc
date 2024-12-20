@@ -142,6 +142,9 @@ ODK_TRICC_TYPE_MAP = { 'note':'note'
     ,'page':''
     ,'bridge':'calculate'
     ,'date':'date'
+    ,'diagnosis':'calculate'
+    ,'proposed_diagnosis':'calculate'
+    ,'input': ''
     }
 
 GROUP_TRICC_TYPE = [TriccNodeType.page,TriccNodeType.activity]
@@ -328,6 +331,31 @@ def get_diagnostic_line(node):
         '',#'repeat_count'
         ''#'image'  
     ]
+    
+def get_input_line(node):
+    label = langs.get_trads(node.label, force_dict =True)
+    empty = langs.get_trads('', force_dict =True)
+    return [
+        'hidden',
+        get_export_name(node),
+        *list(empty.values()) ,
+        *list(empty.values()) ,#hint
+        *list(empty.values()) ,#help
+        '',#default
+        '',#'appearance', clean_name
+        '',#'constraint', 
+        *list(empty.values()) ,#'constraint_message'
+        '',#'relevance'
+        '',#'disabled'
+        '',#'required'
+        *list(empty.values()) ,#'required message'
+        '',#'read only'
+        '',#'expression'
+        '',#'repeat_count'
+        ''#'image'  
+    ]   
+    
+    
 
 def get_diagnostic_start_group_line():
     label = langs.get_trads('List of diagnostics', force_dict =True)

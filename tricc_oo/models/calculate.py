@@ -56,7 +56,9 @@ class TriccNodeProposedDiagnosis(TriccNodeDisplayCalculateBase):
 class TriccNodeFakeCalculateBase(TriccNodeCalculateBase):
     id: triccId = generate_id()
 
-
+class TriccNodeInput(TriccNodeFakeCalculateBase):
+    tricc_type: TriccNodeType = TriccNodeType.input
+    
 class TriccNodeDisplayBridge(TriccNodeDisplayCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.bridge
         

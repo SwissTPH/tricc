@@ -1,6 +1,6 @@
 import logging
 from tricc_oo.models.tricc import TriccNodeActivity
-from tricc_oo.models.calculate import TriccNodeDiagnosis
+from tricc_oo.models.calculate import TriccNodeProposedDiagnosis, TriccNodeInput
 from tricc_oo.serializers.xls_form import (get_diagnostic_add_line,
                                         get_diagnostic_line,
                                         get_diagnostic_none_line,
@@ -15,16 +15,11 @@ logger = logging.getLogger("default")
 
 
 class XLSFormCDSSStrategy(XLSFormStrategy):
-
-            
-    
+  
     def process_export(self, start_pages,  **kwargs):
         diags = []
         self.activity_export(start_pages[self.processes[0]], **kwargs)
-
-        diags += self.export_diag( start_pages[self.processes[0]],  **kwargs)
-
-           
+        diags += self.export_proposed_diags( start_pages[self.processes[0]],  **kwargs)
         if len(diags)>0:
              # add the diag
             self.df_survey.loc[len(self.df_survey)] = get_diagnostic_start_group_line()
@@ -39,15 +34,25 @@ class XLSFormCDSSStrategy(XLSFormStrategy):
         self.add_tab_breaks_choice()
         self.add_wfx_choice()
     
-    def export_diag(self, activity, diags = [], **kwargs):
+    def export_proposed_diags(self, activity, diags = [], **kwargs):
         for node in activity.nodes.values():
             if isinstance(node, TriccNodeActivity):
-                diags = self.export_diag(node, diags, **kwargs)
-            if isinstance(node, TriccNodeDiagnosis):
+                diags = self.export_proposed_diags(node, diags, **kwargs)
+            if isinstance(node, TriccNodeProposedDiagnosis):
                 if node.last\
                     and not any([get_export_name(diag)  == get_export_name(node) for diag in diags]):
                         diags.append(node)
         return diags
+    
+    
+    def export_inputs(self, activity, inputs = [], **kwargs):
+        for node in activity.nodes.values():
+            if isinstance(node, TriccNodeActivity):
+                inputs = self.export_inputs(node, inputs, **kwargs)
+            if isinstance(node, TriccNodeInput):
+                inputs.append(node)
+        return inputs
+    
     def tricc_operation_has_qualifier(self, ref_expressions):
         raise NotImplementedError(f"This type of opreration  is not supported in this strategy")
     def tricc_operation_age_day(self, ref_expressions):

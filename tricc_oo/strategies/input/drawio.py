@@ -160,13 +160,13 @@ class DrawioStrategy(BaseInputStrategy):
                     )
                 )
                 if len(option_edge) == 0:
-                    logger.error(
+                    logger.warning(
                         "node {0} without edges out found in page {1}, full path {2}".format(
                             node.get_name(), page.label, current_path
                         )
                     )
             else:
-                logger.error(
+                logger.warning(
                     "node {0} without edges out found in page {1}, full path {2}".format(
                         node.get_name(), page.label, current_path
                     )
