@@ -32,7 +32,17 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
         inputs = self.export_inputs( start_pages[self.processes[0]],  **kwargs)
         for input in inputs:
             df_input.loc[len(df_input)] = get_input_line(input)
-        
+        df_input.loc[len(df_input)] = [ 
+            'string', 'data_load',
+            *list(langs.get_trads('NO_LABEL', force_dict = True).values()),
+            *list(langs.get_trads('', force_dict = True).values()),
+            *list(langs.get_trads('', force_dict = True).values()),
+            '',  'hidden',  '',
+            *list(langs.get_trads('', force_dict = True).values()),
+            '', '','',
+            *list(langs.get_trads('', force_dict = True).values())
+            ,'', '', '', '' 
+        ]      
         df_input.loc[len(df_input)] = [ 'hidden', 'task_id' ,*list(langs.get_trads('Task ID', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', '',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()), '', '', '', '']
         df_input.loc[len(df_input)] = [ 'begin group	', 'contact' ,*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', '',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()), '', '', '', '' ]
         df_input.loc[len(df_input)] = [ 'db:person', '_id', *list(langs.get_trads('Patient ID', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', 'db-object',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()), '', '', '', '' ]
