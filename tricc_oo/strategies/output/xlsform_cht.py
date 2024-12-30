@@ -19,9 +19,11 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
         
         super().process_export( start_pages,  **kwargs)
         cht_header = pd.DataFrame(columns=SURVEY_MAP.keys())
+        cht_input_df = self.get_cht_input( start_pages,  **kwargs)
+        self.df_survey= self.df_survey[~self.df_survey['name'].isin(cht_input_df['name'])]
+
         
-        
-        self.df_survey = pd.concat([self.get_cht_input( start_pages,  **kwargs),self.df_survey[~self.df_survey['name'].isin(['p_sex', 'p_age', 'p_age_days','p_age_month','p_age_year','p_name','p_dob'])],self.get_cht_summary() ], ignore_index=True)
+        self.df_survey = pd.concat([cht_input_df, self.df_survey ,self.get_cht_summary() ], ignore_index=True)
  
     def get_cht_input(self, start_pages, **kwargs):
         df_input = pd.DataFrame(columns=SURVEY_MAP.keys())
