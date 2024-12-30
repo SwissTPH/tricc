@@ -1,0 +1,138 @@
+from fhir.resources.codesystem import (
+    CodeSystem,
+    CodeSystemConcept,
+    CodeSystemConceptDesignation,
+    CodeSystemConceptProperty
+)
+from fhir.resources.codeableconcept import CodeableConcept
+from fhir.resources.range import Range
+from fhir.resources.quantity import Quantity
+from fhir.resources.coding import Coding
+
+from fhir.resources.valueset import ValueSet, ValueSetCompose, ValueSetComposeInclude
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def add_concept(codesystems, system, code, display, attributes):
+    if system and system not in codesystems:
+        logger.info(f"New codesystem {system} added to project")
+        codesystems[system] = init_codesystem(system, system)
+    
+    
+    
+    return check_and_add_concept(codesystems[system], code, display, attributes)
+            
+
+                
+    
+def init_codesystem(code, name):
+    return CodeSystem(
+            id=code,
+            url=f"http://example.com/fhir/CodeSystem/{code}",
+            version="1.0.0",
+            name=name,
+            title=name,
+            status="draft",
+            description=f"Code system for {name}",
+            content="complete",
+            concept=[]
+        )
+    
+def init_valueset(code, name):
+    return ValueSet(
+            id=code,
+            url=f"http://example.com/fhir/ValueSet/{code}",
+            version="1.0.0",
+            name=name,
+            title=name,
+            status="draft",
+            description=f"Valueset for {name}",
+            content="complete",
+            conatains=[]
+        )
+
+def check_and_add_concept(code_system: CodeSystem, code: str, display: str, attributes: dict={}):
+    """
+    Checks if a concept with the given code already exists in the CodeSystem.
+    If it exists with a different display, raises an error. Otherwise, adds the concept.
+
+    Args:
+        code_system (CodeSystem): The CodeSystem to check and update.
+        code (str): The code of the concept to add.
+        display (str): The display of the concept to add.
+
+    Raises:
+        ValueError: If a concept with the same code exists but has a different display.
+    """
+    new_concept = None
+    # Check if the concept already exists
+    for concept in code_system.concept or []:
+        if concept.code == code:
+            
+            if concept.display != display:
+                logger.warning(
+                    f"Code {code} already exists with a different display: {concept.display}"
+                )
+            new_concept = concept
+    if not new_concept:
+        # Add the new concept if it does not exist
+        new_concept = CodeSystemConcept.construct(code=code, display=display)
+        if not hasattr(code_system, "concept"):
+            code_system.concept = []
+        code_system.concept.append(new_concept)
+    
+    if attributes and not new_concept.property:
+        new_concept.property = []
+    
+    for k,v in attributes.items():          
+        for p in new_concept.property:
+            if p.code == k:
+                #TODO support other type of Codesystem Concept Property Value
+                if p.valueString != v:
+                    logger.warning(f"conflicting value for property {k}: {p.valueString} != {v}")
+    return new_concept
+
+
+def add_yeno_concepts(code_system: CodeSystem) -> ValueSet:
+    """
+    Adds 'yes' and 'no' concepts to the given CodeSystem after checking for duplicates.
+    Creates a ValueSet referencing these concepts.
+
+    Args:
+        code_system (CodeSystem): The CodeSystem to which 'yes' and 'no' concepts will be added.
+
+    Returns:
+        ValueSet: A FHIR ValueSet referencing the added concepts.
+
+    Raises:
+        ValueError: If a concept with the same code exists but has a different display.
+    """
+    # Add 'yes' and 'no' concepts after validation
+    check_and_add_concept(code_system, "1", "Yes", {
+        'archetype': "options"
+        })
+                          
+    check_and_add_concept(code_system, "-1", "No", {
+        'archetype': "options"
+        })
+    # Create a ValueSet referencing the updated CodeSystem
+    value_set = ValueSet.construct(
+        url="http://example.org/fhir/ValueSet/yes-no",
+        name="YesNoValueSet",
+        status="active",
+        compose=ValueSetCompose.construct(
+            include=[
+                ValueSetComposeInclude.construct(
+                    system=code_system.url,
+                    concept=[
+                        {"code": "1", "display": "Yes"},
+                        {"code": "-1", "display": "No"}
+                    ]
+                )
+            ]
+        )
+    )
+
+    return value_set

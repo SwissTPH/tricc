@@ -1,5 +1,6 @@
 import logging
 import os
+import json
 from copy import copy
 
 from tricc_oo.converters.xml_to_tricc import create_activity
@@ -17,6 +18,8 @@ logger = logging.getLogger("default")
 
 
 class DrawioStrategy(BaseInputStrategy):
+    codesystems = {}
+    valuesets = {} 
     processes = [
         "triage",
         "registration",
@@ -70,6 +73,8 @@ class DrawioStrategy(BaseInputStrategy):
         pages = {}
         diagrams = []
         start_pages = {}
+        code_systems = {}
+        value_sets = {}
         # read all pages
         logger.info("# Create the activities from diagram pages")
         # if os.path.isdir(in_filepath):
@@ -85,7 +90,7 @@ class DrawioStrategy(BaseInputStrategy):
         images_diagram = []
         for diagram in diagrams:
             logger.info("Create the activity {0}".format(diagram.attrib.get("name")))
-            page, images = create_activity(diagram, media_path)
+            page, images = create_activity(diagram, media_path, code_systems, value_sets)
             if images is not None:
                 images_diagram += images
             if page is not None:
@@ -107,7 +112,12 @@ class DrawioStrategy(BaseInputStrategy):
                                 )
                             )
         logger.info("# Create the graph from the start node")
-
+        for k,v in code_systems.items():
+            with open(os.path.join(os.path.dirname(media_path),  f"{k}_codesystem.json"), "w") as file:
+                file.write(v.json(indent=4))
+        for k,v in value_sets.items():
+            with open(os.path.join(os.path.dirname(media_path), f"{k}_valueset.json"), "w") as file:
+                file.write(v.json(indent=4))
         app = self.execute_linked_process(start_pages, pages)
         if app:
             start_pages["main"] = app

@@ -19,6 +19,7 @@ from tricc_oo.parsers.xml import (
 )
 
 from tricc_oo.visitors.tricc import *
+from tricc_oo.converters.datadictionnary import add_concept
 
 TRICC_YES_LABEL = ["yes", "oui"]
 TRICC_NO_LABEL = ["no", "non"]
@@ -48,7 +49,7 @@ def get_all_nodes(diagram, activity, nodes):
 
     return nodes
 
-def create_activity(diagram, media_path):
+def create_activity(diagram, media_path, codes_systems, values_sets):
     id = diagram.attrib.get("id")
     root = create_root_node(diagram)
     name = diagram.attrib.get("name")
@@ -71,6 +72,12 @@ def create_activity(diagram, media_path):
         if edges and len(edges) > 0:
             activity.edges = edges
         nodes = get_nodes(diagram, activity)
+        for n in nodes.values():
+            if (
+                issubclass(n.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase)) 
+                and not isinstance(n, (TriccRhombusMixIn, TriccNodeRhombus, TriccNodeDisplayBridge))
+            ):
+                add_concept(codes_systems, 'tricc', n.name, n.label, {})
         groups = get_groups(diagram, nodes, activity)
         if groups and len(groups) > 0:
             activity.groups = groups
