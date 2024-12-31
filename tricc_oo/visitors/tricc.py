@@ -1199,7 +1199,13 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
             expression = TriccOperation(
                 TriccOperator.AND, [
                     TriccOperation(
-                        TriccOperator.NOT, [end_node]
+                        TriccOperator.NOT, 
+                        [
+                            TriccOperation(
+                                TriccOperator.ISTRUE,
+                                [end_node]
+                            )
+                        ]
                     ),
                         expression
                 ]
