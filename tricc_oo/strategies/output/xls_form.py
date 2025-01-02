@@ -256,6 +256,8 @@ class XLSFormStrategy(BaseOutPutStrategy):
         # add the calulate
         self.df_calculate = self.df_calculate.dropna(axis=0, subset=["calculation"])
         df_empty_calc = self.df_calculate[self.df_calculate["calculation"] == ""]
+        self.df_survey.reset_index(drop=True, inplace=True)
+        self.df_calculate.reset_index(drop=True, inplace=True)
         self.df_calculate = self.df_calculate.drop(df_empty_calc.index)
         self.df_survey = pd.concat(
             [df_survey_final, self.df_calculate], ignore_index=True
@@ -322,6 +324,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
         ]
         for index, duplicate in df_duplicate.iterrows(): 
             logger.error(f"duplicate survey name: {duplicate['name']}")
+        self.df_survey.reset_index(drop=True, inplace=True)
         return processed_nodes
 
     def get_tricc_operation_expression(self, operation):

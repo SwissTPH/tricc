@@ -9,6 +9,8 @@ from tricc_oo.serializers.xls_form import (get_diagnostic_add_line,
 from tricc_oo.converters.tricc_to_xls_form import get_export_name
 from tricc_oo.strategies.output.xls_form import XLSFormStrategy
 from tricc_oo.models.lang import SingletonLangClass
+from tricc_oo.converters.utils import clean_name
+
 langs = SingletonLangClass()
 logger = logging.getLogger("default")
 
@@ -20,6 +22,9 @@ class XLSFormCDSSStrategy(XLSFormStrategy):
         diags = []
         self.activity_export(start_pages[self.processes[0]], **kwargs)
         diags += self.export_proposed_diags( start_pages[self.processes[0]],  **kwargs)
+        self.df_survey = self.df_survey[~self.df_survey['name'].isin([clean_name("final.")+get_export_name(n) for n in diags])]
+        self.df_survey.reset_index(drop=True, inplace=True)
+
         if len(diags)>0:
              # add the diag
             self.df_survey.loc[len(self.df_survey)] = get_diagnostic_start_group_line()

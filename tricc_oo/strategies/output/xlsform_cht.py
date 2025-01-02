@@ -21,6 +21,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
         cht_header = pd.DataFrame(columns=SURVEY_MAP.keys())
         cht_input_df = self.get_cht_input( start_pages,  **kwargs)
         self.df_survey= self.df_survey[~self.df_survey['name'].isin(cht_input_df['name'])]
+        self.df_survey.reset_index(drop=True, inplace=True)
 
         
         self.df_survey = pd.concat([cht_input_df, self.df_survey ,self.get_cht_summary() ], ignore_index=True)
