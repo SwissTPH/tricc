@@ -121,7 +121,7 @@ class TriccBaseModel(BaseModel):
         return hash_value
 
     def get_name(self):
-        return id
+        return self.id
     
     def __str__(self):
         return f"{self.tricc_type}:{self.get_name()}({self.id})"

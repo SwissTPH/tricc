@@ -1163,7 +1163,7 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
         )
     elif is_prev and isinstance(node, TriccNodeRhombus):
         expression = get_rhombus_terms(node, processed_nodes)  # if issubclass(node.__class__, TricNodeDisplayCalulate) else TRICC_CALC_EXPRESSION.format(get_export_name(node)) #
-        negate_expression = TriccOperation(TriccOpertor.Not,[r_ref])
+        negate_expression = TriccOperation(TriccOperator.NOT,[expression])
         if node.path is not None: 
             expression = TriccOperation(
                 TriccOperator.AND,
@@ -1451,16 +1451,14 @@ def get_rhombus_terms( node, processed_nodes, is_calculate=False, negate=False):
                 [
                     get_node_expression(expression, processed_nodes, is_calculate=True, is_prev=True)
                 ])
-        elif issubclass(expression.__class__ , ):
+        elif issubclass(expression.__class__ , (TriccOperation)  ):
+            return expression
+        elif issubclass(expression.__class__ , (TriccNodeDisplayModel, TriccReference)):
             return TriccOperation(
-                TriccOperator.CAST_NUMBER,
-                [expression]
-            )
-        elif issubclass(expression.__class__ , TriccNodeDisplayModel):
-            return TriccNodeOperation(
-                TriccOperator.EXISTS,
+                TriccOperator.ISTRUE,
                 [
-                    expression                ]
+                    expression                
+                ]
             )
         else:
             if left_term is not None and re.search(" (\+)|(\-)|(or)|(and) ", expression):

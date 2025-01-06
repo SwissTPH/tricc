@@ -30,7 +30,7 @@ logger = logging.getLogger("default")
 
 def get_export_name(node):
     if isinstance(node, str):
-        return node
+        return clean_name(node)
     if node.export_name is None:
         node.export_name = clean_name(node.name)
         if node.name is None:

@@ -26,7 +26,7 @@ def clean_name( name, prefix='' ):
 
 def generate_id(name=None):
     if name:
-        return hashlib.md5(name)
+        return hashlib.md5(name.encode('utf-8') if isinstance(name, str) else name).hexdigest()
     else:
         return ''.join(random.choices(string.ascii_lowercase, k=8))
 
