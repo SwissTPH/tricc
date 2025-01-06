@@ -527,8 +527,6 @@ def merge_calculate(node, calculates, last_used_calc):
             del calculates[node.name]
     
     return node_to_delete
-    
-
         
 def get_select_not_available_options(node,group,label):
     return {0:TriccNodeSelectOption(
@@ -567,6 +565,7 @@ def get_select_yes_no_options(node, group):
 
 def walktrhough_tricc_node_processed_stached(node, callback, processed_nodes, stashed_nodes, path_len, recursive=True, warn = False,
                                              node_path = [], **kwargs):
+    ended_activity = False
     # logger.debug("walkthrough::{}::{}".format(callback.__name__, node.get_name()))
     if hasattr(node, 'prev_nodes') and len(node.prev_nodes) > 0:
         path_len = max(path_len, *[n.path_len + 1 for n in node.prev_nodes], len(processed_nodes)+1)
@@ -574,9 +573,15 @@ def walktrhough_tricc_node_processed_stached(node, callback, processed_nodes, st
     if (callback(node, processed_nodes=processed_nodes, stashed_nodes=stashed_nodes, warn = warn, node_path=node_path, **kwargs)):
         node_path.append(node)
         # node processing succeed 
-        if node not in processed_nodes:
+        if not isinstance(node, TriccNodeActivity) and node not in processed_nodes:
             processed_nodes.add(node)
             logger.debug("{}::{}: processed ({})".format(callback.__name__, node.get_name(), len(processed_nodes)))
+            if isinstance(node, (TriccNodeEnd,TriccNodeActivityEnd)):
+                end_nodes = node.activity.get_end_nodes()
+                if all([e in processed_nodes for e in end_nodes]):
+                    processed_nodes.add(node.activity)
+                    ended_activity = True
+                    logger.debug("{}::{}: processed ({})".format(callback.__name__, node.activity.get_name(), len(processed_nodes)))
         if node in stashed_nodes:
             stashed_nodes.remove(node)
             # logger.debug("{}::{}: unstashed ({})".format(callback.__name__, node.get_name(), len(stashed_nodes)))
@@ -596,7 +601,7 @@ def walktrhough_tricc_node_processed_stached(node, callback, processed_nodes, st
             else:
                 stashed_nodes += node.activity.calculates 
                 stashed_nodes += node.activity.groups.values()
-        if isinstance(node, TriccNodeActivity):
+        if isinstance(node, TriccNodeActivity) and node.root not in processed_nodes:
             if node.root is not None:
                 node.root.path_len = max(path_len,  node.root.path_len)
                 if recursive:
@@ -618,7 +623,7 @@ def walktrhough_tricc_node_processed_stached(node, callback, processed_nodes, st
                     #     stashed_nodes.add(gp)
                     # #    stashed_nodes.insert(0,gp)
                 return
-        elif isinstance(node, TriccNodeActivityEnd):
+        elif ended_activity:
             for next_node in node.activity.next_nodes:
                 if next_node not in stashed_nodes:
                     #stashed_nodes.insert(0,next_node)
@@ -637,7 +642,7 @@ def walktrhough_tricc_node_processed_stached(node, callback, processed_nodes, st
                         "{}::{}: processed ({})".format(callback.__name__, option.get_name(), len(processed_nodes)))
                 walkthrough_tricc_option(node, callback, processed_nodes, stashed_nodes, path_len + 1, recursive,
                                          warn = warn,node_path = node_path, **kwargs)
-        if hasattr(node, 'next_nodes') and len(node.next_nodes) > 0:
+        if hasattr(node, 'next_nodes') and len(node.next_nodes) > 0 and not isinstance(node, TriccNodeActivity):
             if recursive:
                 walkthrough_tricc_next_nodes(node, callback, processed_nodes, stashed_nodes, path_len + 1, recursive,
                                              warn = warn,node_path = node_path,**kwargs)
@@ -757,23 +762,7 @@ def is_ready_to_process(in_node, processed_nodes, strict=True, local=False):
 def is_prev_processed(prev_node, node, processed_nodes, local):
     if hasattr(prev_node, 'select'):
         return  is_prev_processed(prev_node.select, node, processed_nodes, local)
-    if isinstance(prev_node, TriccNodeActivity):
-        if not local:
-            # other activity dont affect local evaluation
-            activity_end_nodes = prev_node.get_end_nodes()
-            if len(activity_end_nodes) == 0:
-                
-                logger.error("is_ready_to_process:failed: endless activity {0} before {0}".format(prev_node.get_name(),
-                                                                                            node.get_name()))
-                return False
-            for end_node in activity_end_nodes:
-                if end_node not in processed_nodes:
-                    logger.debug("is_ready_to_process:failed:via_end: {} - {} > {} {}:{}".format(
-                        get_data_for_log(prev_node),
-                        end_node.get_name(),
-                        node.__class__, node.get_name(), node.instance))
-                    return False
-    elif prev_node not in processed_nodes and (not local):
+    if prev_node not in processed_nodes and (not local):
         if isinstance(prev_node, TriccNodeExclusive):
             iterator = iter(prev_node.prev_nodes)
             p_n_node = next(iterator)

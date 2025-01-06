@@ -225,9 +225,14 @@ class DrawioStrategy(BaseInputStrategy):
                             self.linking_nodes(
                                 option, page, pages, processed_nodes, current_path
                             )
-                    if target_node not in processed_nodes:
-                        # don't save the link out because the real node is the page
+                    if not isinstance(target_node, TriccNodeActivity) and target_node not in processed_nodes:
                         processed_nodes.add(target_node)
+                        logger.debug("{}::{}: processed ({})".format('linking_nodes', target_node.get_name(), len(processed_nodes)))
+                        if isinstance(target_node.activity.root, TriccNodeActivityEnd) and isinstance(target_node.activity.root, TriccNodeMainStart):
+                            end_nodes = target_node.activity.get_end_nodes()
+                            if all([e in processed_nodes for e in end_nodes]):
+                                processed_nodes.add(target_node.activity)
+                                logger.debug("{}::{}: processed ({})".format('linking_nodes', target_node.activity.get_name(), len(processed_nodes)))
                     self.linking_nodes(
                         target_node, page, pages, processed_nodes, current_path
                     )
