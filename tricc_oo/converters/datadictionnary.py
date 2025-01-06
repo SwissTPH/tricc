@@ -71,9 +71,9 @@ def check_and_add_concept(code_system: CodeSystem, code: str, display: str, attr
     for concept in code_system.concept or []:
         if concept.code == code:
             
-            if concept.display != display:
+            if concept.display.lower() != display.lower():
                 logger.warning(
-                    f"Code {code} already exists with a different display: {concept.display}"
+                    f"Code {code} already exists with a different display:\n Concept:{concept.display}\n Current:{display}"
                 )
             new_concept = concept
     if not new_concept:
