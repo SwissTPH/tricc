@@ -71,9 +71,14 @@ class TriccRhombusMixIn():
     def make_mixin_instance(self, instance, instance_nb, activity, **kwargs):
         # shallow copy
         reference = []
+        expression_reference = None
         instance.path = None
+        if isinstance(self.expression_reference, (str, TriccOperation)):
+            expression_reference = self.expression_reference.copy()
+            reference = expression_reference.get_references()        
         if isinstance(self.reference, (str, TriccOperation)):
-            reference = self.reference
+            expression_reference = self.reference.copy()
+            reference = expression_reference.get_references()
         elif isinstance(self.reference, list):
             for ref in self.reference:
                 if issubclass(ref.__class__, TriccBaseModel):
@@ -93,6 +98,7 @@ class TriccRhombusMixIn():
                     logger.error("unexpected reference {} in node {}".format(ref, self.get_name()))
                     exit(1)
         instance.reference = reference
+        instance.expression_reference = expression_reference
         instance.name = get_rand_name(8)
         return instance
 
@@ -102,7 +108,7 @@ class TriccRhombusMixIn():
 class TriccNodeRhombus(TriccNodeCalculateBase,TriccRhombusMixIn):
     tricc_type: TriccNodeType = TriccNodeType.rhombus
     path: Optional[TriccNodeBaseModel] = None
-    reference: Union[List[TriccNodeBaseModel], Expression, TriccOperation]
+    reference: Union[List[TriccNodeBaseModel], Expression, TriccOperation, TriccReference, List[TriccReference]]
     
     def make_instance(self, instance_nb, activity, **kwargs):
         instance = super(TriccNodeRhombus, self).make_instance(instance_nb, activity, **kwargs)

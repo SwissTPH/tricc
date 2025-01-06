@@ -209,9 +209,21 @@ def process_edges(diagram, media_path, activity, nodes):
             for n in last_nodes:
                 set_prev_next_node(n, fake_end, edge_only=True)
             activity.nodes[fake_end.id] = fake_end
+        # take all last nodes
         else:
-            logger.error(f"cannot guess end for {activity.get_name()}")
-            exit(1)
+            last_nodes = [
+                n for n in list(activity.nodes.values())
+                if (
+                        not any([n.id == e.source for e in activity.edges])
+                )
+            ]
+            if last_nodes:
+                for n in last_nodes:
+                    set_prev_next_node(n, fake_end, edge_only=True)
+                activity.nodes[fake_end.id] = fake_end
+            else:
+                logger.error(f"cannot guess end for {activity.get_name()}")
+                exit(1)
     
     return images
 
@@ -536,20 +548,20 @@ def add_tricc_base_node(
 
 
 def load_expressions(node):
-    source = None
-    expression = None
     if getattr(node, 'expression', None):
-        expression = node.expression
-        source = 'expression'
-    elif getattr(node, 'reference', None):
-        expression = node.reference
-        source = 'reference'
-    if expression:
-        setattr(node, source, parse_expression(node.label, expression))
+        node.expression = parse_expression('', node.expression)
+    if getattr(node, 'relevance', None):
+        node.relevance = parse_expression('', node.relevance)
+    if getattr(node, 'default', None):
+        node.default = parse_expression('', node.default)
+    if getattr(node, 'reference', None):
+        node.expression_reference = parse_expression(node.label, node.reference)
+        node.reference = node.expression_reference.get_references()
+    
+        
         
 
 def parse_expression(label=None, expression=None):
-    label = label or getattr(node, 'label', None)
     if expression:
         ref_pattern = r'(\$\{[^\}]+\})'
             # only if simple ref

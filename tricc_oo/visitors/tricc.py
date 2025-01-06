@@ -110,10 +110,18 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
             ):
                 # generate the calc node version by looking in the processed calculate
                 # TODO the calculates should not be required with the latest version of get_last_version
-                last_calc = get_last_version(None, node.name, processed_nodes)
+                last_calc = get_last_version(
+                    None,
+                    node.name,
+                    [p for p in processed_nodes if issubclass(p.__class__, (TriccNodeCalculateBase, TriccNodeDisplayCalculateBase))]
+                )
                 # get max version used 
                 #last_used_version =  get_max_named_version(used_calculates, node.name)
-                last_used_calc = get_last_version(used_calculates, node.name, processed_nodes )
+                last_used_calc = get_last_version(
+                    used_calculates,
+                    node.name,
+                    processed_nodes
+                )
                 # add calculate is added after the version collection so it is 0 in case there is no calc found
                 add_calculate(calculates,node)  
                 # merge is there is unused version ->
@@ -357,90 +365,109 @@ def get_option_code_from_label(node, option_label):
 
 
 def process_reference(node, processed_nodes, calculates, used_calculates=None,  replace_reference=False,warn=False):
+    if getattr(node, 'expression_reference', None):
+        modified_expression = process_operation_reference(node.expression_reference, node, processed_nodes, calculates, used_calculates, replace_reference,warn)
+        if modified_expression is False:
+            return False
+        elif modified_expression:
+            node.reference = modified_expression.get_references()
+            node.expression_reference = modified_expression
+    elif getattr(node, 'reference', None):
+        if isinstance(node.reference, list):
+            operation = TriccOperation(
+                    TriccOperator.AND,
+                    [node.reference]
+                )
+            modified_expression = process_operation_reference(operation, node, processed_nodes, calculates, used_calculates, replace_reference,warn)
+            if modified_expression is False:
+                return False
+            elif modified_expression:
+                node.reference = modified_expression.get_references()
+            
+        elif isinstance(node.reference, (TriccOperation, TriccReference)):
+            modified_expression = process_operation_reference(node.reference, node, processed_nodes, calculates, used_calculates, replace_reference,warn)
+            if modified_expression is False:
+                return False
+            elif modified_expression:
+                node.reference = modified_expression.get_references()
+                node.expression_reference = modified_expression
+
+    if isinstance(getattr(node, 'relevance', None), (TriccOperation, TriccReference)):
+        modified_expression = process_operation_reference(node.relevance, node, processed_nodes, calculates, used_calculates, replace_reference,warn)
+        if modified_expression is False:
+            return False
+        elif modified_expression:
+            node.relevance = modified_expression
     
-    if getattr(node, 'reference', None):
-        reference = []
-        node_reference = []
-        expression_reference = None
-        ref_list = []
-        real_ref_list = []
-        label_dict = {}
-        refs = []
-        if node.expression_reference is None:
-            expression = node.reference 
-            if isinstance(node.reference, list):
-                # for wait
-                refs = expression
-            if isinstance(expression, TriccOperation):
-                refs = expression.get_references()
-                expression_reference = expression
-            elif isinstance(expression, TriccStatic):
-                expression_reference = expression
-            for r in refs:
-                if isinstance(r, TriccReference):
-                    if r.value.endswith(']'):
-                        terms = r.value[:-1].split('[')
-                        label_dict[terms[0]] = terms[1]
-                    else:
-                        ref_list.append(r.value)
-                if issubclass(r.__class__, TriccNodeBaseModel):
-                    real_ref_list.append(r)
-                
-            if reference is None and expression_reference is None:
-                logger.error(f"process_calculate_version_requirement:reference is None for {node.get_name()}")
-                exit(1)
-        else:
-            expression_reference = node.expression or node.expression_reference
-            ref_list = [r.value for r in node.reference if isinstance(r, TriccReference)]
-            real_ref_list = [r for r in node.reference if issubclass(r.__class__, TriccNodeBaseModel)]
+    if isinstance(getattr(node, 'default', None), (TriccOperation, TriccReference)):
+        modified_expression = process_operation_reference(node.default, node, processed_nodes, calculates, used_calculates, replace_reference,warn)
+        if modified_expression is False:
+            return False
+        elif modified_expression:
+            node.relevance = modified_expression
         
-        for ref in ref_list:
-            last_found = get_prev_node_by_name(processed_nodes, ref, node)
-            if last_found is None or issubclass(last_found.__class__, TriccNodeCalculateBase):
-                if ref in calculates and len(calculates[ref]) > 0:
-                    last_found = get_last_version(calculates, ref, processed_nodes)
-            if last_found is None:
-                logger.debug(f"reference {ref} not found for a calculate {node.get_name()}")
-                return False
-            else:
-                node_reference.append(last_found)
-                reference.append(TriccReference(ref))
-                if replace_reference:
-                    if isinstance(expression_reference, TriccOperation):
-                        expression_reference.replace_node(TriccReference(ref), last_found)
-                    elif expression_reference == TriccReference(ref):
-                        expression_reference = last_found
-                if ref in label_dict:
-                    # Resolve human-readable label
-                    option_code = get_option_code_from_label(last_found, label_dict[ref])
-                    if option_code:
-                        expression_reference = replace_code_reference(expression_reference, old=f"{ref}[{label_dict[ref]}]", new=option_code )
-                    else:
-                        logger.warning(f"Could not resolve label '{label_dict[ref]}' for reference {ref}")
-                        return False
-                if replace_reference:
-                    set_prev_next_node(last_found, node)
-                node.path_len = max(node.path_len, last_found.path_len)
-        for ref in real_ref_list:
-            if is_prev_processed(ref, node, processed_nodes, local=False) is False:
-                return False
-        
-        if used_calculates is not None:
-            for ref_nodes in node_reference:
-                if issubclass(ref_nodes.__class__, TriccNodeCalculateBase):
-                    add_used_calculate(node, ref_nodes, calculates, used_calculates, processed_nodes)
-        
-        if expression_reference and not isinstance(node, TriccNodeWait):
-            node.expression_reference = expression_reference
-        if node.expression:
-            node.expression = expression_reference  
-        if reference or expression_reference:
-            if replace_reference:
-                node.reference = node_reference
-            else:
-                node.reference = reference
+    if isinstance(getattr(node, 'expression', None), (TriccOperation, TriccReference)):
+        modified_expression = process_operation_reference(node.expression, node, processed_nodes, calculates, used_calculates, replace_reference,warn)
+        if modified_expression is False:
+            return False
+        elif modified_expression:
+            node.expression = modified_expression
+            
+
     return True
+
+def process_operation_reference(operation, node, processed_nodes, calculates, used_calculates=None,  replace_reference=False,warn=False):
+    modified_operation = None
+    node_reference = []
+    reference = []
+    option_label = None
+    ref_list = [r.value for r in operation.get_references() if isinstance(r, TriccReference)]
+    real_ref_list = [r for r in operation.get_references() if issubclass(r.__class__, TriccNodeBaseModel)]
+    for ref in ref_list:
+        if ref.endswith(']'):
+            terms = ref[:-1].split('[')
+            option_label = terms[1]
+            ref = terms[0]
+        else:
+            option_label = None
+            
+        last_found = get_prev_node_by_name(processed_nodes, ref, node)
+        if last_found is None or issubclass(last_found.__class__, TriccNodeCalculateBase):
+            if ref in calculates and len(calculates[ref]) > 0:
+                last_found = get_last_version(calculates, ref, processed_nodes)
+        if last_found is None:
+            logger.debug(f"reference {ref} not found for a calculate {node.get_name()}")
+            return False
+        else:
+            node_reference.append(last_found)
+            reference.append(TriccReference(ref))
+            if replace_reference:
+                if isinstance(operation, (TriccOperation, TriccReference)):
+                    modified_operation = operation.copy()
+                    modified_operation.replace_node(TriccReference(ref), last_found)
+                elif operation == TriccReference(ref):
+                    modified_operation = last_found
+            if option_label:
+                # Resolve human-readable label
+                option_code = get_option_code_from_label(last_found, option_label)
+                if option_code:
+                    modified_operation = replace_code_reference(operation, old=f"{ref}[{option_label}]", new=option_code )
+                else:
+                    logger.warning(f"Could not resolve label '{option_label}' for reference {ref}")
+                    return False
+            if replace_reference:
+                set_prev_next_node(last_found, node)
+            node.path_len = max(node.path_len, last_found.path_len)
+    for ref in real_ref_list:
+        if is_prev_processed(ref, node, processed_nodes, local=False) is False:
+            return False
     
+    if used_calculates is not None:
+        for ref_nodes in node_reference:
+            if issubclass(ref_nodes.__class__, TriccNodeCalculateBase):
+                add_used_calculate(node, ref_nodes, calculates, used_calculates, processed_nodes)
+    return modified_operation
+
 def replace_code_reference(expression, old, new):
     if isinstance(expression, str):
         return expression_reference.replace(old, f"'{new}'")
@@ -1427,6 +1454,8 @@ def get_rhombus_terms( node, processed_nodes, is_calculate=False, negate=False):
                     expression = get_node_expression(ref, processed_nodes, is_calculate=True, is_prev=True)
                 else:
                     expression = ref
+            elif issubclass(ref.__class__, TriccReference):
+                expression = ref
             else:
                 logger.error('reference {0} was not found in the previous nodes of node {1}'.format(node.reference,
                                                                                                     node.get_name()))

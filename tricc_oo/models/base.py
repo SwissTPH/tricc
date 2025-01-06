@@ -157,15 +157,20 @@ class TriccGroup(TriccBaseModel):
             self.name = generate_id()
 
     def get_name(self):
-        
-        if self.label is not None:
-            name = self.label[self.label.keys()[0]] if isinstance(self.label, Dict) else self.label
-            if len(name) < 50:
-                return name
-            else:
-                return name[:50]
+        result = str(super().get_name())
+        name =  getattr(self, 'name', None) 
+        label =  getattr(self, 'label', None)
+    
+        if name:
+            result = result + "::" + name
+        if label:
+            result = result + "::" + (
+                next(iter(self.label.values())) if isinstance(self.label, Dict) else self.label
+            )
+        if len(name) < 50:
+            return result
         else:
-            return self.name
+            return result[:50] 
 
 FwTriccNodeBaseModel = ForwardRef('TriccNodeBaseModel')
 
@@ -189,17 +194,22 @@ class TriccNodeBaseModel(TriccBaseModel):
     # to be updated while processing because final expression will be possible to build$
     # #only the last time the script will go through the node (all prev node expression would be created    
     def get_name(self):
-        if self.label is not None:
-            name = next(iter(self.label.values())) if isinstance(self.label, Dict) else self.label
-            if len(name) < 50:
-                return name
-            else:
-                return name[:50]
-        elif self.name is not None:
-            return self.name
+        result = str(super().get_name())
+        name =  getattr(self, 'name', None) 
+        label =  getattr(self, 'label', None)
+    
+        if name:
+            result = result + "::" + name
+        if label:
+            result = result + "::" + (
+                next(iter(self.label.values())) if isinstance(self.label, Dict) else self.label
+            )
+        if len(result) < 50:
+            return result
         else:
-            # TODO call parent.get_name instead
-            return self.id
+            return result[:50]        
+        
+
 
     def make_instance(self, instance_nb, activity=None):
         instance = super().make_instance(instance_nb)
@@ -212,12 +222,18 @@ class TriccNodeBaseModel(TriccBaseModel):
         instance.prev_nodes = prev_nodes
         expression_inputs = []
         instance.expression_inputs = expression_inputs
-
+        
+        for attr in ['expression', 'relevance', 'default', 'reference', 'expression_reference']:
+            if getattr(self, attr, None):
+                setattr(instance, attr,  getattr(self, attr).copy())
+        
         return instance
 
     def gen_name(self):
         if self.name is None:
             self.name = ''.join(random.choices(string.ascii_lowercase, k=8))
+    def get_references(self):
+        return set([self])
 
 class TriccStatic(BaseModel):
     value: Union[str, float, int, bool]
@@ -241,10 +257,16 @@ class TriccStatic(BaseModel):
     def __str__(self):
         return str(self.value)
 
+    def get_references(self):
+        return set()
 
 class TriccReference(TriccStatic):
     value: str
-    
+    def __copy__(self):
+        return type(self)(self.value)
+
+    def get_references(self):
+        return set([self])
 
 
 class TriccOperator(StrEnum):    
@@ -359,6 +381,16 @@ class TriccOperation(BaseModel):
             if hasattr(reference, 'select') and hasattr(new_node, 'select') and issubclass(reference.select.__class__, TriccNodeBaseModel ) :
                 self.replace_node(reference.select ,new_node.select)
         return reference
+    
+    def __copy__(self):
+        # Create a new instance
+        
+        new_instance = type(self)(
+            self.operator, 
+            [e.copy() if isinstance(e, (TriccReference, TriccOperation)) else e for e in self.reference] 
+        )
+        # Copy attributes (shallow copy for mutable attributes)
+        return new_instance
 
 
 TriccGroup.update_forward_refs()

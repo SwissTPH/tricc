@@ -30,8 +30,6 @@ class TriccNodeCalculateBase(TriccNodeBaseModel):
         expression = self.expression.copy() if self.expression is not None else None
         if self.reference:
             instance.reference = self.reference.copy()
-        if self.reference:
-            instance.reference = self.reference.copy()
         if self.expression_reference:
             instance.expression_reference = self.expression_reference.copy()
         version = 1
