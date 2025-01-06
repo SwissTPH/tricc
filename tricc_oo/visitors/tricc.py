@@ -557,8 +557,6 @@ def get_select_yes_no_options(node, group):
             )
     return {0:yes, 1:no }
 
-
-
 # walkthough all node in an iterative way, the same node might be parsed 2 times 
 # therefore to avoid double processing the nodes variable saves the node already processed
 # there 2 strategies : process it the first time or the last time (wait that all the previuous node are processed)
@@ -1257,8 +1255,125 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
     else:
         return expression
     
+def export_proposed_diags(activity, diags=None, **kwargs):
+    if diags is None:
+        diags = []
+    for node in activity.nodes.values():
+        if isinstance(node, TriccNodeActivity):
+            diags = export_proposed_diags(node, diags, **kwargs)
+        if isinstance(node, TriccNodeProposedDiagnosis):
+            if node.last\
+                and not any([diag.name  == node.name for diag in diags]):
+                    diags.append(node)
+    return diags
+    
+
+def get_diagnostic_node(code, display, activity):
+    node = TriccNodeSelectOne(
+        id=generate_id(),
+        name="final." + code,
+        label=display,
+        list_name="acc_rej",
+        activity=activity,
+        group=activity
+    )
+    node.options = get_select_accept_reject_options(node, node.activity)
+    return node
 
 
+def get_select_accept_reject_options(node, group):
+    yes = TriccNodeSelectOption(
+                id = generate_id(),
+                name="1",
+                label="Accept",
+                select = node,
+                group = group,
+                list_name = node.list_name
+            )
+    no = TriccNodeSelectOption(
+                id = generate_id(),
+                name="-1",
+                label="Reject",
+                select = node,
+                group = group,
+                list_name =  node.list_name
+            )
+    return {0:yes, 1:no }
+
+def create_determine_diagnosis_activity(diags):
+    start = TriccNodeActivityStart(
+        id=generate_id(),
+        name="start.determine-diagnosis"
+    )
+
+    
+    activity = TriccNodeActivity(
+        id=generate_id(),
+        name='determine-diagnosis',
+        label='Diagnosis',
+        root=start,
+    )
+
+    
+    start.activity = activity
+    start.group = activity
+    diags_conf = []
+    r_diags_conf = []
+    end = TriccNodeActivityEnd(
+        id=generate_id(),
+        name="end.determine-diagnosis",
+        activity=activity,
+        group=activity,
+    )
+    activity.nodes[end.id]=end
+    for proposed in diags:
+        d = get_diagnostic_node(proposed.name, proposed.label, activity)
+        diags_conf.append(d)
+        r = TriccNodeRhombus(
+            id=generate_id(),
+            # expression_reference=TriccOperation(
+            #     TriccOperator.ISTRUE,
+            #     [TriccReference(proposed.name)]
+            # ),
+            reference=[TriccReference(proposed.name)],
+            activity=activity,
+            group=activity,
+        )
+        r_diags_conf.append(r)
+        set_prev_next_node(start, r, edge_only=False)
+        set_prev_next_node(r, d, edge_only=False)
+        set_prev_next_node(d, end, edge_only=False)
+        activity.nodes[d.options[0].id] = d.options[0]
+        activity.nodes[d.options[1].id] = d.options[1]
+        activity.nodes[d.id]=d
+        activity.nodes[r.id]=r
+    # fallback
+    f = TriccNodeSelectMultiple(
+        name="tricc.manual.diag",
+        label="Add a diagnostic",
+        list_name='manual_diag',
+        id=generate_id("tricc.manual.diag"),
+        activity=activity,
+        group=activity
+        
+    )
+    options = [
+        TriccNodeSelectOption(
+            id=generate_id(d.name),
+            name=d.name,
+            label=d.label,
+            list_name=f.list_name,
+            select=f
+        ) for d in diags
+    ]
+    f.options=dict(zip(range(0, len(options)), options))
+    wait2 = get_activity_wait([activity.root], diags_conf, [f], edge_only=False)
+    activity.nodes[wait2.id]=wait2
+    activity.nodes[f.id]=f
+
+    
+    return activity
+    
 def get_prev_node_expression( node, processed_nodes, is_calculate=False, excluded_name=None):
     expression = None
     if node is None:

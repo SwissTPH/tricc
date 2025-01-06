@@ -21,33 +21,8 @@ class XLSFormCDSSStrategy(XLSFormStrategy):
     def process_export(self, start_pages,  **kwargs):
         diags = []
         self.activity_export(start_pages[self.processes[0]], **kwargs)
-        diags += self.export_proposed_diags( start_pages[self.processes[0]],  **kwargs)
-        self.df_survey = self.df_survey[~self.df_survey['name'].isin([clean_name("final.")+get_export_name(n) for n in diags])]
-        self.df_survey.reset_index(drop=True, inplace=True)
-
-        if len(diags)>0:
-             # add the diag
-            self.df_survey.loc[len(self.df_survey)] = get_diagnostic_start_group_line()
-            # TODO inject flow driven diag list, the folowing fonction will fill the missing ones
-            for diag in diags:
-                self.df_survey.loc[len(self.df_survey)] = get_diagnostic_line(diag)
-            self.df_survey.loc[len(self.df_survey)] = get_diagnostic_none_line(diags)
-            self.df_survey.loc[len(self.df_survey)] = get_diagnostic_add_line(diags, self.df_choice)
-            
-            self.df_survey.loc[len(self.df_survey)] = get_diagnostic_stop_group_line()
-        #TODO inject the TT flow
         self.add_tab_breaks_choice()
         self.add_wfx_choice()
-    
-    def export_proposed_diags(self, activity, diags = [], **kwargs):
-        for node in activity.nodes.values():
-            if isinstance(node, TriccNodeActivity):
-                diags = self.export_proposed_diags(node, diags, **kwargs)
-            if isinstance(node, TriccNodeProposedDiagnosis):
-                if node.last\
-                    and not any([get_export_name(diag)  == get_export_name(node) for diag in diags]):
-                        diags.append(node)
-        return diags
     
     
     def export_inputs(self, activity, inputs = [], **kwargs):

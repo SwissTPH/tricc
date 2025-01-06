@@ -6,7 +6,13 @@ from tricc_oo.models import (
     TriccEdge,
 )
 from tricc_oo.converters.utils import generate_id
-from tricc_oo.visitors.tricc import get_activity_wait, stashed_node_func, set_prev_next_node
+from tricc_oo.visitors.tricc import (
+    get_activity_wait,
+    stashed_node_func,
+    set_prev_next_node,
+    export_proposed_diags,
+    create_determine_diagnosis_activity
+)
 from itertools import chain
 import logging
 
@@ -23,11 +29,27 @@ class BaseInputStrategy:
         if "main" not in start_pages:
             page_processes = [(p.root.process, p,) for p in list(pages.values()) if getattr(p.root, 'process', None)]
             sorted_pages = {}
+            diags = []
+            for a in pages.values():
+                diags += export_proposed_diags(a, [])
+            seen_diags = set()
+            unique_diags = []
+            for diag in diags:
+                if diag.name not in seen_diags:
+                    unique_diags.append(diag)
+                    seen_diags.add(diag.name)
+
             for process in self.processes:
                 if process in [p[0] for p in page_processes]:
                     sorted_pages[process] = [
                         p[1] for p in page_processes if p[0] == process
+                    ]                       
+                elif process == 'determine-diagnosis' and diags:
+                    diags_activity = create_determine_diagnosis_activity(unique_diags)
+                    sorted_pages[process] = [
+                        diags_activity
                     ]
+                    start_pages['determine-diagnosis'] = diags_activity
             root_process = sorted_pages[list(sorted_pages.keys())[0]][0].root
             root = TriccNodeMainStart(
                 id=generate_id(),

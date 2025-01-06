@@ -43,13 +43,6 @@ class TriccNodeCount(TriccNodeDisplayCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.count
 
 
-class TriccNodeDiagnosis(TriccNodeDisplayCalculateBase):
-    tricc_type: TriccNodeType = TriccNodeType.diagnosis
-    def gen_name(self):
-        super(TriccNodeDiagnosis, self).gen_name()
-        if not self.name.startswith('final.'):
-            self.name = f"final.{self.name}"
-
 class TriccNodeProposedDiagnosis(TriccNodeDisplayCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.proposed_diagnosis
     
@@ -125,6 +118,15 @@ class TriccNodeRhombus(TriccNodeCalculateBase,TriccRhombusMixIn):
 def get_rand_name(k):
     return "r_" + ''.join(random.choices(string.ascii_lowercase, k=k))
 
+class TriccNodeDiagnosis(TriccNodeRhombus):
+    tricc_type: TriccNodeType = TriccNodeType.diagnosis
+    
+    def __init__(self, **data):
+        data['reference'] = f'"{data["name"]}" is true'
+        super().__init__(**data)
+
+        # rename rhombus
+        self.name = get_rand_name(8)
 
 class TriccNodeExclusive(TriccNodeFakeCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.exclusive
