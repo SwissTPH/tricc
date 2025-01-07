@@ -11,7 +11,7 @@
         "-i",
         "/home/delcpa/Development/global-almanach/L2",
         "-l",
-        "i",
+        "d",
         "-o",
         "/home/delcpa/Development/global-almanach/output",
         "-t",
