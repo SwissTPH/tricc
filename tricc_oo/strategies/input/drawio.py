@@ -196,6 +196,14 @@ class DrawioStrategy(BaseInputStrategy):
                             processed_nodes,
                             current_path,
                         )
+                        for c in target_node.calculates:
+                            self.linking_nodes(
+                                c,
+                                target_node,
+                                pages,
+                                processed_nodes,
+                                current_path,
+                            )
                     elif isinstance(target_node, TriccNodeGoTo):
                         next_page = self.walkthrough_goto_node(
                             target_node, page, pages, processed_nodes, current_path

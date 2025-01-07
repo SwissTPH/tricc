@@ -118,11 +118,11 @@ class TriccNodeRhombus(TriccNodeCalculateBase,TriccRhombusMixIn):
 def get_rand_name(k):
     return "r_" + ''.join(random.choices(string.ascii_lowercase, k=k))
 
-class TriccNodeDiagnosis(TriccNodeRhombus):
+class TriccNodeDiagnosis(TriccNodeDisplayCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.diagnosis
     
     def __init__(self, **data):
-        data['reference'] = f'"{data["name"]}" is true'
+        data['reference'] = f'"final.{data["name"]}" is true'
         super().__init__(**data)
 
         # rename rhombus
