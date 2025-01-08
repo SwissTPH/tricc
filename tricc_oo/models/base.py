@@ -4,9 +4,9 @@ import logging
 import random
 import string
 from enum import Enum, auto
-from typing import Dict, ForwardRef, List, Optional, Union, Set
+from typing import Dict, ForwardRef, List, Optional, Union, Set, Annotated
 
-from pydantic import BaseModel, constr
+from pydantic import BaseModel, StringConstraints
 from strenum import StrEnum
 
 from tricc_oo.converters.utils import generate_id
@@ -14,13 +14,26 @@ from tricc_oo.converters.utils import generate_id
 
 logger = logging.getLogger("default")
 
-Expression = constr(pattern="^[^\\/]+$")
+Expression = Annotated[
+    str,
+    StringConstraints(pattern=r'^[^\\/\:]+$')
+]
 
-triccId = constr(pattern="^.+$")
-triccIdList = constr(pattern="^.+$")
-triccName = constr(pattern="^.+$")
+triccId = Annotated[
+    str,
+    StringConstraints(pattern=r'^[^\\/\: ]+$')
+]
 
-b64 = constr(pattern="[^-A-Za-z0-9+/=]|=[^=]|={3,}$")
+triccName = Annotated[
+    str,
+    StringConstraints(pattern=r'^[[^\s]+( [^\s]+)*$')
+]
+
+b64 = Annotated[
+    str,
+    StringConstraints(pattern=r'^[^-A-Za-z0-9+/=]|=[^=]|={3,}$')
+]
+
 
 TriccEdge = ForwardRef('TriccEdge')
 # data:page/id,UkO_xCL5ZjyshJO9Bexg
