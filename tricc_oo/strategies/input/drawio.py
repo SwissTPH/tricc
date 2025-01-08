@@ -19,7 +19,7 @@ logger = logging.getLogger("default")
 
 class DrawioStrategy(BaseInputStrategy):
     codesystems = {}
-    valuesets = {} 
+    valuesets = {}
     processes = [
         "triage",
         "registration",
@@ -89,8 +89,10 @@ class DrawioStrategy(BaseInputStrategy):
             diagrams += read_drawio(f)
         images_diagram = []
         for diagram in diagrams:
-            logger.info("Create the activity {0}".format(diagram.attrib.get("name")))
-            page, images = create_activity(diagram, media_path, code_systems, value_sets)
+            logger.info("Create the activity {0}".format(
+                diagram.attrib.get("name")))
+            page, images = create_activity(
+                diagram, media_path, code_systems, value_sets)
             if images is not None:
                 images_diagram += images
             if page is not None:
@@ -112,10 +114,10 @@ class DrawioStrategy(BaseInputStrategy):
                                 )
                             )
         logger.info("# Create the graph from the start node")
-        for k,v in code_systems.items():
-            with open(os.path.join(os.path.dirname(media_path),  f"{k}_codesystem.json"), "w") as file:
+        for k, v in code_systems.items():
+            with open(os.path.join(os.path.dirname(media_path),  f"{k}_codesystem.json"), "w", encoding='utf-8') as file:
                 file.write(v.json(indent=4))
-        for k,v in value_sets.items():
+        for k, v in value_sets.items():
             with open(os.path.join(os.path.dirname(media_path), f"{k}_valueset.json"), "w") as file:
                 file.write(v.json(indent=4))
         app = self.execute_linked_process(start_pages, pages)
@@ -166,7 +168,8 @@ class DrawioStrategy(BaseInputStrategy):
             if issubclass(node.__class__, TriccNodeSelect):
                 option_edge = list(
                     filter(
-                        lambda x: (lambda y: x.source == y.id, node.options), page.edges
+                        lambda x: (lambda y: x.source == y.id,
+                                   node.options), page.edges
                     )
                 )
                 if len(option_edge) == 0:
@@ -235,12 +238,14 @@ class DrawioStrategy(BaseInputStrategy):
                             )
                     if not isinstance(target_node, TriccNodeActivity) and target_node not in processed_nodes:
                         processed_nodes.add(target_node)
-                        logger.debug("{}::{}: processed ({})".format('linking_nodes', target_node.get_name(), len(processed_nodes)))
+                        logger.debug("{}::{}: processed ({})".format(
+                            'linking_nodes', target_node.get_name(), len(processed_nodes)))
                         if isinstance(target_node.activity.root, TriccNodeActivityEnd) and isinstance(target_node.activity.root, TriccNodeMainStart):
                             end_nodes = target_node.activity.get_end_nodes()
                             if all([e in processed_nodes for e in end_nodes]):
                                 processed_nodes.add(target_node.activity)
-                                logger.debug("{}::{}: processed ({})".format('linking_nodes', target_node.activity.get_name(), len(processed_nodes)))
+                                logger.debug("{}::{}: processed ({})".format(
+                                    'linking_nodes', target_node.activity.get_name(), len(processed_nodes)))
                     self.linking_nodes(
                         target_node, page, pages, processed_nodes, current_path
                     )
