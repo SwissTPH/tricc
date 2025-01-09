@@ -14,7 +14,7 @@ logger = logging.getLogger('default')
 langs = SingletonLangClass()
 TRICC_CALC_EXPRESSION = "${{{0}}}>0"
 
-def start_group( strategy, cur_group, groups, df_survey, df_calculate, relevance = False, **kargs):
+def start_group( strategy, cur_group, groups, df_survey, df_calculate, relevance = False, **kwargs):
     name = get_export_name(cur_group)
     
     if name in groups:
@@ -82,7 +82,7 @@ def start_group( strategy, cur_group, groups, df_survey, df_calculate, relevance
     
     
 
-def end_group( strategy, cur_group, groups, df_survey, **kargs):
+def end_group( strategy, cur_group, groups, df_survey, **kwargs):
     
     values = []
     for column in SURVEY_MAP:
@@ -258,9 +258,9 @@ def get_more_info_choice(strategy):
             values.append(get_xfrom_trad(strategy, None, column, CHOICE_MAP, True ))
     return values
  
-def generate_xls_form_export(strategy, node, processed_nodes, stashed_nodes, df_survey, df_choice,df_calculate, cur_group, calculates, **kargs):
+def generate_xls_form_export(strategy, node, processed_nodes, stashed_nodes, df_survey, df_choice,df_calculate, cur_group, calculates, **kwargs):
     # check that all prev nodes were processed
-    if is_ready_to_process(node,processed_nodes, strict=True) and process_reference(node, processed_nodes, calculates, replace_reference=True) :
+    if is_ready_to_process(node,processed_nodes, strict=True) and process_reference(node, processed_nodes, calculates, replace_reference=True, codesystems= kwargs.get('codesystems', None)) :
         if node not in processed_nodes :
             add_calculate(calculates,node)  
             if node.group != cur_group and not isinstance(node,TriccNodeSelectOption) : 

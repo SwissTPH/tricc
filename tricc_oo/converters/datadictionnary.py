@@ -15,6 +15,13 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def lookup_codesystems_code(codesystems, ref):
+    for code_system in codesystems.values():
+        for concept in code_system.concept or []:
+            if concept.code == ref:
+                return concept.display
+
+
 def add_concept(codesystems, system, code, display, attributes):
     if system and system not in codesystems:
         logger.info(f"New codesystem {system} added to project")

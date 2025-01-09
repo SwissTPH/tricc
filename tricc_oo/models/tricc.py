@@ -5,7 +5,8 @@ import random
 import string
 from enum import Enum, auto
 from typing import Dict, ForwardRef, List, Optional, Union
-
+from fhir.resources.codesystem import CodeSystem
+from fhir.resources.valueset import ValueSet
 from pydantic import BaseModel, constr
 from strenum import StrEnum
 from .base import *
@@ -345,3 +346,33 @@ class TriccNodeText(TriccNodeInputModel):
 
 class TriccNodeMoreInfo(TriccNodeInputModel):
     tricc_type: TriccNodeType = TriccNodeType.help
+    
+class TriccProject(BaseModel):
+    title: str = "My project"
+    description: str = ""
+    lang_code: str = "en"
+    # abstract graph / Scheduling
+    #abs_graph: MultiDiGraph = MultiDiGraph()
+    #abs_graph_process_start: Dict = {}
+    # implementation graph
+    #impl_graph: MultiDiGraph = MultiDiGraph()
+    #impl_graph_process_start: Dict = {}
+    # authored graph
+    #graph: MultiDiGraph = MultiDiGraph()
+    #graph_process_start: Dict = {}
+    # list of context:
+    pages: Dict[str, TriccNodeActivity]= {}
+    start_pages: Dict[str, TriccNodeActivity] = {}
+    images: List[Dict[str,str]] = []
+    contexts : Set[triccName] = set()
+    # TODO manage trad properly
+    def get_keyword_trad(keyword):
+        return keyword
+    # dict of code_system_id: codesystem
+    code_systems: Dict[str, CodeSystem] = {}
+    # dict of valueset_id: valueset
+    value_sets: Dict[str, ValueSet] = {}
+    
+    #class Config:
+        # Allow arbitrary types for validation
+    #    arbitrary_types_allowed = True

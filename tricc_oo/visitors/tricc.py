@@ -4,6 +4,7 @@ import logging
 from tricc_oo.converters.utils import *
 from tricc_oo.models import *
 from tricc_oo.visitors.tricc import *
+from tricc_oo.converters.datadictionnary import lookup_codesystems_code
 
 logger = logging.getLogger("default")
 
@@ -76,7 +77,7 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
         # generate condition
         if (
             is_ready_to_process(node, processed_nodes,True)
-            and process_reference(node, processed_nodes, calculates,used_calculates, replace_reference=False, warn = warn) 
+            and process_reference(node, processed_nodes, calculates,used_calculates, replace_reference=False, warn = warn, codesystems= kwargs.get('codesystems', None)) 
         ):
             logger.debug('Processing relevance for node {0}'.format(node.get_name()))
         # if has prev, create condition
@@ -364,9 +365,9 @@ def get_option_code_from_label(node, option_label):
         logger.error(f"node {node.get_name()} has no options")
 
 
-def process_reference(node, processed_nodes, calculates, used_calculates=None,  replace_reference=False,warn=False):
+def process_reference(node, processed_nodes, calculates, used_calculates=None,  replace_reference=False,warn=False, codesystems=None):
     if getattr(node, 'expression_reference', None):
-        modified_expression = process_operation_reference(node.expression_reference, node, processed_nodes, calculates, used_calculates, replace_reference,warn)
+        modified_expression = process_operation_reference(node.expression_reference, node, processed_nodes, calculates, used_calculates, replace_reference,warn, codesystems)
         if modified_expression is False:
             return False
         elif modified_expression:
@@ -378,14 +379,14 @@ def process_reference(node, processed_nodes, calculates, used_calculates=None,  
                     TriccOperator.AND,
                     [node.reference]
                 )
-            modified_expression = process_operation_reference(operation, node, processed_nodes, calculates, used_calculates, replace_reference,warn)
+            modified_expression = process_operation_reference(operation, node, processed_nodes, calculates, used_calculates, replace_reference,warn, codesystems)
             if modified_expression is False:
                 return False
             elif modified_expression:
                 node.reference = modified_expression.get_references()
             
         elif isinstance(node.reference, (TriccOperation, TriccReference)):
-            modified_expression = process_operation_reference(node.reference, node, processed_nodes, calculates, used_calculates, replace_reference,warn)
+            modified_expression = process_operation_reference(node.reference, node, processed_nodes, calculates, used_calculates, replace_reference,warn, codesystems)
             if modified_expression is False:
                 return False
             elif modified_expression:
@@ -393,21 +394,21 @@ def process_reference(node, processed_nodes, calculates, used_calculates=None,  
                 node.expression_reference = modified_expression
 
     if isinstance(getattr(node, 'relevance', None), (TriccOperation, TriccReference)):
-        modified_expression = process_operation_reference(node.relevance, node, processed_nodes, calculates, used_calculates, replace_reference,warn)
+        modified_expression = process_operation_reference(node.relevance, node, processed_nodes, calculates, used_calculates, replace_reference,warn, codesystems)
         if modified_expression is False:
             return False
         elif modified_expression:
             node.relevance = modified_expression
     
     if isinstance(getattr(node, 'default', None), (TriccOperation, TriccReference)):
-        modified_expression = process_operation_reference(node.default, node, processed_nodes, calculates, used_calculates, replace_reference,warn)
+        modified_expression = process_operation_reference(node.default, node, processed_nodes, calculates, used_calculates, replace_reference,warn, codesystems)
         if modified_expression is False:
             return False
         elif modified_expression:
             node.relevance = modified_expression
         
     if isinstance(getattr(node, 'expression', None), (TriccOperation, TriccReference)):
-        modified_expression = process_operation_reference(node.expression, node, processed_nodes, calculates, used_calculates, replace_reference,warn)
+        modified_expression = process_operation_reference(node.expression, node, processed_nodes, calculates, used_calculates, replace_reference,warn, codesystems)
         if modified_expression is False:
             return False
         elif modified_expression:
@@ -416,7 +417,7 @@ def process_reference(node, processed_nodes, calculates, used_calculates=None,  
 
     return True
 
-def process_operation_reference(operation, node, processed_nodes, calculates, used_calculates=None,  replace_reference=False,warn=False):
+def process_operation_reference(operation, node, processed_nodes, calculates, used_calculates=None,  replace_reference=False,warn=False, codesystems=None):
     modified_operation = None
     node_reference = []
     reference = []
@@ -436,7 +437,16 @@ def process_operation_reference(operation, node, processed_nodes, calculates, us
             if ref in calculates and len(calculates[ref]) > 0:
                 last_found = get_last_version(calculates, ref, processed_nodes)
         if last_found is None:
-            logger.debug(f"reference {ref} not found for a calculate {node.get_name()}")
+            if codesystems:
+                display =  lookup_codesystems_code(codesystems, ref)
+                if not display:
+                    logger.error(f"reference {ref} not found in the project")
+                    exit(1)
+                else:
+                    logger.debug(f"reference {ref}::{display} not yet processed {node.get_name()}")
+                
+            else:  
+                logger.debug(f"reference {ref} not found for a calculate {node.get_name()}")
             return False
         else:
             node_reference.append(last_found)

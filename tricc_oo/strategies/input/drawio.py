@@ -9,6 +9,7 @@ from tricc_oo.visitors.tricc import (
     set_prev_next_node,
     replace_node,
     stashed_node_func,
+    TriccProject
 )
 from tricc_oo.models import *
 from tricc_oo.strategies.input.base_input_strategy import BaseInputStrategy
@@ -18,8 +19,7 @@ logger = logging.getLogger("default")
 
 
 class DrawioStrategy(BaseInputStrategy):
-    codesystems = {}
-    valuesets = {}
+
     processes = [
         "triage",
         "registration",
@@ -38,9 +38,9 @@ class DrawioStrategy(BaseInputStrategy):
         "record-and-report",
     ]
 
-    def process_pages(self, start_page, pages):
+    def process_pages(self, start_page, project):
         # create the graph
-        self.linking_nodes(start_page.root, start_page, pages)
+        self.linking_nodes(start_page.root, start_page, project.pages)
         # Save the calculate list [node]
         calculates = {}
         # save when a calcualte is used dict[name, Dict[id, node]]
@@ -55,10 +55,11 @@ class DrawioStrategy(BaseInputStrategy):
             used_calculates=used_calculates,
             calculates=calculates,
             recusive=False,
+            codesystems=project.code_systems
         )
 
         logger.info("# check if all edges (arrow) where used")
-        for key, page in pages.items():
+        for key, page in project.pages.items():
             if page.unused_edges is not None and len(page.unused_edges) > 0:
                 logger.warning(
                     "Page {0} has still {1}/{2} edges that were not used:".format(
@@ -69,14 +70,11 @@ class DrawioStrategy(BaseInputStrategy):
         return pages
 
     def execute(self, file_content, media_path):
+        project = TriccProject()
         files = []
-        pages = {}
         diagrams = []
-        start_pages = {}
-        code_systems = {}
-        value_sets = {}
-        # read all pages
-        logger.info("# Create the activities from diagram pages")
+        # read all project.pages
+        logger.info("# Create the activities from diagram project.pages")
         # if os.path.isdir(in_filepath):
         #     files = [f for f in os.listdir(in_filepath) if f.endswith('.drawio')]
         # elif os.path.isfile(in_filepath):
@@ -91,50 +89,30 @@ class DrawioStrategy(BaseInputStrategy):
         for diagram in diagrams:
             logger.info("Create the activity {0}".format(
                 diagram.attrib.get("name")))
-            page, images = create_activity(
-                diagram, media_path, code_systems, value_sets)
-            if images is not None:
-                images_diagram += images
-            if page is not None:
-                if page.root is not None:
-                    pages[page.id] = page
-                    if page.root.tricc_type == TriccNodeType.start:
-                        if "main" not in start_pages and (
-                            page.root.process == "main" or page.root.process is None
-                        ):
-                            start_pages["main"] = page
-                        elif page.root.process is not None:
-                            if page.root.process not in start_pages:
-                                start_pages[page.root.process] = []
-                            start_pages[page.root.process].append(page)
-                        else:
-                            logger.warning(
-                                "Page {0} has a start node but there is already a start node in page  {1}".format(
-                                    page.label, start_page.label
-                                )
-                            )
+            create_activity(
+                diagram, media_path, project)
         logger.info("# Create the graph from the start node")
-        for k, v in code_systems.items():
+        for k, v in project.code_systems.items():
             with open(os.path.join(os.path.dirname(media_path),  f"{k}_codesystem.json"), "w", encoding='utf-8') as file:
                 file.write(v.json(indent=4))
-        for k, v in value_sets.items():
+        for k, v in project.value_sets.items():
             with open(os.path.join(os.path.dirname(media_path), f"{k}_valueset.json"), "w") as file:
                 file.write(v.json(indent=4))
-        app = self.execute_linked_process(start_pages, pages)
+        app = self.execute_linked_process(project)
         if app:
-            start_pages["main"] = app
-            pages[app.id] = app
-            pages = self.process_pages(app, pages)
+            project.start_pages["main"] = app
+            project.pages[app.id] = app
+            project.pages = self.process_pages(app, project)
 
-            return start_pages, pages, images_diagram
-        elif start_pages:
-            for process in start_pages:
-                if isinstance(start_pages[process], list):
-                    for page_to_process in start_pages[process]:
-                        pages = self.process_pages(page_to_process, pages)
+            return project.start_pages, project.pages, images_diagram
+        elif project.start_pages:
+            for process in project.start_pages:
+                if isinstance(project.start_pages[process], list):
+                    for page_to_process in project.start_pages[process]:
+                        project.pages = self.process_pages(page_to_process, project.pages)
                 else:
-                    pages = self.process_pages(start_pages[process], pages)
-            return start_pages, pages, images_diagram
+                    project.pages = self.process_pages(project.start_pages[process], project.pages)
+            return project.start_pages, project.pages, images_diagram
         return None
         # Q. how to handle graph output
         # hardlink with out edge: create a fake node
@@ -344,7 +322,7 @@ class DrawioStrategy(BaseInputStrategy):
                     self.linking_nodes(
                         linked_target_node,
                         link_in_page,
-                        pages,
+                        project.pages,
                         processed_nodes,
                         current_path,
                     )

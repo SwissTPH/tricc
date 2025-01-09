@@ -49,7 +49,7 @@ def get_all_nodes(diagram, activity, nodes):
 
     return nodes
 
-def create_activity(diagram, media_path, codes_systems, values_sets):
+def create_activity(diagram, media_path, project):
     id = diagram.attrib.get("id")
     root = create_root_node(diagram)
     name = diagram.attrib.get("name")
@@ -77,7 +77,7 @@ def create_activity(diagram, media_path, codes_systems, values_sets):
                 issubclass(n.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase)) 
                 and not isinstance(n, (TriccRhombusMixIn, TriccNodeRhombus, TriccNodeDisplayBridge))
             ):
-                add_concept(codes_systems, 'tricc', n.name, n.label, {})
+                add_concept(project.code_systems, 'tricc', n.name, n.label, {})
         groups = get_groups(diagram, nodes, activity)
         if groups and len(groups) > 0:
             activity.groups = groups
@@ -88,8 +88,30 @@ def create_activity(diagram, media_path, codes_systems, values_sets):
         # link back the activity
         activity.root.activity = activity
         manage_dangling_calculate(activity)
+        
+        if activity is not None:
+            if activity.root is not None:
+                project.pages[activity.id] = activity
+                if activity.root.tricc_type == TriccNodeType.start:
+                    if "main" not in project.start_pages and (
+                        activity.root.process == "main" or activity.root.process is None
+                    ):
+                        project.start_pages["main"] = activity
+                    elif activity.root.process is not None:
+                        if activity.root.process not in project.start_pages:
+                            project.start_pages[activity.root.process] = []
+                        project.start_pages[activity.root.process].append(activity)
+                    else:
+                        logger.warning(
+                            "Page {0} has a start node but there is already a start node in page  {1}".format(
+                                activity.label, start_page.label
+                            )
+                        )
+        if images:
+            project.images += images
+        
 
-        return activity, images
+  
     else:
         return None, None
         logger.warning("root not found for page {0}".format(name))

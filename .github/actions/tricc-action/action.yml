@@ -68,9 +68,9 @@ runs:
             print(f'{in_filepath} is neither a drawio file nor a directory containing drawio files')
             exit(-1)
         input_strategy = ${{ inputs.input_strategy }}(file_content)
-        output_strategy = ${{ inputs.output_strategy }}('./${{ inputs.output_path }}')
         media_path = os.path.join('${{ inputs.output_path }}', 'media-tmp')
-        start_page, pages, images = input_strategy.execute(file_content, media_path)
+        project = input_strategy.execute(file_content, media_path)
+        output_strategy = ${{ inputs.output_strategy }}(project, './${{ inputs.output_path }}')      
         output = output_strategy.execute(start_page, pages=pages)
         "
       shell: bash

@@ -26,7 +26,7 @@ triccId = Annotated[
 
 triccName = Annotated[
     str,
-    StringConstraints(pattern=r'^[[^\s]+( [^\s]+)*$')
+    StringConstraints(pattern=r'^[^\s]+( [^\s]+)*$')
 ]
 
 b64 = Annotated[

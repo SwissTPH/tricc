@@ -603,7 +603,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
     # @param left part
     # @param right part
     def generate_xls_form_condition(self, node, processed_nodes, stashed_nodes, calculates, **kwargs):
-        if is_ready_to_process(node, processed_nodes, strict=False) and process_reference(node, processed_nodes, calculates, replace_reference=False):
+        if is_ready_to_process(node, processed_nodes, strict=False) and process_reference(node, processed_nodes, calculates, replace_reference=False, codesystems= kwargs.get('codesystems', None)):
             if node not in processed_nodes:
                 if issubclass(node.__class__, TriccRhombusMixIn) and isinstance(node.reference, str):
                     logger.warning("node {} still using the reference string".format(node.get_name()))

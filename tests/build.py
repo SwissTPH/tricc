@@ -166,16 +166,16 @@ if __name__ == "__main__":
     strategy = globals()[input_strategy](files)
     logger.info(f"build the graph from strategy {input_strategy}")
     media_path = os.path.join(out_path, "media-tmp")
-    start_page, pages, images = strategy.execute(file_content, media_path)
-    print(len(images))
+    project = strategy.execute(file_content, media_path)
+    print(len(project.images))
 
-    strategy = globals()[output_strategy](out_path)
+    strategy = globals()[output_strategy](project, out_path)
 
     logger.info("Using strategy {}".format(strategy.__class__))
     logger.info("update the node with basic information")
     # create constraints, clean name
 
-    output = strategy.execute(start_page, pages=pages)
+    output = strategy.execute(start_page, project=project)
 
     # compress the output folder to a zip archieve and place it in the download directory
     # shutil.make_archive(os.path.join(download_dir), "zip", os.path.join(out_path))

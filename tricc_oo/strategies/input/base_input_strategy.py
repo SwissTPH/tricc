@@ -21,16 +21,16 @@ logger = logging.getLogger("default")
 
 class BaseInputStrategy:
     input_path = None
-
+    project = None
     processes = ["main"]
 
-    def execute_linked_process(self, start_pages, pages):
+    def execute_linked_process(self, project):
         # create an overall activity only if not specified
-        if "main" not in start_pages:
-            page_processes = [(p.root.process, p,) for p in list(pages.values()) if getattr(p.root, 'process', None)]
+        if "main" not in project.start_pages:
+            page_processes = [(p.root.process, p,) for p in list(project.pages.values()) if getattr(p.root, 'process', None)]
             sorted_pages = {}
             diags = []
-            for a in pages.values():
+            for a in project.pages.values():
                 diags += export_proposed_diags(a, [])
             seen_diags = set()
             unique_diags = []
@@ -49,7 +49,7 @@ class BaseInputStrategy:
                     sorted_pages[process] = [
                         diags_activity
                     ]
-                    start_pages['determine-diagnosis'] = diags_activity
+                    project.start_pages['determine-diagnosis'] = diags_activity
             root_process = sorted_pages[list(sorted_pages.keys())[0]][0].root
             root = TriccNodeMainStart(
                 id=generate_id(),
@@ -98,7 +98,7 @@ class BaseInputStrategy:
 
             return app
         else:
-            return start_pages["main"]
+            return project.start_pages["main"]
 
     def __init__(self, input_path):
         self.input_path = input_path
