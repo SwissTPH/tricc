@@ -126,7 +126,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
                 )
             forms = [form_id]
             for i, e in ends_prev:
-                new_form_id = f"{form_id}_{i}"
+                new_form_id = f"{form_id}_{clean_name(e.name)}"
                 newfilename = f"{new_form_id}.xlsx"
                 newpath = os.path.join(self.output_path, newfilename)
                 settings={'form_title':title,'form_id':f"{new_form_id}",'version':version,'default_language':'English (en)','style':'pages'}
