@@ -9,6 +9,7 @@ from tricc_oo.models.lang import SingletonLangClass
 from tricc_oo.serializers.xls_form import SURVEY_MAP, get_input_line
 from tricc_oo.strategies.output.xlsform_cdss import XLSFormCDSSStrategy
 from tricc_oo.converters.tricc_to_xls_form import get_export_name
+from tricc_oo.converters.utils import clean_name
 from tricc_oo.visitors.xform_pd import make_breakpoints, get_task_js
 
 langs = SingletonLangClass()

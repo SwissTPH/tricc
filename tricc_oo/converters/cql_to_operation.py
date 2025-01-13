@@ -354,7 +354,7 @@ def transform_cql_to_operation(cql_input, context=None):
     library runner
     
     define "calc":
-        {cql_input}
+        {cql_input.replace('−', '-')}
     """
     input_stream = InputStream(chr(10).join(cql_input.split('\n')))
     lexer = cqlLexer(input_stream)
@@ -363,9 +363,10 @@ def transform_cql_to_operation(cql_input, context=None):
 
     # Remove default error listeners and add custom listener
     parser.removeErrorListeners()
+    lexer.removeErrorListeners()
     error_listener = CQLErrorListener(context)
     parser.addErrorListener(error_listener)
-
+    lexer.addErrorListener(error_listener)
     tree = parser.library()
 
     # Check for errors
