@@ -174,7 +174,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
         #  return  (m * (z*s*l-1)^(1/l));
         return f"cht:extension-lib('{ref_expressions[0]}.js',{ref_expressions[1]} ,{ref_expressions[2]} ,{ref_expressions[3]}  )"
 
-    def tricc_operation_drug_dosage(self, ref_expression):
+    def tricc_operation_drug_dosage(self, ref_expressions):
         # drug name
         # age
         #weight
