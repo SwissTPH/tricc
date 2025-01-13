@@ -79,6 +79,15 @@ class cqlToXlsFormVisitor(cqlVisitor):
     def visitThisInvocation(self, ctx):
         return '$this'
    
+    def visitBooleanLiteral(self, ctx):
+        literal =  ctx.getChild(0).getText()
+        if literal == 'true':
+            return True
+        elif literal == 'false':
+            return False
+        else:
+            return None
+   
     def visitFunctionInvocation(self, ctx, operator=TriccOperator.NATIVE):
         if ctx.getChildCount() == 1:
             return self.visitFunctionInvocation(ctx.getChild(0))
