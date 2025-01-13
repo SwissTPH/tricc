@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 exclude = ["locales"]
 [project]
 name = "tricc-oo"
-version = "1.1.14"
+version = "1.1.15"
 readme = "README.md"
 requires-python = ">=3.8"
 classifiers = [
