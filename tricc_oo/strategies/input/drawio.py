@@ -67,7 +67,6 @@ class DrawioStrategy(BaseInputStrategy):
                     )
                 )
         # refresh the edges (were remove by previous code)
-        return project.pages
 
     def execute(self, file_content, media_path):
         project = TriccProject()
@@ -102,19 +101,17 @@ class DrawioStrategy(BaseInputStrategy):
         if app:
             project.start_pages["main"] = app
             project.pages[app.id] = app
-            project.pages = self.process_pages(app, project)
+            self.process_pages(app, project)
 
-            return project.start_pages, project.pages, images_diagram
+            return project
         elif project.start_pages:
             for process in project.start_pages:
                 if isinstance(project.start_pages[process], list):
                     for page_to_process in project.start_pages[process]:
-                        project.pages = self.process_pages(
-                            page_to_process, project.pages)
+                        self.process_pages(page_to_process, project.pages)
                 else:
-                    project.pages = self.process_pages(
-                        project.start_pages[process], project.pages)
-            return project.start_pages, project.pages, images_diagram
+                    self.process_pages(project.start_pages[process], project.pages)
+            return project
         return None
         # Q. how to handle graph output
         # hardlink with out edge: create a fake node

@@ -13,18 +13,19 @@ class BaseOutPutStrategy:
     # list of supported processes for the strategy, 
     # the order of the list will be apply
     
-    def __init__(self, output_path):
+    def __init__(self, project, output_path):
         self.output_path = output_path
+        self.project = project
     
     def get_tricc_operation_expression(self, operation):
         raise NotImplemented("get_tricc_operation_expression not implemented")
     
-    def execute(self, start_pages, pages):
+    def execute(self):
         
         version = datetime.datetime.now().strftime("%Y%m%d%H%M")
         logger.info(f"build version: {version}")
-        if 'main' in start_pages:
-            self.process_base(start_pages, pages=pages, version=version)
+        if 'main' in self.project.start_pages:
+            self.process_base(self.project.start_pages, pages=self.project.pages, version=version)
         else:
             logger.error("Main process required")
 
@@ -36,14 +37,14 @@ class BaseOutPutStrategy:
         # create relevance Expression
 
         # create calculate Expression
-        self.process_calculate(start_pages, pages=pages)
+        self.process_calculate(self.project.start_pages, pages=self.project.pages)
         logger.info("generate the export format")
          # create calculate Expression
-        self.process_export(start_pages, pages=pages)
+        self.process_export(self.project.start_pages, pages=self.project.pages)
              
         logger.info("print the export")
         
-        self.export(start_pages, version=version)
+        self.export(self.project.start_pages, version=version)
     
     ### walking function
     def process_base(self, start_pages, **kwargs):

@@ -76,8 +76,8 @@ class XLSFormStrategy(BaseOutPutStrategy):
     def generate_calculate(self, node, **kwargs):
         return self.generate_xls_form_calculate(node, **kwargs)
 
-    def __init__(self, output_path):
-        super().__init__(output_path)
+    def __init__(self, project, output_path):
+        super().__init__(project, output_path)
         self.do_clean()
 
     def do_clean(self, **kwargs):

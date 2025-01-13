@@ -175,7 +175,7 @@ if __name__ == "__main__":
     logger.info("update the node with basic information")
     # create constraints, clean name
 
-    output = strategy.execute(start_page, project=project)
+    output = strategy.execute()
 
     # compress the output folder to a zip archieve and place it in the download directory
     # shutil.make_archive(os.path.join(download_dir), "zip", os.path.join(out_path))
