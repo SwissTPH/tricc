@@ -24,7 +24,7 @@ class TestCql(unittest.TestCase):
                     reference=[
                         TriccReference("p_age"),
                         TriccStatic(
-                            value=2.0
+                            value=2
                         )
                     ]
                 )
@@ -47,7 +47,7 @@ class TestCql(unittest.TestCase):
         self.assertEqual(str(dg_operation), str(dg_expected))
     
     def test_if(self):
-        if_cql = "if AgeInDays() < 60 then 'newborn' else 'child' end"
+        if_cql = "if AgeInDays() < 60 then 'newborn' else 'child'"
         if_operation = transform_cql_to_operation(if_cql)
         if_expected = TriccOperation(
             operator=TriccOperator.IF,
@@ -60,7 +60,7 @@ class TestCql(unittest.TestCase):
                             reference=[]
                         ),
                         TriccStatic(
-                            value=60.0
+                            value=60
                         )
                     ]
                 ),
@@ -87,7 +87,7 @@ class TestCql(unittest.TestCase):
                 ),
                 [
                     TriccStatic(
-                        value=0.0
+                        value=0
                     ),
                     TriccStatic(
                         value="newborn"
@@ -95,7 +95,7 @@ class TestCql(unittest.TestCase):
                 ],
                 [
                     TriccStatic(
-                        value=1.0
+                        value=1
                     ),
                     TriccStatic(
                         value="newborn"
@@ -126,7 +126,7 @@ class TestCql(unittest.TestCase):
                                 reference=[]
                             ),
                             TriccStatic(
-                                value=2.0
+                                value=2
                             )
                         ]
                     ),
@@ -143,7 +143,7 @@ class TestCql(unittest.TestCase):
                                 reference=[]
                             ),
                             TriccStatic(
-                                value=5.0
+                                value=5
                             )
                         ]
                     ),
@@ -155,5 +155,27 @@ class TestCql(unittest.TestCase):
             ]
         )
         self.assertEqual(str(case_operation), str(case_expected))
+
+
+    def test_minus(self):
+        minus_cql ="""
+        "CHE.B23.DE68" is false and 
+"CHE.B23.DE69" is false and 
+"CHE.B23.DE70" is false and 
+"age_in_months" < 60 and
+case 
+when  "age_in_months" >= 6  then ( "WFL" >= -3 and "WFL" < -2)
+when ("CHE.B6.DE19" >= 115 and "CHE.B6.DE19" < 125) then true
+when "age_in_months" >= 24  then ("WFH" >= -3 and "WFH" < -2)
+else  ("WFL" >= -3 and "WFL" < -2) 
+end
+        """
+        # minus_cql = """
+        # ("age_in_months" < 6 and "WFL" >= -3 and "WFL" < -2) is true
+        # """
+        minus_operation = transform_cql_to_operation(minus_cql)
+        minus_expected = None
+        self.assertEqual(str(minus_operation), str(minus_expected))
+        
 if __name__ == '__main__':
     unittest.main()
