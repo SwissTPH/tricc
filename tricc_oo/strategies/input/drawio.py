@@ -67,7 +67,7 @@ class DrawioStrategy(BaseInputStrategy):
                     )
                 )
         # refresh the edges (were remove by previous code)
-        return pages
+        return project.pages
 
     def execute(self, file_content, media_path):
         project = TriccProject()
@@ -109,9 +109,11 @@ class DrawioStrategy(BaseInputStrategy):
             for process in project.start_pages:
                 if isinstance(project.start_pages[process], list):
                     for page_to_process in project.start_pages[process]:
-                        project.pages = self.process_pages(page_to_process, project.pages)
+                        project.pages = self.process_pages(
+                            page_to_process, project.pages)
                 else:
-                    project.pages = self.process_pages(project.start_pages[process], project.pages)
+                    project.pages = self.process_pages(
+                        project.start_pages[process], project.pages)
             return project.start_pages, project.pages, images_diagram
         return None
         # Q. how to handle graph output
