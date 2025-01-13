@@ -840,7 +840,8 @@ def process_condition_edge(edge, nodes):
         # insert rhombus
         return TriccNodeRhombus(
             id=edge.id,
-            reference=operation,
+            expression_reference=operation,
+            reference=operation.get_references(),
             path=nodes[edge.source],
             activity=nodes[edge.source].activity,
             group=nodes[edge.source].group,

@@ -1162,6 +1162,31 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
             #it is a empty calculate
             return ''     
     
+    elif is_prev and isinstance(node, TriccNodeRhombus):
+        if isinstance(node.expression_reference, TriccOperation):
+            expression = node.expression_reference
+        else:
+            expression = get_rhombus_terms(node, processed_nodes)  # if issubclass(node.__class__, TricNodeDisplayCalulate) else TRICC_CALC_EXPRESSION.format(get_export_name(node)) #
+        negate_expression = TriccOperation(TriccOperator.NOT,[expression])
+        if node.path is None :
+            if len(node.prev_nodes) == 1:
+                node.path = list(node.prev_nodes)[0]
+            elif len(node.prev_nodes) > 1:
+                logger.error(f"missing path for Rhombus {node.get_name()}")
+                exit(1)
+        prev_exp = get_node_expression(node.path, processed_nodes, is_calculate, is_prev)
+        if prev_exp:
+            expression = TriccOperation(
+                TriccOperator.AND,
+                [prev_exp, expression]
+            )
+            negate_expression = TriccOperation(
+                TriccOperator.AND,
+                [
+                    prev_exp, 
+                    negate_expression
+                ]
+            )
     elif hasattr(node, 'expression_reference') and isinstance(node.expression_reference, TriccOperation):
         # if issubclass(node.__class__, TriccNodeDisplayCalculateBase):
         #     expression = TriccOperation(
@@ -1185,21 +1210,8 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
                 TriccStatic(True)
             ]
         )
-    elif is_prev and isinstance(node, TriccNodeRhombus):
-        expression = get_rhombus_terms(node, processed_nodes)  # if issubclass(node.__class__, TricNodeDisplayCalulate) else TRICC_CALC_EXPRESSION.format(get_export_name(node)) #
-        negate_expression = TriccOperation(TriccOperator.NOT,[expression])
-        if node.path is not None: 
-            expression = TriccOperation(
-                TriccOperator.AND,
-                [get_node_expression(node.path, processed_nodes, is_calculate, is_prev), expression]
-            )
-            negate_expression = TriccOperation(
-                TriccOperator.AND,
-                [
-                    get_node_expression(node.path, processed_nodes, is_calculate, is_prev), 
-                    negate_expression
-                ]
-            )      
+
+
     elif is_prev and issubclass(node.__class__, TriccNodeDisplayCalculateBase):
         expression = TriccOperation(TriccOperator.MORE, [node, TriccStatic(0)])
         # expression = TriccOperation(
@@ -1557,32 +1569,36 @@ def get_rhombus_terms( node, processed_nodes, is_calculate=False, negate=False):
     expression = None
     left_term = None
     operator = None
-    # calcualte the expression only for select muzltiple and fake calculate
-    if node.reference is not None and issubclass(node.reference.__class__, list):
-        if node.expression_reference is None and len(node.reference) == 1:
-            ref = node.reference[0]
-            if issubclass(ref.__class__, TriccNodeBaseModel):
-                if isinstance(ref, TriccNodeActivity):
-                    expression = get_activity_end_terms(ref, processed_nodes)
-                elif issubclass(ref.__class__, TriccNodeFakeCalculateBase):
-                    expression = get_node_expression(ref, processed_nodes, is_calculate=True, is_prev=True)
-                else:
+    if node.reference is not None:
+        # calcualte the expression only for select muzltiple and fake calculate
+        if  issubclass(node.reference.__class__, list):
+            if node.expression_reference is None and len(node.reference) == 1:
+                ref = node.reference[0]
+                if issubclass(ref.__class__, TriccNodeBaseModel):
+                    if isinstance(ref, TriccNodeActivity):
+                        expression = get_activity_end_terms(ref, processed_nodes)
+                    elif issubclass(ref.__class__, TriccNodeFakeCalculateBase):
+                        expression = get_node_expression(ref, processed_nodes, is_calculate=True, is_prev=True)
+                    else:
+                        expression = ref
+                elif issubclass(ref.__class__, TriccReference):
                     expression = ref
-            elif issubclass(ref.__class__, TriccReference):
-                expression = ref
+                else:
+                    logger.error('reference {0} was not found in the previous nodes of node {1}'.format(node.reference,
+                                                                                                        node.get_name()))
+                    exit(1)
+            elif node.expression_reference is not None and node.expression_reference != '':
+                if isinstance(node.expression_reference, TriccOperation):
+                    return node.expression_reference
+                else:
+                    expression = node.expression_reference.format(*get_list_names(node.reference))
             else:
-                logger.error('reference {0} was not found in the previous nodes of node {1}'.format(node.reference,
-                                                                                                    node.get_name()))
-                exit(1)
-        elif node.expression_reference is not None and node.expression_reference != '':
-            if isinstance(node.expression_reference, TriccOperation):
-                return node.expression_reference
-            else:
-                expression = node.expression_reference.format(*get_list_names(node.reference))
+                logger.warning("missing expression for node {}".format(node.get_name()))
         else:
-            logger.warning("missing expression for node {}".format(node.get_name()))
+            logger.error('reference {0} is not a list {1}'.format(node.reference, node.get_name()))
+            exit(1)
     else:
-        logger.error('reference {0} is not a list {1}'.format(node.reference, node.get_name()))
+        logger.error('reference empty for Rhombis {}'.format( node.get_name()))
         exit(1)
 
     if expression is not None:

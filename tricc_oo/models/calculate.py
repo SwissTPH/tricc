@@ -68,10 +68,10 @@ class TriccRhombusMixIn():
         instance.path = None
         if isinstance(self.expression_reference, (str, TriccOperation)):
             expression_reference = self.expression_reference.copy()
-            reference = expression_reference.get_references()        
+            reference = list(expression_reference.get_references())
         if isinstance(self.reference, (str, TriccOperation)):
             expression_reference = self.reference.copy()
-            reference = expression_reference.get_references()
+            reference = list(expression_reference.get_references())
         elif isinstance(self.reference, list):
             for ref in self.reference:
                 if issubclass(ref.__class__, TriccBaseModel):
@@ -84,6 +84,8 @@ class TriccRhombusMixIn():
                     else:  # ref from outside
                         # FIXME find the latest version
                         reference.append(ref)
+                elif isinstance(ref, TriccReference):
+                    reference.append(ref)
                 elif isinstance(ref, str):
                     logger.debug("passing raw reference {} on node {}".format(ref, self.get_name()))
                     reference.append(ref)

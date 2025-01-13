@@ -176,9 +176,11 @@ class TriccNodeActivity(TriccNodeBaseModel):
                     # test next_nodes to check that the instance has already prev/next 
                     if node_instance.path is None and node_instance.next_nodes:
                         logger.error("new path not found")
+                elif len(node_instance.prev_nodes) == 1:
+                    node.path = list(node_instance.prev_nodes)[0]
                 elif not (len(node_instance.reference)== 1  and issubclass(node_instance.reference[0].__class__, TriccNodeInputModel)):
-                    logger.warning("Rhombus without a path")
-                
+                    error.warning("Rhombus without a path")
+                    exit(1)
             # generate options
             elif issubclass(node_instance.__class__, TriccNodeSelect):
                 for key, option_instance in node_instance.options.items():
