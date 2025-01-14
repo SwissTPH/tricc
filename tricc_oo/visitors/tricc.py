@@ -379,10 +379,13 @@ def process_reference(node, processed_nodes, calculates, used_calculates=None,  
             node.expression_reference = modified_expression
     elif getattr(node, 'reference', None):
         if isinstance(node.reference, list):
-            operation = TriccOperation(
-                    TriccOperator.AND,
-                    [node.reference]
-                )
+            if len(node.reference) == 1 :
+                operation = node.reference[0]
+            else:
+                operation = TriccOperation(
+                        TriccOperator.AND,
+                        node.reference
+                    )
             modified_expression = process_operation_reference(operation, node, processed_nodes, calculates, used_calculates, replace_reference,warn, codesystems)
             if modified_expression is False:
                 return False
@@ -1181,7 +1184,7 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
                 logger.error(f"missing path for Rhombus {node.get_name()}")
                 exit(1)
         prev_exp = get_node_expression(node.path, processed_nodes, is_calculate, is_prev)
-        if prev_exp:
+        if prev_exp and expression:
             expression = TriccOperation(
                 TriccOperator.AND,
                 [prev_exp, expression]
@@ -1193,6 +1196,12 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
                     negate_expression
                 ]
             )
+        elif prev_exp:
+            
+            logger.error(f"useless rhombus {node.get_name()}")
+            expression = prev_exp
+            negate_expression = prev_exp
+            
     elif hasattr(node, 'expression_reference') and isinstance(node.expression_reference, TriccOperation):
         # if issubclass(node.__class__, TriccNodeDisplayCalculateBase):
         #     expression = TriccOperation(
@@ -1213,7 +1222,7 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
             TriccOperator.SELECTED,
             [
                 node,
-                TriccStatic(True)
+                TriccStatic(1)
             ]
         )
 
@@ -1238,20 +1247,24 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
     if isinstance(node, TriccNodeActivity):
         end_node = get_last_end_node(processed_nodes)
         if end_node:
-            expression = TriccOperation(
-                TriccOperator.AND, [
+            end_operation = TriccOperation(
+                TriccOperator.NOT, 
+                [
                     TriccOperation(
-                        TriccOperator.NOT, 
-                        [
-                            TriccOperation(
-                                TriccOperator.ISTRUE,
-                                [end_node]
-                            )
-                        ]
-                    ),
-                        expression
+                        TriccOperator.ISTRUE,
+                        [end_node]
+                    )
                 ]
             )
+            if  expression:
+                expression = TriccOperation(
+                    TriccOperator.AND, [
+                            end_operation,
+                            expression
+                    ]
+                )
+            elif end_node:
+                expression = end_operation
         if is_prev:
             end_nodes = node.get_end_nodes()
             if all([end in processed_nodes for end in end_nodes]):
@@ -1426,6 +1439,9 @@ def get_prev_node_expression( node, processed_nodes, is_calculate=False, exclude
             for e in expression_inputs])
     
     expression = None
+    if len(expression_inputs) == 1:
+        expression = expression_inputs[0]
+    
     if expression_inputs:
         expression = TriccOperation(
             TriccOperator.OR,
@@ -1703,7 +1719,7 @@ def get_calculation_terms( node, processed_nodes, is_calculate=False, negate=Fal
     
 # Function that add element to array is not None or ''
 def add_sub_expression(array, sub):
-    if isinstance(sub, TriccOperation) or not ( not sub ):
+    if isinstance(sub, TriccOperation) or  sub:
         not_sub = negate_term(sub)
         if not_sub in array:
             # avoid having 2 conditions that are complete opposites
@@ -1711,8 +1727,8 @@ def add_sub_expression(array, sub):
             array.append(TriccStatic(True))
         else:
             array.append(sub)
-    elif sub is None:
-        array.append(TriccStatic(True))
+    # elif sub is None:
+    #     array.append(TriccStatic(True))
         
        
 # function that generate remove unsure condition
