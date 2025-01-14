@@ -52,12 +52,12 @@ def get_node_expressions(node, processed_nodes):
         expression = get_node_expression(node, processed_nodes, is_calculate)
         
     if is_calculate:
-        if expression is not None and (not isinstance(expression, str) or expression != '') and  expression is not True  :
+        if expression  and (not isinstance(expression, str) or expression != '') and  expression is not True  :
             num_expression = TriccOperation(
                 TriccOperator.CAST_NUMBER,
                 [expression]
             )
-        elif expression is True:
+        elif expression is True or (not expression and is_calculate):
             expression = TriccStatic(1)                
         else:
             expression = ''
