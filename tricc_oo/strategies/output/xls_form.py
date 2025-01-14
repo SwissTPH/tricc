@@ -633,6 +633,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
         elif isinstance(r, (int, float)):
             return str(r)
         elif isinstance(r, TriccNodeSelectOption):
+            logger.warning(f"select option {r.get_name()} from {r.select.get_name()} was used as a reference")
             return f"'{r.name}'"
         elif issubclass(r.__class__, TriccNodeBaseModel):
             return f"${{{get_export_name(r)}}}" 
