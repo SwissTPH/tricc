@@ -58,6 +58,8 @@ class TriccNodeCalculateBase(TriccNodeBaseModel):
         elif self.reference:
             return self.reference
             logger.error("Cannot get reference from a sting")
+    def __str__(self):
+        return self.get_name()
 
 
 class TriccNodeActivity(TriccNodeBaseModel):

@@ -260,7 +260,7 @@ def get_more_info_choice(strategy):
  
 def generate_xls_form_export(strategy, node, processed_nodes, stashed_nodes, df_survey, df_choice,df_calculate, cur_group, calculates, **kwargs):
     # check that all prev nodes were processed
-    if is_ready_to_process(node,processed_nodes, strict=True) and process_reference(node, processed_nodes, calculates, replace_reference=True, codesystems= kwargs.get('codesystems', None)) :
+    if is_ready_to_process(node,processed_nodes, strict=True) and process_reference(node, processed_nodes, calculates, replace_reference=False, codesystems= kwargs.get('codesystems', None)) :
         if node not in processed_nodes :
             add_calculate(calculates,node)  
             if node.group != cur_group and not isinstance(node,TriccNodeSelectOption) : 

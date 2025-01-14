@@ -160,6 +160,10 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
                     update_calc_version(calculates,node.name)
             #if hasattr(node, 'next_nodes'):
                 #node.next_nodes=reorder_node_list(node.next_nodes, node.group)
+            process_reference(node, processed_nodes, calculates,used_calculates, replace_reference=True, warn = warn, codesystems= kwargs.get('codesystems', None))
+            if isinstance(node, (TriccNodeMainStart, TriccNodeActivityStart)):
+                process_reference(node.activity, processed_nodes, calculates,used_calculates, replace_reference=True, warn = warn, codesystems= kwargs.get('codesystems', None))
+
             return True
     # not ready to process or already processed
 
@@ -370,7 +374,7 @@ def process_reference(node, processed_nodes, calculates, used_calculates=None,  
         modified_expression = process_operation_reference(node.expression_reference, node, processed_nodes, calculates, used_calculates, replace_reference,warn, codesystems)
         if modified_expression is False:
             return False
-        elif modified_expression:
+        elif modified_expression and replace_reference:
             node.reference = modified_expression.get_references()
             node.expression_reference = modified_expression
     elif getattr(node, 'reference', None):
@@ -384,12 +388,13 @@ def process_reference(node, processed_nodes, calculates, used_calculates=None,  
                 return False
             elif modified_expression:
                 node.reference = modified_expression.get_references()
-            
+                if not isinstance(node, TriccNodeWait):
+                    node.expression_reference = modified_expression
         elif isinstance(node.reference, (TriccOperation, TriccReference)):
             modified_expression = process_operation_reference(node.reference, node, processed_nodes, calculates, used_calculates, replace_reference,warn, codesystems)
             if modified_expression is False:
                 return False
-            elif modified_expression:
+            elif modified_expression and replace_reference:
                 node.reference = modified_expression.get_references()
                 node.expression_reference = modified_expression
 
@@ -397,21 +402,21 @@ def process_reference(node, processed_nodes, calculates, used_calculates=None,  
         modified_expression = process_operation_reference(node.relevance, node, processed_nodes, calculates, used_calculates, replace_reference,warn, codesystems)
         if modified_expression is False:
             return False
-        elif modified_expression:
+        elif modified_expression and replace_reference:
             node.relevance = modified_expression
     
     if isinstance(getattr(node, 'default', None), (TriccOperation, TriccReference)):
         modified_expression = process_operation_reference(node.default, node, processed_nodes, calculates, used_calculates, replace_reference,warn, codesystems)
         if modified_expression is False:
             return False
-        elif modified_expression:
+        elif modified_expression and replace_reference:
             node.relevance = modified_expression
         
     if isinstance(getattr(node, 'expression', None), (TriccOperation, TriccReference)):
         modified_expression = process_operation_reference(node.expression, node, processed_nodes, calculates, used_calculates, replace_reference,warn, codesystems)
         if modified_expression is False:
             return False
-        elif modified_expression:
+        elif modified_expression and replace_reference:
             node.expression = modified_expression
             
 
@@ -452,8 +457,9 @@ def process_operation_reference(operation, node, processed_nodes, calculates, us
             node_reference.append(last_found)
             reference.append(TriccReference(ref))
             if replace_reference:
-                if isinstance(operation, (TriccOperation, TriccReference)):
-                    modified_operation = operation.copy()
+                if isinstance(operation, (TriccOperation)):
+                    if modified_operation is None:
+                        modified_operation = operation.copy()
                     modified_operation.replace_node(TriccReference(ref), last_found)
                 elif operation == TriccReference(ref):
                     modified_operation = last_found
@@ -465,8 +471,8 @@ def process_operation_reference(operation, node, processed_nodes, calculates, us
                 else:
                     logger.warning(f"Could not resolve label '{option_label}' for reference {ref}")
                     return False
-            if replace_reference:
-                set_prev_next_node(last_found, node)
+            
+                
             node.path_len = max(node.path_len, last_found.path_len)
     for ref in real_ref_list:
         if is_prev_processed(ref, node, processed_nodes, local=False) is False:
@@ -1697,7 +1703,7 @@ def get_calculation_terms( node, processed_nodes, is_calculate=False, negate=Fal
     
 # Function that add element to array is not None or ''
 def add_sub_expression(array, sub):
-    if sub is not None and sub not in array and sub != '':
+    if isinstance(sub, TriccOperation) or not ( not sub ):
         not_sub = negate_term(sub)
         if not_sub in array:
             # avoid having 2 conditions that are complete opposites
@@ -1759,12 +1765,12 @@ def clean_list_or(list_or, elm_and=None):
 
     # function that negate terms
 # @param expression to negate
-def negate_term(expression):
-    if expression is None or expression == '':
+def negate_term(expression):            
+    if expression is None or isinstance(expression, str) and expression == '':
         return TriccStatic(False)
-    elif expression == TriccStatic(False):
+    elif isinstance(expression, TriccStatic) and expression == TriccStatic(False):
         return TriccStatic(True)
-    elif expression == TriccStatic(True):
+    elif isinstance(expression, TriccStatic) and expression == TriccStatic(True):
         return TriccStatic(False)
     else:
         if isinstance(expression, TriccOperation) or issubclass(expression.__class__, TriccNodeDisplayCalculateBase):

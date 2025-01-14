@@ -567,37 +567,6 @@ class XLSFormStrategy(BaseOutPutStrategy):
                 return True
         return False
     
-    # function update the relevance in the XLSFORM format
-    # @param left part
-    # @param right part
-    def generate_xls_form_relevance(self, node, processed_nodes, stashed_nodes, **kwargs):
-        if is_ready_to_process(node, processed_nodes):
-            if node not in processed_nodes:
-                logger.debug('Processing relevance for node {0}'.format(node.get_name()))
-                # if has prev, create condition
-                if (
-                    hasattr(node, 'relevance') 
-                    and (node.relevance is None or isinstance(node.relevance, TriccOperation))
-                ):
-                    node.relevance = get_node_expressions(node, processed_nodes)
-                    # manage not Available
-                    if isinstance(node, TriccNodeSelectNotAvailable):
-                        # update the checkbox
-                        if len(node.prev_nodes) == 1:
-                            iterator = iter(node.prev_nodes)
-                            parent_node = next(iterator)
-                            parent_empty = TriccOperation(TriccOperator.ISNULL, [parent_node])
-                            node.relevance  = and_join([parent_node.relevance, parent_empty])
-                            node.required = parent_empty
-                            node.constraint = parent_empty
-                            node.constraint_message = "Cannot be selected with a value entered above"
-                            # update the check box parent : create loop error
-                            parent_node.required = None  # "${{{0}}}=''".format(node.name)
-                        else:
-                            logger.warning("not available node {} does't have a single parent".format(node.get_name()))
-
-                return True
-        return False
     
     # function update the select node in the XLSFORM format
     # @param left part

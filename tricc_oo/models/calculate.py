@@ -29,8 +29,12 @@ class TriccNodeDisplayCalculateBase(TriccNodeCalculateBase):
         fake = TriccNodeFakeCalculateBase(**data)
         replace_node(self,fake)
         return fake
+    def __str__(self):
+        return self.get_name()
 
-
+    def __repr__(self):
+        return self.get_name()
+    
 class TriccNodeCalculate(TriccNodeDisplayCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.calculate
 
