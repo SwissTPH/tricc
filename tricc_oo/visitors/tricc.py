@@ -1359,10 +1359,10 @@ def create_determine_diagnosis_activity(diags):
         diags_conf.append(d)
         r = TriccNodeRhombus(
             id=generate_id(),
-            # expression_reference=TriccOperation(
-            #     TriccOperator.ISTRUE,
-            #     [TriccReference(proposed.name)]
-            # ),
+            expression_reference=TriccOperation(
+                TriccOperator.ISTRUE,
+                [TriccReference(proposed.name)]
+            ),
             reference=[TriccReference(proposed.name)],
             activity=activity,
             group=activity,
