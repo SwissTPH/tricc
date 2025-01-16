@@ -489,7 +489,10 @@ def inject_bridge_path(node, nodes):
 
     for e in node.activity.edges:
         if e.target == node.id:
-            e.target = calc.id
+            if e.source in node.activity.nodes and len(node.activity.nodes[e.source].next_nodes):
+                set_prev_next_node(node.activity[e.source], node, edge_only=False, replaced_node=node)
+            else:
+                e.target = calc.id
 
     # add edge between bridge and node
     set_prev_next_node(calc, node, edge_only=True)
@@ -498,18 +501,25 @@ def inject_bridge_path(node, nodes):
     return calc
 
 
-def enrich_node(diagram, media_path, edge, node):
+def enrich_node(diagram, media_path, edge, node, activity):
     if edge.target == node.id:
         # get node and process type
         type, message = get_message(diagram, edge.source)
         if type is not None:
             if type == 'help':
-                return TriccNodeMoreInfo(
+                help = TriccNodeMoreInfo(
                     id=generate_id(),
                     name=f"{node.name}.more_info",
-                    label=message
-                ), None
-            
+                    label=message,
+                    parent=node,
+                    required=TriccStatic(False)
+                )
+                node.help = help
+                bridge = inject_bridge_path(node, activity.nodes)
+                activity.nodes[help.id] = help
+                set_prev_next_node(bridge, help, activity=activity)
+                return help, None
+
             if type in (TriccNodeType.start, TriccNodeType.activity_start):
                 return True
             elif hasattr(node, type):
@@ -545,7 +555,7 @@ def add_tricc_base_node(
         parent = elm.attrib.get("parent")
         node = type(
             id=id,
-            parent=parent,
+            #parent=parent,
             group=group,
             activity=group,
             **set_mandatory_attribute(elm, mandatory_attributes, group.name),

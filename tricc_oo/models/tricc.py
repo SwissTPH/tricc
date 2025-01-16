@@ -223,8 +223,8 @@ class TriccNodeActivity(TriccNodeBaseModel):
 class TriccNodeDisplayModel(TriccNodeBaseModel):
     name: str
     image: Optional[b64] = None
-    hint: Optional[Union[str, Dict[str,str]]] = None
-    help: Optional[Union[str, Dict[str,str]]] = None
+    hint: Optional[Union[str, TriccNodeBaseModel]] = None
+    help: Optional[Union[str, TriccNodeBaseModel]] = None
     group: Optional[Union[TriccGroup, TriccNodeActivity]] = None
     relevance: Optional[Union[Expression, TriccOperation]] = None
 
@@ -240,7 +240,7 @@ class TriccNodeNote(TriccNodeDisplayModel):
     tricc_type: TriccNodeType = TriccNodeType.note
 
 class TriccNodeInputModel(TriccNodeDisplayModel):
-    required: Optional[Union[Expression, TriccOperation]] = '1'
+    required: Optional[Union[Expression, TriccOperation, TriccStatic]] = '1'
     constraint_message: Optional[Union[str, Dict[str,str]]] = None
     constraint: Optional[Expression] = None
     save: Optional[str] = None # contribute to another calculate
@@ -320,11 +320,13 @@ class TriccNodeSelectOne(TriccNodeSelect):
 class TriccNodeSelectYesNo(TriccNodeSelectOne):
     pass
 
+class TriccParentMixIn(BaseModel):
+    parent: Optional[TriccNodeBaseModel]  = None
 
 #    options: List[TriccNodeSelectOption] = [TriccNodeSelectOption(label='Yes', name='yes'),
 #                 TriccNodeSelectOption(label='No', name='no')]
-class TriccNodeSelectNotAvailable(TriccNodeSelectOne):
-    pass
+class TriccNodeSelectNotAvailable(TriccNodeSelectOne, TriccParentMixIn):
+    ...
 
 
 class TriccNodeSelectMultiple(TriccNodeSelect):
@@ -348,8 +350,9 @@ class TriccNodeInteger(TriccNodeNumber):
 class TriccNodeText(TriccNodeInputModel):
     tricc_type: TriccNodeType = TriccNodeType.text
 
-class TriccNodeMoreInfo(TriccNodeInputModel):
+class TriccNodeMoreInfo(TriccNodeInputModel, TriccParentMixIn):
     tricc_type: TriccNodeType = TriccNodeType.help
+    
     
 class TriccProject(BaseModel):
     title: str = "My project"

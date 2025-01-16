@@ -87,17 +87,17 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
                 if isinstance(node, TriccNodeSelectNotAvailable):
                     # update the checkbox
                     if len(node.prev_nodes) == 1:
-                        iterator = iter(node.prev_nodes)
-                        parent_node = next(iterator)
-                        parent_empty = TriccOperation(TriccOperator.ISNULL, [parent_node])
-                        node.relevance  = and_join([parent_node.relevance, parent_empty])
+          
+                        # managing more info on NotAvaialbee
+                        parent_empty = TriccOperation(TriccOperator.ISNULL, [node.parent])
+                        node.relevance  = and_join([node.parent.relevance, parent_empty])
                         node.required = parent_empty
                         node.constraint = parent_empty
                         node.constraint_message = "Cannot be selected with a value entered above"
                         # update the check box parent : create loop error
-                        parent_node.required = None  # "${{{0}}}=''".format(node.name)
+                        node.parent.required = None  # "${{{0}}}=''".format(node.name)
                     else:
-                        logger.warning("not available node {} does't have a single parent".format(node.get_name()))
+                        logger.warning("not available node {} does't have a single parent".format(node.get_name()))               
                 if isinstance(node.relevance, TriccOperation):
                     relevance_reference = node.relevance.get_references()
                     for r in relevance_reference:
@@ -1217,7 +1217,7 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
         else:
             expression = get_selected_option_expression(node, negate)
         #TODO remove that and manage it on the "Save" part
-    elif is_prev and isinstance(in_node, TriccNodeSelectNotAvailable):
+    elif is_prev and isinstance(node, TriccNodeSelectNotAvailable):
         expression =  TriccOperation(
             TriccOperator.SELECTED,
             [
