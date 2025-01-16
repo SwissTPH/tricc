@@ -1395,7 +1395,8 @@ def create_determine_diagnosis_activity(diags):
         list_name='manual_diag',
         id=generate_id("tricc.manual.diag"),
         activity=activity,
-        group=activity
+        group=activity,
+        required=TriccStatic(False)
         
     )
     options = [
