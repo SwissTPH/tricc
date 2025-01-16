@@ -17,7 +17,7 @@ from tricc_oo.parsers.xml import (
     get_tricc_type,
     get_tricc_type_list,
 )
-
+import hashlib
 from tricc_oo.visitors.tricc import *
 from tricc_oo.converters.datadictionnary import add_concept
 
@@ -149,13 +149,9 @@ def process_edges(diagram, media_path, activity, nodes):
         if edge.target not in nodes:
             activity.unused_edges.append(edge)
         elif edge.source not in nodes and edge.target in nodes:
-            enriched, image = enrich_node(diagram, media_path, edge, nodes[edge.target])
+            enriched, image = enrich_node(diagram, media_path, edge, nodes[edge.target], activity)
             if enriched is None:
                 activity.unused_edges.append(edge)
-            elif issubclass(enriched.__class__, TriccBaseModel):
-                bridge = inject_bridge_path(nodes[edge.target], nodes)
-                activity.nodes[enriched.id] = enriched
-                set_prev_next_node(bridge, enriched, activity=activity) 
             if image is not None:
                 images.append({"file_path": enriched, "image_content": image})
 
@@ -337,7 +333,7 @@ def create_root_node(diagram):
         if elm is not None:
             node = TriccNodeActivityStart(
                 id=elm.attrib.get("id"),
-                parent=elm.attrib.get("parent"),
+                #parent=elm.attrib.get("parent"),
                 name="ma" + diagram.attrib.get("id"),
                 label=diagram.attrib.get("name"),
                 instance=int(
@@ -750,19 +746,17 @@ def add_group_to_child(group, diagram, list_child, nodes, groups, parent_group):
                 nodes[child_id].group = group
 
 
-def get_image(diagram, path, id, image_name=None):
+def get_image(diagram, path, id):
     elm = get_mxcell(diagram, id)
     if elm is not None:
         style = elm.attrib.get("style")
-        if image_name is None:
-            image_name = id
-        file_name, payload = add_image_from_style(style, path, image_name)
+        file_name, payload = add_image_from_style(style, path)
         if file_name is not None:
             return file_name, payload
     return None, None
 
 
-def add_image_from_style(style, path, image_name):
+def add_image_from_style(style, path):
     image_attrib = None
     if style is not None and "image=data:image/" in style:
         image_attrib = style.split("image=data:image/")
@@ -770,6 +764,7 @@ def add_image_from_style(style, path, image_name):
         image_parts = image_attrib[1].split(",")
         if len(image_parts) == 2:
             payload = image_parts[1][:-1]
+            image_name = hashlib.md5(payload.encode('utf-8')).hexdigest()
             path = os.path.join(path, "images")
             file_name = os.path.join(path, image_name + "." + image_parts[0])
             if not (

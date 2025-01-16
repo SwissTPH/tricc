@@ -166,14 +166,14 @@ TRAD_MAP = ['label','constraint_message', 'required_message', 'hint', 'help']
 
 def get_xfrom_trad(strategy, node, column, mapping, clean_html = False ):
     arr = column.split('::')
-    column = arr[0]
-    trad =  arr[1] if len(arr)==2 else None
-    value = get_attr_if_exists(strategy, node, column, mapping)
+    new_column = arr[0] if arr[0] != 'media' else "::".join(arr[0:2])
+    trad =  arr[-1] if new_column != column  else None
+    value = get_attr_if_exists(strategy, node, new_column, mapping)
     if (
         issubclass(node.__class__, TriccNodeDisplayCalculateBase) 
         and column == 'calculation' and isinstance(value, str) and not value.startswith('number')
     ):
-        value = f"number({value})"
+        value = f"number({value})" if str(value) not in ['0', '1'] else value
     if clean_html and isinstance(value, str):
         value = remove_html(value)
     if column in TRAD_MAP:
