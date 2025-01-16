@@ -209,7 +209,7 @@ class DrawioStrategy(BaseInputStrategy):
                         if link_out is not None:
                             target_node = link_out
                     elif isinstance(target_node, TriccNodeSelectNotAvailable):
-                        if isinstance(node, (TriccNodeBridge, TriccNodeDisplayBridge)):
+                        if isinstance(node, (TriccNodeBridge, TriccNodeMoreInfo)):
                             if len(target_node.prev_nodes) == 1:
                                 target_node.parent = next(target_node.prev_nodes)
                             elif len(target_node.prev_nodes) == 0:
@@ -221,6 +221,10 @@ class DrawioStrategy(BaseInputStrategy):
                         if not  target_node.parent :    
                             logger.error(f"unable to find the parent of the NotApplicable node {node.get_name()}")
                             exit(1)
+                    elif isinstance(node, TriccNodeMoreInfo):
+                       
+                        if target_node.name == node.parent.name:
+                            node.parent = target_node
                     if issubclass(target_node.__class__, TriccNodeSelect):
                         for key, option in target_node.options.items():
                             self.linking_nodes(

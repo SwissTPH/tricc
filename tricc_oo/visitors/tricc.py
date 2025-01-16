@@ -86,7 +86,12 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
                 # manage not Available
                 if isinstance(node, TriccNodeSelectNotAvailable):
                     # update the checkbox
-                    if len(node.prev_nodes) == 1:
+                    if node.parent: 
+                        if len(node.prev_nodes) == 1:
+                            prev = list(node.prev_nodes)[0]
+                            if isinstance(prev, TriccNodeMoreInfo) and prev.parent.name == node.name:
+                                prev.parent = node
+                            
           
                         # managing more info on NotAvaialbee
                         parent_empty = TriccOperation(TriccOperator.ISNULL, [node.parent])
@@ -264,7 +269,7 @@ def get_bridge_path(prev_nodes, node=None,edge_only=False):
     
 def inject_bridge_path(node, nodes):
 
-    prev_nodes = [nodes[n.source] for n in list(filter(lambda x: (x.target == node.id or x.target == node) and x.source in nodes ,node.activity.edges ))] 
+    prev_nodes = [nodes[n.source] for n in list(filter(lambda x: (x.target == node.id or x.target == node) and x.source in nodes, node.activity.edges))] 
     calc = get_bridge_path(prev_nodes, node,edge_only=True)
 
     for e in node.activity.edges:
@@ -275,6 +280,30 @@ def inject_bridge_path(node, nodes):
     set_prev_next_node(calc,node,edge_only=True, activity=node.activity)
     node.path_len += 1
     return calc
+
+
+def inject_node_before(before, node, activity):
+    before.group = activity
+    before.activity = activity
+    activity.nodes[before.id] = before
+    nodes = activity.nodes
+    prev_nodes = node.prev_nodes.union(set(nodes[n.source] for n in list(filter(lambda x: (x.target == node.id or x.target == node) and x.source in nodes, node.activity.edges))))
+    edge_processed = False
+    before.path_len = node.path_len
+    for e in node.activity.edges:
+        if e.target == node.id:
+            e.target = before.id
+    for p in prev_nodes:   
+        prev_processed = len(node.next_nodes) > 0
+        if node in p.next_nodes:
+            p.next_nodes.remove(node)
+            p.next_nodes.append(before)
+
+    # add edge between bridge and node
+    set_prev_next_node(before,node,edge_only=not edge_processed, activity=node.activity)
+    node.path_len += 1
+
+    
     
 def generate_calculates(node,calculates, used_calculates,processed_nodes):
     list_calc = []
