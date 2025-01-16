@@ -510,7 +510,7 @@ def enrich_node(diagram, media_path, edge, node, activity):
                     parent=node,
                     required=TriccStatic(False)
                 )
-                node.help = help
+                #node.help = message
                 bridge = inject_bridge_path(node, activity.nodes)
                 activity.nodes[help.id] = help
                 set_prev_next_node(bridge, help, activity=activity)

@@ -224,7 +224,7 @@ def get_more_info_select(strategy, node):
             values.append("NO_LABEL")
         elif column == 'name':
             values.append(get_export_name(node) + '_optin')
-        elif column == 'hint':
+        elif column in ('hint', 'relevance'):
             values.append(get_xfrom_trad(strategy, node,column,SURVEY_MAP))
         else:
             values.append(get_xfrom_trad(strategy, None,column,SURVEY_MAP))
