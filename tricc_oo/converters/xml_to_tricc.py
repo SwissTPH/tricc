@@ -508,12 +508,10 @@ def enrich_node(diagram, media_path, edge, node, activity):
                     name=f"{node.name}.more_info",
                     label=message,
                     parent=node,
-                    required=TriccStatic(False)
+                    required=None,
                 )
                 #node.help = message
-                bridge = inject_bridge_path(node, activity.nodes)
-                activity.nodes[help.id] = help
-                set_prev_next_node(bridge, help, activity=activity)
+                inject_node_before(help, node, activity)
                 return help, None
 
             if type in (TriccNodeType.start, TriccNodeType.activity_start):
