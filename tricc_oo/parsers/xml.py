@@ -103,8 +103,16 @@ def get_mxcell_parent_list(diagram, select_id, tricc_type=None, attrib=None):
         )
 
 
-def get_mxcell(diagram, id):
+def get_elm(diagram, id):
     return diagram.find(f".//*[@id='{id}']")
+
+
+def get_mxcell(diagram, id):
+    elm =  diagram.find(f".//*[@id='{id}']")
+    if elm.tag == 'mxCell':
+        return elm
+    else:
+        return diagram.find(f".//*[@id='{id}']/mxCell")
 
 
 def get_edges_list(diagram):

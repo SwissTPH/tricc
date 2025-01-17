@@ -13,6 +13,7 @@ from tricc_oo.converters.drawio_type_map import TYPE_MAP
 from tricc_oo.parsers.xml import (
     get_edges_list,
     get_mxcell,
+    get_elm,
     get_mxcell_parent_list,
     get_tricc_type,
     get_tricc_type_list,
@@ -534,8 +535,11 @@ def enrich_node(diagram, media_path, edge, node, activity):
                     node.image = image
                     return image, payload
                 else:
-                    print("image not supported for {} ".format(node.get_name()))
+                    logger.warning("image not supported for {} ".format(node.get_name()))
                     return None, None
+            else:
+                logger.warning(f"edge from an unsuported node {edge.source}")
+                
             return None, None
 
 
@@ -758,7 +762,7 @@ def add_image_from_style(style, path):
     image_attrib = None
     if style is not None and "image=data:image/" in style:
         image_attrib = style.split("image=data:image/")
-    if image_attrib is not None and len(image_attrib) == 2:
+    if image_attrib is not None and len(image_attrib)== 2:
         image_parts = image_attrib[1].split(",")
         if len(image_parts) == 2:
             payload = image_parts[1][:-1]
@@ -785,7 +789,7 @@ def get_contained_main_node(diagram, id):
 
 
 def get_message(diagram, id):
-    elm = get_mxcell(diagram, id)
+    elm = get_elm(diagram, id)
     if elm is not None:
         type = elm.attrib.get("odk_type")
         if type is not None:

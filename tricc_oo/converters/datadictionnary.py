@@ -12,7 +12,7 @@ from fhir.resources.coding import Coding
 from fhir.resources.valueset import ValueSet, ValueSetCompose, ValueSetComposeInclude
 import logging
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("default")
 
 
 def lookup_codesystems_code(codesystems, ref):
