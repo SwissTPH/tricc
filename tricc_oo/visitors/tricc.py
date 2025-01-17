@@ -346,15 +346,7 @@ def generate_calculates(node,calculates, used_calculates,processed_nodes):
     #if the node have a save 
     if hasattr(node, 'save') and node.save is not None and node.save != '':
         # get fragments type.name.icdcode
-        save_fragments=node.save.split('.')
-        if len(save_fragments)>1:
-            calculate_name = "{0}.{1}".format(save_fragments[0], save_fragments[1])
-        else:
-            calculate_name = "{0}.{1}".format(save_fragments[0], node.name)
-            
-        
-
-    
+        calculate_name=node.save   
         if not isinstance(node, TriccNodeSelectYesNo) and  issubclass(node.__class__, (TriccNodeSelect)):
             calc_node = get_count_node(node)
             calc_node.path_len += 1
