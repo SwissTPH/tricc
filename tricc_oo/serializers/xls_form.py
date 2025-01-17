@@ -1,7 +1,7 @@
 
 
 import logging
-
+from bs4 import BeautifulSoup
 from tricc_oo.converters.tricc_to_xls_form import (
         negate_term, VERSION_SEPARATOR,INSTANCE_SEPARATOR,  get_export_name)
 from tricc_oo.converters.utils import clean_name, remove_html
@@ -80,6 +80,33 @@ def start_group( strategy, cur_group, groups, df_survey, df_calculate, relevance
 
         df_calculate.loc[len(df_calculate)] = calc_values
     
+def add_background_color(input_string, color):
+    """
+    Adds a background color to an HTML string or wraps a plain string in a <p> tag with the background color.
+    
+    Args:
+        input_string (str): The input string, either plain text or HTML.
+        color (str): The background color to apply (e.g., 'yellow', '#ffcc00').
+    
+    Returns:
+        str: The resulting HTML string with the background color applied.
+    """
+    if not input_string:
+        return input_string
+    # Parse the input string using BeautifulSoup
+    soup = BeautifulSoup(input_string, 'html.parser')
+    
+    # Check if the input is already an HTML structure
+    if soup.find():  # If there are any tags in the input
+        # Add the background color to the root element's style attribute
+        root = soup.find()  # Get the first (root) element
+        existing_style = root.get('style', '')
+        root['style'] = f"{existing_style} background-color: {color};".strip()
+    else:
+        # Wrap the plain text in a <p> tag with the background color
+        soup = BeautifulSoup(f'<p style="background-color: {color};">{input_string}</p>', 'html.parser')
+    
+    return str(soup)
     
 
 def end_group( strategy, cur_group, groups, df_survey, **kwargs):
@@ -178,7 +205,21 @@ def get_xfrom_trad(strategy, node, column, mapping, clean_html = False ):
         value = remove_html(value)
     if column in TRAD_MAP:
         value = langs.get_trads(value, trad=trad)
-
+        if column in ('hint', 'label') and isinstance(node, TriccNodeAcceptDiagnostic) and node.severity:
+            
+            if node.severity == 'severe':
+                color = '#f8cecc'   
+            elif node.severity == 'severe':
+                color = '#f8cecc'
+            else:
+                color = None
+            if color:
+                if isinstance(value, list):
+                    for v in value:
+                        v = add_background_color(v, color)
+                else:
+                    value =  add_background_color(value, color)
+                
     return value
 
     

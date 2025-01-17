@@ -49,6 +49,7 @@ class TriccNodeCount(TriccNodeDisplayCalculateBase):
 
 class TriccNodeProposedDiagnosis(TriccNodeDisplayCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.proposed_diagnosis
+    severity: str = None
     
 class TriccNodeFakeCalculateBase(TriccNodeCalculateBase):
     id: triccId = generate_id()
@@ -126,7 +127,7 @@ def get_rand_name(k):
 
 class TriccNodeDiagnosis(TriccNodeDisplayCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.diagnosis
-    
+    severity: str = None
     def __init__(self, **data):
         data['reference'] = f'"final.{data["name"]}" is true'
         super().__init__(**data)
@@ -178,6 +179,7 @@ class TriccNodeEnd(TriccNodeDisplayCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.end
     process: str = None
     def __init__(self, **data):
+        data['hint'] = data['name']
         super().__init__(**data)
         # FOR END
         

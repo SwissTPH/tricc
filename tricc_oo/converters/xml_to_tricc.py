@@ -543,6 +543,17 @@ def enrich_node(diagram, media_path, edge, node, activity):
             return None, None
 
 
+get_style_dict = lambda style: dict(item.split('=', 1) for item in style.split(';') if '=' in item)
+
+
+def severity_from_color(color):  
+    if color == '#fff2cc':
+        return 'mild'
+    elif color == '#f8cecc':
+        return 'severe'
+    else:
+        return 'light'
+    
 
 
 def add_tricc_base_node(
@@ -550,7 +561,7 @@ def add_tricc_base_node(
 ):
     for elm in list:
         id = elm.attrib.get("id")
-        parent = elm.attrib.get("parent")
+        parent = elm.attrib.get("parent")    
         node = type(
             id=id,
             #parent=parent,
@@ -571,6 +582,13 @@ def add_tricc_base_node(
             node.options = get_select_yes_no_options(node, group)
             nodes[node.options[0].id] = node.options[0]
             nodes[node.options[1].id] = node.options[1]
+        elif type == TriccNodeProposedDiagnosis and getattr(node, 'severity', '') == None:
+            mxcell = get_mxcell(diagram, id)
+            styles = get_style_dict(mxcell.attrib.get('style',''))
+            if 'fillColor' in styles and styles['fillColor'] != 'none':
+                node.severity = severity_from_color(styles['fillColor'])
+            
+    
                 
         set_additional_attributes(attributes, elm, node)
         load_expressions(node)

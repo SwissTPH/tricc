@@ -197,7 +197,7 @@ TYPE_MAP = {
     },
     TriccNodeType.proposed_diagnosis: {
         "objects": ["UserObject", "object"],
-        "attributes": ["save", "reference"],
+        "attributes": ["save", "reference", "severity"],
         "mandatory_attributes": [ "name", 'label'],
         "model": TriccNodeProposedDiagnosis
     },

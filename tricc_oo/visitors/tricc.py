@@ -1330,14 +1330,16 @@ def export_proposed_diags(activity, diags=None, **kwargs):
     return diags
     
 
-def get_diagnostic_node(code, display, activity):
-    node = TriccNodeSelectOne(
+def get_diagnostic_node(code, display, severity, activity):
+    node = TriccNodeAcceptDiagnostic(
         id=generate_id(),
         name="final." + code,
         label=display,
         list_name="acc_rej",
         activity=activity,
-        group=activity
+        group=activity,
+        severity=severity
+
     )
     node.options = get_select_accept_reject_options(node, node.activity)
     return node
@@ -1389,7 +1391,7 @@ def create_determine_diagnosis_activity(diags):
     )
     activity.nodes[end.id]=end
     for proposed in diags:
-        d = get_diagnostic_node(proposed.name, proposed.label, activity)
+        d = get_diagnostic_node(proposed.name, proposed.label, proposed.severity, activity)
         diags_conf.append(d)
         r = TriccNodeRhombus(
             id=generate_id(),
@@ -1399,8 +1401,7 @@ def create_determine_diagnosis_activity(diags):
             ),
             reference=[TriccReference(proposed.name)],
             activity=activity,
-            group=activity,
-        )
+            group=activity        )
         r_diags_conf.append(r)
         set_prev_next_node(start, r, edge_only=False)
         set_prev_next_node(r, d, edge_only=False)

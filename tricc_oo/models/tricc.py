@@ -320,6 +320,10 @@ class TriccNodeSelectOne(TriccNodeSelect):
 class TriccNodeSelectYesNo(TriccNodeSelectOne):
     pass
 
+class TriccNodeAcceptDiagnostic(TriccNodeSelectOne):
+    severity: Optional[str] = None
+
+
 class TriccParentMixIn(BaseModel):
     parent: Optional[TriccNodeBaseModel]  = None
 
