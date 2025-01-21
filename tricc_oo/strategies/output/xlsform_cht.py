@@ -6,6 +6,7 @@ import shutil
 import pandas as pd
 
 from tricc_oo.models.lang import SingletonLangClass
+from tricc_oo.models.calculate import TriccNodeEnd
 from tricc_oo.serializers.xls_form import SURVEY_MAP, get_input_line
 from tricc_oo.strategies.output.xlsform_cdss import XLSFormCDSSStrategy
 from tricc_oo.converters.tricc_to_xls_form import get_export_name
@@ -112,22 +113,23 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
         writer.close()
         # pause
         if "tricc_end" in self.calculates:
-            ends = self.calculates['tricc_end'].values()
+            ends = [c for sublist in [list(self.calculates[cn].values()) for cn in self.calculates] for c in sublist if isinstance(c, TriccNodeEnd)]
             # TODO get loc
             ends_prev = []
             for e in ends:
-                latest = None
-                for p in e.prev_nodes:
-                    if not latest or latest.path_len < p.path_len:
-                        latest = p
-                if hasattr(latest, 'select'):
-                    latest = latest.select 
-                ends_prev.append(
-                    (int(self.df_survey[self.df_survey.name == latest.export_name].index.values[0]), e,)
-                )
+                if getattr(e, 'hint', None):
+                    latest = None
+                    for p in e.prev_nodes:
+                        if not latest or latest.path_len < p.path_len:
+                            latest = p
+                    if hasattr(latest, 'select'):
+                        latest = latest.select 
+                    ends_prev.append(
+                        (int(self.df_survey[self.df_survey.name == latest.export_name].index.values[0]), e,)
+                    )
             forms = [form_id]
             for i, e in ends_prev:
-                new_form_id = f"{form_id}_{clean_name(e.hint)}"
+                new_form_id = f"{form_id}_{clean_name(e.label)}"
                 newfilename = f"{new_form_id}.xlsx"
                 newpath = os.path.join(self.output_path, newfilename)
                 settings={'form_title':title,'form_id':f"{new_form_id}",'version':version,'default_language':'English (en)','style':'pages'}

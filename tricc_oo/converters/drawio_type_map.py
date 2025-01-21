@@ -173,8 +173,8 @@ TYPE_MAP = {
     },
     TriccNodeType.end: {
         "objects": ["UserObject", "object"],
-        "attributes": ['process'],
-        "mandatory_attributes": [],
+        "attributes": ['process', 'name', 'label'],
+        "mandatory_attributes": ['label'],
         "model": TriccNodeEnd
     },
     TriccNodeType.activity_end: {

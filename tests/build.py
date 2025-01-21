@@ -49,16 +49,41 @@ def setup_logger(
     l.addHandler(file_handler)
 
 
+class ColorFormatter(logging.Formatter):
+    # Define ANSI escape codes for colors
+    grey = "\x1b[38;21m"
+    yellow = "\x1b[33;21m"
+    red = "\x1b[31;21m"
+    bold_red = "\x1b[31;1m"
+    reset = "\x1b[0m"
+    format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s (%(filename)s:%(lineno)d)"
+
+    # Map log levels to their respective colors
+    FORMATS = {
+        logging.DEBUG: grey + format + reset,
+        logging.INFO: grey + format + reset,
+        logging.WARNING: yellow + format + reset,
+        logging.ERROR: red + format + reset,
+        logging.CRITICAL: bold_red + format + reset,
+    }
+
+    def format(self, record):
+        # Get the appropriate color format for the log level
+        log_fmt = self.FORMATS.get(record.levelno)
+        formatter = logging.Formatter(log_fmt)
+        return formatter.format(record)
+
+
 logger = logging.getLogger("default")
+
 
 # set up logging to console
 console = logging.StreamHandler()
 console.setLevel(logging.INFO)
 # set a format which is simpler for console use
-formatter = logging.Formatter("%(name)-12s: %(levelname)-8s %(message)s")
-console.setFormatter(formatter)
+console.setFormatter(ColorFormatter())
 # add the handler to the root logger
-logging.getLogger("").addHandler(console)
+logging.getLogger("default").addHandler(console)
 
 LEVELS = {
     "d": logging.DEBUG,

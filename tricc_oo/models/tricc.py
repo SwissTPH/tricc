@@ -192,7 +192,7 @@ class TriccNodeActivity(TriccNodeBaseModel):
                 node_edge = list(filter(lambda x: (x.source == node_instance.id or x.source == node_instance) , node_instance.activity.edges))
                 node_edge_origin = list(filter(lambda x: (x.source == node_origin.id or x.source == node_origin) , node_origin.activity.edges))
                 if len(node_edge) == 0 and not issubclass(node_origin.__class__, TriccNodeCalculateBase):
-                    logger.error("no edge was updated for node {}::{}::{}::{}".format(node_instance.activity.get_name(),
+                    logger.warning("no edge was updated for node {}::{}::{}::{}".format(node_instance.activity.get_name(),
                                                                                   node_instance.__class__,
                                                                                   node_instance.get_name(),
                                                                                   node_instance.instance))

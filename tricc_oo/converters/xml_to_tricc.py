@@ -548,7 +548,7 @@ get_style_dict = lambda style: dict(item.split('=', 1) for item in style.split('
 
 def severity_from_color(color):  
     if color == '#fff2cc':
-        return 'mild'
+        return 'moderate'
     elif color == '#f8cecc':
         return 'severe'
     else:

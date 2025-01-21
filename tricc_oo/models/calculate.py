@@ -179,14 +179,14 @@ class TriccNodeEnd(TriccNodeDisplayCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.end
     process: str = None
     def __init__(self, **data):
-        data['hint'] = data['name']
         super().__init__(**data)
         # FOR END
         
         self.set_name()
 
     def set_name(self):
-        self.name = 'tricc_end'
+        if self.name is None:
+            self.name = 'tricc_end'
         #self.name = END_NODE_FORMAT.format(self.activity.id)
 
 

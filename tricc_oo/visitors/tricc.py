@@ -31,7 +31,7 @@ def get_last_version(_list, name, processed_nodes):
     if isinstance(_list, dict):
         _list = _list[name].values() if name in _list else []
     if _list is None:
-        _list = [n for n in processed_nodes if n.name == name]
+        _list = [n for n in processed_nodes if (name == 'tricc_end' and isinstance(n, TriccNodeEnd)) or  n.name == name]
     if _list:
         for  sim_node in _list:
             # get the max version while not taking a node that have a next node before next calc
@@ -118,14 +118,15 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
                 # TODO the calculates should not be required with the latest version of get_last_version
                 last_calc = get_last_version(
                     None,
-                    node.name,
+                    node.name if not isinstance(node, TriccNodeEnd) else 'tricc_end',
                     [p for p in processed_nodes if issubclass(p.__class__, (TriccNodeCalculateBase, TriccNodeDisplayCalculateBase))]
                 )
+                
                 # get max version used 
                 #last_used_version =  get_max_named_version(used_calculates, node.name)
                 last_used_calc = get_last_version(
                     used_calculates,
-                    node.name,
+                    node.name if not isinstance(node, TriccNodeEnd) else 'tricc_end',
                     processed_nodes
                 )
                 # add calculate is added after the version collection so it is 0 in case there is no calc found
