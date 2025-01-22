@@ -111,11 +111,22 @@ class XLSFormCHTHFStrategy(XLSFormCHTStrategy):
             '', '', '', ''
         ]
         df_input.loc[len(df_input)] = [ 
-            'begin_group', 'inputs',
+            'begin_group', 'contact',
             *list(langs.get_trads('NO_LABEL', force_dict = True).values()),
             *list(langs.get_trads('', force_dict = True).values()),
             *list(langs.get_trads('', force_dict = True).values()),
             '',  'field-list',  '',
+            *list(langs.get_trads('', force_dict = True).values()),
+            '', '','',
+            *list(langs.get_trads('', force_dict = True).values())
+            ,'', '', '', '' 
+        ]
+        df_input.loc[len(df_input)] = [ 
+            'hidden', 'external_id',
+            *list(langs.get_trads('NO_LABEL', force_dict = True).values()),
+            *list(langs.get_trads('', force_dict = True).values()),
+            *list(langs.get_trads('', force_dict = True).values()),
+            '',  'hidden',  '',
             *list(langs.get_trads('', force_dict = True).values()),
             '', '','',
             *list(langs.get_trads('', force_dict = True).values())

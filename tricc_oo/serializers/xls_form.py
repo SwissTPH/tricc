@@ -388,7 +388,7 @@ def get_input_line(node):
         '',#'required'
         *list(empty.values()) ,#'required message'
         '',#'read only'
-        '',#'expression'
+        '../input/contact/'+get_export_name(node),#'expression'
         '',#'repeat_count'
         ''#'image'  
     ]   
