@@ -793,10 +793,8 @@ def is_ready_to_process(in_node, processed_nodes, strict=True, local=False):
         for prev_node in node.prev_nodes:
             if is_prev_processed(prev_node, node, processed_nodes, local) is False:
                 return False
-        else:
-            return True
-    else:
-        return True
+       
+    return True
     
 def is_prev_processed(prev_node, node, processed_nodes, local):
     if hasattr(prev_node, 'select'):
@@ -1291,6 +1289,9 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
             end_nodes = node.get_end_nodes()
             if all([end in processed_nodes for end in end_nodes]):
                 expression = and_join([expression, get_activity_end_terms(node,processed_nodes)])
+        elif node.root.relevance:
+            expression = and_join([expression, node.root.relevance])
+        
         elif node.base_instance is not None:
             activity = node
             expression_inputs = []

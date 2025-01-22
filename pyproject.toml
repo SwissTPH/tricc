@@ -1,18 +1,37 @@
 [build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
-[tool.setuptools.packages.find]
-exclude = ["locales"]
+
 [project]
 name = "tricc-oo"
-version = "1.1.25"
+version = "1.1.26"
+description = "Python library that converts CDSS L2 in L3"
 readme = "README.md"
 requires-python = ">=3.8"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
 ]
-description = "Python library that converts CDSS L2 in L3"
+dependencies = [
+    "lxml",
+    "html2text",
+    "pydantic",
+    "babel",
+    "xlsxwriter",
+    "pandas",
+    "polib",
+    "StrEnum",
+    "fhir.resources",
+    "antlr4-python3-runtime",
+    "antlr-ast",
+    "antlr-tools",
+    "bs4"
+]
+keywords = ["xlsform", "drawio", "authoring"]
+
 [project.urls]
 Homepage = "https://github.com/SwissTPH/tricc"
 Issues = "https://github.com/SwissTPH/tricc/issues"
+
+[tool.setuptools.packages.find]
+exclude = ["locales"]

@@ -6,13 +6,13 @@ from tricc_oo.models.calculate import *
 TYPE_MAP = {
     TriccNodeType.start: {
         "objects": ["UserObject", "object"],
-        "attributes": ['process', 'parent', 'form_id'],
+        "attributes": ['process', 'parent', 'form_id','relevance'],
         "mandatory_attributes": ["label"],
         "model": TriccNodeMainStart
     },
     TriccNodeType.activity_start: {
         "objects": ["UserObject", "object"],
-        "attributes": ['parent', 'parent', 'instance'],
+        "attributes": ['parent', 'parent', 'instance', 'relevance'],
         "mandatory_attributes": ["label", "name"],
         "model": TriccNodeActivityStart
     },

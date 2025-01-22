@@ -254,6 +254,7 @@ class TriccNodeMainStart(TriccNodeBaseModel):
     tricc_type: TriccNodeType = TriccNodeType.start
     form_id: Optional[str] = None
     process: Optional[str] = None
+    relevance: Optional[Union[Expression, TriccOperation]] = None
 
 
 class TriccNodeLinkIn(TriccNodeBaseModel):
