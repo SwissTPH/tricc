@@ -31,6 +31,7 @@ from tricc_oo.strategies.output.xls_form import XLSFormStrategy
 from tricc_oo.strategies.output.xlsform_cdss import XLSFormCDSSStrategy
 from tricc_oo.strategies.output.xlsform_cht import XLSFormCHTStrategy
 from tricc_oo.strategies.output.xlsform_cht_hf import XLSFormCHTHFStrategy
+from tricc_oo.strategies.output.spice import SpiceStrategy
 
 def setup_logger(
     logger_name,
@@ -192,7 +193,6 @@ if __name__ == "__main__":
     logger.info(f"build the graph from strategy {input_strategy}")
     media_path = os.path.join(out_path, "media-tmp")
     project = strategy.execute(file_content, media_path)
-    print(len(project.images))
 
     strategy = globals()[output_strategy](project, out_path)
 

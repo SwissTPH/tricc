@@ -8,7 +8,7 @@ logger = logging.getLogger('default')
 
 class BaseOutPutStrategy:
     processes = ['main']
-
+    project = None
     output_path = None
     # list of supported processes for the strategy, 
     # the order of the list will be apply

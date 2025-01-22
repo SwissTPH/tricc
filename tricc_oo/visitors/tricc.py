@@ -468,7 +468,7 @@ def process_operation_reference(operation, node, processed_nodes, calculates, us
                 last_found = get_last_version(calculates, ref, processed_nodes)
         if last_found is None:
             if codesystems:
-                display =  lookup_codesystems_code(codesystems, ref)
+                display =  lookup_codesystems_code(codesystems, ref).display
                 if not display:
                     logger.error(f"reference {ref} not found in the project")
                     exit(1)

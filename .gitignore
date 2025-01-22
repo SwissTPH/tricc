@@ -161,6 +161,6 @@ cython_debug/
 #.idea/
 /media/
 /.idea/
-output
 
-test/data
+test/output/
+test/data/

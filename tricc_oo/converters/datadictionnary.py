@@ -19,7 +19,7 @@ def lookup_codesystems_code(codesystems, ref):
     for code_system in codesystems.values():
         for concept in code_system.concept or []:
             if concept.code == ref:
-                return concept.display
+                return concept
 
 
 def add_concept(codesystems, system, code, display, attributes):
