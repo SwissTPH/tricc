@@ -114,11 +114,12 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
             if (
                 issubclass(node.__class__, (TriccNodeDisplayCalculateBase )) and node.name is not None
             ):
+                node_name = node.name if not isinstance(node, TriccNodeEnd) else 'tricc_end'
                 # generate the calc node version by looking in the processed calculate
                 # TODO the calculates should not be required with the latest version of get_last_version
                 last_calc = get_last_version(
                     None,
-                    node.name if not isinstance(node, TriccNodeEnd) else 'tricc_end',
+                    node_name,
                     [p for p in processed_nodes if issubclass(p.__class__, (TriccNodeCalculateBase, TriccNodeDisplayCalculateBase))]
                 )
                 
@@ -126,7 +127,7 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
                 #last_used_version =  get_max_named_version(used_calculates, node.name)
                 last_used_calc = get_last_version(
                     used_calculates,
-                    node.name if not isinstance(node, TriccNodeEnd) else 'tricc_end',
+                    node_name,
                     processed_nodes
                 )
                 # add calculate is added after the version collection so it is 0 in case there is no calc found
@@ -141,15 +142,16 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
                         # TODO reactivate merges
                         if None:# node_to_delete is not None:  
                             for d_node in node_to_delete:
+                                d_node_name = node.name if not isinstance(node, TriccNodeEnd) else 'tricc_end'
                                 if d_node in processed_nodes:
                                     processed_nodes.remove(d_node)
-                                del calculates[d_node.name][d_node.id]
+                                del calculates[d_node_name][d_node.id]
                                 if d_node in d_node.activity.calculates:
                                     d_node.activity.calculates.remove(d_node)
                                 if node not in d_node.activity.calculates:
                                     d_node.activity.calculates.append(node)
-                                if d_node.name in used_calculates:
-                                    if d_node.id in used_calculates[d_node.name]:
+                                if d_node_name in used_calculates:
+                                    if d_node.id in used_calculates[d_node_name]:
                                         logger.error("node {} used but deleted".format(d_node.get_name()))
                                 if d_node.id in d_node.activity.nodes:
                                     # mostly for end nodes
@@ -163,7 +165,7 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
                         logger.debug("set last to false for node {}  and add its link it to next one".format(last_used_calc.get_name()))
                         set_prev_next_node(last_used_calc,node)
                         last_used_calc.last = False
-                    update_calc_version(calculates,node.name)
+                    update_calc_version(calculates,node_name)
             #if hasattr(node, 'next_nodes'):
                 #node.next_nodes=reorder_node_list(node.next_nodes, node.group)
             process_reference(node, processed_nodes, calculates,used_calculates, replace_reference=True, warn = warn, codesystems= kwargs.get('codesystems', None))
@@ -468,12 +470,12 @@ def process_operation_reference(operation, node, processed_nodes, calculates, us
                 last_found = get_last_version(calculates, ref, processed_nodes)
         if last_found is None:
             if codesystems:
-                display =  lookup_codesystems_code(codesystems, ref).display
-                if not display:
+                concept =  lookup_codesystems_code(codesystems, ref)
+                if not concept:
                     logger.error(f"reference {ref} not found in the project")
                     exit(1)
                 else:
-                    logger.debug(f"reference {ref}::{display} not yet processed {node.get_name()}")
+                    logger.debug(f"reference {ref}::{concept.display} not yet processed {node.get_name()}")
                 
             else:  
                 logger.debug(f"reference {ref} not found for a calculate {node.get_name()}")
@@ -1264,35 +1266,13 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
             expression = node.relevance     
     if expression is None:
             expression = get_prev_node_expression(node, processed_nodes, is_calculate)
+            # in_node not in processed_nodes is need for calculates that can but run after the end of the activity
+
+    
     if isinstance(node, TriccNodeActivity):
-        end_node = get_last_end_node(processed_nodes)
-        if end_node:
-            end_operation = TriccOperation(
-                TriccOperator.NOT, 
-                [
-                    TriccOperation(
-                        TriccOperator.ISTRUE,
-                        [end_node]
-                    )
-                ]
-            )
-            if  expression:
-                expression = TriccOperation(
-                    TriccOperator.AND, [
-                            end_operation,
-                            expression
-                    ]
-                )
-            elif end_node:
-                expression = end_operation
-        if is_prev:
-            end_nodes = node.get_end_nodes()
-            if all([end in processed_nodes for end in end_nodes]):
-                expression = and_join([expression, get_activity_end_terms(node,processed_nodes)])
-        elif node.root.relevance:
-            expression = and_join([expression, node.root.relevance])
         
-        elif node.base_instance is not None:
+
+        if node.base_instance is not None:
             activity = node
             expression_inputs = []
             #exclude base node only if the defaulf instance number is not 0
@@ -1307,7 +1287,31 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
                 expression = nand_join(expression, expression_activity)
             elif expression_activity:
                 expression = negate_term(expression_activity)
-            
+        if not is_prev:
+            end_node = get_last_end_node(processed_nodes)
+            if end_node:
+                end_operation = TriccOperation(
+                    TriccOperator.NOT, 
+                    [
+                        TriccOperation(
+                            TriccOperator.ISTRUE,
+                            [end_node]
+                        )
+                    ]
+                )
+                if  expression:
+                    expression = TriccOperation(
+                        TriccOperator.AND, [
+                                end_operation,
+                                expression
+                        ]
+                    )
+                else:
+                    expression = end_operation
+
+            elif node.root.relevance:
+                expression = and_join([expression, node.root.relevance])
+              
     if negate:
         if negate_expression is not None:
             return negate_expression
@@ -1420,7 +1424,7 @@ def create_determine_diagnosis_activity(diags):
         id=generate_id("tricc.manual.diag"),
         activity=activity,
         group=activity,
-        required=TriccStatic(False)
+        required=TriccStatic(False),
         
     )
     options = [

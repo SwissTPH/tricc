@@ -112,30 +112,34 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
         df_settings.to_excel(writer, sheet_name='settings',index=False)
         writer.close()
         # pause
-        if "tricc_end" in self.calculates:
-            ends = [c for sublist in [list(self.calculates[cn].values()) for cn in self.calculates] for c in sublist if isinstance(c, TriccNodeEnd)]
+        ends = []
+        for p in self.project.pages.values():
+            p_ends = list(filter(lambda x:  issubclass(x.__class__, TriccNodeEnd) and hasattr(x, 'hint'), p.nodes.values() ))
+            if p_ends:
+                ends += p_ends
+        if ends:
             # TODO get loc
             ends_prev = []
             for e in ends:
-                if getattr(e, 'hint', None):
-                    latest = None
-                    for p in e.prev_nodes:
-                        if not latest or latest.path_len < p.path_len:
-                            latest = p
-                    if hasattr(latest, 'select'):
-                        latest = latest.select 
-                    ends_prev.append(
-                        (int(self.df_survey[self.df_survey.name == latest.export_name].index.values[0]), e,)
-                    )
+                
+                latest = None
+                for p in e.prev_nodes:
+                    if not latest or latest.path_len < p.path_len:
+                        latest = p
+                if hasattr(latest, 'select'):
+                    latest = latest.select 
+                ends_prev.append(
+                    (int(self.df_survey[self.df_survey.name == latest.export_name].index.values[0]), e,)
+                )
             forms = [form_id]
             for i, e in ends_prev:
-                new_form_id = f"{form_id}_{clean_name(e.label)}"
+                new_form_id = f"{form_id}_{clean_name(e.name)}"
                 newfilename = f"{new_form_id}.xlsx"
                 newpath = os.path.join(self.output_path, newfilename)
                 settings={'form_title':title,'form_id':f"{new_form_id}",'version':version,'default_language':'English (en)','style':'pages'}
                 df_settings=pd.DataFrame(settings,index=indx)
                 df_settings.head()
-                task_df, hidden_names = make_breakpoints(self.df_survey, i)
+                task_df, hidden_names = make_breakpoints(self.df_survey, i, e.name)
                 # deactivate the end node
                 task_df.loc[task_df['name'] == get_export_name(e), 'calculation'] = 0
                 #print fileds
@@ -147,7 +151,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
                 newfilename = f"{new_form_id}.js"
                 newpath = os.path.join(self.output_path, newfilename)
                 with open(newpath, 'w') as f:
-                    f.write(get_task_js(new_form_id, f"continue {title}", forms, hidden_names, self.df_survey))
+                    f.write(get_task_js(new_form_id, f"continue {title}", forms, hidden_names, self.df_survey, e.hint))
                     f.close()
                 forms.append(new_form_id)
                 

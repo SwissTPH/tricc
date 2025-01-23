@@ -12,7 +12,7 @@ import pandas as pd
 
 # df is the dataframe to be split
 # pausepoint is the index of the row after which the form should pause
-def make_breakpoints(df, pausepoint):
+def make_breakpoints(df, pausepoint, calculate_name=None):
     
     # get all data points that were collected before the break and convert into 'hidden' fields 
     # include the breakpoint itself
@@ -79,6 +79,8 @@ def make_breakpoints(df, pausepoint):
         
     # concat the inputs group with the form that resumes after the breakpoint
     df = pd.concat([df_input, df])
+    if calculate_name:
+        df.loc[df['name']=='hidden','calculation']='0'  
     df.fillna('', inplace = True)
     df.reset_index(inplace=True, drop=True)
     
@@ -113,7 +115,7 @@ def get_tasksstrings(hidden_names, df_survey):
     return tasks_strings
 
 
-def get_task_js(name, title, form_types, hidden_names, df_survey):
+def get_task_js(name, title, form_types, hidden_names, df_survey, task_title="'id: '+getField(report, 'g_registration.p_id')+'; age: '+getField(report, 'p_age')+getField(report, 'g_registration.p_gender')+' months; '+getField(report, 'p_weight') + 'kg; ' + getField(report, 'g_fever.p_temp')+'°'"):
     lines = get_tasksstrings(hidden_names, df_survey)
     indented_lines = '\n          '.join(lines)
     
@@ -123,7 +125,7 @@ const extras = require('./nools-extras');
 
 const {{ addDays, getField}} = extras;
 
-var task_title = 'id: '+getField(report, 'g_registration.p_id')+'; age: '+getField(report, 'p_age')+getField(report, 'g_registration.p_gender')+' months; '+getField(report, 'p_weight') + 'kg; ' + getField(report, 'g_fever.p_temp')+'°'
+var task_title = "{task_title}"
 
 module.exports = [
   {{

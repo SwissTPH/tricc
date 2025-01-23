@@ -164,7 +164,7 @@ class TriccNodeActivity(TriccNodeBaseModel):
             else:
                 node_instance = node_origin.make_instance(self.instance, activity=self)
             self.nodes[node_instance.id] = node_instance
-            if isinstance(node_instance, (TriccNodeActivityEnd, TriccNodeEnd)):
+            if isinstance(node_instance, (TriccNodeActivityEnd)):
                 node_instance.set_name()
             # update root
             if isinstance(node_origin, TriccNodeActivityStart) and node_origin == node_origin.activity.root:
