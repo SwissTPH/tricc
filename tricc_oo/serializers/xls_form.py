@@ -203,6 +203,11 @@ def get_xfrom_trad(strategy, node, column, mapping, clean_html = False ):
         value = f"number({value})" if str(value) not in ['0', '1'] else value
     if clean_html and isinstance(value, str):
         value = remove_html(value)
+    if column == 'appearance':
+        if isinstance(node, TriccNodeSelect) and len(node.options)>9:
+            value = 'autocomplete'
+        elif isinstance(node, TriccNodeNote) and 'countdown-timer' in node.name:
+            value = 'countdown-timer'
     if column in TRAD_MAP:
         value = langs.get_trads(value, trad=trad)
     elif column == 'calculation' and isinstance(node, TriccNodeAcceptDiagnostic) and node.severity and not value:
@@ -291,7 +296,7 @@ def get_more_info_choice(strategy):
             arr = column.split('::')
             column = arr[0]
             trad =  arr[1] if len(arr)==2 else None
-            values.append( langs.get_trads('more info', trad=trad))    
+            values.append( langs.get_trads('More informnation', trad=trad))    
         else:
             values.append(get_xfrom_trad(strategy, None, column, CHOICE_MAP, True ))
     return values
