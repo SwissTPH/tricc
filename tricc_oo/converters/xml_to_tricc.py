@@ -593,7 +593,12 @@ def load_expressions(node):
     if getattr(node, 'default', None):
         node.default = parse_expression('', node.default)
     if getattr(node, 'reference', None):
-        node.expression_reference = parse_expression(node.label, node.reference)
+        if isinstance(node, TriccNodeRhombus):
+            node.label = remove_html(node.label)
+            node.expression_reference = parse_expression(node.label, node.reference)
+        else:
+            node.expression_reference = parse_expression('', node.reference)
+            
         node.reference = node.expression_reference.get_references()
     
         

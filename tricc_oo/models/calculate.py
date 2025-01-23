@@ -117,9 +117,9 @@ class TriccNodeRhombus(TriccNodeCalculateBase,TriccRhombusMixIn):
 
 
     def __init__(self, **data):
+        data['name'] = get_rand_name(8)
         super().__init__(**data)
-        # rename rhombus
-        self.name = get_rand_name(8)
+
 
 
 def get_rand_name(k):
