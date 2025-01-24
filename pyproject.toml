@@ -24,7 +24,7 @@ dependencies = [
     "fhir.resources",
     "antlr4-python3-runtime",
     "antlr-ast",
-    "antlr-tools",
+#    "antlr-tools",
     "bs4"
 ]
 keywords = ["xlsform", "drawio", "authoring"]
