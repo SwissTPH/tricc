@@ -210,8 +210,7 @@ def get_xfrom_trad(strategy, node, column, mapping, clean_html = False ):
             value = 'countdown-timer'
     if column in TRAD_MAP:
         value = langs.get_trads(value, trad=trad)
-    elif column == 'calculation' and isinstance(node, TriccNodeAcceptDiagnostic) and node.severity and not value:
-         
+    elif column == 'appearance' and isinstance(node, TriccNodeAcceptDiagnostic) and node.severity and not value:
             if node.severity == 'severe':
                 value = 'severe'   
             elif node.severity == 'moderate':
@@ -296,7 +295,7 @@ def get_more_info_choice(strategy):
             arr = column.split('::')
             column = arr[0]
             trad =  arr[1] if len(arr)==2 else None
-            values.append( langs.get_trads('More informnation', trad=trad))    
+            values.append( langs.get_trads('More information', trad=trad))    
         else:
             values.append(get_xfrom_trad(strategy, None, column, CHOICE_MAP, True ))
     return values
@@ -393,11 +392,33 @@ def get_input_line(node):
         '',#'required'
         *list(empty.values()) ,#'required message'
         '',#'read only'
-        '../input/contact/'+get_export_name(node),#'expression'
+        '',#'expression'
         '',#'repeat_count'
         ''#'image'  
     ]   
-    
+
+def get_input_calc_line(node):
+    label = langs.get_trads(node.label, force_dict =True)
+    empty = langs.get_trads('', force_dict =True)
+    return [
+        'calculate',
+        get_export_name(node),
+        *list(empty.values()) ,
+        *list(empty.values()) ,#hint
+        *list(empty.values()) ,#help
+        '',#default
+        '',#'appearance', clean_name
+        '',#'constraint', 
+        *list(empty.values()) ,#'constraint_message'
+        '',#'relevance'
+        '',#'disabled'
+        '',#'required'
+        *list(empty.values()) ,#'required message'
+        '',#'read only'
+        '../input/contact/'+get_export_name(node),#'expression'
+        '',#'repeat_count'
+        ''#'image'  
+    ]       
     
 
 def get_diagnostic_start_group_line():

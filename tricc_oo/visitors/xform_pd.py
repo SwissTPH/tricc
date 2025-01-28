@@ -10,6 +10,19 @@ allowing to simulate a pause functionality.
 
 import pandas as pd
 
+
+
+def chf_clean_name(s):
+    # Check if there is a dot in the string
+    if "." in s:
+        # Split the string into parts based on the dot
+        s_p = s.split(".")
+        # Return the formatted string
+        return f'{s_p[0]}["{".".join(s_p[2:])}"]'
+    else:
+        # If no dot is present, return None or handle it as needed
+        return s
+
 # df is the dataframe to be split
 # pausepoint is the index of the row after which the form should pause
 def make_breakpoints(df, pausepoint, calculate_name=None):
@@ -106,16 +119,16 @@ def get_tasksstrings(hidden_names, df_survey):
             else: 
                 fullpath = fullpath[:-1]
         if len(fullpath)>0:
-            fullpath = 'content.' + s +' = getField(report, \'' + '.'.join(fullpath) + '.' + s + '\');'
+            fullpath = 'content.' + chf_clean_name(s) +' = getField(report, \'' + '.'.join(fullpath) + '.' + chf_clean_name(s) + '\');'
         else:
-            fullpath = 'content.' + s +' = getField(report, \'' + s + '\');'
+            fullpath = 'content.' + chf_clean_name(s) +' = getField(report, \'' + chf_clean_name(s) + '\');'
         d[s]=fullpath
     tasks_strings = list(d.values())
     
     return tasks_strings
 
 
-def get_task_js(name, title, form_types, hidden_names, df_survey, task_title="'id: '+getField(report, 'g_registration.p_id')+'; age: '+getField(report, 'p_age')+getField(report, 'g_registration.p_gender')+' months; '+getField(report, 'p_weight') + 'kg; ' + getField(report, 'g_fever.p_temp')+'°'"):
+def get_task_js(form_id, calculate_name, title, form_types, hidden_names, df_survey, task_title="'id: '+getField(report, 'g_registration.p_id')+'; age: '+getField(report, 'p_age')+getField(report, 'g_registration.p_gender')+' months; '+getField(report, 'p_weight') + 'kg; ' + getField(report, 'g_fever.p_temp')+'°'"):
     lines = get_tasksstrings(hidden_names, df_survey)
     indented_lines = '\n          '.join(lines)
     
@@ -129,7 +142,7 @@ var task_title = "{task_title}"
 
 module.exports = [
   {{
-    name: '{name}',
+    name: '{form_id}_{calculate_name}',
     icon: 'icon-followup-general',
     title: '{title}',
     appliesTo: 'reports',
@@ -137,12 +150,12 @@ module.exports = [
     contactLabel: (contact, report) =>
       task_title,
     appliesIf: function (contact, report) {{
-      return getField(report, 'source_id') === '' && getField(report, 'continue_afterlab') === '1';
+      return getField(report, 'source_id') === '' && getField(report, '{chf_clean_name(calculate_name)}') === '1';
    }},
     actions: [
       {{
         type: 'report',
-        form: '{name}',
+        form: '{form_id}',
         modifyContent: function (content, contact, report) {{
           {indented_lines}
        }},
@@ -150,7 +163,7 @@ module.exports = [
     ],
     events: [
       {{
-        id: '{name}',
+        id:  '{form_id}_{calculate_name}',
         days: 1,
         start: 1,
         end: 0,
