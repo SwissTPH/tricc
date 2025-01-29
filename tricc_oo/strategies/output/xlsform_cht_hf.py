@@ -6,7 +6,7 @@ import shutil
 import pandas as pd
 
 from tricc_oo.models.lang import SingletonLangClass
-from tricc_oo.serializers.xls_form import SURVEY_MAP,get_input_line
+from tricc_oo.serializers.xls_form import SURVEY_MAP,get_input_line, get_input_calc_line
 from tricc_oo.strategies.output.xlsform_cht import XLSFormCHTStrategy
 from tricc_oo.visitors.xform_pd import make_breakpoints, get_tasksstrings
 
@@ -52,9 +52,7 @@ class XLSFormCHTHFStrategy(XLSFormCHTStrategy):
             ,'', '', '', '' 
         ]
         
-        inputs = self.export_inputs( start_pages[self.processes[0]],  **kwargs)
-        for input in inputs:
-            df_input.loc[len(df_input)] = get_input_line(input)
+
         df_input.loc[len(df_input)] = [ 
             'begin_group', 'user',
             *list(langs.get_trads('NO_LABEL', force_dict = True).values()),
@@ -121,6 +119,9 @@ class XLSFormCHTHFStrategy(XLSFormCHTStrategy):
             *list(langs.get_trads('', force_dict = True).values())
             ,'', '', '', '' 
         ]
+        inputs = self.export_inputs( start_pages[self.processes[0]],  **kwargs)
+        for input in inputs:
+            df_input.loc[len(df_input)] = get_input_line(input)
         df_input.loc[len(df_input)] = [ 
             'hidden', 'external_id',
             *list(langs.get_trads('NO_LABEL', force_dict = True).values()),
@@ -177,7 +178,9 @@ class XLSFormCHTHFStrategy(XLSFormCHTStrategy):
             '', '', '',
             *list(langs.get_trads('', force_dict = True).values()),
             '', '', '', ''
-        ]        
+        ]
+        for input in inputs:
+            df_input.loc[len(df_input)] = get_input_calc_line(input)        
 
         
         

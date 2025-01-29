@@ -95,7 +95,7 @@ class TriccRhombusMixIn():
                     logger.debug("passing raw reference {} on node {}".format(ref, self.get_name()))
                     reference.append(ref)
                 else:
-                    logger.error("unexpected reference {} in node {}".format(ref, self.get_name()))
+                    logger.critical("unexpected reference {} in node {}".format(ref, self.get_name()))
                     exit(1)
         instance.reference = reference
         instance.expression_reference = expression_reference
@@ -141,14 +141,14 @@ class TriccNodeExclusive(TriccNodeFakeCalculateBase):
 def get_node_from_id(activity, node, edge_only):
     node_id = getattr(node,'id',node)
     if not isinstance(node_id, str):
-        logger.error("can set prev_next only with string or node")
+        logger.critical("can set prev_next only with string or node")
         exit(1)
     if issubclass(node.__class__, TriccBaseModel):
         return node_id, node
     elif node_id in activity.nodes:
         node = activity.nodes[node_id]
     elif not edge_only:
-        logger.error(f"cannot find {node_id} in  {activiy.get_name()}")
+        logger.critical(f"cannot find {node_id} in  {activiy.get_name()}")
         exit(1)
     return node_id, node
 
@@ -175,7 +175,7 @@ class TriccNodeActivityEnd(TriccNodeFakeCalculateBase):
         self.name = ACTIVITY_END_NODE_FORMAT.format(self.activity.id)
 
 
-class TriccNodeEnd(TriccNodeNote):
+class TriccNodeEnd(TriccNodeDisplayCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.end
     process: str = None
     def __init__(self, **data):

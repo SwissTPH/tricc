@@ -336,7 +336,7 @@ def generate_xls_form_export(strategy, node, processed_nodes, stashed_nodes, df_
                         if len(df_calculate[df_calculate.name == get_export_name(node)])==0:
                             df_calculate.loc[len(df_calculate)] = values
                         else:
-                            logger.error("name {} found twice".format(node.name))
+                            logger.critical("name {} found twice".format(node.name))
                     elif  ODK_TRICC_TYPE_MAP[node.tricc_type] !='':
                         values = []
                         for column in SURVEY_MAP:

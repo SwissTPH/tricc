@@ -27,7 +27,7 @@ class BaseOutPutStrategy:
         if 'main' in self.project.start_pages:
             self.process_base(self.project.start_pages, pages=self.project.pages, version=version)
         else:
-            logger.error("Main process required")
+            logger.critical("Main process required")
 
 
         logger.info("generate the relevance based on edges")

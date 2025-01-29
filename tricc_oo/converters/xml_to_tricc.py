@@ -78,7 +78,10 @@ def create_activity(diagram, media_path, project):
                 issubclass(n.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase)) 
                 and not isinstance(n, (TriccRhombusMixIn, TriccNodeRhombus, TriccNodeDisplayBridge))
             ):
-                add_concept(project.code_systems, 'tricc', n.name, n.label, {})
+                if isinstance(n, TriccNodeSelectOption) and isinstance(n.select, TriccNodeSelectNotAvailable):
+                    add_concept(project.code_systems, 'tricc', n.select.name, n.label, {})
+                else:
+                    add_concept(project.code_systems, 'tricc', n.name, n.label, {})
         groups = get_groups(diagram, nodes, activity)
         if groups and len(groups) > 0:
             activity.groups = groups
@@ -241,7 +244,7 @@ def process_edges(diagram, media_path, activity, nodes):
                     set_prev_next_node(n, fake_end, edge_only=True)
                 activity.nodes[fake_end.id] = fake_end
             else:
-                logger.error(f"cannot guess end for {activity.get_name()}")
+                logger.critical(f"cannot guess end for {activity.get_name()}")
                 exit(1)
     
     return images
@@ -366,7 +369,7 @@ def get_select_options(diagram, select_node, nodes):
     for elm in list:
         name = elm.attrib.get("name")
         if name in options_name_list and not name.endswith("_"):
-            logger.error(
+            logger.critical(
                 "Select question {0} have twice the option name {1}".format(
                     select_node.get_name(), name
                 )
@@ -388,7 +391,7 @@ def get_select_options(diagram, select_node, nodes):
         nodes[id] = option
         i += 1
     if len(list) == 0:
-        logger.error("select {} does not have any option".format(select_node.label))
+        logger.critical("select {} does not have any option".format(select_node.label))
     else:
         return options
 
@@ -678,16 +681,16 @@ def set_mandatory_attribute(elm, mandatory_attributes, groupname=None):
                  
             if attributes == "source":
                 if elm.attrib.get("target") is not None:
-                    logger.error(
+                    logger.critical(
                         "the attibute target is {}".format(elm.attrib.get("target"))
                     )
             elif attributes == "target":
                 if elm.attrib.get("source") is not None:
-                    logger.error(
+                    logger.critical(
                         "the attibute target is {}".format(elm.attrib.get("source"))
                     )
             
-            logger.error(
+            logger.critical(
                 "the attibute {} is mandatory but not found in {} within group {}".format(
                     attributes, display_name, groupname if groupname is not None else ""
                 )
@@ -902,7 +905,7 @@ def process_exclusive_edge(edge, nodes):
 
 def process_yesno_edge(edge, nodes):
     if edge.value is None:
-        logger.error(
+        logger.critical(
             "yesNo {} node with labelless edges".format(nodes[edge.source].get_name())
         )
         exit(1)

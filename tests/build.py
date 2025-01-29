@@ -174,7 +174,7 @@ if __name__ == "__main__":
     files = []
     if os.path.isdir(in_filepath):
         files = [
-            os.path.join(in_filepath, f) 
+            os.path.join(in_filepath, f)
             for f in os.listdir(in_filepath) 
             if f.endswith(".drawio")
         ]
@@ -183,9 +183,12 @@ if __name__ == "__main__":
         
     for f in files:
         with open(f, 'r') as s:
-            file_content.append(s.read())
+            content = s.read()
+            # present issue with some drawio file that miss the XML header
+
+            file_content.append(content)
     if not file_content:
-        logger.error(f"{in_filepath} is neither a drawio file nor a directory containing drawio files")
+        logger.critical(f"{in_filepath} is neither a drawio file nor a directory containing drawio files")
         exit(1)
 
 

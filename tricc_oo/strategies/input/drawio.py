@@ -79,7 +79,7 @@ class DrawioStrategy(BaseInputStrategy):
         # elif os.path.isfile(in_filepath):
         #     files = [in_filepath]
         # else:
-        #     logger.error(f"no input file found at {in_filepath}")
+        #     logger.critical(f"no input file found at {in_filepath}")
         #     exit(1)
         # for file in files:
         for f in file_content:
@@ -219,7 +219,7 @@ class DrawioStrategy(BaseInputStrategy):
                         else:    
                             target_node.parent = node
                         if not  target_node.parent :    
-                            logger.error(f"unable to find the parent of the NotApplicable node {node.get_name()}")
+                            logger.critical(f"unable to find the parent of the NotApplicable node {node.get_name()}")
                             exit(1)
                     elif isinstance(node, TriccNodeMoreInfo):
                        
@@ -234,7 +234,7 @@ class DrawioStrategy(BaseInputStrategy):
                         processed_nodes.add(target_node)
                         logger.debug("{}::{}: processed ({})".format(
                             'linking_nodes', target_node.get_name(), len(processed_nodes)))
-                        if isinstance(target_node.activity.root, TriccNodeActivityEnd) and isinstance(target_node.activity.root, TriccNodeMainStart):
+                        if isinstance(target_node.activity.root, TriccNodeActivityStart) and isinstance(target_node.activity.root, TriccNodeMainStart):
                             end_nodes = target_node.activity.get_end_nodes()
                             if all([e in processed_nodes for e in end_nodes]):
                                 processed_nodes.add(target_node.activity)
@@ -258,7 +258,7 @@ class DrawioStrategy(BaseInputStrategy):
                 else:
                     set_prev_next_node(node, target_node)
             else:
-                logger.warning(
+                logger.error(
                     "target not found {0} for node {1}".format(
                         edge.target, node.get_name()
                     )
@@ -297,11 +297,12 @@ class DrawioStrategy(BaseInputStrategy):
             # continue on the initial page
             return next_page
         else:
-            logger.warning(
+            logger.critical(
                 "node {0} from page {1} doesnot have a valid link".format(
                     node.label, page.label
                 )
             )
+            exit()
 
     def walkthrough_link_out_node(
         self, node, page, pages, processed_nodes, current_path

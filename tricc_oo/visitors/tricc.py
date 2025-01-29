@@ -10,13 +10,13 @@ logger = logging.getLogger("default")
 
 def merge_node(from_node,to_node):
     if from_node.activity != to_node.activity:
-        logger.error("Cannot merge nodes from different activities")
+        logger.critical("Cannot merge nodes from different activities")
     elif issubclass(from_node.__class__, TriccNodeCalculateBase) and issubclass(to_node.__class__, TriccNodeCalculateBase):
         for e in to_node.activity.edges:
             if e.target == from_node.id:
                 e.target = to_node.id
     else:
-        logger.error("Cannot merge not calculate nodes ")
+        logger.critical("Cannot merge not calculate nodes ")
     
 
 def get_max_version(dict):
@@ -61,7 +61,12 @@ def get_node_expressions(node, processed_nodes):
             expression = TriccStatic(1)                
         else:
             expression = ''
-    if issubclass(node.__class__, TriccNodeCalculateBase) and not isinstance(expression, (TriccStatic, TriccReference, TriccOperation)) and str(expression) != '' and not isinstance(node, (TriccNodeWait, TriccNodeActivityEnd, TriccNodeActivityStart))  :
+    if (
+        issubclass(node.__class__, TriccNodeCalculateBase) 
+        and not isinstance(expression, (TriccStatic, TriccReference, TriccOperation)) 
+        and str(expression) != '' 
+        and not isinstance(node, (TriccNodeWait, TriccNodeActivityEnd, TriccNodeActivityStart, TriccNodeEnd))
+    ):
         logger.warning("Calculate {0} returning no calculations".format(node.get_name()))
         expression = TriccStatic(True)
     return expression
@@ -152,13 +157,13 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
                                     d_node.activity.calculates.append(node)
                                 if d_node_name in used_calculates:
                                     if d_node.id in used_calculates[d_node_name]:
-                                        logger.error("node {} used but deleted".format(d_node.get_name()))
+                                        logger.critical("node {} used but deleted".format(d_node.get_name()))
                                 if d_node.id in d_node.activity.nodes:
                                     # mostly for end nodes
                                     if isinstance(d_node,(TriccNodeEnd,TriccNodeActivityEnd)):
                                         del d_node.activity.nodes[d_node.id]
                                 if  d_node  in stashed_nodes:
-                                    logger.error("node {} not porcessed but deleted".format(d_node.get_name()))
+                                    logger.critical("node {} not porcessed but deleted".format(d_node.get_name()))
                                 ## need to update all nodes calc 
                     # chaining the calculate, this is needed each time there is a last used version       
                     elif not node_to_delete:
@@ -388,9 +393,9 @@ def get_option_code_from_label(node, option_label):
         for i in node.options:
             if node.options[i].label.strip() == option_label.strip():
                 return node.options[i].name
-        logger.error(f"option with label {option_label} not found in {node.get_name()}")
+        logger.critical(f"option with label {option_label} not found in {node.get_name()}")
     else:
-        logger.error(f"node {node.get_name()} has no options")
+        logger.critical(f"node {node.get_name()} has no options")
 
 
 def process_reference(node, processed_nodes, calculates, used_calculates=None,  replace_reference=False,warn=False, codesystems=None):
@@ -472,7 +477,7 @@ def process_operation_reference(operation, node, processed_nodes, calculates, us
             if codesystems:
                 concept =  lookup_codesystems_code(codesystems, ref)
                 if not concept:
-                    logger.error(f"reference {ref} not found in the project")
+                    logger.critical(f"reference {ref} not found in the project")
                     exit(1)
                 else:
                     logger.debug(f"reference {ref}::{concept.display} not yet processed {node.get_name()}")
@@ -541,7 +546,7 @@ def merge_calculate(node, calculates, last_used_calc):
         if calc_node != node and node.tricc_type == calc_node.tricc_type:
             remaining = node
             to_remove = calc_node
-            if not(isinstance(remaining, (TriccNodeActivityEnd, TriccNodeActivityStart))) or remaining.instance == to_remove.instance:
+            if not(isinstance(remaining, (TriccNodeActivityEnd, TriccNodeEnd, TriccNodeActivityStart, TriccNodeMainStart))) or remaining.instance == to_remove.instance:
                 if (last_used_calc is None or to_remove.path_len > last_used_calc.path_len) and to_remove.path_len <= remaining.path_len:
                     logger.debug(f"merge_calculate: {remaining.name if hasattr(remaining, 'name') else remaining.id}")
                     
@@ -712,7 +717,7 @@ def walkthrough_tricc_next_nodes(node, callback, processed_nodes, stashed_nodes,
                     walktrhough_tricc_node_processed_stached(next_node, callback, processed_nodes, stashed_nodes,
                                                         path_len + 1,recursive, warn = warn,node_path = node_path.copy(), **kwargs)
             else:
-                logger.error(
+                logger.critical(
                     "{}::end node of {} has a next node".format(callback.__name__, node.activity.get_name()))
                 exit(1)
 
@@ -832,7 +837,7 @@ def print_trace(node, prev_node, processed_nodes, stashed_nodes, history = []):
             processed_nodes.add(prev_node)
             return False
         elif node in history:
-            logger.error("print trace :: CYCLE node {} found in history ({})".format(
+            logger.critical("print trace :: CYCLE node {} found in history ({})".format(
                 get_data_for_log(prev_node), ">".join(history)))
             exit(1)
         elif node in stashed_nodes:
@@ -900,7 +905,7 @@ def check_stashed_loop(stashed_nodes, prev_stashed_nodes, processed_nodes, len_p
             if set(stashed_nodes) == set(prev_stashed_nodes) and len(processed_nodes) == len_prev_processed_nodes:
                 loop_count += 1
                 if loop_count > max(MIN_LOOP_COUNT, 11 * len(prev_stashed_nodes) + 1):
-                    logger.error("Stashed node list was unchanged: loop likely or unresolved dependence")
+                    logger.critical("Stashed node list was unchanged: loop likely or unresolved dependence")
                     waited, looped =  get_all_dependant(stashed_nodes, stashed_nodes, processed_nodes)               
                     logger.debug(f"{len(looped)} nodes waiting stashed nodes")
                     logger.info("looped nodes")
@@ -931,7 +936,7 @@ def get_all_dependant(loop, stashed_nodes, processed_nodes, depth=0, waited=[] ,
     for n in loop:
         dependant = set()
         i=0
-        logger.error(f"{i}: {n.__class__}::{n.get_name()}::{getattr(n,'instance','')}::{process_reference(n, processed_nodes, [])}")
+        logger.critical(f"{i}: {n.__class__}::{n.get_name()}::{getattr(n,'instance','')}::{process_reference(n, processed_nodes, [])}")
         i += 1
         if hasattr(n, 'prev_nodes') and n.prev_nodes:
             dependant =  dependant | n.prev_nodes
@@ -1143,10 +1148,10 @@ def reorder_node_list(list_node, group):
         logger.debug("reorder list init len: {}, group : {} group.group: {} other: {}".format(len(list_node), len(list_out), len(list_out_group), len(list_out_other)))
 
 def loop_info(loop, **kwargs):
-    logger.error("dependency details")
+    logger.critical("dependency details")
     for n in loop:
         i=0
-        logger.error(f"{i}: {n.__class__}::{n.get_name()}")
+        logger.critical(f"{i}: {n.__class__}::{n.get_name()}")
         i += 1
 
 
@@ -1183,7 +1188,7 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
     expression = None
     negate_expression = None
     node = in_node
-    if is_prev and is_calculate and isinstance(node, (TriccNodeActivityStart, TriccNodeActivityEnd)):
+    if is_prev and is_calculate and isinstance(node, (TriccNodeActivityStart, TriccNodeActivityEnd, TriccNodeEnd)):
         expression = get_node_expression(node.activity, processed_nodes, is_calculate, is_prev, negate )
     elif isinstance(node, TriccNodeWait):
         if is_prev:
@@ -1203,7 +1208,7 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
             if len(node.prev_nodes) == 1:
                 node.path = list(node.prev_nodes)[0]
             elif len(node.prev_nodes) > 1:
-                logger.error(f"missing path for Rhombus {node.get_name()}")
+                logger.critical(f"missing path for Rhombus {node.get_name()}")
                 exit(1)
         prev_exp = get_node_expression(node.path, processed_nodes, is_calculate, is_prev)
         if prev_exp and expression:
@@ -1220,7 +1225,7 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
             )
         elif prev_exp:
             
-            logger.error(f"useless rhombus {node.get_name()}")
+            logger.critical(f"useless rhombus {node.get_name()}")
             expression = prev_exp
             negate_expression = prev_exp
             
@@ -1318,7 +1323,7 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
         elif expression is not None:
             return negate_term(expression)
         else:
-            logger.error("exclusive can not negate None from {}".format(node.get_name()))
+            logger.critical("exclusive can not negate None from {}".format(node.get_name()))
             # exit(1)
     else:
         return expression
@@ -1635,7 +1640,7 @@ def get_rhombus_terms( node, processed_nodes, is_calculate=False, negate=False):
                 elif issubclass(ref.__class__, TriccReference):
                     expression = ref
                 else:
-                    logger.error('reference {0} was not found in the previous nodes of node {1}'.format(node.reference,
+                    logger.critical('reference {0} was not found in the previous nodes of node {1}'.format(node.reference,
                                                                                                         node.get_name()))
                     exit(1)
             elif node.expression_reference is not None and node.expression_reference != '':
@@ -1646,10 +1651,10 @@ def get_rhombus_terms( node, processed_nodes, is_calculate=False, negate=False):
             else:
                 logger.warning("missing expression for node {}".format(node.get_name()))
         else:
-            logger.error('reference {0} is not a list {1}'.format(node.reference, node.get_name()))
+            logger.critical('reference {0} is not a list {1}'.format(node.reference, node.get_name()))
             exit(1)
     else:
-        logger.error('reference empty for Rhombis {}'.format( node.get_name()))
+        logger.critical('reference empty for Rhombis {}'.format( node.get_name()))
         exit(1)
 
     if expression is not None:
@@ -1676,7 +1681,7 @@ def get_rhombus_terms( node, processed_nodes, is_calculate=False, negate=False):
             else:
                 expression = "{0}{1}".format(expression, left_term)
     else:
-        logger.error("Rhombus reference was not found for node {}, reference {}".format(
+        logger.critical("Rhombus reference was not found for node {}, reference {}".format(
             node.get_name(),
             node.reference
         ))
@@ -1712,7 +1717,7 @@ def get_calculation_terms( node, processed_nodes, is_calculate=False, negate=Fal
             iterator = iter(node.prev_nodes)
             node_to_negate = next(iterator)
             if isinstance(node_to_negate, TriccNodeExclusive):
-                logger.error("2 exclusives cannot be on a row")
+                logger.critical("2 exclusives cannot be on a row")
                 exit(1)
             elif issubclass(node_to_negate.__class__, TriccNodeCalculateBase):
                 return get_node_expression(node_to_negate, processed_nodes, is_prev=True, negate=True)
@@ -1720,12 +1725,12 @@ def get_calculation_terms( node, processed_nodes, is_calculate=False, negate=Fal
                 return get_node_expression(node_to_negate, processed_nodes, is_calculate=False, is_prev=True,
                                         negate=True)
             else:
-                logger.error(f"exclusive node {node.get_name()}\
+                logger.critical(f"exclusive node {node.get_name()}\
                     does not depend of a calculate but on\
                         {node_to_negate.__class__}::{node_to_negate.get_name()}")
 
         else:
-            logger.error("exclusive node {} has no ou too much parent".format(node.get_name()))
+            logger.critical("exclusive node {} has no ou too much parent".format(node.get_name()))
     
     if isinstance(node.expression_reference, (TriccOperation, TriccStatic)):
         expression = node.expression_reference
@@ -1866,7 +1871,7 @@ def simple_and_join(left, right):
         right = get_export_name(right)    
     
     if left_issue and right_issue:
-        logger.error("and with both terms empty")
+        logger.critical("and with both terms empty")
     elif left_neg or right_neg:
         return 'false()'
     elif left_issue:
@@ -1911,7 +1916,7 @@ def nand_join(left, right):
     if issubclass(right.__class__, TriccNodeBaseModel):
         right = get_export_name(right) 
     if left_issue and right_issue:
-        logger.error("and with both terms empty")
+        logger.critical("and with both terms empty")
     elif left_issue:
         logger.debug('and with empty left term')
         return  negate_term(right)

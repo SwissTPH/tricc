@@ -50,14 +50,13 @@ class TriccNodeCalculateBase(TriccNodeBaseModel):
         elif isinstance(self.reference, list):
             return set(self.reference)
         elif isinstance(self.expression_reference, TriccOperation):
-            self.reference =  self.expression_reference.get_references()
-            return self.reference
+            return self.self.expression_reference.get_references()
         elif isinstance(self.reference, TriccOperation):
             return self.reference.get_references()
         
         elif self.reference:
             return self.reference
-            logger.error("Cannot get reference from a sting")
+            logger.critical("Cannot get reference from a sting")
     def __str__(self):
         return self.get_name()
 
@@ -177,7 +176,7 @@ class TriccNodeActivity(TriccNodeBaseModel):
                             node_instance.path = n
                     # test next_nodes to check that the instance has already prev/next 
                     if node_instance.path is None and node_instance.next_nodes:
-                        logger.error("new path not found")
+                        logger.critical("new path not found")
                 elif len(node_instance.prev_nodes) == 1:
                     node.path = list(node_instance.prev_nodes)[0]
                 elif not (len(node_instance.reference)== 1  and issubclass(node_instance.reference[0].__class__, TriccNodeInputModel)):

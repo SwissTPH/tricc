@@ -100,7 +100,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
         if start_pages["main"].root.form_id is not None:
             form_id = str(start_pages["main"].root.form_id)
         else:
-            logger.error("form id required in the first start node")
+            logger.critical("form id required in the first start node")
             exit(1)
         title = start_pages["main"].root.label
         file_name = form_id + ".xlsx"
@@ -195,7 +195,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
                         + 1
                     )
                 if s_node.group is None:
-                    logger.error(
+                    logger.critical(
                         "ERROR group is none for node {}".format(s_node.get_name())
                     )
                 start_group(
@@ -301,7 +301,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
                             regex=True,
                         )
                 else:
-                    logger.error(
+                    logger.critical(
                         "duplicate reference not found for calculation: {}".format(
                             drop_calc["calculation"]
                         )
@@ -323,7 +323,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
             self.df_survey.duplicated(subset=["name"], keep="first")
         ]
         for index, duplicate in df_duplicate.iterrows(): 
-            logger.error(f"duplicate survey name: {duplicate['name']}")
+            logger.critical(f"duplicate survey name: {duplicate['name']}")
         self.df_survey.reset_index(drop=True, inplace=True)
         return processed_nodes
 

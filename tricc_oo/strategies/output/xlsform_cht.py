@@ -10,7 +10,7 @@ from tricc_oo.models.calculate import TriccNodeEnd
 from tricc_oo.serializers.xls_form import SURVEY_MAP, get_input_line
 from tricc_oo.strategies.output.xlsform_cdss import XLSFormCDSSStrategy
 from tricc_oo.converters.tricc_to_xls_form import get_export_name
-from tricc_oo.converters.utils import clean_name
+from tricc_oo.converters.utils import clean_name, remove_html
 from tricc_oo.visitors.xform_pd import make_breakpoints, get_task_js
 
 langs = SingletonLangClass()
@@ -86,9 +86,9 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
         if start_pages[self.processes[0]].root.form_id is not None:
             form_id= str(start_pages[self.processes[0]].root.form_id )
         else:
-            logger.error("form id required in the first start node")
+            logger.critical("form id required in the first start node")
             exit(1)
-        title = start_pages[self.processes[0]].root.label
+        title = remove_html(start_pages[self.processes[0]].root.label)
         file_name = form_id + ".xlsx"
         # make a 'settings' tab
         now = datetime.datetime.now()
@@ -151,7 +151,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
                 newfilename = f"{new_form_id}.js"
                 newpath = os.path.join(self.output_path, newfilename)
                 with open(newpath, 'w') as f:
-                    f.write(get_task_js(new_form_id, f"continue {title}", forms, hidden_names, self.df_survey, e.hint))
+                    f.write(get_task_js(new_form_id, e.name,f"continue {title}", forms, hidden_names, self.df_survey, e.hint))
                     f.close()
                 forms.append(new_form_id)
                 
