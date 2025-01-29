@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tricc-oo"
-version = "1.1.27"
+version = "1.1.36"
 description = "Python library that converts CDSS L2 in L3"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -24,7 +24,7 @@ dependencies = [
     "fhir.resources",
     "antlr4-python3-runtime",
     "antlr-ast",
-    "antlr-tools",
+    "antlr4-tools",
     "bs4"
 ]
 keywords = ["xlsform", "drawio", "authoring"]

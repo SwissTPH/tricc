@@ -86,8 +86,12 @@ class DrawioStrategy(BaseInputStrategy):
             diagrams += read_drawio(f)
         images_diagram = []
         for diagram in diagrams:
-            logger.info("Create the activity {0}".format(
-                diagram.attrib.get("name")))
+            id_tab = diagram.attrib.get("id")
+            if id_tab in project.pages:
+                logger.critical(f"{id_tab} already found in pages")
+                exit(1)
+            logger.info("Create the activity {0}::{1}".format(
+                id_tab, diagram.attrib.get("name")))
             create_activity(
                 diagram, media_path, project)
         logger.info("# Create the graph from the start node")
@@ -298,11 +302,11 @@ class DrawioStrategy(BaseInputStrategy):
             return next_page
         else:
             logger.critical(
-                "node {0} from page {1} doesnot have a valid link".format(
-                    node.label, page.label
+                "node {0} from page {1} doesnot have a valid link: {2}".format(
+                    node.label, page.label, node.link
                 )
             )
-            exit()
+            exit(1)
 
     def walkthrough_link_out_node(
         self, node, page, pages, processed_nodes, current_path
