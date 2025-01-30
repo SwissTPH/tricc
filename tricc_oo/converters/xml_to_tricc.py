@@ -313,6 +313,8 @@ def get_nodes(diagram, activity):
 def create_root_node(diagram):
     node = None
     elm = get_tricc_type(diagram, "object", TriccNodeType.start)
+    if elm is None:
+        elm = get_tricc_type(diagram, "UserObject", TriccNodeType.start)
     if elm is not None:
         node = TriccNodeMainStart(
             id=elm.attrib.get("id"),
@@ -324,6 +326,8 @@ def create_root_node(diagram):
         )
     else:
         elm = get_tricc_type(diagram, "object", TriccNodeType.activity_start)
+        if elm is None:
+            elm = get_tricc_type(diagram, "UserObject", TriccNodeType.activity_start)
         if elm is not None:
             node = TriccNodeActivityStart(
                 id=elm.attrib.get("id"),

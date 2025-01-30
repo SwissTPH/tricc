@@ -82,18 +82,24 @@ class DrawioStrategy(BaseInputStrategy):
         #     logger.critical(f"no input file found at {in_filepath}")
         #     exit(1)
         # for file in files:
-        for f in file_content:
-            diagrams += read_drawio(f)
         images_diagram = []
-        for diagram in diagrams:
-            id_tab = diagram.attrib.get("id")
-            if id_tab in project.pages:
-                logger.critical(f"{id_tab} already found in pages")
-                exit(1)
-            logger.info("Create the activity {0}::{1}".format(
-                id_tab, diagram.attrib.get("name")))
-            create_activity(
-                diagram, media_path, project)
+        for f in file_content:
+            file_diagrams = read_drawio(f)
+            diagrams += file_diagrams
+            for diagram in file_diagrams:
+                old_page_len = len(project.pages)
+                id_tab = diagram.attrib.get("id")
+                name_tab = diagram.attrib.get("name")
+                if id_tab in project.pages:
+                    logger.critical(f"{id_tab} already found in pages")
+                    exit(1)
+                logger.info("Create the activity {0}::{1}".format(
+                    id_tab, name_tab))
+                
+                create_activity(
+                    diagram, media_path, project)
+                if len(project.pages) == old_page_len:
+                    logger.error(f"diagram {id_tab}::{name_tab} was not loaded properly")
         logger.info("# Create the graph from the start node")
         for k, v in project.code_systems.items():
             with open(os.path.join(os.path.dirname(media_path),  f"{k}_codesystem.json"), "w", encoding='utf-8') as file:
