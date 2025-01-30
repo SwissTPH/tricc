@@ -109,7 +109,7 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
                     else:
                         logger.warning("not available node {} does't have a single parent".format(node.get_name()))               
                 if isinstance(node.relevance, TriccOperation):
-                    relevance_reference = node.relevance.get_references()
+                    relevance_reference = list(node.relevance.get_references())
                     for r in relevance_reference:
                         if issubclass(r.__class__, (TriccNodeDisplayCalculateBase )):
                             add_used_calculate(node, r, calculates, used_calculates, processed_nodes)
@@ -128,48 +128,30 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
                     [p for p in processed_nodes if issubclass(p.__class__, (TriccNodeCalculateBase, TriccNodeDisplayCalculateBase))]
                 )
                 
-                # get max version used 
-                #last_used_version =  get_max_named_version(used_calculates, node.name)
-                last_used_calc = get_last_version(
-                    used_calculates,
-                    node_name,
-                    processed_nodes
-                )
-                # add calculate is added after the version collection so it is 0 in case there is no calc found
-                add_calculate(calculates,node)  
+                # add calculate is added after the version collection so it is 0 in case there is no calc found_                add_calculate(calculates,node)  
                 # merge is there is unused version ->
                 # current node not yet in the list so 1 item is enough
                 node_to_delete = None
                 if last_calc is not None:
-                    if last_used_calc is None:
-                        node.version = last_calc.version + 1
-                        # node_to_delete = merge_calculate(node, calculates[node.name],last_used_calc)
-                        # TODO reactivate merges
-                        if None:# node_to_delete is not None:  
-                            for d_node in node_to_delete:
-                                d_node_name = node.name if not isinstance(node, TriccNodeEnd) else 'tricc_end'
-                                if d_node in processed_nodes:
-                                    processed_nodes.remove(d_node)
-                                del calculates[d_node_name][d_node.id]
-                                if d_node in d_node.activity.calculates:
-                                    d_node.activity.calculates.remove(d_node)
-                                if node not in d_node.activity.calculates:
-                                    d_node.activity.calculates.append(node)
-                                if d_node_name in used_calculates:
-                                    if d_node.id in used_calculates[d_node_name]:
-                                        logger.critical("node {} used but deleted".format(d_node.get_name()))
-                                if d_node.id in d_node.activity.nodes:
-                                    # mostly for end nodes
-                                    if isinstance(d_node,(TriccNodeEnd,TriccNodeActivityEnd)):
-                                        del d_node.activity.nodes[d_node.id]
-                                if  d_node  in stashed_nodes:
-                                    logger.critical("node {} not porcessed but deleted".format(d_node.get_name()))
-                                ## need to update all nodes calc 
-                    # chaining the calculate, this is needed each time there is a last used version       
-                    elif not node_to_delete:
-                        logger.debug("set last to false for node {}  and add its link it to next one".format(last_used_calc.get_name()))
-                        set_prev_next_node(last_used_calc,node)
-                        last_used_calc.last = False
+
+                    node.version = last_calc.version + 1
+                        #logger.debug("set last to false for node {}  and add its link it to next one".format(last_used_calc.get_name()))
+                    if node.prev_nodes:    
+                        set_prev_next_node(last_calc,node)
+                    elif isinstance(node.expression_reference, TriccOperation):
+                        if  isinstance(node, ( TriccNodeAdd, TriccNodeCount)):
+                            node.expression_reference = TriccOperation(
+                                TriccOperator.PLUS,
+                                [last_calc, node.expression_reference]
+                            )
+                        else:
+                            node.expression_reference = TriccOperation(
+                                TriccOperator.OR,
+                                [last_calc, node.expression_reference]
+                            )
+                    else:
+                        logger.error(f"not able to find how to prev calc should contribute to {node.get_name()}")
+                    last_calc.last = False
                     update_calc_version(calculates,node_name)
             #if hasattr(node, 'next_nodes'):
                 #node.next_nodes=reorder_node_list(node.next_nodes, node.group)
@@ -404,7 +386,7 @@ def process_reference(node, processed_nodes, calculates, used_calculates=None,  
         if modified_expression is False:
             return False
         elif modified_expression and replace_reference:
-            node.reference = modified_expression.get_references()
+            node.reference = list(modified_expression.get_references())
             node.expression_reference = modified_expression
     elif getattr(node, 'reference', None):
         if isinstance(node.reference, list):
@@ -419,7 +401,7 @@ def process_reference(node, processed_nodes, calculates, used_calculates=None,  
             if modified_expression is False:
                 return False
             elif modified_expression:
-                node.reference = modified_expression.get_references()
+                node.reference = list(modified_expression.get_references())
                 if not isinstance(node, TriccNodeWait):
                     node.expression_reference = modified_expression
         elif isinstance(node.reference, (TriccOperation, TriccReference)):
@@ -427,7 +409,7 @@ def process_reference(node, processed_nodes, calculates, used_calculates=None,  
             if modified_expression is False:
                 return False
             elif modified_expression and replace_reference:
-                node.reference = modified_expression.get_references()
+                node.reference = list(modified_expression.get_references())
                 node.expression_reference = modified_expression
 
     if isinstance(getattr(node, 'relevance', None), (TriccOperation, TriccReference)):
@@ -1198,11 +1180,14 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
             #it is a empty calculate
             return ''     
     
-    elif is_prev and isinstance(node, TriccNodeRhombus):
-        if isinstance(node.expression_reference, TriccOperation):
-            expression = node.expression_reference
-        else:
-            expression = get_rhombus_terms(node, processed_nodes)  # if issubclass(node.__class__, TricNodeDisplayCalulate) else TRICC_CALC_EXPRESSION.format(get_export_name(node)) #
+    elif isinstance(node, TriccNodeRhombus):
+        # if is_prev:
+        #     expression = TriccOperation(
+        #         TriccOperator.ISTRUE,
+        #         [node]
+        #     )
+        # else:
+        expression = get_rhombus_terms(node, processed_nodes)  # if issubclass(node.__class__, TricNodeDisplayCalulate) else TRICC_CALC_EXPRESSION.format(get_export_name(node)) #
         negate_expression = TriccOperation(TriccOperator.NOT,[expression])
         if node.path is None :
             if len(node.prev_nodes) == 1:
@@ -1225,10 +1210,10 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
             )
         elif prev_exp:
             
-            logger.critical(f"useless rhombus {node.get_name()}")
+            logger.error(f"useless rhombus {node.get_name()}")
             expression = prev_exp
             negate_expression = prev_exp
-            
+            critical
     elif hasattr(node, 'expression_reference') and isinstance(node.expression_reference, TriccOperation):
         # if issubclass(node.__class__, TriccNodeDisplayCalculateBase):
         #     expression = TriccOperation(
@@ -1255,7 +1240,7 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
 
 
     elif is_prev and issubclass(node.__class__, TriccNodeDisplayCalculateBase):
-        expression = TriccOperation(TriccOperator.MORE, [node, TriccStatic(0)])
+        expression = TriccOperation(TriccOperator.ISTRUE, [node])
         # expression = TriccOperation(
         #     TriccOperator.MORE,
         #     [node, TriccStatic(0)]
@@ -1626,6 +1611,8 @@ def get_rhombus_terms( node, processed_nodes, is_calculate=False, negate=False):
     left_term = None
     operator = None
     if node.reference is not None:
+        if isinstance(node.reference, set):
+            node.reference = list(node.reference)
         # calcualte the expression only for select muzltiple and fake calculate
         if  issubclass(node.reference.__class__, list):
             if node.expression_reference is None and len(node.reference) == 1:
