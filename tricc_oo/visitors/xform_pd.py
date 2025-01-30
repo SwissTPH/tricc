@@ -12,13 +12,16 @@ import pandas as pd
 
 
 
-def chf_clean_name(s):
+def chf_clean_name(s, remove_dots=False):
     # Check if there is a dot in the string
     if "." in s:
         # Split the string into parts based on the dot
         s_p = s.split(".")
         # Return the formatted string
-        return f'{s_p[0]}["{".".join(s_p[2:])}"]'
+        if remove_dots:
+          return "_".join(s_p)
+        else:
+          return f'["{".".join(s_p)}"]'
     else:
         # If no dot is present, return None or handle it as needed
         return s
@@ -119,9 +122,9 @@ def get_tasksstrings(hidden_names, df_survey):
             else: 
                 fullpath = fullpath[:-1]
         if len(fullpath)>0:
-            fullpath = 'content.' + chf_clean_name(s) +' = getField(report, \'' + '.'.join(fullpath) + '.' + chf_clean_name(s) + '\');'
+            fullpath = 'content.' + chf_clean_name(s, False) +' = getField(report, \'' + '.'.join(fullpath) + '.' + chf_clean_name(s) + '\');'
         else:
-            fullpath = 'content.' + chf_clean_name(s) +' = getField(report, \'' + chf_clean_name(s) + '\');'
+            fullpath = 'content.' + chf_clean_name(s, False) +' = getField(report, \'' + chf_clean_name(s) + '\');'
         d[s]=fullpath
     tasks_strings = list(d.values())
     
