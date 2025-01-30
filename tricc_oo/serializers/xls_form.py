@@ -415,7 +415,7 @@ def get_input_calc_line(node):
         '',#'required'
         *list(empty.values()) ,#'required message'
         '',#'read only'
-        '../input/contact/'+get_export_name(node),#'expression'
+        '../contact/'+get_export_name(node),#'expression'
         '',#'repeat_count'
         ''#'image'  
     ]       
