@@ -204,7 +204,7 @@ def get_xfrom_trad(strategy, node, column, mapping, clean_html = False ):
     if clean_html and isinstance(value, str):
         value = remove_html(value)
     if column == 'appearance':
-        if isinstance(node, TriccNodeSelect) and len(node.options)>9:
+        if isinstance(node, TriccNodeSelect) and len(node.options)>9 and not any( o.image or o.hint for o in node.options.values()):
             value = 'autocomplete'
         elif isinstance(node, TriccNodeNote) and 'countdown-timer' in node.name:
             value = 'countdown-timer'
