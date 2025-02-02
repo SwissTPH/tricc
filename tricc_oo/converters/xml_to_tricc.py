@@ -297,6 +297,14 @@ def get_nodes(diagram, activity):
             else:
                 merge_node(node, activity_end_node)
                 node_to_remove.append(node.id)
+        # add activity relevance to calculate
+        elif (
+            issubclass(node.__class__, TriccNodeDisplayCalculateBase) 
+            and not getattr(node, 'relevance', None)
+            and node.activity.root.relevance
+        ):
+            node.applicability = node.activity.root.relevance
+            
 
     nodes.update(new_nodes)
 
@@ -322,6 +330,7 @@ def create_root_node(diagram):
             name="ms" + diagram.attrib.get("id"),
             label=elm.attrib.get("label"),
             form_id=elm.attrib.get("form_id"),
+            relevance=elm.attrib.get("relevance"),
             process=elm.attrib.get("process") or 'main',
         )
     else:
@@ -334,13 +343,14 @@ def create_root_node(diagram):
                 #parent=elm.attrib.get("parent"),
                 name="ma" + diagram.attrib.get("id"),
                 label=diagram.attrib.get("name"),
+                relevance=elm.attrib.get("relevance"),
                 instance=int(
                     elm.attrib.get("instance")
                     if elm.attrib.get("instance") is not None
                     else 1
                 ),
             )
-
+    load_expressions(node)
     return node
 
 

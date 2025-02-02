@@ -20,6 +20,7 @@ class TriccNodeDisplayCalculateBase(TriccNodeCalculateBase):
     save: Optional[str] = None  # contribute to another calculate
     hint: Optional[str] = None  # for diagnostic display
     help: Optional[str] = None  # for diagnostic display
+    applicability: Optional[Union[Expression, TriccOperation]] = None
     # no need to copy save
     def to_fake(self):
         data = vars(self)
