@@ -560,7 +560,8 @@ class XLSFormStrategy(BaseOutPutStrategy):
     def generate_xls_form_calculate(self, node, processed_nodes, stashed_nodes, **kwargs):
         if is_ready_to_process(node, processed_nodes):
             if node not in processed_nodes:
-                logger.debug("generation of calculate for node {}".format(node.get_name()))
+                if kwargs.get('warn', True):          
+                    logger.debug("generation of calculate for node {}".format(node.get_name()))
                 if hasattr(node, 'expression') and (node.expression is None) and issubclass(node.__class__,TriccNodeCalculateBase):
                     node.expression = get_node_expressions(node, processed_nodes)
                     # continue walk

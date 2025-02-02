@@ -1,8 +1,7 @@
 import logging
 from tricc_oo.models.tricc import TriccNodeActivity
 from tricc_oo.models.calculate import TriccNodeProposedDiagnosis, TriccNodeInput
-from tricc_oo.serializers.xls_form import (get_diagnostic_add_line,
-                                        get_diagnostic_line,
+from tricc_oo.serializers.xls_form import (
                                         get_diagnostic_none_line,
                                         get_diagnostic_start_group_line,
                                         get_diagnostic_stop_group_line)

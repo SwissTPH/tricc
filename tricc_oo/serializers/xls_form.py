@@ -307,11 +307,13 @@ def generate_xls_form_export(strategy, node, processed_nodes, stashed_nodes, df_
             add_calculate(calculates,node)  
             if node.group != cur_group and not isinstance(node,TriccNodeSelectOption) : 
                 return False
-            logger.debug("printing node {}".format(node.get_name()))
+            if kwargs.get('warn', True):
+                logger.debug("printing node {}".format(node.get_name()))
             # clean stashed node when processed
             if node in stashed_nodes:
                 stashed_nodes.remove(node)
-                logger.debug("generate_xls_form_export: unstashing processed node{} ".format(node.get_name()))
+                if kwargs.get('warn', True):
+                    logger.debug("generate_xls_form_export: unstashing processed node{} ".format(node.get_name()))
             if issubclass(node.__class__, ( TriccNodeDisplayCalculateBase,TriccNodeDisplayModel)):
                 if isinstance(node, TriccNodeSelectOption):
                     values = []
@@ -351,28 +353,7 @@ def generate_xls_form_export(strategy, node, processed_nodes, stashed_nodes, df_
     return False
 
 
-def get_diagnostic_line(node):
-    label = langs.get_trads(node.label, force_dict =True)
-    empty = langs.get_trads('', force_dict =True)
-    return [
-        'select_one yes_no',
-        clean_name("final.")+get_export_name(node),
-        *list(label.values()) ,
-        *list(empty.values()) ,#hint
-        *list(empty.values()) ,#help
-        '',#default
-        '',#'appearance', clean_name
-        '',#'constraint', 
-        *list(empty.values()) ,#'constraint_message'
-        TRICC_CALC_EXPRESSION.format(get_export_name(node)),#'relevance'
-        '',#'disabled'
-        '1',#'required'
-        *list(empty.values()) ,#'required message'
-        '',#'read only'
-        '',#'expression'
-        '',#'repeat_count'
-        ''#'image'  
-    ]
+
     
 def get_input_line(node):
     label = langs.get_trads(node.label, force_dict =True)

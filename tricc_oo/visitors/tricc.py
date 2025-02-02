@@ -84,7 +84,8 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
             is_ready_to_process(node, processed_nodes,True)
             and process_reference(node, processed_nodes, calculates,used_calculates, replace_reference=False, warn = warn, codesystems= kwargs.get('codesystems', None)) 
         ):
-            logger.debug('Processing relevance for node {0}'.format(node.get_name()))
+            if kwargs.get('warn', True):
+                logger.debug('Processing relevance for node {0}'.format(node.get_name()))
         # if has prev, create condition
             if hasattr(node, 'relevance') and (node.relevance is None or isinstance(node.relevance, TriccOperation)):
                 node.relevance = get_node_expressions(node, processed_nodes)
@@ -462,9 +463,10 @@ def process_operation_reference(operation, node, processed_nodes, calculates, us
                     logger.critical(f"reference {ref} not found in the project")
                     exit(1)
                 else:
-                    logger.debug(f"reference {ref}::{concept.display} not yet processed {node.get_name()}")
+                    if warn:
+                        logger.debug(f"reference {ref}::{concept.display} not yet processed {node.get_name()}")
                 
-            else:  
+            elif warn:
                 logger.debug(f"reference {ref} not found for a calculate {node.get_name()}")
             return False
         else:
@@ -483,7 +485,8 @@ def process_operation_reference(operation, node, processed_nodes, calculates, us
                 if option_code:
                     modified_operation = replace_code_reference(operation, old=f"{ref}[{option_label}]", new=option_code )
                 else:
-                    logger.warning(f"Could not resolve label '{option_label}' for reference {ref}")
+                    if warn:
+                        logger.warning(f"Could not resolve label '{option_label}' for reference {ref}")
                     return False
             
                 
@@ -603,13 +606,15 @@ def walktrhough_tricc_node_processed_stached(node, callback, processed_nodes, st
         # node processing succeed 
         if not isinstance(node, TriccNodeActivity) and node not in processed_nodes:
             processed_nodes.add(node)
-            logger.debug("{}::{}: processed ({})".format(callback.__name__, node.get_name(), len(processed_nodes)))
+            if warn:
+                logger.debug("{}::{}: processed ({})".format(callback.__name__, node.get_name(), len(processed_nodes)))
             if isinstance(node, (TriccNodeEnd,TriccNodeActivityEnd)):
                 end_nodes = node.activity.get_end_nodes()
                 if all([e in processed_nodes for e in end_nodes]):
                     processed_nodes.add(node.activity)
                     ended_activity = True
-                    logger.debug("{}::{}: processed ({})".format(callback.__name__, node.activity.get_name(), len(processed_nodes)))
+                    if warn:
+                        logger.debug("{}::{}: processed ({})".format(callback.__name__, node.activity.get_name(), len(processed_nodes)))
         if node in stashed_nodes:
             stashed_nodes.remove(node)
             # logger.debug("{}::{}: unstashed ({})".format(callback.__name__, node.get_name(), len(stashed_nodes)))
@@ -666,8 +671,9 @@ def walktrhough_tricc_node_processed_stached(node, callback, processed_nodes, st
                 callback(option, processed_nodes=processed_nodes, stashed_nodes=stashed_nodes, warn = warn, node_path=node_path,**kwargs)    
                 if option not in processed_nodes:
                     processed_nodes.add(option)
-                    logger.debug(
-                        "{}::{}: processed ({})".format(callback.__name__, option.get_name(), len(processed_nodes)))
+                    if warn:
+                        logger.debug(
+                            "{}::{}: processed ({})".format(callback.__name__, option.get_name(), len(processed_nodes)))
                 walkthrough_tricc_option(node, callback, processed_nodes, stashed_nodes, path_len + 1, recursive,
                                          warn = warn,node_path = node_path, **kwargs)
         if hasattr(node, 'next_nodes') and len(node.next_nodes) > 0 and not isinstance(node, TriccNodeActivity):
@@ -683,7 +689,8 @@ def walktrhough_tricc_node_processed_stached(node, callback, processed_nodes, st
         if node not in processed_nodes and node not in stashed_nodes:
             if node not in stashed_nodes:
                 stashed_nodes.insert_at_bottom(node)
-                logger.debug("{}::{}: stashed({})".format(callback.__name__, node.get_name(), len(stashed_nodes)))
+                if warn:
+                    logger.debug("{}::{}: stashed({})".format(callback.__name__, node.get_name(), len(stashed_nodes)))
 
 
 def walkthrough_tricc_next_nodes(node, callback, processed_nodes, stashed_nodes, path_len, recursive, warn = False, node_path = [], **kwargs):
@@ -758,7 +765,8 @@ def stashed_node_func(node, callback, recursive=False, **kwargs):
             # remove duplicates
             if s_node in stashed_nodes:
                 stashed_nodes.remove(s_node)
-            logger.debug("{}:: {}: unstashed for processing ({})".format(callback.__name__, s_node.__class__, 
+            if kwargs.get('warn', True):         
+                logger.debug("{}:: {}: unstashed for processing ({})".format(callback.__name__, s_node.__class__, 
                                                                         get_data_for_log(s_node),
                                                                         len(stashed_nodes)))
             warn = loop_count >=  (9 * len(stashed_nodes   )+1)

@@ -141,36 +141,6 @@ class DrawioStrategy(BaseInputStrategy):
         # build current path
         current_path = path + [node.id]
         # don't stop the walkthroug by default
-        logger.debug("linking node {0}".format(node.get_name()))
-        # FIXME remove note
-        if len(node_edge) == 0 and not issubclass(
-            node.__class__,
-            (
-                TriccNodeCalculateBase,
-                TriccNodeSelectOption,
-                TriccNodeActivity,
-                TriccNodeNote,
-            ),
-        ):
-            if issubclass(node.__class__, TriccNodeSelect):
-                option_edge = list(
-                    filter(
-                        lambda x: (lambda y: x.source == y.id,
-                                   node.options), page.edges
-                    )
-                )
-                if len(option_edge) == 0:
-                    logger.warning(
-                        "node {0} without edges out found in page {1}, full path {2}".format(
-                            node.get_name(), page.label, current_path
-                        )
-                    )
-            else:
-                logger.warning(
-                    "node {0} without edges out found in page {1}, full path {2}".format(
-                        node.get_name(), page.label, current_path
-                    )
-                )
         for edge in node_edge:
             # get target node
             if edge.target in page.nodes:
