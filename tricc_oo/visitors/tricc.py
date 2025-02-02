@@ -147,7 +147,7 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
                         else:
                             node.expression_reference = TriccOperation(
                                 TriccOperator.OR,
-                                [last_calc, node.expression_reference]
+                                [TriccOperation(TriccOperator.ISTRUE, [last_calc]), node.expression_reference]
                             )
                     else:
                         logger.error(f"not able to find how to prev calc should contribute to {node.get_name()}")
@@ -1326,6 +1326,19 @@ def export_proposed_diags(activity, diags=None, **kwargs):
     return diags
     
 
+def get_accept_diagnostic_node(code, display, severity, activity):
+    node = TriccNodeAcceptDiagnostic(
+        id=generate_id(),
+        name="pre_final." + code,
+        label=display,
+        list_name="acc_rej",
+        activity=activity,
+        group=activity,
+        severity=severity
+    )
+    node.options = get_select_accept_reject_options(node, node.activity)
+    return node
+
 def get_diagnostic_node(code, display, severity, activity):
     node = TriccNodeAcceptDiagnostic(
         id=generate_id(),
@@ -1335,11 +1348,9 @@ def get_diagnostic_node(code, display, severity, activity):
         activity=activity,
         group=activity,
         severity=severity
-
     )
     node.options = get_select_accept_reject_options(node, node.activity)
     return node
-
 
 def get_select_accept_reject_options(node, group):
     yes = TriccNodeSelectOption(
