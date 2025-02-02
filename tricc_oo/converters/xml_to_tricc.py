@@ -80,7 +80,7 @@ def create_activity(diagram, media_path, project):
             ):
                 if isinstance(n, TriccNodeSelectOption) and isinstance(n.select, TriccNodeSelectNotAvailable):
                     add_concept(project.code_systems, 'tricc', n.select.name, n.label, {})
-                else:
+                elif not isinstance(n, TriccNodeSelectNotAvailable):
                     add_concept(project.code_systems, 'tricc', n.name, n.label, {})
         groups = get_groups(diagram, nodes, activity)
         if groups and len(groups) > 0:
