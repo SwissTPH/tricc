@@ -199,7 +199,7 @@ def get_xfrom_trad(strategy, node, column, mapping, clean_html = False ):
     if (
         issubclass(node.__class__, TriccNodeDisplayCalculateBase) 
         and column == 'calculation'  
-        and isinstance(value, str) and  value.startswith('number')
+        and isinstance(value, str) and not value.startswith('number')
     ):
         value = f"number({value})" if str(value) not in ['0', '1'] else value
     if clean_html and isinstance(value, str):
@@ -409,7 +409,7 @@ def get_input_calc_line(node):
         '',#'required'
         *list(empty.values()) ,#'required message'
         '',#'read only'
-        '../contact/'+get_export_name(node),#'expression'
+        '../inputs/contact/'+get_export_name(node),#'expression'
         '',#'repeat_count'
         ''#'image'  
     ]       

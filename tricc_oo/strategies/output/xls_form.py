@@ -369,18 +369,18 @@ class XLSFormStrategy(BaseOutPutStrategy):
         return f"{ref_expressions[0]} mod {ref_expressions[1]}"
     def tricc_operation_minus(self, ref_expressions):
         if len(ref_expressions)>1:
-            return '-'.join(ref_expressions)
+            return ' - '.join(ref_expressions)
         elif len(ref_expressions)==1:
             return f'-{ref_expressions[0]}'
     def tricc_operation_plus(self, ref_expressions):
-        return '+'.join(ref_expressions)
+        return ' + '.join(ref_expressions)
     def tricc_operation_not(self, ref_expressions):
         return f"not({ref_expressions[0]})"
     def tricc_operation_and(self, ref_expressions):
         if len(ref_expressions) == 1:
             return ref_expressions[0]
         if len(ref_expressions)>1: 
-            ref_expressions = [f"({r})" if isinstance(r, str) and any(op in r for op in [' and ','+','-'])else r for r in ref_expressions]
+            ref_expressions = [f"({r})" if isinstance(r, str) and any(op in r for op in [' or ',' + ',' - '])else r for r in ref_expressions]
             return ' and '.join(map(str, ref_expressions))
         else:
             return '1'
@@ -389,7 +389,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
         if len(ref_expressions) == 1:
             return ref_expressions[0]
         if len(ref_expressions)>1: 
-            ref_expressions = [f"({r})" if isinstance(r, str) and any(op in r for op in [' or ','+','-'])else r for r in ref_expressions]
+            ref_expressions = [f"({r})" if isinstance(r, str) and any(op in r for op in [' and ',' + ',' - ']) else r for r in ref_expressions]
             return ' or '.join(map(str, ref_expressions))
         else:
             return '1'

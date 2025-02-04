@@ -291,7 +291,7 @@ class XLSFormCHTHFStrategy(XLSFormCHTStrategy):
             '',#'required'
             *list(empty.values()) ,#'required message'
             '',#'read only'
-            '.../inputs/user/facility_id',#'expression'
+            '../inputs/user/facility_id',#'expression'
             '',#'repeat_count'
             ''#'image'  
         ] 
