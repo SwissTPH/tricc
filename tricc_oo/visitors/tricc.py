@@ -594,7 +594,7 @@ def get_select_yes_no_options(node, group):
 # therefore to avoid double processing the nodes variable saves the node already processed
 # there 2 strategies : process it the first time or the last time (wait that all the previuous node are processed)
 
-def walktrhough_tricc_node_processed_stached(node, callback, processed_nodes, stashed_nodes, path_len, recursive=True, warn = False,
+def walktrhough_tricc_node_processed_stached(node, callback, processed_nodes, stashed_nodes, path_len, recursive=False, warn = False,
                                              node_path = [], **kwargs):
     ended_activity = False
     # logger.debug("walkthrough::{}::{}".format(callback.__name__, node.get_name()))
@@ -622,7 +622,7 @@ def walktrhough_tricc_node_processed_stached(node, callback, processed_nodes, st
         # if has next, walkthrough them (support options)
         # if len(stashed_nodes)>1:
         if not recursive:
-            reorder_node_list(stashed_nodes, node.group)
+            reorder_node_list(stashed_nodes, node.group, processed_nodes)
         if isinstance(node, (TriccNodeActivityStart, TriccNodeMainStart)):
             if recursive:
                 for gp in node.activity.groups.values():
@@ -649,7 +649,7 @@ def walktrhough_tricc_node_processed_stached(node, callback, processed_nodes, st
                 #                                          recursive, warn = warn,**kwargs)
                 elif node.root not in stashed_nodes:
                     #stashed_nodes.insert(0,node.root)
-                    stashed_nodes.insert_at_bottom(node.root)
+                    stashed_nodes.insert_at_top(node.root)
                     # if node.calculates:
                     #     stashed_nodes += node.calculates
                     # for gp in node.groups:
@@ -664,7 +664,7 @@ def walktrhough_tricc_node_processed_stached(node, callback, processed_nodes, st
                         walktrhough_tricc_node_processed_stached(next_node, callback, processed_nodes, stashed_nodes, path_len,
                                                          recursive, warn = warn,node_path = node_path.copy(),**kwargs)
                     else:
-                        stashed_nodes.insert_at_bottom(next_node)
+                        stashed_nodes.insert_at_top(next_node)
         elif issubclass(node.__class__, TriccNodeSelect):
             for option in node.options.values():
                 option.path_len = max(path_len,  option.path_len)
@@ -683,7 +683,8 @@ def walktrhough_tricc_node_processed_stached(node, callback, processed_nodes, st
             else:
                 for nn in node.next_nodes:
                     if nn not in stashed_nodes:
-                        stashed_nodes.add(nn)
+                        stashed_nodes.insert_at_top(nn)
+        
                 
     else:
         if node not in processed_nodes and node not in stashed_nodes:
@@ -694,10 +695,11 @@ def walktrhough_tricc_node_processed_stached(node, callback, processed_nodes, st
 
 
 def walkthrough_tricc_next_nodes(node, callback, processed_nodes, stashed_nodes, path_len, recursive, warn = False, node_path = [], **kwargs):
+    
     if not recursive:
         for next_node in node.next_nodes:
             if next_node not in stashed_nodes:
-                stashed_nodes.insert_at_bottom(next_node)
+                stashed_nodes.insert_at_top(next_node)
     else:
         list_next = set(node.next_nodes)
         for next_node in list_next:
@@ -717,7 +719,7 @@ def walkthrough_tricc_option(node, callback, processed_nodes, stashed_nodes, pat
             if hasattr(option, 'next_nodes') and len(option.next_nodes) > 0:
                 for next_node in option.next_nodes:
                     if next_node not in stashed_nodes:
-                        stashed_nodes.insert_at_bottom(next_node)
+                        stashed_nodes.insert_at_top(next_node)
                         #stashed_nodes.insert(0,next_node)
     else:
         list_option = []
@@ -1111,32 +1113,37 @@ def replace_next_node(prev_node,next_node,old_node):
             set_prev_next_node(prev_node, next_node, old_node)
     
 #FIXME should work with OrderedSet
-def reorder_node_list(list_node, group):
-    if len(list_node)>1:
-        list_out = []
-        list_out_group = []
-        list_out_other = []
+def reorder_node_list(list_node, group, processed_nodes):
+    active_activities = set(n.activity for n in processed_nodes)
+    
+    # Define a lambda to assign numeric priorities
+    def filter_logic(l_node):
         
-        
-        for l_node in list_node:
-            group_id = l_node.group.id if hasattr(l_node, 'group') and l_node.group is not None else None
-            if group is not None and group.id == group_id:
-                list_out.append(l_node)
-            elif hasattr(group, 'group') and group.group is not None and group.group.id == group_id:
-                list_out_group.append(l_node)
-            else:
-                list_out_other.append(l_node)
+        if (
+            isinstance(l_node, TriccNodeWait)
+            and any(isinstance(rn, TriccNodeActivity) and any(sn.activity == rn for sn in list_node) for rn in l_node.reference)
+        ):
+            return 7
+        elif issubclass(l_node.__class__, TriccNodeCalculateBase) and not issubclass(l_node.__class__, TriccNodeDisplayCalculateBase):
+            return 6
+        elif hasattr(group, 'group') and group.group and l_node.group and l_node.group.id == group.group.id:
+            return 1  # Second priority: Parent group
+        elif not isinstance(l_node.activity.root, TriccNodeActivityStart) and l_node.activity in active_activities:
+            return 2  # Third priority: Active activities
+        elif not isinstance(l_node.activity.root, TriccNodeActivityStart):
+            return 3  # Third priority: Active activities
+        elif l_node.activity in active_activities:
+            return 4  # Third priority: Active activities
+        elif group is not None and hasattr(l_node, 'group') and l_node.group and l_node.group.id == group.id:
+            return 0  # Highest priority: Same group
 
-        list_node = []
-        if len(list_out)>0:
-            list_node.extend(list_out)
-        if len(list_out_group)>0:
-            list_node.extend(list_out_group)
-        if len(list_out_other)>0:
-            list_node.extend(list_out_other)
-            
-        logger.debug("reorder list init len: {}, group : {} group.group: {} other: {}".format(len(list_node), len(list_out), len(list_out_group), len(list_out_other)))
-
+        else:
+            return 5  # Lowest priority: Others
+    
+    # Sort list_node in place using filter_logic as the key
+    list_node.sort(key=filter_logic, reverse=False)
+    return None
+    
 def loop_info(loop, **kwargs):
     logger.critical("dependency details")
     for n in loop:

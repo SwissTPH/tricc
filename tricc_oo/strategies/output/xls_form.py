@@ -409,7 +409,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
     def tricc_operation_istrue(self, ref_expressions):
         return f"{ref_expressions[0]}>0"
     def tricc_operation_isfalse(self, ref_expressions):
-        return f"{ref_expressions[0]}=0"
+        return f"{ref_expressions[0]}<=0"
     def tricc_operation_parenthesis(self, ref_expressions):
         return f"({ref_expressions[0]})"
     def tricc_operation_selected(self, ref_expressions):

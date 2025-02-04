@@ -7,10 +7,10 @@ class OrderedSet:
         self._od = OrderedDict.fromkeys(iterable or [])
 
     def copy(self):
-        return OrderedSet(self._od.keys())
+        return OrderedSet(list(self._od.keys()))
 
     def add(self, item):
-        self._od[item] = None
+        self.insert_at_bottom(item)
 
     def remove(self, item):
         del self._od[item]
@@ -19,10 +19,14 @@ class OrderedSet:
         return self._od.popitem(last=False)[0]
 
     def insert_at_top(self, item):
+            # Add item if not already present
+        self.insert_at_bottom(item)
+        # Move item to the top
         self._od.move_to_end(item, last=False)
         
     def insert_at_bottom(self, item):
-        self._od[item] = None
+        if item not in self._od:
+            self._od[item] = None
     def __contains__(self, item):
         return item in self._od
 
@@ -58,3 +62,7 @@ class OrderedSet:
             return list(self._od.keys())[index]
         except IndexError:
             raise IndexError("Index out of range") from None
+        
+    def sort(self, key=None, reverse=False):
+        sorted_keys = sorted(self._od.keys(), key=key, reverse=reverse)
+        self._od = OrderedDict.fromkeys(sorted_keys)
