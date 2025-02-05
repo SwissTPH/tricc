@@ -159,6 +159,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
             stashed_nodes,
             path_len,
             cur_group=activity.root.group,
+            recursive=False,
             **self.get_kwargs()
         )
         end_group(self, cur_group=activity, groups=groups, **self.get_kwargs())
@@ -185,15 +186,6 @@ class XLSFormStrategy(BaseOutPutStrategy):
                 s_node = stashed_nodes.pop()
                 # while len(stashed_nodes)>0 and isinstance(s_node,TriccGroup):
                 #    s_node = stashed_nodes.pop()
-                if len(s_node.prev_nodes) > 0:
-                    path_len = (
-                        sorted(
-                            s_node.prev_nodes,
-                            key=lambda p_node: p_node.path_len,
-                            reverse=True,
-                        )[0].path_len
-                        + 1
-                    )
                 if s_node.group is None:
                     logger.critical(
                         "ERROR group is none for node {}".format(s_node.get_name())
@@ -215,6 +207,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
                     path_len,
                     groups=groups,
                     cur_group=s_node.group,
+                    recursive=False,
                     **self.get_kwargs()
                 )
                 # add end group if new node where added OR if the previous end group was removed

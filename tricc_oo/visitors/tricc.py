@@ -35,8 +35,10 @@ def get_last_version(_list, name, processed_nodes):
     if _list:
         for  sim_node in _list:
             # get the max version while not taking a node that have a next node before next calc
-            if (max_version is None or  max_version.path_len < sim_node.path_len 
-                and (processed_nodes is None or all(p in processed_nodes for p in sim_node.next_nodes))):
+            if ((max_version is None 
+                or  max_version.activity.path_len < sim_node.activity.path_len
+                or  max_version.path_len < sim_node.path_len 
+                ) ):
                 max_version = sim_node
     return max_version
 
@@ -598,9 +600,15 @@ def walktrhough_tricc_node_processed_stached(node, callback, processed_nodes, st
                                              node_path = [], **kwargs):
     ended_activity = False
     # logger.debug("walkthrough::{}::{}".format(callback.__name__, node.get_name()))
-    if hasattr(node, 'prev_nodes') and len(node.prev_nodes) > 0:
-        path_len = max(path_len, *[n.path_len + 1 for n in node.prev_nodes], len(processed_nodes)+1)
-    node.path_len = max(node.path_len, path_len)
+    
+    path_len = max(node.activity.path_len, *[0,*[getattr(n,'path_len',0) + 1 for n in node.activity.prev_nodes]]) + 1
+    if hasattr(node, 'prev_nodes'):
+        path_len = max(path_len, *[0,*[getattr(n,'path_len',0)+ 1 for n in node.prev_nodes]])
+    if hasattr(node, 'get_references'):
+        references = node.get_references()
+        if references:
+            path_len = max(path_len, *[0,*[getattr(n,'path_len',0) + 1 for n in references]])
+    node.path_len = max(node.path_len, path_len)    
     if (callback(node, processed_nodes=processed_nodes, stashed_nodes=stashed_nodes, warn = warn, node_path=node_path, **kwargs)):
         node_path.append(node)
         # node processing succeed 
@@ -778,13 +786,22 @@ def stashed_node_func(node, callback, recursive=False, **kwargs):
 
 # check if the all the prev nodes are processed
 def is_ready_to_process(in_node, processed_nodes, strict=True, local=False):
+    if not isinstance(in_node, TriccNodeActivity):
+        activity_ready = is_ready_to_process(
+            in_node.activity,
+            processed_nodes,
+            strict=strict,
+            local=local
+        )
+        if not activity_ready:
+            return False
     if isinstance(in_node, TriccNodeSelectOption):
         node = in_node.select
-    elif isinstance(in_node, (TriccNodeActivityStart, TriccNodeMainStart)):
-        if local:
-            # an activitiy start iss always processable locally
-            return True
-        node = in_node.activity
+    elif (
+        isinstance(in_node, (TriccNodeActivityStart, TriccNodeMainStart))    ):
+        # check before
+        return True
+ 
     else:
         node = in_node
     if hasattr(node, 'prev_nodes'):
@@ -875,9 +892,17 @@ def reverse_walkthrough(in_node, next_node, callback, processed_nodes, stashed_n
 
 
 def get_prev_node_by_name(processed_nodes, name, node):
+    last_calc = get_last_version(
+                    None,
+                    name,
+                    [p for p in processed_nodes if issubclass(p.__class__, (TriccNodeCalculateBase, TriccNodeDisplayCalculateBase))]
+                )
+    if last_calc:
+        return last_calc
+                
     filtered = list(filter(lambda p_node: hasattr(p_node,'name') and p_node.name == name and p_node.instance == node.instance and p_node.path_len <= node.path_len, processed_nodes))
     if len(filtered) == 0:
-        filtered = list(filter(lambda p_node: hasattr(p_node, 'name') and p_node.name == name, processed_nodes))
+        filtered = list(filter(lambda p_node: hasattr(p_node, 'name') and p_node.name == name , processed_nodes))
     if len(filtered) > 0:
         return sorted(filtered, key=lambda x: x.path_len, reverse=False)[0]
 
@@ -1124,7 +1149,9 @@ def reorder_node_list(list_node, group, processed_nodes):
             and any(isinstance(rn, TriccNodeActivity) and any(sn.activity == rn for sn in list_node) for rn in l_node.reference)
         ):
             return 7
-        elif issubclass(l_node.__class__, TriccNodeCalculateBase) and not issubclass(l_node.__class__, TriccNodeDisplayCalculateBase):
+        elif group is not None and hasattr(l_node, 'group') and l_node.group and l_node.group.id == group.id:
+            return 0  # Highest priority: Same group
+        elif issubclass(l_node.__class__, TriccRhombusMixIn) :
             return 6
         elif hasattr(group, 'group') and group.group and l_node.group and l_node.group.id == group.group.id:
             return 1  # Second priority: Parent group
@@ -1134,8 +1161,7 @@ def reorder_node_list(list_node, group, processed_nodes):
             return 3  # Third priority: Active activities
         elif l_node.activity in active_activities:
             return 4  # Third priority: Active activities
-        elif group is not None and hasattr(l_node, 'group') and l_node.group and l_node.group.id == group.id:
-            return 0  # Highest priority: Same group
+ 
 
         else:
             return 5  # Lowest priority: Others

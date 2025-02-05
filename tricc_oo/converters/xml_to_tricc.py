@@ -420,13 +420,13 @@ def get_max_version(dict):
     return max_version
 
 
-def get_last_version(dict, name):
-    max_version = None
-    if name in dict:
-        for sim_node in dict[name].values():
-            if max_version is None or max_version.path_len < sim_node.path_len:
-                max_version = sim_node
-    return max_version
+# def get_last_version(dict, name):
+#     max_version = None
+#     if name in dict:
+#         for sim_node in dict[name].values():
+#             if max_version is None or max_version.path_len < sim_node.path_len:
+#                 max_version = sim_node
+#     return max_version
 
 
 

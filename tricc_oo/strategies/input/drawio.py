@@ -54,7 +54,7 @@ class DrawioStrategy(BaseInputStrategy):
             process_calculate,
             used_calculates=used_calculates,
             calculates=calculates,
-            recusive=False,
+            recursive=False,
             codesystems=project.code_systems
         )
 
