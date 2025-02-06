@@ -10,7 +10,7 @@ from pydantic import BaseModel, StringConstraints
 from strenum import StrEnum
 
 from tricc_oo.converters.utils import generate_id
-
+from tricc_oo.models.ordered_set import OrderedSet
 
 logger = logging.getLogger("default")
 
@@ -163,7 +163,7 @@ class TriccGroup(TriccBaseModel):
     label: Optional[Union[str, Dict[str,str]]] = None
     relevance: Optional[Union[Expression, TriccOperation]] = None
     path_len: int = 0
-    prev_nodes: List[TriccBaseModel] = []
+    prev_nodes: OrderedSet[TriccBaseModel] = OrderedSet()
     def __init__(self, **data):
         super().__init__(**data)
         if self.name is None:
@@ -194,8 +194,8 @@ class TriccNodeBaseModel(TriccBaseModel):
     name: Optional[str] = None
     export_name: Optional[str] = None
     label: Optional[Union[str, Dict[str,str]]] = None
-    next_nodes: Set[TriccNodeBaseModel] = set()
-    prev_nodes: Set[TriccNodeBaseModel] = set()
+    next_nodes: OrderedSet[TriccNodeBaseModel] = OrderedSet()
+    prev_nodes: OrderedSet[TriccNodeBaseModel] = OrderedSet()
     expression: Optional[Union[Expression, TriccOperation]] = None  # will be generated based on the input
     expression_inputs: List[Expression] = []
     activity: Optional[FwTriccNodeBaseModel] = None
@@ -203,6 +203,9 @@ class TriccNodeBaseModel(TriccBaseModel):
 
     class Config:
         use_enum_values = True  # <--
+    
+    def __hash__(self):
+        return hash(self.id )
 
     # to be updated while processing because final expression will be possible to build$
     # #only the last time the script will go through the node (all prev node expression would be created    
@@ -229,9 +232,9 @@ class TriccNodeBaseModel(TriccBaseModel):
         instance.group = activity
         if hasattr(self, 'activity') and activity is not None:
             instance.activity = activity
-        next_nodes = set()
+        next_nodes = OrderedSet()
         instance.next_nodes = next_nodes
-        prev_nodes = set()
+        prev_nodes = OrderedSet()
         instance.prev_nodes = prev_nodes
         expression_inputs = []
         instance.expression_inputs = expression_inputs
@@ -246,7 +249,7 @@ class TriccNodeBaseModel(TriccBaseModel):
         if self.name is None:
             self.name = ''.join(random.choices(string.ascii_lowercase, k=8))
     def get_references(self):
-        return set([self])
+        return OrderedSet([self])
 
 class TriccStatic(BaseModel):
     value: Union[str, float, int, bool]
@@ -271,7 +274,7 @@ class TriccStatic(BaseModel):
         return str(self.value)
 
     def get_references(self):
-        return set()
+        return OrderedSet()
 
 class TriccReference(TriccStatic):
     value: str
@@ -279,7 +282,7 @@ class TriccReference(TriccStatic):
         return type(self)(self.value)
 
     def get_references(self):
-        return set([self])
+        return OrderedSet([self])
 
 
 class TriccOperator(StrEnum):    
@@ -336,7 +339,7 @@ OPERATION_LIST = {
 class TriccOperation(BaseModel):
     tricc_type: TriccNodeType = TriccNodeType.operation
     operator: TriccOperator = TriccOperator.NATIVE
-    reference: List[
+    reference: OrderedSet[
         Union[
             TriccStatic, TriccNodeBaseModel, TriccOperation, TriccReference, Expression,
             List[Union[TriccStatic, TriccNodeBaseModel, TriccOperation, TriccReference, Expression]]
@@ -354,7 +357,7 @@ class TriccOperation(BaseModel):
         super().__init__(operator=operator, reference=reference)
         
     def get_references(self):
-        predecessor = set()
+        predecessor = OrderedSet()
         if isinstance(self.reference, list):
             for reference in self.reference:
                 self._process_reference(reference, predecessor)

@@ -38,8 +38,11 @@ def get_last_version(_list, name, processed_nodes):
             if ((max_version is None 
                 or  max_version.activity.path_len < sim_node.activity.path_len
                 or  max_version.path_len < sim_node.path_len 
+                or max_version.path_len == sim_node.path_len and hash(max_version.id) < hash(sim_node.id)
                 ) ):
                 max_version = sim_node
+    
+    
     return max_version
 
 
@@ -136,7 +139,7 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
                 # current node not yet in the list so 1 item is enough
                 node_to_delete = None
                 if last_calc is not None:
-
+                    node.path_len = max(node.path_len, last_calc.path_len + 1 )
                     node.version = last_calc.version + 1
                         #logger.debug("set last to false for node {}  and add its link it to next one".format(last_used_calc.get_name()))
                     if node.prev_nodes:    
@@ -453,7 +456,9 @@ def process_operation_reference(operation, node, processed_nodes, calculates, us
             ref = terms[0]
         else:
             option_label = None
-            
+        node_in_act = [n for n in node.activity.nodes.values() if n.name == ref and n != node]    
+        if any(n not in processed_nodes for n in node_in_act):
+            return False
         last_found = get_prev_node_by_name(processed_nodes, ref, node)
         if last_found is None or issubclass(last_found.__class__, TriccNodeCalculateBase):
             if ref in calculates and len(calculates[ref]) > 0:
@@ -892,6 +897,7 @@ def reverse_walkthrough(in_node, next_node, callback, processed_nodes, stashed_n
 
 
 def get_prev_node_by_name(processed_nodes, name, node):
+    # look for the node in the same activity   
     last_calc = get_last_version(
                     None,
                     name,
@@ -900,7 +906,13 @@ def get_prev_node_by_name(processed_nodes, name, node):
     if last_calc:
         return last_calc
                 
-    filtered = list(filter(lambda p_node: hasattr(p_node,'name') and p_node.name == name and p_node.instance == node.instance and p_node.path_len <= node.path_len, processed_nodes))
+    filtered = list(
+        filter(lambda p_node: 
+            hasattr(p_node,'name') 
+            and p_node.name == name 
+            and p_node.instance == node.instance 
+            and p_node.path_len <= node.path_len, processed_nodes
+        ))
     if len(filtered) == 0:
         filtered = list(filter(lambda p_node: hasattr(p_node, 'name') and p_node.name == name , processed_nodes))
     if len(filtered) > 0:

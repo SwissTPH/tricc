@@ -50,7 +50,7 @@ class TriccNodeCalculateBase(TriccNodeBaseModel):
         elif isinstance(self.reference, list):
             return set(self.reference)
         elif isinstance(self.expression_reference, TriccOperation):
-            return self.self.expression_reference.get_references()
+            return self.expression_reference.get_references()
         elif isinstance(self.reference, TriccOperation):
             return self.reference.get_references()
         

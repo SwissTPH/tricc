@@ -1,8 +1,9 @@
 from collections import OrderedDict
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
+from pydantic import BaseModel, GetCoreSchemaHandler
+from pydantic_core import CoreSchema
 
-
-class OrderedSet:
+class OrderedSet(Sequence):
     def __init__(self, iterable=None):
         self._od = OrderedDict.fromkeys(iterable or [])
 
@@ -43,7 +44,22 @@ class OrderedSet:
         for item in items:
             if item not in self:
                 self.insert_at_bottom(item)
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return False
+        else:
+            return self._od.keys() == other._od.keys()
+    
+    # Union method (| operator)
+    def __or__(self, other):
+        if not isinstance(other, Iterable):
+            raise TypeError(f"Unsupported operand type(s) for |: 'OrderedSet' and '{type(other).__name__}'")
+        new_set = self.copy()
+        new_set._add_items(other)
+        return new_set
 
+    def union(self, other):
+        return self.__or__(other)
     def __or__(self, other):
         if not isinstance(other, Iterable):
             raise TypeError("Unsupported operand type(s) for |: 'OrderedSet' and '{}'".format(type(other)))
@@ -58,6 +74,9 @@ class OrderedSet:
         return self
     
     def get(self, index):
+        return self.__getitem__(index)
+    
+    def __getitem__(self, index):
         try:
             return list(self._od.keys())[index]
         except IndexError:
@@ -66,3 +85,8 @@ class OrderedSet:
     def sort(self, key=None, reverse=False):
         sorted_keys = sorted(self._od.keys(), key=key, reverse=reverse)
         self._od = OrderedDict.fromkeys(sorted_keys)
+        
+    @classmethod
+    def __get_pydantic_core_schema__(cls, source_type: type, handler: GetCoreSchemaHandler) -> CoreSchema:
+        # Define how Pydantic should handle this type
+        return handler.generate_schema(list)  # Treat it as a list for validation purposes
