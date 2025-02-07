@@ -1223,16 +1223,19 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
     expression = None
     negate_expression = None
     node = in_node
-    if is_prev and is_calculate and isinstance(node, (TriccNodeActivityStart, TriccNodeActivityEnd, TriccNodeEnd)):
-        expression = get_node_expression(node.activity, processed_nodes, is_calculate, is_prev, negate )
+    if isinstance(node, (TriccNodeActivityStart,TriccNodeMainStart, TriccNodeActivityEnd, TriccNodeEnd)):
+        if is_prev and is_calculate:
+            expression = get_node_expression(node.activity, processed_nodes, is_calculate, is_prev, negate )
+        elif  isinstance(node, (TriccNodeActivityStart)):
+            return None
+        
     elif isinstance(node, TriccNodeWait):
         if is_prev:
             # the wait don't do any calculation with the reference it is only use to wait until the reference are valid
             return get_node_expression(node.path, processed_nodes, is_calculate, is_prev)
         else:
             #it is a empty calculate
-            return ''     
-    
+            return None
     elif isinstance(node, TriccNodeRhombus):
         # if is_prev:
         #     expression = TriccOperation(
@@ -1303,12 +1306,12 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
             negate_expression = get_calculation_terms(node, processed_nodes, is_calculate, negate=True)
         else:
             expression = get_calculation_terms(node, processed_nodes, is_calculate)
-    elif is_prev and hasattr(node, 'required') and node.required:
-        expression = get_required_node_expression(node)
     elif is_prev and hasattr(node, 'relevance') and node.relevance is not None and node.relevance != '':
             expression = node.relevance     
+    elif is_prev and hasattr(node, 'required') and node.required:
+        expression = get_required_node_expression(node)
     if expression is None:
-            expression = get_prev_node_expression(node, processed_nodes, is_calculate)
+        expression = get_prev_node_expression(node, processed_nodes, is_calculate)
             # in_node not in processed_nodes is need for calculates that can but run after the end of the activity
 
     
@@ -1512,7 +1515,7 @@ def get_prev_node_expression( node, processed_nodes, is_calculate=False, exclude
         if excluded_name is None or prev_node != excluded_name or (
                 isinstance(excluded_name, str) and hasattr(prev_node, 'name') and prev_node.name != excluded_name): # or isinstance(prev_node, TriccNodeActivityEnd):
             # the rhombus should calculate only reference
-            add_sub_expression(expression_inputs, get_node_expression(prev_node, processed_nodes, is_calculate, True))
+            add_sub_expression(expression_inputs, get_node_expression(prev_node, processed_nodes=processed_nodes, is_calculate=is_calculate, is_prev=True))
             # avoid void is there is not conditions to avoid looping too much itme
     expression_inputs = clean_list_or(
         [
