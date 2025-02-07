@@ -963,14 +963,14 @@ def check_stashed_loop(stashed_nodes, prev_stashed_nodes, processed_nodes, len_p
         
 def get_all_dependant(loop, stashed_nodes, processed_nodes, depth=0, waited=[] , looped=[]):
     for n in loop:
-        dependant = set()
+        dependant = OrderedSet()
         i=0
         logger.critical(f"{i}: {n.__class__}::{n.get_name()}::{getattr(n,'instance','')}::{process_reference(n, processed_nodes, [])}")
         i += 1
         if hasattr(n, 'prev_nodes') and n.prev_nodes:
             dependant =  dependant | n.prev_nodes
         if hasattr(n, 'get_references'):
-            dependant =  dependant | (n.get_references() or set())
+            dependant =  dependant | (n.get_references() or OrderedSet())
         if not isinstance(dependant, list):
             pass
         for d in dependant:

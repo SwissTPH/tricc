@@ -196,10 +196,13 @@ def get_xfrom_trad(strategy, node, column, mapping, clean_html = False ):
     new_column = arr[0] if arr[0] != 'media' else "::".join(arr[0:2])
     trad =  arr[-1] if new_column != column  else None
     value = get_attr_if_exists(strategy, node, new_column, mapping)
-    if (
+    # the pattern is to look for if that define a string if(test>0, 'strin')
+    pattern = r"[^\}] *, *'[^']"
+    if (    
         issubclass(node.__class__, TriccNodeDisplayCalculateBase) 
         and column == 'calculation'  
         and isinstance(value, str) and not value.startswith('number')
+        and not re.search(pattern, value)
     ):
         value = f"number({value})" if str(value) not in ['0', '1'] else value
     if clean_html and isinstance(value, str):
