@@ -228,7 +228,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
                             df_survey_final.drop(
                                 index=df_survey_final.index[-1], axis=0, inplace=True
                             )
-                        self.df_survey = self.df_survey[(1 + skip_header) :]
+                            self.df_survey = self.df_survey[(1 + skip_header) :]
                         df_survey_final = pd.concat(
                             [df_survey_final, self.df_survey], ignore_index=True
                         )
