@@ -376,12 +376,12 @@ def get_input_line(node):
     empty = langs.get_trads('', force_dict =True)
     return [
         'hidden',
-        get_export_name(node),
+        'load_' + get_export_name(node),
         *list(empty.values()) ,
         *list(empty.values()) ,#hint
         *list(empty.values()) ,#help
         '',#default
-        '',#'appearance', clean_name
+        'hidden',#'appearance', clean_name
         '',#'constraint', 
         *list(empty.values()) ,#'constraint_message'
         '',#'relevance'
@@ -412,7 +412,7 @@ def get_input_calc_line(node):
         '',#'required'
         *list(empty.values()) ,#'required message'
         '',#'read only'
-        '../inputs/contact/'+get_export_name(node),#'expression'
+        '../inputs/contact/load_'+get_export_name(node),#'expression'
         '',#'repeat_count'
         ''#'image'  
     ]       
