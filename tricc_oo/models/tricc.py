@@ -38,8 +38,10 @@ class TriccNodeCalculateBase(TriccNodeBaseModel):
         return instance
 
     def __init__(self, **data):
+        if 'name' not in data:
+            data['name'] = get_rand_name(8)
         super().__init__(**data)
-        self.gen_name()
+        
         
     def append(self, elm):
         reference.append(elm)

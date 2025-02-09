@@ -30,6 +30,10 @@ def generate_id(name=None):
     else:
         return ''.join(random.choices(string.ascii_lowercase, k=8))
 
+
+def get_rand_name(k):
+    return "r_" + ''.join(random.choices(string.ascii_lowercase, k=k))
+
 # the soup.text strips off the html formatting also
 def remove_html(string):
     text = html2text.html2text(string) # retrive pure text from html

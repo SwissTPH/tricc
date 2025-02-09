@@ -9,7 +9,7 @@ from pydantic import BaseModel, constr
 from strenum import StrEnum
 from .base import *
 from .tricc import *
-from tricc_oo.converters.utils import generate_id
+from tricc_oo.converters.utils import generate_id, get_rand_name
 
 
     
@@ -53,7 +53,7 @@ class TriccNodeProposedDiagnosis(TriccNodeDisplayCalculateBase):
     severity: str = None
     
 class TriccNodeFakeCalculateBase(TriccNodeCalculateBase):
-    id: triccId = generate_id()
+    ...
 
 class TriccNodeInput(TriccNodeFakeCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.input
@@ -123,8 +123,7 @@ class TriccNodeRhombus(TriccNodeCalculateBase,TriccRhombusMixIn):
 
 
 
-def get_rand_name(k):
-    return "r_" + ''.join(random.choices(string.ascii_lowercase, k=k))
+
 
 class TriccNodeDiagnosis(TriccNodeDisplayCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.diagnosis

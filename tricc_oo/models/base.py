@@ -9,7 +9,7 @@ from typing import Dict, ForwardRef, List, Optional, Union, Set, Annotated
 from pydantic import BaseModel, StringConstraints
 from strenum import StrEnum
 
-from tricc_oo.converters.utils import generate_id
+from tricc_oo.converters.utils import generate_id, get_rand_name
 from tricc_oo.models.ordered_set import OrderedSet
 
 logger = logging.getLogger("default")
@@ -130,7 +130,7 @@ class TriccBaseModel(BaseModel):
         return not self.__eq__(other)
 
     def __hash__(self):
-        hash_value = hash(self.id)
+        hash_value = hash(self.id + self.name + self.instance)
         return hash_value
 
     def get_name(self):
@@ -138,6 +138,11 @@ class TriccBaseModel(BaseModel):
     
     def __str__(self):
         return f"{self.tricc_type}:{self.get_name()}({self.id})"
+    
+    def __init__(self, **data):
+        if 'id' not in data:
+            data['id'] = generate_id()
+        super().__init__(**data)
 
 
 class TriccEdge(TriccBaseModel):
@@ -247,7 +252,7 @@ class TriccNodeBaseModel(TriccBaseModel):
 
     def gen_name(self):
         if self.name is None:
-            self.name = ''.join(random.choices(string.ascii_lowercase, k=8))
+            self.name = get_rand_name(8)
     def get_references(self):
         return OrderedSet([self])
 

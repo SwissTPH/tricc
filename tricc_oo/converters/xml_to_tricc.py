@@ -211,7 +211,7 @@ def process_edges(diagram, media_path, activity, nodes):
                     )
                 )
     if not end_found:
-        fake_end = TriccNodeActivityEnd(activity=activity, group=activity)
+        fake_end = TriccNodeActivityEnd(id=generate_id(), activity=activity, group=activity)
         last_nodes = [
             n for n in list(activity.nodes.values())
             if (
@@ -233,6 +233,7 @@ def process_edges(diagram, media_path, activity, nodes):
             activity.nodes[fake_end.id] = fake_end
         # take all last nodes
         else:
+            logger.warning(f"Activity {activity.label} have no end, calculated might be included in the end definition")
             last_nodes = [
                 n for n in list(activity.nodes.values())
                 if (
