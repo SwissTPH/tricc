@@ -210,21 +210,14 @@ class DrawioStrategy(BaseInputStrategy):
                             self.linking_nodes(
                                 option, page, pages, processed_nodes, current_path
                             )
-                    if not isinstance(target_node, TriccNodeActivity) and target_node not in processed_nodes:
-                        processed_nodes.add(target_node)
-                        logger.debug("{}::{}: processed ({})".format(
-                            'linking_nodes', target_node.get_name(), len(processed_nodes)))
-                        if isinstance(target_node.activity.root, TriccNodeActivityStart) and isinstance(target_node.activity.root, TriccNodeMainStart):
-                            end_nodes = target_node.activity.get_end_nodes()
-                            if all([e in processed_nodes for e in end_nodes]):
-                                processed_nodes.add(target_node.activity)
-                                logger.debug("{}::{}: processed ({})".format(
-                                    'linking_nodes', target_node.activity.get_name(), len(processed_nodes)))
+                    processed_nodes.add(target_node)
+                    logger.debug("{}::{}: processed ({})".format(
+                        'linking_nodes', target_node.get_name(), len(processed_nodes)))
                     self.linking_nodes(
                         target_node, page, pages, processed_nodes, current_path
                     )
                 elif edge.target in current_path:
-                    logger.warning(
+                    logger.error(
                         "possible loop detected for node {0} in page {1}; path:".format(
                             node.get_name(), page.label
                         )
