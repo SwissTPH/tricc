@@ -647,37 +647,6 @@ def walktrhough_tricc_node_processed_stached(node, callback, processed_nodes, st
             else:
                 stashed_nodes += node.activity.calculates 
                 stashed_nodes += node.activity.groups.values()
-        if isinstance(node, TriccNodeActivity) and node.root not in processed_nodes:
-            if node.root is not None:
-                node.root.path_len = max(path_len,  node.root.path_len)
-                if recursive:
-                    walktrhough_tricc_node_processed_stached(node.root, callback, processed_nodes, stashed_nodes, path_len,
-                                                         recursive, warn = warn,node_path = node_path.copy(),**kwargs)
-                #     for gp in node.groups:
-                #         walktrhough_tricc_node_processed_stached(gp, callback, processed_nodes, stashed_nodes, path_len,
-                #                                          recursive, warn = warn,**kwargs)
-                #     if node.calculates:
-                #         for c in node.calculates:
-                #             walktrhough_tricc_node_processed_stached(c, callback, processed_nodes, stashed_nodes, path_len,
-                #                                          recursive, warn = warn,**kwargs)
-                elif node.root not in stashed_nodes:
-                    #stashed_nodes.insert(0,node.root)
-                    stashed_nodes.insert_at_top(node.root)
-                    # if node.calculates:
-                    #     stashed_nodes += node.calculates
-                    # for gp in node.groups:
-                    #     stashed_nodes.add(gp)
-                    # #    stashed_nodes.insert(0,gp)
-                return
-        elif ended_activity:
-            for next_node in node.activity.next_nodes:
-                if next_node not in stashed_nodes:
-                    #stashed_nodes.insert(0,next_node)
-                    if recursive:
-                        walktrhough_tricc_node_processed_stached(next_node, callback, processed_nodes, stashed_nodes, path_len,
-                                                         recursive, warn = warn,node_path = node_path.copy(),**kwargs)
-                    else:
-                        stashed_nodes.insert_at_top(next_node)
         elif issubclass(node.__class__, TriccNodeSelect):
             for option in node.options.values():
                 option.path_len = max(path_len,  option.path_len)
@@ -689,7 +658,41 @@ def walktrhough_tricc_node_processed_stached(node, callback, processed_nodes, st
                             "{}::{}: processed ({})".format(callback.__name__, option.get_name(), len(processed_nodes)))
                 walkthrough_tricc_option(node, callback, processed_nodes, stashed_nodes, path_len + 1, recursive,
                                          warn = warn,node_path = node_path, **kwargs)
-        if hasattr(node, 'next_nodes') and len(node.next_nodes) > 0 and not isinstance(node, TriccNodeActivity):
+        if isinstance(node, TriccNodeActivity):
+            if node.root not in processed_nodes:
+                if node.root is not None:
+                    node.root.path_len = max(path_len,  node.root.path_len)
+                    if recursive:
+                        walktrhough_tricc_node_processed_stached(node.root, callback, processed_nodes, stashed_nodes, path_len,
+                                                            recursive, warn = warn,node_path = node_path.copy(),**kwargs)
+                    #     for gp in node.groups:
+                    #         walktrhough_tricc_node_processed_stached(gp, callback, processed_nodes, stashed_nodes, path_len,
+                    #                                          recursive, warn = warn,**kwargs)
+                    #     if node.calculates:
+                    #         for c in node.calculates:
+                    #             walktrhough_tricc_node_processed_stached(c, callback, processed_nodes, stashed_nodes, path_len,
+                    #                                          recursive, warn = warn,**kwargs)
+                    elif node.root not in stashed_nodes:
+                        #stashed_nodes.insert(0,node.root)
+                        stashed_nodes.insert_at_top(node.root)
+                        # if node.calculates:
+                        #     stashed_nodes += node.calculates
+                        # for gp in node.groups:
+                        #     stashed_nodes.add(gp)
+                        # #    stashed_nodes.insert(0,gp)
+                    return
+            elif ended_activity:
+                for next_node in node.next_nodes:
+                    if next_node not in stashed_nodes:
+                        #stashed_nodes.insert(0,next_node)
+                        if recursive:
+                            walktrhough_tricc_node_processed_stached(next_node, callback, processed_nodes, stashed_nodes, path_len,
+                                                            recursive, warn = warn,node_path = node_path.copy(),**kwargs)
+                        else:
+                            stashed_nodes.insert_at_top(next_node)
+ 
+        
+        elif hasattr(node, 'next_nodes') and len(node.next_nodes) > 0 and not isinstance(node, TriccNodeActivity):
             if recursive:
                 walkthrough_tricc_next_nodes(node, callback, processed_nodes, stashed_nodes, path_len + 1, recursive,
                                              warn = warn,node_path = node_path,**kwargs)
@@ -791,22 +794,12 @@ def stashed_node_func(node, callback, recursive=False, **kwargs):
 
 # check if the all the prev nodes are processed
 def is_ready_to_process(in_node, processed_nodes, strict=True, local=False):
-    if not isinstance(in_node, TriccNodeActivity):
-        activity_ready = is_ready_to_process(
-            in_node.activity,
-            processed_nodes,
-            strict=strict,
-            local=local
-        )
-        if not activity_ready:
-            return False
     if isinstance(in_node, TriccNodeSelectOption):
         node = in_node.select
     elif (
         isinstance(in_node, (TriccNodeActivityStart, TriccNodeMainStart))    ):
         # check before
         return True
- 
     else:
         node = in_node
     if hasattr(node, 'prev_nodes'):
