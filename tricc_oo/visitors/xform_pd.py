@@ -35,14 +35,15 @@ def make_breakpoints(df, pausepoint, calculate_name=None):
     df_input = df.loc[:pausepoint]
     
     # types you want to be loaded in the form after the pause
-    typesconvert = ['hidden', 'integer', 'decimal', 'select_', 'text']
+    typesconvert = [ 'calculate', 'integer', 'decimal', 'select_', 'text']
     # types you want to keep in the part that comes before the pause
-    typeskeep = ['hidden', 'integer', 'decimal', 'select_', 'text', 'calculate'] 
+    typeskeep = ['hidden', 'integer', 'decimal', 'select_', 'text', 'calculate', 'string'] 
     # mask for dropping irrelevant fields based on type
     m = df_input['type'].str.contains('|'.join(typeskeep))
     df_input = df_input.loc[m] # dropped irrelevant rows
     m = df_input['type'].str.contains('|'.join(typesconvert))
     df_input.loc[m, 'type'] = 'hidden' # convert all types into 'hidden'
+    # df_input.loc[m, 'calculation'] = '' # convert all types into 'hidden'
     
     # add a data_load row, to load contextual parameters from the previous form
     d = {'type':['hidden'], 'name':['data_load']}
