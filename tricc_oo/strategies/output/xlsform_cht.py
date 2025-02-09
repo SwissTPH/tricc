@@ -17,9 +17,12 @@ langs = SingletonLangClass()
 logger = logging.getLogger("default")
 
 class XLSFormCHTStrategy(XLSFormCDSSStrategy):
+    
+    
     def process_export(self, start_pages,  **kwargs):
-        
-        super().process_export( start_pages,  **kwargs)
+        diags = []
+        self.activity_export(start_pages[self.processes[0]], **kwargs)
+        self.add_tab_breaks_choice()
         cht_header = pd.DataFrame(columns=SURVEY_MAP.keys())
         cht_input_df = self.get_cht_input( start_pages,  **kwargs)
         self.df_survey= self.df_survey[~self.df_survey['name'].isin(cht_input_df['name'])]
