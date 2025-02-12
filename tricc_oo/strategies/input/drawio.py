@@ -168,8 +168,6 @@ class DrawioStrategy(BaseInputStrategy):
                         next_page = self.walkthrough_goto_node(
                             target_node, page, pages, processed_nodes, current_path
                         )
-                        # update reference
-                        # FIXME support reference str
                         for n in page.nodes:
                             sn = page.nodes[n]
                             if (

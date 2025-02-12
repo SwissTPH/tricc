@@ -24,6 +24,7 @@ FUNCTION_MAP = {
 # Min
 # Max
 # Round
+# this need to be done by contribution to DMN
 
 class cqlToXlsFormVisitor(cqlVisitor):
     def __init__(self):
@@ -318,7 +319,7 @@ class cqlToXlsFormVisitor(cqlVisitor):
         for child in ctx.getChildren():
             c = self.visit(child)
             if c:
-                op.reference.append(c)
+                op.append(c)
         return op
 
     def visitCaseExpressionItem(self, ctx):

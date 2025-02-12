@@ -104,9 +104,10 @@ media_nodes = [
 class TriccBaseModel(BaseModel):
     id: triccId
     tricc_type: TriccNodeType
-    #parent: Optional[triccId]#TODO: used ?
     instance: int = 1
     base_instance: Optional[TriccBaseModel] = None
+    last: bool = True
+    version: int = 1
 
     def make_instance(self, nb_instance, **kwargs):
         instance = self.copy()
@@ -130,7 +131,7 @@ class TriccBaseModel(BaseModel):
         return not self.__eq__(other)
 
     def __hash__(self):
-        hash_value = hash(self.id + self.name + self.instance)
+        hash_value = hash(self.id)
         return hash_value
 
     def get_name(self):
@@ -154,7 +155,7 @@ class TriccEdge(TriccBaseModel):
     def make_instance(self, instance_nb, activity=None):
         instance = super().make_instance(instance_nb, activity=activity)
         #if issubclass(self.source.__class__, TriccBaseModel):
-        instance.source = self.source if isinstance(self.source, str) else self.source.copy() #TODO should we copy  the nodes ?  
+        instance.source = self.source if isinstance(self.source, str) else self.source.copy()
         #if issubclass(self.target.__class__, TriccBaseModel):
         instance.target = self.target if isinstance(self.target, str) else self.target.copy()
         return instance
@@ -252,7 +253,7 @@ class TriccNodeBaseModel(TriccBaseModel):
 
     def gen_name(self):
         if self.name is None:
-            self.name = get_rand_name(8)
+            self.name = get_rand_name(self.id)
     def get_references(self):
         return OrderedSet([self])
 
@@ -323,6 +324,7 @@ class TriccOperator(StrEnum):
     MULTIPLIED = 'multiplied'
     COALESCE = 'coalesce'
     ISNULL = 'isnull'
+    ISNOTNULL= 'isnotnull'
     PLUS = 'plus'
     MINUS = 'minus'
     MODULO = 'modulo'

@@ -121,7 +121,6 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             if p_ends:
                 ends += p_ends
         if ends:
-            # TODO get loc
             ends_prev = []
             for e in ends:
                 

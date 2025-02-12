@@ -88,8 +88,8 @@ class TriccRhombusMixIn():
                             if sub_node.base_instance == ref:
                                 reference.append(sub_node)
                     else:  # ref from outside
-                        # FIXME find the latest version
                         reference.append(ref)
+                        logger.warning("new instance of a rhombus use the reference of the base one")
                 elif isinstance(ref, TriccReference):
                     reference.append(ref)
                 elif isinstance(ref, str):
@@ -100,7 +100,7 @@ class TriccRhombusMixIn():
                     exit(1)
         instance.reference = reference
         instance.expression_reference = expression_reference
-        instance.name = get_rand_name(8)
+        instance.name = get_rand_name()
         return instance
 
 
@@ -118,7 +118,7 @@ class TriccNodeRhombus(TriccNodeCalculateBase,TriccRhombusMixIn):
 
 
     def __init__(self, **data):
-        data['name'] = get_rand_name(8)
+        data['name'] = get_rand_name(data.get('id', None))
         super().__init__(**data)
 
 
@@ -133,7 +133,7 @@ class TriccNodeDiagnosis(TriccNodeDisplayCalculateBase):
         super().__init__(**data)
 
         # rename rhombus
-        self.name = get_rand_name(8)
+        self.name = get_rand_name(f"d{data.get('id', None)}")
 
 class TriccNodeExclusive(TriccNodeFakeCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.exclusive

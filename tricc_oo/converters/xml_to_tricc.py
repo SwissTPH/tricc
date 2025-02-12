@@ -58,7 +58,7 @@ def create_activity(diagram, media_path, project):
     if root is not None:
         activity = TriccNodeActivity(
             root=root,
-            name=id,
+            name=get_rand_name(f"a{id}"),
             id=id,
             label=name,
             form_id=form_id,
@@ -438,7 +438,7 @@ def update_calc_version(calculates, name):
         len_max = len(calculates[name])
         for elm in ordered_list:
             elm.version = i
-            elm.last = i == len_max
+            elm.last = (i == len_max)
             i += 1
 
 

@@ -137,7 +137,6 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
                 # generate the calc node version by looking in the processed calculate
                 # TODO the calculates should not be required with the latest version of get_last_version
                 last_calc = get_last_version(
-                    None,
                     node_name,
                     [p for p in processed_nodes if issubclass(p.__class__, (TriccNodeCalculateBase, TriccNodeDisplayCalculateBase))]
                 )
@@ -166,7 +165,7 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
                     else:
                         logger.error(f"not able to find how to prev calc should contribute to {node.get_name()}")
                     last_calc.last = False
-                    update_calc_version(calculates,node_name)
+                    #update_calc_version(calculates,node_name)
             #if hasattr(node, 'next_nodes'):
                 #node.next_nodes=reorder_node_list(node.next_nodes, node.group)
             process_reference(
@@ -561,12 +560,13 @@ def process_operation_reference(operation, node, processed_nodes, calculates, us
         else:
             option_label = None
         node_in_act = [n for n in node.activity.nodes.values() if n.name == ref and n != node]    
-        if any(n not in processed_nodes for n in node_in_act):
-            return False
-        last_found = get_prev_node_by_name(processed_nodes=processed_nodes, name=ref, node=node)
-        if last_found is None or issubclass(last_found.__class__, TriccNodeCalculateBase):
-            if ref in calculates and len(calculates[ref]) > 0:
-                last_found = get_last_version(calculates, ref, processed_nodes=processed_nodes)
+        if node_in_act:
+            if any(n not in processed_nodes for n in node_in_act):
+                return False
+            else:
+                last_found = node_in_act[0]
+        else:
+            last_found = get_last_version(name=ref, processed_nodes=processed_nodes)
         if last_found is None:
             if codesystems:
                 concept =  lookup_codesystems_code(codesystems, ref)
@@ -636,41 +636,6 @@ def add_used_calculate(node, prev_node, calculates, used_calculates, processed_n
         else:
             logger.debug("process_calculate_version_requirement: failed for {0} , prev Node {1} ".format(node.get_name(), prev_node.get_name()))
 
-def merge_calculate(node, calculates, last_used_calc):
-    node_to_delete = []
-    for calc_node in list(calculates.values()):
-        if calc_node != node and node.tricc_type == calc_node.tricc_type:
-            remaining = node
-            to_remove = calc_node
-            if not(isinstance(remaining, (TriccNodeActivityEnd, TriccNodeEnd, TriccNodeActivityStart, TriccNodeMainStart))) or remaining.instance == to_remove.instance:
-                if (last_used_calc is None or to_remove.path_len > last_used_calc.path_len) and to_remove.path_len <= remaining.path_len:
-                    logger.debug(f"merge_calculate: {remaining.name if hasattr(remaining, 'name') else remaining.id}")
-                    
-                    # Merge next nodes
-                    for next_node in list(to_remove.next_nodes):
-                        set_prev_next_node(remaining, next_node, to_remove)
-                    
-                    # Merge prev nodes
-                    for prev_node in list(to_remove.prev_nodes):
-                        set_prev_next_node(prev_node, remaining, to_remove)
-                    
-                    # Merge attributes
-                    remaining.reference = remaining.reference or to_remove.reference
-                    remaining.expression = remaining.expression or to_remove.expression
-                    remaining.expression_reference = remaining.expression_reference or to_remove.expression_reference
-                    
-                    node_to_delete.append(to_remove)
-            else:
-                logger.info(f"Activity {remaining.activity.get_name()} instance {remaining.activity.instance} and {to_remove.activity.instance} might be merged (end node mergables)")
-        elif node.tricc_type != calc_node.tricc_type:
-            logger.warning(f"Two different types of calculate node share the same name {node.name}::{node.tricc_type}::{calc_node.tricc_type}")
-    
-    # Remove deleted nodes from calculates
-    for node in node_to_delete:
-        if node.name in calculates:
-            del calculates[node.name]
-    
-    return node_to_delete
         
 def get_select_not_available_options(node,group,label):
     return {0:TriccNodeSelectOption(
@@ -1263,7 +1228,6 @@ def replace_next_node(prev_node,next_node,old_node):
         if n_p_node == old_node :
             set_prev_next_node(prev_node, next_node, old_node)
     
-#FIXME should work with OrderedSet
 def reorder_node_list(list_node, group, processed_nodes):
     active_activities = set(n.activity for n in processed_nodes)
     
@@ -1407,14 +1371,8 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
                 TriccStatic(1)
             ]
         )
-
-
     elif is_prev and issubclass(node.__class__, TriccNodeDisplayCalculateBase):
         expression = TriccOperation(TriccOperator.ISTRUE, [node])
-        # expression = TriccOperation(
-        #     TriccOperator.MORE,
-        #     [node, TriccStatic(0)]
-        # )
     elif issubclass(node.__class__, TriccNodeCalculateBase):
         if negate:
             negate_expression = get_calculation_terms(node, processed_nodes=processed_nodes, is_calculate=is_calculate, negate=True)

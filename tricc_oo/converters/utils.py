@@ -21,18 +21,20 @@ def clean_name( name, prefix='' ):
     if name[0].isdigit():
         name = 'id_' + name
     elif  name[0].isdigit() == '_':
-         name =  name[1:]
+        name =  name[1:]
     return name
 
-def generate_id(name=None):
+def generate_id(name=None, length=18):
     if name:
-        return hashlib.md5(name.encode('utf-8') if isinstance(name, str) else name).hexdigest()
+        h = hashlib.blake2b(digest_size=length)
+        h.update(name.encode('utf-8') if isinstance(name, str) else name)
+        return h.hexdigest()
     else:
-        return ''.join(random.choices(string.ascii_lowercase, k=8))
+        return ''.join(random.choices(string.ascii_lowercase + string.digits + string.ascii_uppercase, k=length))
 
 
-def get_rand_name(k):
-    return "r_" + ''.join(random.choices(string.ascii_lowercase, k=k))
+def get_rand_name(name=None, length=8):
+    return "n" + generate_id(name=name, length=length)
 
 # the soup.text strips off the html formatting also
 def remove_html(string):

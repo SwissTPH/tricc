@@ -16,7 +16,6 @@ class TriccNodeCalculateBase(TriccNodeBaseModel):
     #input: Dict[TriccOperation, TriccNodeBaseModel] = {}
     reference: Union[List[Union[TriccNodeBaseModel,TriccStatic]], Expression, TriccStatic] = None
     expression_reference: Union[str, TriccOperation] = None
-    version: int = 1
     last: bool = True
 
     # to use the enum value of the TriccNodeType
@@ -39,12 +38,12 @@ class TriccNodeCalculateBase(TriccNodeBaseModel):
 
     def __init__(self, **data):
         if 'name' not in data:
-            data['name'] = get_rand_name(8)
+            data['name'] = get_rand_name(data.get('id', None))
         super().__init__(**data)
         
         
     def append(self, elm):
-        reference.append(elm)
+        self.reference.append(elm)
     
     def get_references(self):
         if isinstance(self.reference, set):
@@ -83,6 +82,7 @@ class TriccNodeActivity(TriccNodeBaseModel):
     # - dangling calculate
     # - case definition
     calculates: List[TriccNodeCalculateBase] = []
+    applicability: Optional[Union[Expression, TriccOperation]] = None
 
     # redefine 
     def make_instance(self, instance_nb, **kwargs):

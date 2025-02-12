@@ -349,7 +349,7 @@ def generate_xls_form_export(strategy, node, processed_nodes, stashed_nodes, df_
                         for column in SURVEY_MAP:
                             value = get_xfrom_trad(strategy, node, column, SURVEY_MAP )
                             if column == 'default' and issubclass(node.__class__, TriccNodeDisplayCalculateBase) and value == '':
-                                    value = 0
+                                value = 0
                             values.append(value)
                         if len(df_calculate[df_calculate.name == get_export_name(node)])==0:
                             df_calculate.loc[len(df_calculate)] = values

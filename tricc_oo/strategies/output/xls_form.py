@@ -141,7 +141,9 @@ class XLSFormStrategy(BaseOutPutStrategy):
     def process_export(self, start_pages, **kwargs):
         self.activity_export(start_pages["main"], **kwargs)
 
-    def activity_export(self, activity, processed_nodes=set(), **kwargs):
+    def activity_export(self, activity, processed_nodes=None, **kwargs):
+        if processed_nodes is None:
+            processed_nodes = set()
         stashed_nodes = OrderedSet()
         # The stashed node are all the node that have all their prevnode processed but not from the same group
         # This logic works only because the prev node are ordered by group/parent ..
@@ -430,6 +432,8 @@ class XLSFormStrategy(BaseOutPutStrategy):
         return f"{ref_expressions[0]}!={ref_expressions[1]}"
     def tricc_operation_isnull(self, ref_expressions):
         return f"{ref_expressions[0]}=''"
+    def tricc_operation_isnotnull(self, ref_expressions):
+        return f"{ref_expressions[0]}!=''"
     def tricc_operation_case(self, ref_expressions):
         ifs = 0
         parts = []
