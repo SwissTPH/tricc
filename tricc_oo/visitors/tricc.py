@@ -26,12 +26,12 @@ def get_max_version(dict):
             max_version = sim_node
     return max_version
 
-def get_last_version(_list, name, processed_nodes):
+def get_last_version(name, processed_nodes,  _list=None):
     max_version = None
     if isinstance(_list, dict):
         _list = _list[name].values() if name in _list else []
     if _list is None:
-        _list = [n for n in processed_nodes if (name == 'tricc_end' and isinstance(n, TriccNodeEnd)) or  n.name == name]
+        _list = [n for n in processed_nodes if ((name == 'tricc_end' and isinstance(n, TriccNodeEnd)) or  n.name == name) and not isinstance(n, TriccNodeSelectOption)]
     if _list:
         for  sim_node in _list:
             # get the max version while not taking a node that have a next node before next calc
@@ -41,7 +41,10 @@ def get_last_version(_list, name, processed_nodes):
                 or max_version.path_len == sim_node.path_len and hash(max_version.id) < hash(sim_node.id)
                 ) ):
                 max_version = sim_node
-    
+    if not max_version:
+        already_processed = list(filter(lambda p_node: hasattr(p_node, 'name') and p_node.name == name , _list))
+        if already_processed:
+            max_version = sorted(filtered, key=lambda x: x.path_len, reverse=False)[0]
     
     return max_version
 
@@ -99,6 +102,20 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
         ):
             if kwargs.get('warn', True):
                 logger.debug('Processing relevance for node {0}'.format(node.get_name()))
+            last_version = get_last_version(node.name, processed_nodes) if issubclass(node.__class__, (TriccNodeDisplayModel)) and not isinstance(node, TriccNodeSelectOption)  else  None
+            if last_version:
+                # 0-100 for manually specified instance.  100-200 for auto instance 
+                node.version == last_version.version + 1
+                node.last = True
+                last_version.last = False
+                if issubclass(node.__class__, TriccNodeInputModel):
+                    node.expression = TriccOperation(
+                        TriccOperator.COALESCE,
+                        [
+                            '$this',
+                            last_version
+                        ]
+                    )
         # if has prev, create condition
             if hasattr(node, 'relevance') and (node.relevance is None or isinstance(node.relevance, TriccOperation)):
                 node.relevance = get_node_expressions(node, processed_nodes=processed_nodes)
@@ -129,6 +146,58 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
                             add_used_calculate(node, r, calculates, used_calculates, processed_nodes)
                 
                 generate_calculates(node,calculates, used_calculates,processed_nodes=processed_nodes)
+            if last_version:
+                if isinstance(node, TriccNodeInputModel):
+                    version_relevance =  TriccOperation(
+                            TriccOperator.ISNULL,
+                            [last_version]
+                        )
+                elif last_version.relevance:
+                    if last_version.activity.relevance:
+                        version_relevance = TriccOperation(
+                                TriccOperator.NOT,
+                                [
+                                    TriccOperation(
+                                        TriccOperator.AND,
+                                        [
+                                            last_version.relevance,
+                                            last_version.activity.relevance
+                                        ]
+                                    )
+                                ]
+                            )
+                    else:
+                        version_relevance = TriccOperation(
+                                TriccOperator.NOT,
+                                [
+
+                                    last_version.relevance,
+
+                                ]
+                            )
+                elif last_version.activity.relevance:
+                    version_relevance = TriccOperation(
+                        TriccOperator.NOT,
+                        [
+
+                            last_version.activity.relevance,
+
+                        ]
+                    )
+                else:
+                    version_relevance = None
+                
+                if version_relevance:
+                    if getattr(node, 'relevance', None):
+                        node.relevance = TriccOperation(
+                            TriccOperator.AND,
+                            [
+                                version_relevance,
+                                node.relevance
+                            ]
+                        )
+                    elif hasattr(node, 'relevance'):
+                        node.relevance = version_relevance
             
             if (
                 issubclass(node.__class__, (TriccNodeDisplayCalculateBase )) and node.name is not None
@@ -978,9 +1047,8 @@ def reverse_walkthrough(in_node, next_node, callback, processed_nodes, stashed_n
 def get_prev_node_by_name(processed_nodes, name, node):
     # look for the node in the same activity   
     last_calc = get_last_version(
-                    None,
                     name,
-                    [p for p in processed_nodes if issubclass(p.__class__, (TriccNodeCalculateBase, TriccNodeDisplayCalculateBase))]
+                    processed_nodes
                 )
     if last_calc:
         return last_calc
@@ -1081,7 +1149,7 @@ def get_last_end_node(processed_nodes, process=None):
     end_name = 'tricc_end'
     if process:
         end_name += f"_{process}"
-    return get_last_version(None, end_name, processed_nodes)
+    return get_last_version(end_name, processed_nodes)
 
 # Set the source next node to target and clean  next nodes of replace node
 def set_prev_next_node(source_node, target_node, replaced_node=None, edge_only = False, activity=None):

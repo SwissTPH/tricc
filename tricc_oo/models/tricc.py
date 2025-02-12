@@ -29,7 +29,9 @@ class TriccNodeCalculateBase(TriccNodeBaseModel):
         #instance.input = input
         expression = self.expression.copy() if self.expression is not None else None
         if self.reference:
-            instance.reference = self.reference.copy()
+            instance.reference = [e.copy() if isinstance(e, (TriccReference, TriccOperation)) else (TriccReference(e.name) if hasattr(e, 'name') else e) for e in self.reference]
+        else:
+            instance.reference = None
         if self.expression_reference:
             instance.expression_reference = self.expression_reference.copy()
         version = 1

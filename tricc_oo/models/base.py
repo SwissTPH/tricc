@@ -287,6 +287,9 @@ class TriccReference(TriccStatic):
     def __copy__(self):
         return type(self)(self.value)
 
+    def copy(self):
+        return self.__copy__()
+
     def get_references(self):
         return OrderedSet([self])
 
@@ -410,10 +413,13 @@ class TriccOperation(BaseModel):
         
         new_instance = type(self)(
             self.operator, 
-            [e.copy() if isinstance(e, (TriccReference, TriccOperation)) else e for e in self.reference] 
+            [e.copy() if isinstance(e, (TriccReference, TriccOperation)) else (TriccReference(e.name) if hasattr(e, 'name') else e) for e in self.reference] 
         )
         # Copy attributes (shallow copy for mutable attributes)
         return new_instance
+    
+    def copy(self):
+        return self.__copy__()
 
 
 TriccGroup.update_forward_refs()
