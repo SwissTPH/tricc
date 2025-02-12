@@ -655,7 +655,7 @@ def process_operation_reference(operation, node, processed_nodes, calculates, us
             if replace_reference:
                 if isinstance(operation, (TriccOperation)):
                     if modified_operation is None:
-                        modified_operation = operation.copy()
+                        modified_operation = operation.copy(keep_node=True)
                     modified_operation.replace_node(TriccReference(ref), last_found)
                 elif operation == TriccReference(ref):
                     modified_operation = last_found

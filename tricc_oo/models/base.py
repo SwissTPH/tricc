@@ -408,18 +408,24 @@ class TriccOperation(BaseModel):
                 self.replace_node(reference.select ,new_node.select)
         return reference
     
-    def __copy__(self):
+    def __copy__(self, keep_node=False):
         # Create a new instance
+        if keep_node:
+            reference = [e for e in self.reference]
+        else:
+            reference = [e.copy() if isinstance(e, (TriccReference, TriccOperation)) else (TriccReference(e.name) if hasattr(e, 'name') else e) for e in self.reference]
+        
         
         new_instance = type(self)(
             self.operator, 
-            [e.copy() if isinstance(e, (TriccReference, TriccOperation)) else (TriccReference(e.name) if hasattr(e, 'name') else e) for e in self.reference] 
+            reference
         )
         # Copy attributes (shallow copy for mutable attributes)
+        
         return new_instance
     
-    def copy(self):
-        return self.__copy__()
+    def copy(self, keep_node=False):
+        return self.__copy__(keep_node)
 
 
 TriccGroup.update_forward_refs()
