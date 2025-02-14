@@ -9,7 +9,7 @@ allowing to simulate a pause functionality.
 """
 
 import pandas as pd
-
+import json
 
 
 def chf_clean_name(s, remove_dots=False):
@@ -29,79 +29,106 @@ def chf_clean_name(s, remove_dots=False):
 # df is the dataframe to be split
 # pausepoint is the index of the row after which the form should pause
 def make_breakpoints(df, pausepoint, calculate_name=None):
+    """
+    Creates a dataframe for a follow-up questionnaire while preserving previous inputs.
     
-    # get all data points that were collected before the break and convert into 'hidden' fields 
-    # include the breakpoint itself
-    df_input = df.loc[:pausepoint]
+    Args:
+        df: Input dataframe containing the questionnaire
+        pausepoint: Point where the questionnaire should pause
+        calculate_name: Optional name for calculation fields
+    """
     
-    # types you want to be loaded in the form after the pause
-    typesconvert = [ 'calculate', 'integer', 'decimal', 'select_', 'text']
-    # types you want to keep in the part that comes before the pause
-    typeskeep = ['hidden', 'integer', 'decimal', 'select_', 'text', 'calculate', 'string'] 
-    # mask for dropping irrelevant fields based on type
-    m = df_input['type'].str.contains('|'.join(typeskeep))
-    df_input = df_input.loc[m] # dropped irrelevant rows
-    m = df_input['type'].str.contains('|'.join(typesconvert))
-    df_input.loc[m, 'type'] = 'hidden' # convert all types into 'hidden'
-    # df_input.loc[m, 'calculation'] = '' # convert all types into 'hidden'
+    # Get data points collected before break
+    if 'input end' not in df['name'].values:
+        raise ValueError("input end field not found in input dataframe")
+    end_inputs_loc = df.index[df['name'] == 'input end'][0]
+    next_begin_group_loc = min([i for i in df.index[df['type'] == 'begin group'] if i > end_inputs_loc])
+        
+    df_input = df.loc[next_begin_group_loc:pausepoint]
     
-    # add a data_load row, to load contextual parameters from the previous form
-    d = {'type':['hidden'], 'name':['data_load']}
-    d = pd.DataFrame.from_dict(d, orient='columns')
-    df_input = pd.concat([df_input, d])
+    # Define field types to handle
+    typesconvert = ['integer', 'decimal', 'select_', 'text']
+    typeskeep = ['hidden', 'calculate', 'string'] 
     
-    cols = [col for col in df.columns if 'label' in col] # all columns that contain text for user (have 'label' in column name)
-    df_input[cols] = 'NO_LABEL' # set the text of columns to NO_LABEL so that nothing shows up in CHT
+    # Create masks for filtering
+    type_mask = df_input['type'].str.contains('|'.join(typeskeep + typesconvert))
+    optin_mask = ~df_input['name'].str.contains('more_info_optin', na=False)
     
-    # drop 
-    cols2 = df_input.columns.drop(cols)
-    cols2 = cols2.drop(['name', 'type', 'calculation'])
-    df_input[cols2]=''
-    df_input.loc[df_input['type']=='hidden','calculation']=''
+    # Filter dataframe keeping important fields
+    df_input = df_input.loc[type_mask & optin_mask]
     
-    df_input.index = df_input.index.map(str) # convert index to string for sorting 
-    hidden_ids = df_input.loc[df_input['type']=='hidden'].index # extract the indices of the 'hidden' rows
-    # index of the begin-group-inputs row:
+    # Preserve existing hidden fields and their calculations
+    existing_hidden = df_input[df_input['type'] == 'hidden'].copy()
+    
+    # Convert specified types to hidden while preserving their data
+    mask_indices = df_input.index[df_input['type'].str.contains('|'.join(typesconvert))]
+    df_input.loc[mask_indices, 'type'] = 'hidden'
+    df_input.loc[mask_indices, 'calculation'] = 'hidden'    
+
+    # Handle label columns while preserving existing labels where needed
+    label_cols = [col for col in df.columns if 'label' in col]
+    df_input.loc[mask_indices, label_cols] = 'NO_LABEL'
+    
+    # Clear non-essential columns while preserving crucial data
+    essential_cols = ['name', 'type', 'calculation'] + label_cols
+    other_cols = df_input.columns.drop(essential_cols)
+    df_input[other_cols] = ''
+    
+    # Preserve calculations for existing hidden fields
+    df_input.update(existing_hidden[['calculation']])
+    
+    # Handle indexing and grouping
+    df_input.index = df_input.index.map(str)
+    hidden_ids = df_input.loc[df_input['type']=='hidden'].index
     inputs_group_index = '0'
-    # change index of the 'hidden' fields so that they end up in the 'inputs' group after sorting:
     new_hidden_ids = inputs_group_index + '.' + hidden_ids
-    d = dict(zip(hidden_ids, new_hidden_ids))
-    # put the new indices of the 'hidden' fields into the df:
-    #df_input = df_input.rename(index = d)
-    df_input.rename(index = d, inplace = True)
-    df_input.sort_index(inplace = True) # sort the index
-    df_input.reset_index(drop = True, inplace = True)
     
+    # Update indices
+    index_map = dict(zip(hidden_ids, new_hidden_ids))
+    df_input.rename(index=index_map, inplace=True)
+    df_input.sort_index(inplace=True)
+    df_input.reset_index(drop=True, inplace=True)
+    
+
+    # Get hidden field names
     hidden_names = list(df_input.loc[df_input['type']=='hidden', 'name'])
     
-    # for some reason, in ODK, one cannot have empty groups that only contain 'hidden'
-    # therefore we add an integer with relevance = false()
-    intfill = pd.DataFrame({'type' : 'integer', 'name' : 'hidden_int', 'label::en' : 'NO_LABEL', 'relevance' : 'false()'}, index = [0.5])
-        
-    # wrap the entire df before the breakpoint into the 'inputs' group
-    bgroup = pd.DataFrame({'type' : 'begin group', 'name' : 'inputs', 'label::en' : 'NO_LABEL', 'appearance':'field-list', 'relevance':'./source = \'user\''}, index = [-1])
-    endinputgroupindex = df_input.loc[df_input['type']=='hidden'].index[-1]
-    egroup = pd.DataFrame({'type' : 'end group', 'name':'inputs'}, index = [endinputgroupindex+0.5])
-    df_input = pd.concat([bgroup, intfill, df_input, egroup])
-    df_input.fillna('', inplace=True)
-    df_input.sort_index(inplace = True)
     
-    # make the df that resumes after the break, it starts right after the breakpoint
-    df = df.loc[pausepoint+1:] 
-    # if a breakpoint is on a page, it must be the last element of that page 
-    # (it would make no sense to put a breakpoint in the middle of a page)
-    # if the breakpoint was in a group the first row would be of type 'end group' and must be deleted
-    if df.iloc[0,0] == 'end group':
-        df = df.iloc[1:]
-        
-    # concat the inputs group with the form that resumes after the breakpoint
-    df = pd.concat([df_input, df])
+# put all together
+    if 'data_load' not in df['name'].values:
+        raise ValueError("data_load field not found in input dataframe")
+    data_load_loc = df.index[df['name'] == 'data_load'][0]
+    
+    # Split the dataframe into three parts
+    df_before_data_load = df.loc[:data_load_loc]  # Everything up to data_load
+    df_until_begin_group = df.loc[data_load_loc+1:next_begin_group_loc-1]  # From data_load to next begin_group
+    
+    # Reset indices for proper concatenation
+    df_input = df_input.reset_index(drop=True)
+    df_before_data_load = df_before_data_load.reset_index(drop=True)
+    df_until_begin_group = df_until_begin_group.reset_index(drop=True)
+    
+    # Concatenate in the correct order
+    df_combined = pd.concat([
+        df_before_data_load,  # First part until data_load
+        df_input,            # Injected converted fields
+        df_until_begin_group # Remaining part until next begin_group
+    ]).reset_index(drop=True)
+    
+    # Handle post-break section
+    df_after = df.loc[pausepoint+1:].reset_index(drop=True)
+    if df_after.iloc[0,0] == 'end group':
+        df_after = df_after.iloc[1:]
+    
+    # Final concatenation
+    final_df = pd.concat([df_combined, df_after])
     if calculate_name:
-        df.loc[df['name']=='hidden','calculation']='0'  
-    df.fillna('', inplace = True)
-    df.reset_index(inplace=True, drop=True)
+        final_df.loc[final_df['name']=='hidden','calculation']='0'
     
-    return df, hidden_names
+    final_df.fillna('', inplace=True)
+    final_df.reset_index(inplace=True, drop=True)
+    
+    return final_df, hidden_names
 
 
 
@@ -111,7 +138,9 @@ def get_tasksstrings(hidden_names, df_survey):
     @hidden_names: are the names of the 'hidden' fields in the input group of the follow up form
     @df_survey: is the survey tab of the complete (original) form without breaks, going from A to Z
     @tasks_strings: is the string that has to be pasted into tasks.js'''
-    d = {}
+    
+    task_string_template = "content['{variableName}'] = getField(report, '{full_path}')"
+    task_strings = {}
     for s in hidden_names:
         df_above_s = df_survey.iloc[:df_survey.loc[df_survey['name']==s].index[0]]
         df_above_s_groups = df_above_s.loc[df_above_s['type'].isin(['begin group', 'end group'])]
@@ -123,13 +152,16 @@ def get_tasksstrings(hidden_names, df_survey):
             else: 
                 fullpath = fullpath[:-1]
         if len(fullpath)>0:
-            fullpath = 'content.' + chf_clean_name(s, False) +' = getField(report, \'' + '.'.join(fullpath) + '.' + chf_clean_name(s) + '\');'
+            line = task_string_template.format(
+                variableName=s, full_path='.'.join(fullpath) + chf_clean_name(s)
+            )
         else:
-            fullpath = 'content.' + chf_clean_name(s, False) +' = getField(report, \'' + chf_clean_name(s) + '\');'
-        d[s]=fullpath
-    tasks_strings = list(d.values())
-    
-    return tasks_strings
+            line = task_string_template.format(
+                variableName=s, full_path=chf_clean_name(s)
+            )
+        task_strings[s]=line
+    return  list(task_strings.values())
+
 
 
 def get_task_js(form_id, calculate_name, title, form_types, hidden_names, df_survey, task_title="'id: '+getField(report, 'g_registration.p_id')+'; age: '+getField(report, 'p_age')+getField(report, 'g_registration.p_gender')+' months; '+getField(report, 'p_weight') + 'kg; ' + getField(report, 'g_fever.p_temp')+'°'"):
