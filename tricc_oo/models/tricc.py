@@ -34,7 +34,7 @@ class TriccNodeCalculateBase(TriccNodeBaseModel):
             instance.reference = None
         if self.expression_reference:
             instance.expression_reference = self.expression_reference.copy()
-        version = 1
+        version = self.version + 1
         instance.version = version
         return instance
 

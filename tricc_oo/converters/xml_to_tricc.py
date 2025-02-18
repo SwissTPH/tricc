@@ -9,6 +9,7 @@ from tricc_oo.converters.utils import clean_name, remove_html
 from tricc_oo.converters.cql_to_operation import transform_cql_to_operation
 from tricc_oo.models.tricc import *
 from tricc_oo.models.base import TriccNodeType, OPERATION_LIST
+from tricc_oo.models.ocl import get_data_type
 from tricc_oo.converters.drawio_type_map import TYPE_MAP
 from tricc_oo.parsers.xml import (
     get_edges_list,
@@ -79,9 +80,9 @@ def create_activity(diagram, media_path, project):
                 and not isinstance(n, (TriccRhombusMixIn, TriccNodeRhombus, TriccNodeDisplayBridge))
             ):
                 if isinstance(n, TriccNodeSelectOption) and isinstance(n.select, TriccNodeSelectNotAvailable):
-                    add_concept(project.code_systems, 'tricc', n.select.name, n.label, {})
+                    add_concept(project.code_systems, 'tricc', n.select.name, n.label, {"datatype": 'Boolean'})
                 elif not isinstance(n, TriccNodeSelectNotAvailable):
-                    add_concept(project.code_systems, 'tricc', n.name, n.label, {})
+                    add_concept(project.code_systems, 'tricc', n.name, n.label, {"datatype": get_data_type(n.tricc_type)})
         groups = get_groups(diagram, nodes, activity)
         if groups and len(groups) > 0:
             activity.groups = groups

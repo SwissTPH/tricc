@@ -94,11 +94,21 @@ def check_and_add_concept(code_system: CodeSystem, code: str, display: str, attr
         new_concept.property = []
     
     for k,v in attributes.items():          
+        existing_attributes = False
         for p in new_concept.property:
             if p.code == k:
                 #TODO support other type of Codesystem Concept Property Value
+                existing_attributes
                 if p.valueString != v:
                     logger.warning(f"conflicting value for property {k}: {p.valueString} != {v}")
+        if not existing_attributes:
+            new_concept.property.append(
+                CodeSystemConceptProperty(
+                    code=k,
+                    valueString=v
+                )
+            )
+    
     return new_concept
 
 
@@ -117,12 +127,15 @@ def add_yeno_concepts(code_system: CodeSystem) -> ValueSet:
         ValueError: If a concept with the same code exists but has a different display.
     """
     # Add 'yes' and 'no' concepts after validation
+    
     check_and_add_concept(code_system, "1", "Yes", {
-        'archetype': "options"
+        'archetype': "options",
+        "datatype": 'Coded'
         })
                           
     check_and_add_concept(code_system, "-1", "No", {
-        'archetype': "options"
+        'archetype': "options",
+        "datatype": 'Coded'
         })
     # Create a ValueSet referencing the updated CodeSystem
     value_set = ValueSet.construct(

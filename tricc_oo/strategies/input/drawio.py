@@ -11,6 +11,8 @@ from tricc_oo.visitors.tricc import (
     stashed_node_func,
     TriccProject
 )
+from tricc_oo.converters.codesystem_to_ocl import transform_fhir_to_ocl
+
 from tricc_oo.models import *
 from tricc_oo.strategies.input.base_input_strategy import BaseInputStrategy
 from tricc_oo.parsers.xml import read_drawio
@@ -104,6 +106,23 @@ class DrawioStrategy(BaseInputStrategy):
         for k, v in project.code_systems.items():
             with open(os.path.join(os.path.dirname(media_path),  f"{k}_codesystem.json"), "w", encoding='utf-8') as file:
                 file.write(v.json(indent=4))
+
+            # Transform to OCL payload
+            ocl_payload = transform_fhir_to_ocl(
+                v,
+                source_name="ALM",
+                source_owner="pdelcroix",
+                source_owner_type="User"
+            )
+
+            # Save the transformed OCL payload to a file
+            with open("ocl_bulk_upload.json", "w") as f:
+                for item in ocl_payload:
+                    json_line = json.dumps(item.dict(exclude_none=True), indent=None)
+                    f.write(json_line + '\n')
+
+                print("OCL bulk upload payload generated successfully!")
+
         for k, v in project.value_sets.items():
             with open(os.path.join(os.path.dirname(media_path), f"{k}_valueset.json"), "w") as file:
                 file.write(v.json(indent=4))
