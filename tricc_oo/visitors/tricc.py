@@ -1397,7 +1397,7 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
             elif len(node.prev_nodes) > 1:
                 logger.critical(f"missing path for Rhombus {node.get_name()}")
                 exit(1)
-        prev_exp = get_node_expression(node.path, processed_nodes=processed_nodes, is_calculate=is_calculate, is_prev=is_prev)
+        prev_exp = get_node_expression(node.path, processed_nodes=processed_nodes, is_calculate=is_calculate, is_prev=True)
         if prev_exp and expression:
             expression = TriccOperation(
                 TriccOperator.AND,
@@ -1422,9 +1422,7 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
         #         TriccOperator.CAST_NUMBER,
         #         [node.expression_reference])
         # else:    
-        expression = node.expression_reference
-    elif hasattr(node, 'relevance') and isinstance(node.relevance, TriccOperation):
-        expression = node.relevance  
+        expression = node.expression_reference 
     elif is_prev and isinstance(node, TriccNodeSelectOption):
         if negate:
             negate_expression = get_selected_option_expression(node, negate)
@@ -1445,10 +1443,8 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
         if negate:
             negate_expression = get_calculation_terms(node, processed_nodes=processed_nodes, is_calculate=is_calculate, negate=True)
         else:
-            expression = get_calculation_terms(node, processed_nodes=processed_nodes, is_calculate=is_calculate)
-    elif is_prev and hasattr(node, 'relevance') and node.relevance is not None and node.relevance != '':
-            expression = node.relevance     
-    elif is_prev and hasattr(node, 'required') and node.required:
+            expression = get_calculation_terms(node, processed_nodes=processed_nodes, is_calculate=is_calculate)     
+    elif is_prev and not is_calculate and hasattr(node, 'required') and node.required:
         expression = get_required_node_expression(node)
     if expression is None:
         expression = get_prev_node_expression(node, processed_nodes=processed_nodes, is_calculate=is_calculate)
@@ -1668,7 +1664,7 @@ def get_prev_node_expression( node, processed_nodes, is_calculate=False, exclude
     if len(expression_inputs) == 1:
         expression = expression_inputs[0]
     
-    if expression_inputs:
+    elif expression_inputs:
         expression = TriccOperation(
             TriccOperator.OR,
             expression_inputs

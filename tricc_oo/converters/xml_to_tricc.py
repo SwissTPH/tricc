@@ -192,10 +192,11 @@ def process_edges(diagram, media_path, activity, nodes):
                 calc = process_factor_edge(edge, nodes)
             elif label.lower() in TRICC_NO_LABEL:
                 calc = process_exclusive_edge(edge, nodes)
-            else:
+            elif  any(reserved in label.lower() for reserved in ([str(o) for o in list(TriccOperator)] + list(OPERATION_LIST.keys()) + ['$this'])):
                 # manage comment
                 calc = process_condition_edge(edge, nodes)
-
+            else:
+                logger.warning(f"unsupported edge label {label} in {diagram.attrib.get('name', diagram.attrib['id'])}")
             if calc is not None:
                 processed = True
                 nodes[calc.id] = calc
