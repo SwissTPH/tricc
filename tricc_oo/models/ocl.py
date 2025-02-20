@@ -155,7 +155,7 @@ class OCLBaseModel(BaseModel):
     id:OCLId
     external_id:str = None
     public_access:Literal[tuple(OclConstants.ACCESS_TYPES)] = OclConstants.ACCESS_TYPE_VIEW
-    extras:Dict[str,Union[str,Dict[str,str]]] = []
+    extras:Dict[str,Union[str,Dict[str,str]]] = {}
     url: Union[AnyHttpUrl,Uri] = None
     # enriched data for get
 class OclGet(BaseModel):
