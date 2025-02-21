@@ -208,9 +208,5 @@ if __name__ == "__main__":
     # compress the output folder to a zip archieve and place it in the download directory
     # shutil.make_archive(os.path.join(download_dir), "zip", os.path.join(out_path))
 
-    # print the content of debug.log
-    with open(debug_file_path, "r") as f:
-        print(f.read())
-
     # if trad:
     # langs.to_po_file("./trad.po")

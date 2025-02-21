@@ -352,22 +352,25 @@ def get_bridge_path(prev_nodes, node=None,edge_only=False):
         calc= TriccNodeDisplayBridge( **data)
     else:
         calc =  TriccNodeBridge( **data)
-    for prev in prev_nodes:
-        set_prev_next_node(prev, calc, activity=node.activity, edge_only=edge_only )
+    return calc
     
 def inject_bridge_path(node, nodes):
 
-    prev_nodes = [nodes[n.source] for n in list(filter(lambda x: (x.target == node.id or x.target == node) and x.source in nodes, node.activity.edges))] 
-    calc = get_bridge_path(prev_nodes, node,edge_only=True)
+    prev_nodes = [nodes[n.source] for n in list(filter(lambda x: (x.target == node.id or x.target == node) and x.source in list(nodes.keys()), node.activity.edges))] 
+    if prev_nodes:
+        calc = get_bridge_path(prev_nodes, node,edge_only=True)
 
-    for e in node.activity.edges:
-        if e.target == node.id:
-            e.target = calc.id
+        for e in node.activity.edges:
+            if e.target == node.id:
+                # if e.source in node.activity.nodes and len(node.activity.nodes[e.source].next_nodes):
+                #     set_prev_next_node(node.activity[e.source], node, edge_only=True, replaced_node=node)
+                # else:
+                    e.target = calc.id
    
-    # add edge between bridge and node
-    set_prev_next_node(calc,node,edge_only=True, activity=node.activity)
-    node.path_len += 1
-    return calc
+        # add edge between bridge and node
+        set_prev_next_node(calc,node,edge_only=True, activity=node.activity)
+        node.path_len += 1
+        return calc
 
 
 def inject_node_before(before, node, activity):
@@ -1378,7 +1381,7 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
     elif isinstance(node, TriccNodeWait):
         if is_prev:
             # the wait don't do any calculation with the reference it is only use to wait until the reference are valid
-            return get_node_expression(node.path, processed_nodes=processed_nodes, is_calculate=is_calculate, is_prev=is_prev)
+            return get_node_expression(node.path, processed_nodes=processed_nodes, is_calculate=is_calculate, is_prev=True)
         else:
             #it is a empty calculate
             return None
@@ -1422,7 +1425,9 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
         #         TriccOperator.CAST_NUMBER,
         #         [node.expression_reference])
         # else:    
-        expression = node.expression_reference 
+        expression = node.expression_reference
+    elif not is_prev and hasattr(node, 'relevance') and isinstance(node.relevance, TriccOperation):
+        expression = node.relevance  
     elif is_prev and isinstance(node, TriccNodeSelectOption):
         if negate:
             negate_expression = get_selected_option_expression(node, negate)
@@ -1443,7 +1448,7 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
         if negate:
             negate_expression = get_calculation_terms(node, processed_nodes=processed_nodes, is_calculate=is_calculate, negate=True)
         else:
-            expression = get_calculation_terms(node, processed_nodes=processed_nodes, is_calculate=is_calculate)     
+            expression = get_calculation_terms(node, processed_nodes=processed_nodes, is_calculate=is_calculate)
     elif is_prev and not is_calculate and hasattr(node, 'required') and node.required:
         expression = get_required_node_expression(node)
     if expression is None:

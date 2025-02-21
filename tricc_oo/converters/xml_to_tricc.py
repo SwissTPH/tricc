@@ -276,14 +276,20 @@ def get_nodes(diagram, activity):
             node.name = _get_name(node.name, node.id)
         if issubclass(node.__class__, TriccRhombusMixIn) and node.path is None:
             # generate rhombuse path
-            calc = inject_bridge_path(node, nodes)
-            node.path = calc
-            new_nodes[calc.id] = calc
+            calc = inject_bridge_path(node, {**nodes, **new_nodes})
+            if calc:
+                node.path = calc
+                new_nodes[calc.id] = calc
+            else:
+                node.path = activity.root
             # add the edge between trhombus and its path
         elif isinstance(node, TriccNodeGoTo):
             # find if the node has next nodes, if yes, add a bridge + Rhoimbus
-            path = inject_bridge_path(node, nodes)
-            new_nodes[path.id] = path
+            path = inject_bridge_path(node, {**nodes, **new_nodes})
+            if path:
+                new_nodes[path.id] = path
+            else:
+                logger.critical(f"goto without in edges {node.get_name()}")
             # action after the activity
             next_nodes_id = [e.target for e in activity.edges if e.source == node.id]
             if len(next_nodes_id) > 0:
