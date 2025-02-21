@@ -1164,7 +1164,7 @@ def set_prev_next_node(source_node, target_node, replaced_node=None, edge_only =
         set_prev_node(source_node, target_node, replaced_node, edge_only)
         set_next_node(source_node, target_node, replaced_node, edge_only)
          
-    if not any([(e.source == source_id) and ( e.target == target_id) for e in activity.edges]):
+    if activity and not any([(e.source == source_id) and ( e.target == target_id) for e in activity.edges]):
         activity.edges.append(TriccEdge(id = generate_id(), source = source_id, target = target_id))
 
 def remove_prev_next(prev_node, next_node, activity=None):

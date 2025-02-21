@@ -233,7 +233,8 @@ class TriccNodeDisplayModel(TriccNodeBaseModel):
 
     def make_instance(self, instance_nb, activity=None):
         instance = super().make_instance(instance_nb, activity=activity)
-        instance.relevance = None
+        instance.relevance = self.relevance.copy() if self.relevance else None
+       
         return instance
 
     # to use the enum value of the TriccNodeType

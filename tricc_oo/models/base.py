@@ -103,6 +103,7 @@ media_nodes = [
 
 class TriccBaseModel(BaseModel):
     id: triccId
+    external_id: triccId = None
     tricc_type: TriccNodeType
     instance: int = 1
     base_instance: Optional[TriccBaseModel] = None
@@ -149,7 +150,9 @@ class TriccBaseModel(BaseModel):
 class TriccEdge(TriccBaseModel):
     tricc_type: TriccNodeType = TriccNodeType.edge
     source: Union[triccId, TriccNodeBaseModel]
+    source_external_id: triccId = None
     target: Union[triccId, TriccNodeBaseModel]
+    target_external_id: triccId = None
     value: Optional[str]  = None
 
     def make_instance(self, instance_nb, activity=None):

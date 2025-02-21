@@ -52,7 +52,9 @@ def get_all_nodes(diagram, activity, nodes):
     return nodes
 
 def create_activity(diagram, media_path, project):
-    id = diagram.attrib.get("id")
+
+    external_id = diagram.attrib.get("id")
+    id = get_id( external_id,  diagram.attrib.get("id"))
     root = create_root_node(diagram)
     name = diagram.attrib.get("name")
     form_id = diagram.attrib.get("name", None)
@@ -61,6 +63,7 @@ def create_activity(diagram, media_path, project):
             root=root,
             name=get_rand_name(f"a{id}"),
             id=id,
+            external_id=external_id,
             label=name,
             form_id=form_id,
         )
@@ -252,12 +255,15 @@ def process_edges(diagram, media_path, activity, nodes):
     
     return images
 
-def _get_name(name, id):
+def get_id(elm_id, activity_id):
+   return  str(elm_id) if len(elm_id)>8 else str(activity_id) + str(elm_id)
+
+def _get_name(name, id, act_id):
     if (
         name is not None
         and (name.endswith(("_", ".")))
     ):
-        return name + id
+        return name + get_id(id, act_id)
     return name
    
 
@@ -273,7 +279,7 @@ def get_nodes(diagram, activity):
         if (
             hasattr(node, "name")
         ):
-            node.name = _get_name(node.name, node.id)
+            node.name = _get_name(node.name, node.id, activity.id)
         if issubclass(node.__class__, TriccRhombusMixIn) and node.path is None:
             # generate rhombuse path
             calc = inject_bridge_path(node, {**nodes, **new_nodes})
@@ -333,10 +339,13 @@ def create_root_node(diagram):
     if elm is None:
         elm = get_tricc_type(diagram, "UserObject", TriccNodeType.start)
     if elm is not None:
+        external_id = elm.attrib.get("id")
+        id = get_id( external_id,  diagram.attrib.get("id"))
         node = TriccNodeMainStart(
-            id=elm.attrib.get("id"),
+            id=id,
+            external_id=external_id,
             parent=elm.attrib.get("parent"),
-            name="ms" + diagram.attrib.get("id"),
+            name="ms" + id,
             label=elm.attrib.get("label"),
             form_id=elm.attrib.get("form_id"),
             relevance=elm.attrib.get("relevance"),
@@ -347,10 +356,13 @@ def create_root_node(diagram):
         if elm is None:
             elm = get_tricc_type(diagram, "UserObject", TriccNodeType.activity_start)
         if elm is not None:
+            external_id = elm.attrib.get("id")
+            id = get_id( external_id,  diagram.attrib.get("id"))
             node = TriccNodeActivityStart(
-                id=elm.attrib.get("id"),
+                id=id,
+                external_id=external_id,
                 #parent=elm.attrib.get("parent"),
-                name="ma" + diagram.attrib.get("id"),
+                name="ma" + id,
                 label=diagram.attrib.get("name"),
                 relevance=elm.attrib.get("relevance"),
                 instance=int(
@@ -387,7 +399,7 @@ def set_additional_attributes(attribute_names, elm, node):
 def get_select_options(diagram, select_node, nodes):
     options = {}
     i = 0
-    list = get_mxcell_parent_list(diagram, select_node.id, TriccNodeType.select_option)
+    list = get_mxcell_parent_list(diagram, select_node.external_id, TriccNodeType.select_option)
     options_name_list = []
     for elm in list:
         name = elm.attrib.get("name")
@@ -399,7 +411,9 @@ def get_select_options(diagram, select_node, nodes):
             )
         else:
             options_name_list.append(name)
-        id = elm.attrib.get("id")
+        
+        external_id = elm.attrib.get("id")
+        id = get_id(external_id, diagram.attrib.get('id'))  
         option = TriccNodeSelectOption(
             id=id,
             label=elm.attrib.get("label"),
@@ -408,8 +422,9 @@ def get_select_options(diagram, select_node, nodes):
             list_name=select_node.list_name,
             activity=select_node.activity,
             group=select_node.group,
-        )
-        set_additional_attributes(["save"], elm, option)
+            )
+        set_additional_attributes(["save", "relevance"], elm, option)
+        load_expressions(option)
         options[i] = option
         nodes[id] = option
         i += 1
@@ -517,7 +532,7 @@ def inject_bridge_path(node, nodes):
 def enrich_node(diagram, media_path, edge, node, activity):
     if edge.target == node.id:
         # get node and process type
-        type, message = get_message(diagram, edge.source)
+        type, message = get_message(diagram, edge.source_external_id)
         if type is not None:
             if type == 'help':
                 help = TriccNodeMoreInfo(
@@ -545,7 +560,7 @@ def enrich_node(diagram, media_path, edge, node, activity):
                 )
                 return False, None
         else:
-            image, payload = get_image(diagram, media_path, edge.source)
+            image, payload = get_image(diagram, media_path, edge.source_external_id)
             if image is not None:
                 if hasattr(node, "image"):
                     node.image = image
@@ -554,7 +569,7 @@ def enrich_node(diagram, media_path, edge, node, activity):
                     logger.warning("image not supported for {} ".format(node.get_name()))
                     return None, None
             else:
-                logger.warning(f"edge from an unsuported node {edge.source}")
+                logger.warning(f"edge from an unsuported node {edge.source_external_id}")
                 
             return None, None
 
@@ -576,14 +591,16 @@ def add_tricc_base_node(
     diagram, nodes, type, list, group, attributes=[], mandatory_attributes=[], has_options=None
 ):
     for elm in list:
-        id = elm.attrib.get("id")
+        external_id = elm.attrib.get("id")
+        id = get_id( external_id,  diagram.attrib.get("id"))
         parent = elm.attrib.get("parent")    
         node = type(
+            external_id=external_id,
             id=id,
             #parent=parent,
             group=group,
             activity=group,
-            **set_mandatory_attribute(elm, mandatory_attributes, group.name),
+            **set_mandatory_attribute(elm, mandatory_attributes, diagram),
         )
         if has_options:
             node.options = get_select_options(diagram, node, nodes)
@@ -599,7 +616,7 @@ def add_tricc_base_node(
             nodes[node.options[0].id] = node.options[0]
             nodes[node.options[1].id] = node.options[1]
         elif type == TriccNodeProposedDiagnosis and getattr(node, 'severity', '') == None:
-            mxcell = get_mxcell(diagram, id)
+            mxcell = get_mxcell(diagram, external_id)
             styles = get_style_dict(mxcell.attrib.get('style',''))
             if 'fillColor' in styles and styles['fillColor'] != 'none':
                 node.severity = severity_from_color(styles['fillColor'])
@@ -681,17 +698,18 @@ def parse_expression(label=None, expression=None):
     return operation
         
 
-def set_mandatory_attribute(elm, mandatory_attributes, groupname=None):
+def set_mandatory_attribute(elm, mandatory_attributes, diagram=None):
     param = {}
+    diagram_id = diagram.attrib.get('id')
     for attributes in mandatory_attributes:
         if attributes == 'name':
             name = elm.attrib.get("name")
             id = elm.attrib.get("id")
-            attribute_value = _get_name(name, id)
+            attribute_value = _get_name(name, id, diagram_id)
         elif attributes == 'list_name':
             name = elm.attrib.get("name")
             id = elm.attrib.get("id")
-            attribute_value = TRICC_LIST_NAME.format(_get_name(name, id))
+            attribute_value = TRICC_LIST_NAME.format(_get_name(name, id, diagram_id))
         else:   
             attribute_value = elm.attrib.get(attributes)
         if attribute_value is None:
@@ -715,7 +733,7 @@ def set_mandatory_attribute(elm, mandatory_attributes, groupname=None):
             
             logger.critical(
                 "the attibute {} is mandatory but not found in {} within group {}".format(
-                    attributes, display_name, groupname if groupname is not None else ""
+                    attributes, display_name, diagram.attrib.get('name') if diagram is not None else ""
                 )
             )
             exit(1)
@@ -744,12 +762,14 @@ def get_groups(diagram, nodes, parent_group):
 
 
 def add_group(elm, diagram, nodes, groups, parent_group):
-    id = elm.attrib.get("id")
+    external_id = elm.attrib.get("id")
+    id = get_id(external_id, diagram.attrib.get("id"))
     if id not in groups:
         group = TriccGroup(
             name=elm.attrib.get("name"),
             label=elm.attrib.get("label"),
             id=id,
+            external_id=external_id,
             group=parent_group,
         )
         # get elememt witn parent = id and tricc_type defiend
@@ -843,13 +863,18 @@ def get_edges(diagram):
     edges = []
     list = get_edges_list(diagram)
     for elm in list:
-        id = elm.attrib.get("id")
+        external_id = elm.attrib.get("id")
+        id = get_id(external_id, diagram.attrib.get("id"))
         edge = TriccEdge(
             id=id,
             **set_mandatory_attribute(
-                elm, ["source", "parent", "target"], diagram.attrib.get("name")
+                elm, ["source", "parent", "target"], diagram
             ),
         )
+        edge.source_external_id = edge.source
+        edge.target_external_id = edge.target
+        edge.source = get_id(edge.source,  diagram.attrib.get("id"))
+        edge.target = get_id(edge.target,  diagram.attrib.get("id"))
         set_additional_attributes(["value"], elm, edge)
         if edge.value is not None:
             edge.value = remove_html(edge.value)

@@ -186,7 +186,7 @@ SURVEY_MAP = {
     **langs.get_trads_map('required_message'), 'read only':'read only', 
     'calculation':'expression','repeat_count':'repeat_count','media::image':'image'
 }
-CHOICE_MAP = {'list_name':'list_name', 'value':'name', **langs.get_trads_map('label'), 'media::image':'image',  'filter':'', 'y_min':'', 'y_max':'', 'l':'', 's':'', 'm':'' }
+CHOICE_MAP = {'list_name':'list_name', 'value':'name', **langs.get_trads_map('label'), 'media::image':'image',  'choice_filter':'relevance', 'y_min':'', 'y_max':'', 'l':'', 's':'', 'm':'' }
      
      
 TRAD_MAP = ['label','constraint_message', 'required_message', 'hint', 'help']  
@@ -207,21 +207,20 @@ def get_xfrom_trad(strategy, node, column, mapping, clean_html = False ):
         value = f"number({value})" if str(value) not in ['0', '1'] else value
     if clean_html and isinstance(value, str):
         value = remove_html(value)
-    if column == 'appearance':
+    if column in TRAD_MAP:
+        value = langs.get_trads(value, trad=trad)
+    elif column == 'appearance':
         if isinstance(node, TriccNodeSelect) and len(node.options)>9 and not any( o.image or o.hint for o in node.options.values()):
             value = 'autocomplete'
         elif isinstance(node, TriccNodeNote) and 'countdown-timer' in node.name:
             value = 'countdown-timer'
-    if column in TRAD_MAP:
-        value = langs.get_trads(value, trad=trad)
     elif column == 'appearance' and isinstance(node, TriccNodeAcceptDiagnostic) and node.severity and not value:
             if node.severity == 'severe':
                 value = 'severe'   
             elif node.severity == 'moderate':
                 value = 'moderate'
             elif node.severity == 'light':
-                value == 'light'
-                
+                value == 'light'               
 
     return value
 
