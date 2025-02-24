@@ -109,11 +109,7 @@ def transform_fhir_to_ocl(fhir_codesystem_json: Dict, source_name: str, source_o
     ocl_payload = []
 
     # Add source metadata
-    source_extras = {
-        "url": fhir_cs.url,
-        "version": fhir_cs.version,
-        "status": fhir_cs.status,
-    }
+
     
     # Add property definitions to extras
     if property_types:
@@ -123,6 +119,7 @@ def transform_fhir_to_ocl(fhir_codesystem_json: Dict, source_name: str, source_o
         OCLSource(
             short_code=source_name,
             id=source_name,
+            canonical_url=fhir_cs.url,
             owner=source_owner,
             owner_type=source_owner_type,
             name=fhir_cs.name or "Unnamed Source",
@@ -131,7 +128,6 @@ def transform_fhir_to_ocl(fhir_codesystem_json: Dict, source_name: str, source_o
             source_type="Dictionary",
             default_locale="en",
             supported_locales=["en"],
-            extras=source_extras
         )
       )
 

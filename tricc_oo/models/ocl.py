@@ -196,7 +196,7 @@ class OCLConcept(OCLBaseModel):
     versions: str = None # TODO version
     source:OCLId = None
     owner:OCLId = None
-    owner_type:Literal[tuple(OclConstants.OWNER_TYPE_TO_STEM.values())] = None
+    owner_type:Literal[tuple(OclConstants.OWNER_TYPE_TO_STEM)] = None    
     owner_url:Union[AnyHttpUrl,Uri] = None
     versions_url:Union[AnyHttpUrl,Uri] = None
     source_url:Union[AnyHttpUrl,Uri] = None
