@@ -184,7 +184,7 @@ SURVEY_MAP = {
     **langs.get_trads_map('constraint_message'), 'relevance':'relevance',
     'disabled':'disabled','required':'required',
     **langs.get_trads_map('required_message'), 'read only':'read only', 
-    'calculation':'expression','repeat_count':'repeat_count','media::image':'image'
+    'calculation':'expression','repeat_count':'repeat_count','media::image':'image', 'choice_filter':''
 }
 CHOICE_MAP = {'list_name':'list_name', 'value':'name', **langs.get_trads_map('label'), 'media::image':'image',  'choice_filter':'relevance', 'y_min':'', 'y_max':'', 'l':'', 's':'', 'm':'' }
      
@@ -390,7 +390,8 @@ def get_input_line(node):
         '',#'read only'
         '',#'expression'
         '',#'repeat_count'
-        ''#'image'  
+        '',#'image' 
+        ''
     ]   
 
 def get_input_calc_line(node):
@@ -413,7 +414,8 @@ def get_input_calc_line(node):
         '',#'read only'
         '../inputs/contact/load_'+get_export_name(node),#'expression'
         '',#'repeat_count'
-        ''#'image'  
+        '',#'image' 
+        ''#choice filter
     ]       
     
 
@@ -437,7 +439,8 @@ def get_diagnostic_start_group_line():
         '',#'read only'
         '',#'expression'
         '',#'repeat_count'
-        ''#'image'  
+        '',#'image' 
+        ''
     ]
     
 def get_diagnostic_add_line(diags, df_choice):
@@ -474,7 +477,8 @@ def get_diagnostic_add_line(diags, df_choice):
         '',#'read only'
         '',#'expression'
         '',#'repeat_count'
-        ''#'image'  
+        '',#'image' 
+        ''
     ]  
     
 def get_diagnostic_none_line(diags):
@@ -501,6 +505,7 @@ def get_diagnostic_none_line(diags):
         '',#'expression'
         '',#'repeat_count'
         ''#'image'  TRICC_NEGATE
+        ,''
     ]
     
 def  get_diagnostic_stop_group_line():
@@ -522,5 +527,6 @@ def  get_diagnostic_stop_group_line():
         '',#'read only'
         '',#'expression'
         '',#'repeat_count'
-        ''#'image'  
+        '',#'image' 
+        ''
     ]

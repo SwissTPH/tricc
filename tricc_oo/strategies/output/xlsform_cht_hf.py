@@ -28,7 +28,7 @@ class XLSFormCHTHFStrategy(XLSFormCHTStrategy):
             *list(empty.values()),
             './source = "user"', '','',
             *list(empty.values())
-            ,'', '', '', '' 
+            ,'', '', '', '' ,''
         ]
         df_input.loc[len(df_input)] = [ 
             'hidden', 'source',
@@ -39,7 +39,7 @@ class XLSFormCHTHFStrategy(XLSFormCHTStrategy):
             *list(empty.values()),
             '', '','',
             *list(empty.values())
-            ,'', '', '', '' 
+            ,'', '', '', '' ,''
         ]
         df_input.loc[len(df_input)] = [ 
             'hidden', 'source_id',
@@ -50,7 +50,7 @@ class XLSFormCHTHFStrategy(XLSFormCHTStrategy):
             *list(empty.values()),
             '', '','',
             *list(empty.values())
-            ,'', '', '', '' 
+            ,'', '', '', '' ,''
         ]
         
 
@@ -63,7 +63,7 @@ class XLSFormCHTHFStrategy(XLSFormCHTStrategy):
             *list(empty.values()),
             '', '','',
             *list(empty.values())
-            ,'', '', '', '' 
+            ,'', '', '', '' ,''
         ]
         df_input.loc[len(df_input)] = [ 
             'string', 'contact_id',
@@ -74,7 +74,7 @@ class XLSFormCHTHFStrategy(XLSFormCHTStrategy):
             *list(empty.values()),
             '', '','',
             *list(empty.values())
-            ,'', '', '', '' 
+            ,'', '', '', '' ,''
         ]
         df_input.loc[len(df_input)] = [ 
             'string', 'facility_id',
@@ -85,7 +85,7 @@ class XLSFormCHTHFStrategy(XLSFormCHTStrategy):
             *list(empty.values()),
             '', '','',
             *list(empty.values())
-            ,'', '', '', '' 
+            ,'', '', '', '' ,''
         ]
         df_input.loc[len(df_input)] = [ 
             'string', 'name',
@@ -96,7 +96,7 @@ class XLSFormCHTHFStrategy(XLSFormCHTStrategy):
             *list(empty.values()),
             '', '','',
             *list(empty.values())
-            ,'', '', '', '' 
+            ,'', '', '', '' ,''
         ]
         df_input.loc[len(df_input)] = [
             'end_group', 'user end' ,
@@ -107,7 +107,7 @@ class XLSFormCHTHFStrategy(XLSFormCHTStrategy):
             *list(empty.values()),
             '', '', '',
             *list(empty.values()),
-            '', '', '', ''
+            '', '', '', '',''
         ]
         df_input.loc[len(df_input)] = [ 
             'begin_group', 'contact',
@@ -118,7 +118,7 @@ class XLSFormCHTHFStrategy(XLSFormCHTStrategy):
             *list(empty.values()),
             '', '','',
             *list(empty.values())
-            ,'', '', '', '' 
+            ,'', '', '', '' ,''
         ]
         inputs = self.export_inputs( start_pages[self.processes[0]],  **kwargs)
         for input in inputs:
@@ -132,7 +132,7 @@ class XLSFormCHTHFStrategy(XLSFormCHTStrategy):
             *list(empty.values()),
             '', '','',
             *list(empty.values())
-            ,'', '', '', '' 
+            ,'', '', '', '' ,''
         ]
         
         df_input.loc[len(df_input)] = [ 
@@ -144,7 +144,7 @@ class XLSFormCHTHFStrategy(XLSFormCHTStrategy):
             *list(empty.values()),
             '', '','',
             *list(empty.values())
-            ,'', '', '', '' 
+            ,'', '', '', '' ,''
         ]
         df_input.loc[len(df_input)] = [ 
             'string', 'data_load',
@@ -155,7 +155,7 @@ class XLSFormCHTHFStrategy(XLSFormCHTStrategy):
             *list(empty.values()),
             '', '','',
             *list(empty.values())
-            ,'', '', '', '' 
+            ,'', '', '', '' ,''
         ]        
         
         df_input.loc[len(df_input)] = [
@@ -167,7 +167,7 @@ class XLSFormCHTHFStrategy(XLSFormCHTStrategy):
             *list(empty.values()),
             '', '', '',
             *list(empty.values()),
-            '', '', '', ''
+            '', '', '', '',''
         ]
         df_input.loc[len(df_input)] = [
             'end_group', 'input end' ,
@@ -178,7 +178,7 @@ class XLSFormCHTHFStrategy(XLSFormCHTStrategy):
             *list(empty.values()),
             '', '', '',
             *list(empty.values()),
-            '', '', '', ''
+            '', '', '', '',''
         ]
         df_input.loc[len(df_input)] = [
             'calculate',
@@ -197,7 +197,8 @@ class XLSFormCHTHFStrategy(XLSFormCHTStrategy):
             '',#'read only'
             '../inputs/user/contact_id',#'expression'
             '',#'repeat_count'
-            ''#'image'  
+            '',#'image'
+            '' # choice filter
         ] 
         df_input.loc[len(df_input)] = [
             'calculate',
@@ -216,7 +217,8 @@ class XLSFormCHTHFStrategy(XLSFormCHTStrategy):
             '',#'read only'
             '../inputs/user/facility_id',#'expression'
             '',#'repeat_count'
-            ''#'image'  
+             '',#'image'
+            '' # choice filter        
         ] 
         df_input.loc[len(df_input)] = [
             'calculate',
@@ -235,7 +237,8 @@ class XLSFormCHTHFStrategy(XLSFormCHTStrategy):
             '',#'read only'
             '../inputs/user/name',#'expression'
             '',#'repeat_count'
-            ''#'image'  
+            '',#'image'
+            '' # choice filter
         ] 
         df_input.loc[len(df_input)] = [
             'calculate',
@@ -254,7 +257,8 @@ class XLSFormCHTHFStrategy(XLSFormCHTStrategy):
             '',#'read only'
             '../inputs/contact/_id',#'expression'
             '',#'repeat_count'
-            ''#'image'  
+            '',#'image'
+            '' # choice filter 
         ] 
 
         df_input.loc[len(df_input)] = [
@@ -274,7 +278,8 @@ class XLSFormCHTHFStrategy(XLSFormCHTStrategy):
             '',#'read only'
             '../inputs/source_id',#'expression'
             '',#'repeat_count'
-            ''#'image'  
+            '',#'image'
+            '' # choice filter 
         ] 
         df_input.loc[len(df_input)] = [
             'calculate',
@@ -293,7 +298,8 @@ class XLSFormCHTHFStrategy(XLSFormCHTStrategy):
             '',#'read only'
             '../inputs/user/facility_id',#'expression'
             '',#'repeat_count'
-            ''#'image'  
+            '',#'image'
+            '' # choice filter
         ] 
         
         for input in inputs:

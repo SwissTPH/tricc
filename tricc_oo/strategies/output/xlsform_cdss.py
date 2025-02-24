@@ -75,7 +75,8 @@ class XLSFormCDSSStrategy(XLSFormStrategy):
             '',#'read only'
             '',#'expression'
             '',#'repeat_count'
-            ''#'image'  
+            '',#'image' 
+            ''
         ]
         self.df_survey.loc[len(self.df_survey)] = [
             'select_one wfa',
@@ -94,7 +95,8 @@ class XLSFormCDSSStrategy(XLSFormStrategy):
             '',#'read only'
             '',#'expression'
             '',#'repeat_count'
-            ''#'image'  
+            '',#'image' 
+            ''
         ]
         self.df_survey.loc[len(self.df_survey)] = [
             'select_one wfh',
@@ -113,7 +115,8 @@ class XLSFormCDSSStrategy(XLSFormStrategy):
             '',#'read only'
             '',#'expression'
             '',#'repeat_count'
-            ''#'image'  
+            '',#'image' 
+            ''
         ]
     
     def add_tab_breaks_choice(self):
@@ -136,7 +139,8 @@ class XLSFormCDSSStrategy(XLSFormStrategy):
             '',#'read only'
             '',#'expression'
             '',#'repeat_count'
-            ''#'image'  
+            '',#'image' 
+            ''
         ]
         new_rows = [
             ['tab-label-4', 0, langs.get_trads('--'),*list(empty.values()),'','','','','',''],
