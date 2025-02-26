@@ -639,5 +639,5 @@ class XLSFormStrategy(BaseOutPutStrategy):
         else:
             raise NotImplementedError(f"This type of node {r.__class__} is not supported within an operation")
 
-def tricc_operation_concatenate(self, ref_expressions):
-    return f"concatenate({','.join(ref_expressions)})"
+    def tricc_operation_concatenate(self, ref_expressions):
+        return f"concatenate({','.join(ref_expressions)})"
