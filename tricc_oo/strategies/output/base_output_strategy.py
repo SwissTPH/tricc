@@ -139,7 +139,8 @@ class BaseOutPutStrategy:
         raise NotImplementedError(f"This type of opreration  is not supported in this strategy")
     def tricc_operation_age_year(self, ref_expressions):
         raise NotImplementedError(f"This type of opreration  is not supported in this strategy")
-
+    def tricc_operation_concatenate(self, ref_expressions):
+        raise NotImplementedError(f"This type of opreration  is not supported in this strategy")
 ## Utils
     def do_clean(self, **kwargs):
         pass

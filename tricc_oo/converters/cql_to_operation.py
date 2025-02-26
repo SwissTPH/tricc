@@ -15,6 +15,7 @@ FUNCTION_MAP = {
     'AgeInMonths': TriccOperator.AGE_MONTH,
     'AgeInDays': TriccOperator.AGE_DAY,
     'Coalesce': TriccOperator.COALESCE,
+    'Concatenate': TriccOperator.CONCATENATE,
     'Izscore': TriccOperator.IZSCORE,
     'Zscore': TriccOperator.ZSCORE,
     'DrugDosage':  TriccOperator.DRUG_DOSAGE,
