@@ -1,6 +1,7 @@
 
 
 import logging
+import hashlib
 #from bs4 import BeautifulSoup
 from tricc_oo.converters.tricc_to_xls_form import (
         negate_term, VERSION_SEPARATOR,INSTANCE_SEPARATOR,  get_export_name)
@@ -186,7 +187,7 @@ SURVEY_MAP = {
     **langs.get_trads_map('required_message'), 'read only':'read only', 
     'calculation':'expression','repeat_count':'repeat_count','media::image':'image', 'choice_filter':''
 }
-CHOICE_MAP = {'list_name':'list_name', 'value':'name', **langs.get_trads_map('label'), 'media::image':'image',  'choice_filter':'relevance', 'y_min':'', 'y_max':'', 'l':'', 's':'', 'm':'' }
+CHOICE_MAP = {'list_name':'list_name', 'value':'name', **langs.get_trads_map('label'), 'media::image':'image',  'choice_filter':'', 'y_min':'', 'y_max':'', 'l':'', 's':'', 'm':'' }
      
      
 TRAD_MAP = ['label','constraint_message', 'required_message', 'hint', 'help']  
@@ -197,13 +198,15 @@ def get_xfrom_trad(strategy, node, column, mapping, clean_html = False ):
     trad =  arr[-1] if new_column != column  else None
     value = get_attr_if_exists(strategy, node, new_column, mapping)
     # the pattern is to look for if that define a string if(test>0, 'strin')
-    pattern = r"[^\}] *, *'[^']"
+    pattern = r"concat\(|[^\}] *, *'[^']"
     if (    
         issubclass(node.__class__, TriccNodeDisplayCalculateBase) 
         and column == 'calculation'  
         and isinstance(value, str) and not value.startswith('number')
         and not re.search(pattern, value)
     ):
+    
+        
         value = f"number({value})" if str(value) not in ['0', '1'] else value
     if clean_html and isinstance(value, str):
         value = remove_html(value)
@@ -224,8 +227,48 @@ def get_xfrom_trad(strategy, node, column, mapping, clean_html = False ):
 
     return value
 
-    
+def gen_operation_hash(op):
+    h = hashlib.blake2b(digest_size=6)
+    h.update(str(op).encode('utf-8'))
+    return h.hexdigest()
 
+
+
+def generate_choice_filter(strategy, node):
+    if isinstance(node, TriccNodeSelectOption) and node.relevance:
+        return gen_operation_hash(node.relevance)
+    if not isinstance(node, (TriccNodeSelectMultiple, TriccNodeSelectOne)):
+        return
+    relevances = {}
+    option_filter = {}
+    for o in node.options.values():
+        if o.relevance:
+            key = gen_operation_hash(o.relevance)
+            if key not in relevances:
+                relevances[key] = o.relevance
+    if relevances:
+        choice_filter = TriccOperation(
+            TriccOperator.OR,
+            ['string-length(choice_filter)=0']
+        )
+        for k, op in relevances.items():
+            choice_filter.append(
+                TriccOperation(
+                    TriccOperator.EQUAL,
+                    [
+                        'choice_filter',
+                        TriccOperation(
+                            TriccOperator.IF,
+                            [
+                                op,
+                                TriccStatic(k),
+                                TriccStatic('')
+                            ]
+                        )
+                    ]
+                )
+            )
+        return strategy.get_tricc_operation_expression(choice_filter)
 
 def get_attr_if_exists(strategy, node, column, map_array):
     if column in map_array:
@@ -262,6 +305,9 @@ def get_attr_if_exists(strategy, node, column, map_array):
                 return str(value) if not isinstance(value, dict) else value
             else:
                 return ''
+        elif column == 'choice_filter':
+            return generate_choice_filter(strategy, node)
+        
         else:
             return ''
     elif hasattr(node, column) and getattr(node, column) is not None:

@@ -566,7 +566,6 @@ class XLSFormStrategy(BaseOutPutStrategy):
                 return True
         return False
     
-    
     # function update the select node in the XLSFORM format
     # @param left part
     # @param right part
@@ -640,4 +639,4 @@ class XLSFormStrategy(BaseOutPutStrategy):
             raise NotImplementedError(f"This type of node {r.__class__} is not supported within an operation")
 
     def tricc_operation_concatenate(self, ref_expressions):
-        return f"concatenate({','.join(ref_expressions)})"
+        return f"concat({','.join(ref_expressions)})"
