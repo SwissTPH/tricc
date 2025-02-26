@@ -247,24 +247,37 @@ def generate_choice_filter(strategy, node):
             if key not in relevances:
                 relevances[key] = o.relevance
     if relevances:
+        basic = 'string-length(choice_filter)=0'
+        # TODO remove when the bug regarding filter + image will be fixed
+        if any(i.image is not None for i in node.options.values()):
+            basic =  TriccOperation(
+                        TriccOperator.AND,
+                        [
+                            'string-length(choice_filter)=0',
+                            node.relevance
+                        ]
+                    )
+        
         choice_filter = TriccOperation(
             TriccOperator.OR,
-            ['string-length(choice_filter)=0']
+            [
+               basic
+            ]
+            
         )
         for k, op in relevances.items():
             choice_filter.append(
                 TriccOperation(
-                    TriccOperator.EQUAL,
+                    TriccOperator.AND,
                     [
-                        'choice_filter',
                         TriccOperation(
-                            TriccOperator.IF,
+                            TriccOperator.EQUAL,
                             [
-                                op,
+                                'choice_filter',
                                 TriccStatic(k),
-                                TriccStatic('')
                             ]
-                        )
+                        ),
+                        op
                     ]
                 )
             )
