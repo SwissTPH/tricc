@@ -78,14 +78,21 @@ def create_activity(diagram, media_path, project):
             activity.edges = edges
         nodes = get_nodes(diagram, activity)
         for n in nodes.values():
+            
             if (
                 issubclass(n.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase)) 
                 and not isinstance(n, (TriccRhombusMixIn, TriccNodeRhombus, TriccNodeDisplayBridge))
+                and not n.name.startswith('label_')
             ):
+                system = n.name.split('.')[0] if '.' in n.name else 'tricc'
                 if isinstance(n, TriccNodeSelectOption) and isinstance(n.select, TriccNodeSelectNotAvailable):
-                    add_concept(project.code_systems, 'tricc', n.select.name, n.label, {"datatype": 'Boolean'})
+                    add_concept(project.code_systems, system, n.select.name, n.label, {"datatype": 'Boolean'})
                 elif not isinstance(n, TriccNodeSelectNotAvailable):
-                    add_concept(project.code_systems, 'tricc', n.name, n.label, {"datatype": get_data_type(n.tricc_type)})
+                    add_concept(project.code_systems, system, n.name, n.label, {"datatype": get_data_type(n.tricc_type)})
+                if getattr(n,'save', None):
+                    system = n.save.split('.')[0] if '.' in n.save else 'tricc'
+                    add_concept(project.code_systems, system, n.save, n.label, {"datatype": get_data_type(n.tricc_type)})
+            
         groups = get_groups(diagram, nodes, activity)
         if groups and len(groups) > 0:
             activity.groups = groups

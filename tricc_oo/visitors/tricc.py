@@ -473,6 +473,8 @@ def generate_calculates(node,calculates, used_calculates,processed_nodes):
             set_prev_next_node(node,calc_node)
         list_calc.append(calc_node)
         #add_save_calculate(calc_node, calculates, used_calculates,processed_nodes)
+        for calc in list_calc:
+            node.activity.nodes[calc.id] = calc
     return list_calc
 
 
@@ -1458,22 +1460,21 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
     
     if isinstance(node, TriccNodeActivity):
         
-
-        if node.base_instance is not None:
+        
+        if node.base_instance is not None and not is_prev:
             activity = node
             expression_inputs = []
-            #exclude base node only if the defaulf instance number is not 0
-            if activity.base_instance.instance >1:
-                add_sub_expression(expression_inputs, get_node_expression(activity.base_instance, processed_nodes=processed_nodes, is_calculate=False, is_prev=True))
-            # relevance of the previous instance must be false to display this activity
-            for past_instance in activity.base_instance.instances.values():
-                if int(past_instance.path_len) < int(activity.path_len) and past_instance in processed_nodes:
-                    add_sub_expression(expression_inputs, get_node_expression(past_instance, processed_nodes=processed_nodes, is_calculate=False))     
-            expression_activity = or_join(expression_inputs)
-            if expression and expression_activity:
-                expression = nand_join(expression, expression_activity)
-            elif expression_activity:
-                expression = negate_term(expression_activity)
+            past_instances = [
+                n for n in processed_nodes if getattr(n.base_instance, 'id', None) == node.base_instance.id
+            ]
+            for past_instance in past_instances:
+                add_sub_expression(expression_inputs, get_node_expression(past_instance, processed_nodes=processed_nodes, is_calculate=False, is_prev=True))
+            if expression and expression_inputs:
+    
+                add_sub_expression(expression_inputs, expression)
+                expression = nand_join(expression, or_join(expression_inputs))
+            elif expression_inputs:
+                expression =  negate_term(or_join(expression_inputs))
         if not is_prev:
             end_node = get_last_end_node(processed_nodes)
             if end_node:
@@ -1968,6 +1969,8 @@ def clean_list_or(list_or, elm_and=None):
         return []
     if 'false()' in list_or:
         list_or.remove('false()')
+    if TriccStatic(False) in list_or:
+        ist_or.remove(TriccStatic(False))
     if (
         '1' in list_or 
         or 1 in list_or 
@@ -2092,7 +2095,7 @@ def or_join(list_or, elm_and=None):
     if len(cleaned_list)>1: 
         return TriccOperation(
             TriccOperator.OR,
-            [cleaned_list]
+            cleaned_list
         )
     
     

@@ -139,6 +139,9 @@ class TriccBaseModel(BaseModel):
         return self.id
     
     def __str__(self):
+        return self.get_name()
+    
+    def __repr__(self):
         return f"{self.tricc_type}:{self.get_name()}({self.id})"
     
     def __init__(self, **data):
@@ -281,6 +284,9 @@ class TriccStatic(BaseModel):
     
     def __str__(self):
         return str(self.value)
+    
+    def __repr__(self):
+        return "TriccStatic:"+type(self.value)+':' +str(self.value)
 
     def get_references(self):
         return OrderedSet()
@@ -339,6 +345,7 @@ class TriccOperator(StrEnum):
     CAST_INTEGER = 'cast_integer'
     CAST_DATE = 'cast_date'
     PARENTHESIS = 'parenthesis'
+    CONCATENATE = 'concatenate'
 
 OPERATION_LIST = {
     '>=': TriccOperator.MORE_OR_EQUAL,
@@ -362,6 +369,9 @@ class TriccOperation(BaseModel):
     def __str__(self):
         str_ref = map(str, self.reference)
         return f"{self.operator}({', '.join(map(str, str_ref))})"
+    
+    def __repr__(self):
+        return "TriccOperation:"+self.__str__()
     
     def __eq__(self, other):
         return self.__str__() == str(other)
