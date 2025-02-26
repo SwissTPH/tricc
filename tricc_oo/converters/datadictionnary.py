@@ -36,7 +36,7 @@ def add_concept(codesystems, system, code, display, attributes):
     
 def init_codesystem(code, name):
     return CodeSystem(
-            id=code,
+            id=code.replace('_','-'),
             url=f"http://example.com/fhir/CodeSystem/{code}",
             version="1.0.0",
             name=name,
