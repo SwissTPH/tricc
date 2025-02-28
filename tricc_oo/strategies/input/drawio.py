@@ -107,22 +107,6 @@ class DrawioStrategy(BaseInputStrategy):
             with open(os.path.join(os.path.dirname(media_path),  f"{k}_codesystem.json"), "w", encoding='utf-8') as file:
                 file.write(v.json(indent=4))
 
-            # Transform to OCL payload
-            ocl_payload = transform_fhir_to_ocl(
-                v,
-                source_name="ALM",
-                source_owner="pdelcroix",
-                source_owner_type="User"
-            )
-
-            # Save the transformed OCL payload to a file
-            with open("ocl_bulk_upload.json", "w") as f:
-                for item in ocl_payload:
-                    json_line = json.dumps(item.dict(exclude_none=True), indent=None)
-                    f.write(json_line + '\n')
-
-                print("OCL bulk upload payload generated successfully!")
-
         for k, v in project.value_sets.items():
             with open(os.path.join(os.path.dirname(media_path), f"{k}_valueset.json"), "w") as file:
                 file.write(v.json(indent=4))
