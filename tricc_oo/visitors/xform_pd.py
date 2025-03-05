@@ -163,58 +163,88 @@ def get_tasksstrings(hidden_names, df_survey):
     return  list(task_strings.values())
 
 
-
 def get_task_js(form_id, calculate_name, title, form_types, hidden_names, df_survey, task_title="'id: '+getField(report, 'g_registration.p_id')+'; age: '+getField(report, 'p_age')+getField(report, 'g_registration.p_gender')+' months; '+getField(report, 'p_weight') + 'kg; ' + getField(report, 'g_fever.p_temp')+'°'"):
-    lines = get_tasksstrings(hidden_names, df_survey)
-    indented_lines = '\n          '.join(lines)
+    task_name = f"{form_id}_{calculate_name}"
+    task_name_upper = task_name.upper()
+
     
     return f"""
+const CASE_DATA = ['{"','".join(hidden_names)}'];
     
-const extras = require('./nools-extras');
+const {{injectDataFromForm}} = require('./stph-extras');
 
-const {{ addDays, getField}} = extras;
+const {task_name_upper}_FORMS = ['{"','".join(form_types)}'];
 
 var task_title = "{task_title}"
 
-module.exports = [
-  {{
-    name: '{form_id}_{calculate_name}',
-    icon: 'icon-followup-general',
-    title: '{title}',
-    appliesTo: 'reports',
-    appliesToType: ['{"','".join(form_types)}'],
-    contactLabel: (contact, report) =>
-      task_title,
-    appliesIf: function (contact, report) {{
-      return getField(report, 'source_id') === '' && getField(report, '{chf_clean_name(calculate_name)}') === '1';
-   }},
-    actions: [
-      {{
-        type: 'report',
-        form: '{form_id}',
-        modifyContent: function (content, contact, report) {{
-          {indented_lines}
-       }},
-     }},
-    ],
-    events: [
-      {{
-        id:  '{form_id}_{calculate_name}',
-        days: 1,
-        start: 1,
-        end: 0,
-     }},
-    ],
-    resolvedIf: function (contact, report, event, dueDate) {{
-      const startTime = Math.max(addDays(dueDate, -event.start).getTime(), report.reported_date);
-      const endTime = addDays(dueDate, event.end + 1).getTime();
-      const forms = ['reverse_alm_label_form_pause'];
-      const matchingReports = contact.reports
-        .filter((c_report) => forms.includes(c_report.form))
-        .filter((c_report) => c_report.reported_date >= startTime && c_report.reported_date <= endTime)
-        .filter((c_report) => getField(c_report, 'source_id') === report._id);
-      return matchingReports.length > 0;
-   }},
- }},
-];
+const {task_name_upper}_TASK_FORM = '{form_id}_{calculate_name}';
+
+const {task_name}Content =  function (content, contact, report){{
+
+  injectDataFromForm(content, '', CASE_DATA, {task_name_upper}_FORMS, [report]);
+  content['patient_id'] = report.contact._id;
+  content['source_id'] = report._id;
+  console.log(content);
+  console.log(report);
+}};
+//TODO: redirect after task
+/*function navigateToTask() {{
+      Router.navigate(['first'])
+}}*/
+
+
+function {task_name}ContactLabel (){{
+  task_title;
+}}
+
+
+function {task_name}ResolveIf(contact, report, event, dueDate) {{
+  return isFormArrayHasSourceId( report, contact.reports, event, dueDate, {task_name_upper}_FORMS);
+}}
+
+
+module.exports = {{
+  {task_name_upper}_TASK_FORM,
+  {task_name_upper}_FORMS,
+  {task_name}Content,
+  {task_name}ContactLabel,
+  {task_name}ResolveIf,
+}}
+// 
+//// to be copied in task
+//
+//const {{
+//  {task_name_upper}_TASK_FORM,
+//  {task_name_upper}_FORMS,
+//  {task_name}Content,
+//  {task_name}ContactLabel,
+//  {task_name}ResolveIf, }} = require('./{task_name}');
+//
+//module.exports = [
+//
+//    {{
+//        name: '{task_name}',
+//        icon: 'icon-healthcare-diagnosis',
+//        title: 'diagnostic',
+//        appliesTo: 'reports',
+//        appliesToType: {task_name_upper}_FORMS,
+//        actions: [
+//            {{
+//                type: 'report',
+//                form: {task_name_upper}_TASK_FORM,
+//                modifyContent: {task_name}Content
+//            }}
+//        ],
+//        events: [
+//            {{
+//                id: '{task_name}',
+//                days: 0,
+//                start: 1,
+//                end: 0
+//            }}
+//        ],
+//        resolvedIf: {task_name}ResolveIf
+//    }}
+//];
 """
+

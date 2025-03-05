@@ -263,7 +263,6 @@ def generate_choice_filter(strategy, node):
             [
                basic
             ]
-            
         )
         for k, op in relevances.items():
             choice_filter.append(
@@ -426,15 +425,12 @@ def generate_xls_form_export(strategy, node, processed_nodes, stashed_nodes, df_
             return True
     return False
 
-
-
-    
 def get_input_line(node):
     label = langs.get_trads(node.label, force_dict =True)
     empty = langs.get_trads('', force_dict =True)
     return [
         'hidden',
-        'load_' + get_export_name(node),
+        clean_name(node.name),
         *list(empty.values()) ,
         *list(empty.values()) ,#hint
         *list(empty.values()) ,#help
@@ -471,7 +467,7 @@ def get_input_calc_line(node):
         '',#'required'
         *list(empty.values()) ,#'required message'
         '',#'read only'
-        '../inputs/contact/load_'+get_export_name(node),#'expression'
+        '../inputs/contact/'+clean_name(node.name),#'expression'
         '',#'repeat_count'
         '',#'image' 
         ''#choice filter
