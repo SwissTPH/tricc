@@ -13,11 +13,12 @@ def replace_all(text, list_char, replacement):
         text = text.replace(i, replacement)
     return text
 
-def clean_str(name):
-    return replace_all(name, ['-', ' ', ','],'_')
+def clean_str(name, replace_dots=False):
+    replacement_list = ['-', ' ', ',', '.'] if replace_dots else ['-', ' ', ',']
+    return replace_all(name, replacement_list,'_')
 
-def clean_name( name, prefix='' ):
-    name = clean_str(name)
+def clean_name( name, prefix='', replace_dots=False):
+    name = clean_str(name, replace_dots)
     if name[0].isdigit():
         name = 'id_' + name
     elif  name[0].isdigit() == '_':

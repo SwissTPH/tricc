@@ -37,12 +37,10 @@ class cqlToXlsFormVisitor(cqlVisitor):
         # look for the system, if not found fallback on default system
         # look for the code in the system
         # if no code or not found return None
-        # if code found, return f"${{{clean_name(arg)}}}"
         if arg.startswith('"') and arg.endswith('"'):
             return TriccReference(arg[1:-1])
         else:
             return TriccReference(arg)
-        #return f"${{{clean_name(arg[1:-1].lower())}}}"
         
     def translate(self, arg, type=ANY):
         return self.resolve_scv(arg) or str(arg)

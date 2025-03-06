@@ -30,21 +30,21 @@ logger = logging.getLogger("default")
 
 def get_export_name(node):
     if isinstance(node, str):
-        return clean_name(node)
+        return clean_name(node, replace_dots=True)
     if node.export_name is None:
         node.gen_name()
         if isinstance(node, TriccNodeSelectOption):
                 node.export_name = node.name
         elif isinstance(node,  TriccNodeActivityStart):
-            node.export_name =  clean_name(node.name +  INSTANCE_SEPARATOR + str(node.instance))
+            node.export_name =  clean_name(node.name +  INSTANCE_SEPARATOR + str(node.instance), replace_dots=True)
         elif isinstance(node, TriccNodeInput):
-            node.export_name = clean_name('load.' +node.name)
+            node.export_name = clean_name('load.' +node.name, replace_dots=True)
         elif node.last == False:
-            node.export_name = clean_name(node.name + VERSION_SEPARATOR + str(node.version))
+            node.export_name = clean_name(node.name + VERSION_SEPARATOR + str(node.version), replace_dots=True)
         else:
-            node.export_name = clean_name(node.name)
+            node.export_name = clean_name(node.name, replace_dots=True)
             
-    return node.export_name 
+    return node.export_name
 
 
 

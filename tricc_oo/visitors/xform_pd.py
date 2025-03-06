@@ -91,6 +91,13 @@ def make_breakpoints(df, pausepoint, calculate_name=None, replace_dots=False):
     df_input.sort_index(inplace=True)
     df_input.reset_index(drop=True, inplace=True)
     
+    if remove_dots:
+        # Precompute replacement dictionary
+        replacement_dict = {f'${old_name}': f'${remove_dots(old_name)}' for old_name in hidden_names if '.' in old_name}
+
+        # Apply replacements to entire DataFrame
+        df_input = df_input.astype(str).replace(replacement_dict, regex=False)
+    
 
  
     

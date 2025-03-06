@@ -716,7 +716,7 @@ def set_mandatory_attribute(elm, mandatory_attributes, diagram=None):
         elif attributes == 'list_name':
             name = elm.attrib.get("name")
             id = elm.attrib.get("id")
-            attribute_value = TRICC_LIST_NAME.format(_get_name(name, id, diagram_id))
+            attribute_value = TRICC_LIST_NAME.format(clean_str(_get_name(name, id, diagram_id), replace_dots= True))
         else:   
             attribute_value = elm.attrib.get(attributes)
         if attribute_value is None:
