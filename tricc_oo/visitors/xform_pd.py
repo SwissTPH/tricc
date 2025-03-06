@@ -11,24 +11,22 @@ allowing to simulate a pause functionality.
 import pandas as pd
 import json
 
+def remove_dots(s):
+     return s.replace('.','_')
 
 def chf_clean_name(s, remove_dots=False):
     # Check if there is a dot in the string
-    if "." in s:
-        # Split the string into parts based on the dot
-        s_p = s.split(".")
-        # Return the formatted string
-        if remove_dots:
-          return "_".join(s_p)
-        else:
-          return f'["{".".join(s_p)}"]'
+    if remove_dots:
+        return remove_dots(s)
+    elif "." in s:
+        return f'["{s}"]'
     else:
         # If no dot is present, return None or handle it as needed
         return s
 
 # df is the dataframe to be split
 # pausepoint is the index of the row after which the form should pause
-def make_breakpoints(df, pausepoint, calculate_name=None):
+def make_breakpoints(df, pausepoint, calculate_name=None, replace_dots=False):
     """
     Creates a dataframe for a follow-up questionnaire while preserving previous inputs.
     
@@ -62,6 +60,10 @@ def make_breakpoints(df, pausepoint, calculate_name=None):
     
     # Convert specified types to hidden while preserving their data
     mask_indices = df_input.index[df_input['type'].str.contains('|'.join(typesconvert))]
+    # Get hidden field names
+    hidden_names = list(df_input.loc[df_input['type']=='hidden', 'name'])
+    if replace_dots:
+        df_input['name'] = df_input['name'].map(remove_dots)
     df_input.loc[mask_indices, 'type'] = 'hidden'
     df_input.loc[mask_indices, 'calculation'] = 'hidden'    
 
@@ -90,8 +92,7 @@ def make_breakpoints(df, pausepoint, calculate_name=None):
     df_input.reset_index(drop=True, inplace=True)
     
 
-    # Get hidden field names
-    hidden_names = list(df_input.loc[df_input['type']=='hidden', 'name'])
+ 
     
     
 # put all together
@@ -163,7 +164,7 @@ def get_tasksstrings(hidden_names, df_survey):
     return  list(task_strings.values())
 
 
-def get_task_js(form_id, calculate_name, title, form_types, hidden_names, df_survey, task_title="'id: '+getField(report, 'g_registration.p_id')+'; age: '+getField(report, 'p_age')+getField(report, 'g_registration.p_gender')+' months; '+getField(report, 'p_weight') + 'kg; ' + getField(report, 'g_fever.p_temp')+'°'"):
+def get_task_js(form_id, calculate_name, title, form_types, hidden_names, df_survey, repalce_dots=False, task_title="'id: '+getField(report, 'g_registration.p_id')+'; age: '+getField(report, 'p_age')+getField(report, 'g_registration.p_gender')+' months; '+getField(report, 'p_weight') + 'kg; ' + getField(report, 'g_fever.p_temp')+'°'"):
     task_name = f"{form_id}_{calculate_name}"
     task_name_upper = task_name.upper()
 
@@ -181,7 +182,7 @@ const {task_name_upper}_TASK_FORM = '{form_id}_{calculate_name}';
 
 const {task_name}Content =  function (content, contact, report){{
 
-  injectDataFromForm(content, '', CASE_DATA, {task_name_upper}_FORMS, [report]);
+  injectDataFromForm(content, '', CASE_DATA, {task_name_upper}_FORMS, [report], {'true' if repalce_dots else  'false'});
   content['patient_id'] = report.contact._id;
   content['source_id'] = report._id;
   console.log(content);

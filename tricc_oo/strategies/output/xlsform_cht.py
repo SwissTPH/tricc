@@ -141,7 +141,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
                 settings={'form_title':title,'form_id':f"{new_form_id}",'version':version,'default_language':'English (en)','style':'pages'}
                 df_settings=pd.DataFrame(settings,index=indx)
                 df_settings.head()
-                task_df, hidden_names = make_breakpoints(self.df_survey, i, e.name)
+                task_df, hidden_names = make_breakpoints(self.df_survey, i, e.name, replace_dots=True)
                 # deactivate the end node
                 task_df.loc[task_df['name'] == get_export_name(e), 'calculation'] = 0
                 #print fileds
@@ -153,7 +153,18 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
                 newfilename = f"{new_form_id}.js"
                 newpath = os.path.join(self.output_path, newfilename)
                 with open(newpath, 'w') as f:
-                    f.write(get_task_js(new_form_id, e.name,f"continue {title}", forms, hidden_names, self.df_survey, e.hint))
+                    f.write(
+                        get_task_js(
+                            new_form_id,
+                            e.name,
+                            f"continue {title}",
+                            forms,
+                            hidden_names,
+                            self.df_survey,
+                            repalce_dots=True,
+                            task_title=e.hint
+                        )
+                    )
                     f.close()
                 forms.append(new_form_id)
                 
