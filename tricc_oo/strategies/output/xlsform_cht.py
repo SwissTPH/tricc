@@ -161,7 +161,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
                             forms,
                             hidden_names,
                             self.df_survey,
-                            repalce_dots=True,
+                            repalce_dots=False,
                             task_title=e.hint
                         )
                     )

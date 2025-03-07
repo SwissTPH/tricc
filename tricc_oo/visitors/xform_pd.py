@@ -61,9 +61,7 @@ def make_breakpoints(df, pausepoint, calculate_name=None, replace_dots=False):
     # Convert specified types to hidden while preserving their data
     mask_indices = df_input.index[df_input['type'].str.contains('|'.join(typesconvert))]
     # Get hidden field names
-    hidden_names = list(df_input.loc[df_input['type']=='hidden', 'name'])
-    if replace_dots:
-        df_input['name'] = df_input['name'].map(remove_dots)
+
     df_input.loc[mask_indices, 'type'] = 'hidden'
     df_input.loc[mask_indices, 'calculation'] = 'hidden'    
 
@@ -78,7 +76,10 @@ def make_breakpoints(df, pausepoint, calculate_name=None, replace_dots=False):
     
     # Preserve calculations for existing hidden fields
     df_input.update(existing_hidden[['calculation']])
-    
+    # SAVE THE INPUT NAMES
+    hidden_names = list(df_input.loc[df_input['type']=='hidden', 'name'])
+    if replace_dots:
+        df_input['name'] = df_input['name'].map(remove_dots)
     # Handle indexing and grouping
     df_input.index = df_input.index.map(str)
     hidden_ids = df_input.loc[df_input['type']=='hidden'].index
@@ -177,6 +178,11 @@ def get_task_js(form_id, calculate_name, title, form_types, hidden_names, df_sur
 
     
     return f"""
+/* eslint-disable no-use-before-define */
+/* eslint-disable */
+
+const {{injectDataFromForm, isFormArrayHasSourceId}} = require('./stph-extras'); -> isFormArrayHasSourceId was missing from the imports
+
 const CASE_DATA = ['{"','".join(hidden_names)}'];
     
 const {{injectDataFromForm}} = require('./stph-extras');
@@ -207,7 +213,7 @@ function {task_name}ContactLabel (){{
 
 
 function {task_name}ResolveIf(contact, report, event, dueDate) {{
-  return isFormArrayHasSourceId( report, contact.reports, event, dueDate, {task_name_upper}_FORMS);
+  return isFormArrayHasSourceId( report, contact.reports, event, dueDate, {task_name_upper}_TASK_FORMS);
 }}
 
 
