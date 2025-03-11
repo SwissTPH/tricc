@@ -7,6 +7,8 @@ type_name = "odk_type"
 
 
 def read_drawio(file_content):
+    if file_content.startswith('<mxfile host'):
+        file_content = "<?xml version='1.0' encoding='utf-8'?>\n" + file_content
     file_content = bytes(bytearray(file_content, encoding="utf-8"))
     root = etree.fromstring(file_content)
     # import xml.etree.cElementTree as ET

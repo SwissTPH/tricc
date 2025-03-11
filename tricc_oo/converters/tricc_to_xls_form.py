@@ -30,30 +30,21 @@ logger = logging.getLogger("default")
 
 def get_export_name(node):
     if isinstance(node, str):
-        return clean_name(node)
+        return clean_name(node, replace_dots=True)
     if node.export_name is None:
-        node.export_name = clean_name(node.name)
-        if node.name is None:
-            node.export_name= clean_name("id_" + node.id)
-        elif not ( INSTANCE_SEPARATOR  in node.name or  VERSION_SEPARATOR in node.name):
-            if issubclass(node.__class__, TriccNodeCalculateBase):
-                node.gen_name()
-                if node.last == False:
-                    node.export_name = clean_name(node.name + VERSION_SEPARATOR + str(node.path_len))
-                else:
-                    node.export_name = clean_name(node.name)
-            elif issubclass(node.__class__, (TriccNodeDisplayModel)):
-                node.gen_name()
-                if isinstance(node, TriccNodeSelectOption):
-                    node.export_name = node.name
-                elif not isinstance(node, TriccNodeSelectOption) and node.activity.instance!=1:
-                    node.export_name = clean_name(node.name +  INSTANCE_SEPARATOR + str(node.instance))
-            #elif isinstance(node, TriccNodeActivityEnd):
-            #    node.export_name =  clean_name(node.name +  INSTANCE_SEPARATOR + str(node.instance))
-            elif isinstance(node,  TriccNodeActivityStart):
-                node.export_name =  clean_name(node.name +  INSTANCE_SEPARATOR + str(node.instance))
-                
-    return node.export_name 
+        node.gen_name()
+        if isinstance(node, TriccNodeSelectOption):
+                node.export_name = node.name
+        elif isinstance(node,  TriccNodeActivityStart):
+            node.export_name =  clean_name(node.name +  INSTANCE_SEPARATOR + str(node.instance), replace_dots=True)
+        elif isinstance(node, TriccNodeInput):
+            node.export_name = clean_name('load.' +node.name, replace_dots=True)
+        elif node.last == False:
+            node.export_name = clean_name(node.name + VERSION_SEPARATOR + str(node.version), replace_dots=True)
+        else:
+            node.export_name = clean_name(node.name, replace_dots=True)
+            
+    return node.export_name
 
 
 

@@ -9,7 +9,7 @@ from pydantic import BaseModel, constr
 from strenum import StrEnum
 from .base import *
 from .tricc import *
-from tricc_oo.converters.utils import generate_id
+from tricc_oo.converters.utils import generate_id, get_rand_name
 
 
     
@@ -20,6 +20,7 @@ class TriccNodeDisplayCalculateBase(TriccNodeCalculateBase):
     save: Optional[str] = None  # contribute to another calculate
     hint: Optional[str] = None  # for diagnostic display
     help: Optional[str] = None  # for diagnostic display
+    applicability: Optional[Union[Expression, TriccOperation]] = None
     # no need to copy save
     def to_fake(self):
         data = vars(self)
@@ -52,7 +53,7 @@ class TriccNodeProposedDiagnosis(TriccNodeDisplayCalculateBase):
     severity: str = None
     
 class TriccNodeFakeCalculateBase(TriccNodeCalculateBase):
-    id: triccId = generate_id()
+    ...
 
 class TriccNodeInput(TriccNodeFakeCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.input
@@ -87,19 +88,19 @@ class TriccRhombusMixIn():
                             if sub_node.base_instance == ref:
                                 reference.append(sub_node)
                     else:  # ref from outside
-                        # FIXME find the latest version
                         reference.append(ref)
+                        logger.warning("new instance of a rhombus use the reference of the base one")
                 elif isinstance(ref, TriccReference):
                     reference.append(ref)
                 elif isinstance(ref, str):
                     logger.debug("passing raw reference {} on node {}".format(ref, self.get_name()))
                     reference.append(ref)
                 else:
-                    logger.error("unexpected reference {} in node {}".format(ref, self.get_name()))
+                    logger.critical("unexpected reference {} in node {}".format(ref, self.get_name()))
                     exit(1)
         instance.reference = reference
         instance.expression_reference = expression_reference
-        instance.name = get_rand_name(8)
+        instance.name = get_rand_name()
         return instance
 
 
@@ -117,13 +118,12 @@ class TriccNodeRhombus(TriccNodeCalculateBase,TriccRhombusMixIn):
 
 
     def __init__(self, **data):
-        data['name'] = get_rand_name(8)
+        data['name'] = get_rand_name(data.get('id', None))
         super().__init__(**data)
 
 
 
-def get_rand_name(k):
-    return "r_" + ''.join(random.choices(string.ascii_lowercase, k=k))
+
 
 class TriccNodeDiagnosis(TriccNodeDisplayCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.diagnosis
@@ -133,7 +133,7 @@ class TriccNodeDiagnosis(TriccNodeDisplayCalculateBase):
         super().__init__(**data)
 
         # rename rhombus
-        self.name = get_rand_name(8)
+        self.name = get_rand_name(f"d{data.get('id', None)}")
 
 class TriccNodeExclusive(TriccNodeFakeCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.exclusive
@@ -141,14 +141,14 @@ class TriccNodeExclusive(TriccNodeFakeCalculateBase):
 def get_node_from_id(activity, node, edge_only):
     node_id = getattr(node,'id',node)
     if not isinstance(node_id, str):
-        logger.error("can set prev_next only with string or node")
+        logger.critical("can set prev_next only with string or node")
         exit(1)
     if issubclass(node.__class__, TriccBaseModel):
         return node_id, node
     elif node_id in activity.nodes:
         node = activity.nodes[node_id]
     elif not edge_only:
-        logger.error(f"cannot find {node_id} in  {activiy.get_name()}")
+        logger.critical(f"cannot find {node_id} in  {activiy.get_name()}")
         exit(1)
     return node_id, node
 
@@ -175,7 +175,7 @@ class TriccNodeActivityEnd(TriccNodeFakeCalculateBase):
         self.name = ACTIVITY_END_NODE_FORMAT.format(self.activity.id)
 
 
-class TriccNodeEnd(TriccNodeNote):
+class TriccNodeEnd(TriccNodeDisplayCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.end
     process: str = None
     def __init__(self, **data):

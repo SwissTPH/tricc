@@ -16,7 +16,6 @@ class TriccNodeCalculateBase(TriccNodeBaseModel):
     #input: Dict[TriccOperation, TriccNodeBaseModel] = {}
     reference: Union[List[Union[TriccNodeBaseModel,TriccStatic]], Expression, TriccStatic] = None
     expression_reference: Union[str, TriccOperation] = None
-    version: int = 1
     last: bool = True
 
     # to use the enum value of the TriccNodeType
@@ -30,19 +29,23 @@ class TriccNodeCalculateBase(TriccNodeBaseModel):
         #instance.input = input
         expression = self.expression.copy() if self.expression is not None else None
         if self.reference:
-            instance.reference = self.reference.copy()
+            instance.reference = [e.copy() if isinstance(e, (TriccReference, TriccOperation)) else (TriccReference(e.name) if hasattr(e, 'name') else e) for e in self.reference]
+        else:
+            instance.reference = None
         if self.expression_reference:
             instance.expression_reference = self.expression_reference.copy()
-        version = 1
+        version = self.version + 1
         instance.version = version
         return instance
 
     def __init__(self, **data):
+        if 'name' not in data:
+            data['name'] = get_rand_name(data.get('id', None))
         super().__init__(**data)
-        self.gen_name()
+        
         
     def append(self, elm):
-        reference.append(elm)
+        self.reference.append(elm)
     
     def get_references(self):
         if isinstance(self.reference, set):
@@ -50,14 +53,13 @@ class TriccNodeCalculateBase(TriccNodeBaseModel):
         elif isinstance(self.reference, list):
             return set(self.reference)
         elif isinstance(self.expression_reference, TriccOperation):
-            self.reference =  self.expression_reference.get_references()
-            return self.reference
+            return self.expression_reference.get_references()
         elif isinstance(self.reference, TriccOperation):
             return self.reference.get_references()
         
         elif self.reference:
             return self.reference
-            logger.error("Cannot get reference from a sting")
+            logger.critical("Cannot get reference from a sting")
     def __str__(self):
         return self.get_name()
 
@@ -82,6 +84,7 @@ class TriccNodeActivity(TriccNodeBaseModel):
     # - dangling calculate
     # - case definition
     calculates: List[TriccNodeCalculateBase] = []
+    applicability: Optional[Union[Expression, TriccOperation]] = None
 
     # redefine 
     def make_instance(self, instance_nb, **kwargs):
@@ -122,7 +125,13 @@ class TriccNodeActivity(TriccNodeBaseModel):
                 instance_node = instance.update_nodes(node)
                 if node in self.calculates and instance_node:
                     instance.calculates.append(instance_node)
-
+            # update parents        
+            for node in list(filter(lambda p_node: hasattr(p_node, 'parent'),list(instance.nodes.values()))):
+                new_parent = list(filter(lambda p_node: p_node.base_instance == node.parent,list(instance.nodes.values())))
+                if new_parent:
+                    node.parent = new_parent[0]
+                else:
+                    logger.error("Parent not found in the activity")
             for group in self.groups.values():
                 instance.update_groups(group)
                 # update parent group
@@ -177,7 +186,7 @@ class TriccNodeActivity(TriccNodeBaseModel):
                             node_instance.path = n
                     # test next_nodes to check that the instance has already prev/next 
                     if node_instance.path is None and node_instance.next_nodes:
-                        logger.error("new path not found")
+                        logger.critical("new path not found")
                 elif len(node_instance.prev_nodes) == 1:
                     node.path = list(node_instance.prev_nodes)[0]
                 elif not (len(node_instance.reference)== 1  and issubclass(node_instance.reference[0].__class__, TriccNodeInputModel)):
@@ -230,7 +239,8 @@ class TriccNodeDisplayModel(TriccNodeBaseModel):
 
     def make_instance(self, instance_nb, activity=None):
         instance = super().make_instance(instance_nb, activity=activity)
-        instance.relevance = None
+        instance.relevance = self.relevance.copy() if self.relevance else None
+       
         return instance
 
     # to use the enum value of the TriccNodeType

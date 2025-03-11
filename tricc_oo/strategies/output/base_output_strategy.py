@@ -27,7 +27,7 @@ class BaseOutPutStrategy:
         if 'main' in self.project.start_pages:
             self.process_base(self.project.start_pages, pages=self.project.pages, version=version)
         else:
-            logger.error("Main process required")
+            logger.critical("Main process required")
 
 
         logger.info("generate the relevance based on edges")
@@ -139,7 +139,8 @@ class BaseOutPutStrategy:
         raise NotImplementedError(f"This type of opreration  is not supported in this strategy")
     def tricc_operation_age_year(self, ref_expressions):
         raise NotImplementedError(f"This type of opreration  is not supported in this strategy")
-
+    def tricc_operation_concatenate(self, ref_expressions):
+        raise NotImplementedError(f"This type of opreration  is not supported in this strategy")
 ## Utils
     def do_clean(self, **kwargs):
         pass

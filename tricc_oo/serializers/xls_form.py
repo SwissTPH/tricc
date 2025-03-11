@@ -1,6 +1,7 @@
 
 
 import logging
+import hashlib
 #from bs4 import BeautifulSoup
 from tricc_oo.converters.tricc_to_xls_form import (
         negate_term, VERSION_SEPARATOR,INSTANCE_SEPARATOR,  get_export_name)
@@ -184,9 +185,9 @@ SURVEY_MAP = {
     **langs.get_trads_map('constraint_message'), 'relevance':'relevance',
     'disabled':'disabled','required':'required',
     **langs.get_trads_map('required_message'), 'read only':'read only', 
-    'calculation':'expression','repeat_count':'repeat_count','media::image':'image'
+    'calculation':'expression','repeat_count':'repeat_count','media::image':'image', 'choice_filter':''
 }
-CHOICE_MAP = {'list_name':'list_name', 'value':'name', **langs.get_trads_map('label'), 'filter':'', 'y_min':'', 'y_max':'', 'l':'', 's':'', 'm':'' }
+CHOICE_MAP = {'list_name':'list_name', 'value':'name', **langs.get_trads_map('label'), 'media::image':'image',  'choice_filter':'', 'y_min':'', 'y_max':'', 'l':'', 's':'', 'm':'' }
      
      
 TRAD_MAP = ['label','constraint_message', 'required_message', 'hint', 'help']  
@@ -196,34 +197,90 @@ def get_xfrom_trad(strategy, node, column, mapping, clean_html = False ):
     new_column = arr[0] if arr[0] != 'media' else "::".join(arr[0:2])
     trad =  arr[-1] if new_column != column  else None
     value = get_attr_if_exists(strategy, node, new_column, mapping)
-    if (
+    # the pattern is to look for if that define a string if(test>0, 'strin')
+    pattern = r"concat\(|[^\}] *, *'[^']"
+    if (    
         issubclass(node.__class__, TriccNodeDisplayCalculateBase) 
-        and column == 'calculation' and isinstance(value, str) and not value.startswith('number')
+        and column == 'calculation'  
+        and isinstance(value, str) and not value.startswith('number')
+        and not re.search(pattern, value)
     ):
+    
+        
         value = f"number({value})" if str(value) not in ['0', '1'] else value
     if clean_html and isinstance(value, str):
         value = remove_html(value)
-    if column == 'appearance':
-        if isinstance(node, TriccNodeSelect) and len(node.options)>9:
+    if column in TRAD_MAP:
+        value = langs.get_trads(value, trad=trad)
+    elif column == 'appearance':
+        if isinstance(node, TriccNodeSelect) and len(node.options)>9 and not any( o.image or o.hint for o in node.options.values()):
             value = 'autocomplete'
         elif isinstance(node, TriccNodeNote) and 'countdown-timer' in node.name:
             value = 'countdown-timer'
-    if column in TRAD_MAP:
-        value = langs.get_trads(value, trad=trad)
-    elif column == 'calculation' and isinstance(node, TriccNodeAcceptDiagnostic) and node.severity and not value:
-         
+    elif column == 'appearance' and isinstance(node, TriccNodeAcceptDiagnostic) and node.severity and not value:
             if node.severity == 'severe':
                 value = 'severe'   
             elif node.severity == 'moderate':
                 value = 'moderate'
             elif node.severity == 'light':
-                value == 'light'
-                
+                value == 'light'               
 
     return value
 
-    
+def gen_operation_hash(op):
+    h = hashlib.blake2b(digest_size=6)
+    h.update(str(op).encode('utf-8'))
+    return h.hexdigest()
 
+
+
+def generate_choice_filter(strategy, node):
+    if isinstance(node, TriccNodeSelectOption) and node.relevance:
+        return gen_operation_hash(node.relevance)
+    if not isinstance(node, (TriccNodeSelectMultiple, TriccNodeSelectOne)):
+        return
+    relevances = {}
+    option_filter = {}
+    for o in node.options.values():
+        if o.relevance:
+            key = gen_operation_hash(o.relevance)
+            if key not in relevances:
+                relevances[key] = o.relevance
+    if relevances:
+        basic = 'string-length(choice_filter)=0'
+        # TODO remove when the bug regarding filter + image will be fixed
+        if any(i.image is not None for i in node.options.values()):
+            basic =  TriccOperation(
+                        TriccOperator.AND,
+                        [
+                            'string-length(choice_filter)=0',
+                            node.relevance
+                        ]
+                    )
+        
+        choice_filter = TriccOperation(
+            TriccOperator.OR,
+            [
+               basic
+            ]
+        )
+        for k, op in relevances.items():
+            choice_filter.append(
+                TriccOperation(
+                    TriccOperator.AND,
+                    [
+                        TriccOperation(
+                            TriccOperator.EQUAL,
+                            [
+                                'choice_filter',
+                                TriccStatic(k),
+                            ]
+                        ),
+                        op
+                    ]
+                )
+            )
+        return strategy.get_tricc_operation_expression(choice_filter)
 
 def get_attr_if_exists(strategy, node, column, map_array):
     if column in map_array:
@@ -236,6 +293,18 @@ def get_attr_if_exists(strategy, node, column, map_array):
                 return tricc_type
         elif hasattr(node, map_array[column]):
             value =  getattr(node, map_array[column])
+            if (
+                column == 'calculation'
+                and len(node.prev_nodes) == 0
+                and value and isinstance(
+                    getattr(node, 'applicability', None), 
+                    (TriccOperation, TriccStatic, TriccReference)
+                )
+            ):
+                value = TriccOperation(
+                    TriccOperator.AND,
+                    [node.applicability, value]
+                )
             if column == 'name':
                 if issubclass(value.__class__, (TriccNodeBaseModel)):
                     return get_export_name(value)
@@ -248,6 +317,9 @@ def get_attr_if_exists(strategy, node, column, map_array):
                 return str(value) if not isinstance(value, dict) else value
             else:
                 return ''
+        elif column == 'choice_filter':
+            return generate_choice_filter(strategy, node)
+        
         else:
             return ''
     elif hasattr(node, column) and getattr(node, column) is not None:
@@ -296,7 +368,7 @@ def get_more_info_choice(strategy):
             arr = column.split('::')
             column = arr[0]
             trad =  arr[1] if len(arr)==2 else None
-            values.append( langs.get_trads('More informnation', trad=trad))    
+            values.append( langs.get_trads('More information', trad=trad))    
         else:
             values.append(get_xfrom_trad(strategy, None, column, CHOICE_MAP, True ))
     return values
@@ -308,11 +380,13 @@ def generate_xls_form_export(strategy, node, processed_nodes, stashed_nodes, df_
             add_calculate(calculates,node)  
             if node.group != cur_group and not isinstance(node,TriccNodeSelectOption) : 
                 return False
-            logger.debug("printing node {}".format(node.get_name()))
+            if kwargs.get('warn', True):
+                logger.debug("printing node {}".format(node.get_name()))
             # clean stashed node when processed
             if node in stashed_nodes:
                 stashed_nodes.remove(node)
-                logger.debug("generate_xls_form_export: unstashing processed node{} ".format(node.get_name()))
+                if kwargs.get('warn', True):
+                    logger.debug("generate_xls_form_export: unstashing processed node{} ".format(node.get_name()))
             if issubclass(node.__class__, ( TriccNodeDisplayCalculateBase,TriccNodeDisplayModel)):
                 if isinstance(node, TriccNodeSelectOption):
                     values = []
@@ -332,12 +406,12 @@ def generate_xls_form_export(strategy, node, processed_nodes, stashed_nodes, df_
                         for column in SURVEY_MAP:
                             value = get_xfrom_trad(strategy, node, column, SURVEY_MAP )
                             if column == 'default' and issubclass(node.__class__, TriccNodeDisplayCalculateBase) and value == '':
-                                    value = 0
+                                value = 0
                             values.append(value)
                         if len(df_calculate[df_calculate.name == get_export_name(node)])==0:
                             df_calculate.loc[len(df_calculate)] = values
                         else:
-                            logger.error("name {} found twice".format(node.name))
+                            logger.critical("name {} found twice".format(node.name))
                     elif  ODK_TRICC_TYPE_MAP[node.tricc_type] !='':
                         values = []
                         for column in SURVEY_MAP:
@@ -351,35 +425,35 @@ def generate_xls_form_export(strategy, node, processed_nodes, stashed_nodes, df_
             return True
     return False
 
-
-def get_diagnostic_line(node):
-    label = langs.get_trads(node.label, force_dict =True)
-    empty = langs.get_trads('', force_dict =True)
-    return [
-        'select_one yes_no',
-        clean_name("final.")+get_export_name(node),
-        *list(label.values()) ,
-        *list(empty.values()) ,#hint
-        *list(empty.values()) ,#help
-        '',#default
-        '',#'appearance', clean_name
-        '',#'constraint', 
-        *list(empty.values()) ,#'constraint_message'
-        TRICC_CALC_EXPRESSION.format(get_export_name(node)),#'relevance'
-        '',#'disabled'
-        '1',#'required'
-        *list(empty.values()) ,#'required message'
-        '',#'read only'
-        '',#'expression'
-        '',#'repeat_count'
-        ''#'image'  
-    ]
-    
 def get_input_line(node):
     label = langs.get_trads(node.label, force_dict =True)
     empty = langs.get_trads('', force_dict =True)
     return [
         'hidden',
+        clean_name(node.name),
+        *list(empty.values()) ,
+        *list(empty.values()) ,#hint
+        *list(empty.values()) ,#help
+        '',#default
+        'hidden',#'appearance', clean_name
+        '',#'constraint', 
+        *list(empty.values()) ,#'constraint_message'
+        '',#'relevance'
+        '',#'disabled'
+        '',#'required'
+        *list(empty.values()) ,#'required message'
+        '',#'read only'
+        '',#'expression'
+        '',#'repeat_count'
+        '',#'image' 
+        ''
+    ]   
+
+def get_input_calc_line(node):
+    label = langs.get_trads(node.label, force_dict =True)
+    empty = langs.get_trads('', force_dict =True)
+    return [
+        'calculate',
         get_export_name(node),
         *list(empty.values()) ,
         *list(empty.values()) ,#hint
@@ -393,11 +467,11 @@ def get_input_line(node):
         '',#'required'
         *list(empty.values()) ,#'required message'
         '',#'read only'
-        '../input/contact/'+get_export_name(node),#'expression'
+        '../inputs/contact/'+clean_name(node.name),#'expression'
         '',#'repeat_count'
-        ''#'image'  
-    ]   
-    
+        '',#'image' 
+        ''#choice filter
+    ]       
     
 
 def get_diagnostic_start_group_line():
@@ -420,7 +494,8 @@ def get_diagnostic_start_group_line():
         '',#'read only'
         '',#'expression'
         '',#'repeat_count'
-        ''#'image'  
+        '',#'image' 
+        ''
     ]
     
 def get_diagnostic_add_line(diags, df_choice):
@@ -457,7 +532,8 @@ def get_diagnostic_add_line(diags, df_choice):
         '',#'read only'
         '',#'expression'
         '',#'repeat_count'
-        ''#'image'  
+        '',#'image' 
+        ''
     ]  
     
 def get_diagnostic_none_line(diags):
@@ -484,6 +560,7 @@ def get_diagnostic_none_line(diags):
         '',#'expression'
         '',#'repeat_count'
         ''#'image'  TRICC_NEGATE
+        ,''
     ]
     
 def  get_diagnostic_stop_group_line():
@@ -505,5 +582,6 @@ def  get_diagnostic_stop_group_line():
         '',#'read only'
         '',#'expression'
         '',#'repeat_count'
-        ''#'image'  
+        '',#'image' 
+        ''
     ]

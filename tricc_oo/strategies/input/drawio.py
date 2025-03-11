@@ -11,6 +11,8 @@ from tricc_oo.visitors.tricc import (
     stashed_node_func,
     TriccProject
 )
+from tricc_oo.converters.codesystem_to_ocl import transform_fhir_to_ocl
+
 from tricc_oo.models import *
 from tricc_oo.strategies.input.base_input_strategy import BaseInputStrategy
 from tricc_oo.parsers.xml import read_drawio
@@ -54,7 +56,7 @@ class DrawioStrategy(BaseInputStrategy):
             process_calculate,
             used_calculates=used_calculates,
             calculates=calculates,
-            recusive=False,
+            recursive=False,
             codesystems=project.code_systems
         )
 
@@ -79,21 +81,32 @@ class DrawioStrategy(BaseInputStrategy):
         # elif os.path.isfile(in_filepath):
         #     files = [in_filepath]
         # else:
-        #     logger.error(f"no input file found at {in_filepath}")
+        #     logger.critical(f"no input file found at {in_filepath}")
         #     exit(1)
         # for file in files:
-        for f in file_content:
-            diagrams += read_drawio(f)
         images_diagram = []
-        for diagram in diagrams:
-            logger.info("Create the activity {0}".format(
-                diagram.attrib.get("name")))
-            create_activity(
-                diagram, media_path, project)
+        for f in file_content:
+            file_diagrams = read_drawio(f)
+            diagrams += file_diagrams
+            for diagram in file_diagrams:
+                old_page_len = len(project.pages)
+                id_tab = diagram.attrib.get("id")
+                name_tab = diagram.attrib.get("name")
+                if id_tab in project.pages:
+                    logger.critical(f"{id_tab} already found in pages")
+                    exit(1)
+                logger.info("Create the activity {0}::{1}".format(
+                    id_tab, name_tab))
+                
+                create_activity(
+                    diagram, media_path, project)
+                if len(project.pages) == old_page_len:
+                    logger.error(f"diagram {id_tab}::{name_tab} was not loaded properly")
         logger.info("# Create the graph from the start node")
         for k, v in project.code_systems.items():
             with open(os.path.join(os.path.dirname(media_path),  f"{k}_codesystem.json"), "w", encoding='utf-8') as file:
                 file.write(v.json(indent=4))
+
         for k, v in project.value_sets.items():
             with open(os.path.join(os.path.dirname(media_path), f"{k}_valueset.json"), "w") as file:
                 file.write(v.json(indent=4))
@@ -131,36 +144,6 @@ class DrawioStrategy(BaseInputStrategy):
         # build current path
         current_path = path + [node.id]
         # don't stop the walkthroug by default
-        logger.debug("linking node {0}".format(node.get_name()))
-        # FIXME remove note
-        if len(node_edge) == 0 and not issubclass(
-            node.__class__,
-            (
-                TriccNodeCalculateBase,
-                TriccNodeSelectOption,
-                TriccNodeActivity,
-                TriccNodeNote,
-            ),
-        ):
-            if issubclass(node.__class__, TriccNodeSelect):
-                option_edge = list(
-                    filter(
-                        lambda x: (lambda y: x.source == y.id,
-                                   node.options), page.edges
-                    )
-                )
-                if len(option_edge) == 0:
-                    logger.warning(
-                        "node {0} without edges out found in page {1}, full path {2}".format(
-                            node.get_name(), page.label, current_path
-                        )
-                    )
-            else:
-                logger.warning(
-                    "node {0} without edges out found in page {1}, full path {2}".format(
-                        node.get_name(), page.label, current_path
-                    )
-                )
         for edge in node_edge:
             # get target node
             if edge.target in page.nodes:
@@ -188,8 +171,6 @@ class DrawioStrategy(BaseInputStrategy):
                         next_page = self.walkthrough_goto_node(
                             target_node, page, pages, processed_nodes, current_path
                         )
-                        # update reference
-                        # FIXME support reference str
                         for n in page.nodes:
                             sn = page.nodes[n]
                             if (
@@ -208,19 +189,6 @@ class DrawioStrategy(BaseInputStrategy):
                         )
                         if link_out is not None:
                             target_node = link_out
-                    elif isinstance(target_node, TriccNodeSelectNotAvailable):
-                        if isinstance(node, (TriccNodeBridge, TriccNodeMoreInfo)):
-                            if len(target_node.prev_nodes) == 1:
-                                target_node.parent = next(target_node.prev_nodes)
-                            elif len(target_node.prev_nodes) == 0:
-                                in_nodes = [e.source for e in page.edges if e.target == node.id and e.source in page.nodes]
-                                if len(in_nodes) == 1:
-                                    target_node.parent = page.nodes[in_nodes[0]]
-                        else:    
-                            target_node.parent = node
-                        if not  target_node.parent :    
-                            logger.error(f"unable to find the parent of the NotApplicable node {node.get_name()}")
-                            exit(1)
                     elif isinstance(node, TriccNodeMoreInfo):
                        
                         if target_node.name == node.parent.name:
@@ -230,21 +198,14 @@ class DrawioStrategy(BaseInputStrategy):
                             self.linking_nodes(
                                 option, page, pages, processed_nodes, current_path
                             )
-                    if not isinstance(target_node, TriccNodeActivity) and target_node not in processed_nodes:
-                        processed_nodes.add(target_node)
-                        logger.debug("{}::{}: processed ({})".format(
-                            'linking_nodes', target_node.get_name(), len(processed_nodes)))
-                        if isinstance(target_node.activity.root, TriccNodeActivityEnd) and isinstance(target_node.activity.root, TriccNodeMainStart):
-                            end_nodes = target_node.activity.get_end_nodes()
-                            if all([e in processed_nodes for e in end_nodes]):
-                                processed_nodes.add(target_node.activity)
-                                logger.debug("{}::{}: processed ({})".format(
-                                    'linking_nodes', target_node.activity.get_name(), len(processed_nodes)))
+                    processed_nodes.add(target_node)
+                    logger.debug("{}::{}: processed ({})".format(
+                        'linking_nodes', target_node.get_name(), len(processed_nodes)))
                     self.linking_nodes(
                         target_node, page, pages, processed_nodes, current_path
                     )
                 elif edge.target in current_path:
-                    logger.warning(
+                    logger.error(
                         "possible loop detected for node {0} in page {1}; path:".format(
                             node.get_name(), page.label
                         )
@@ -258,7 +219,7 @@ class DrawioStrategy(BaseInputStrategy):
                 else:
                     set_prev_next_node(node, target_node)
             else:
-                logger.warning(
+                logger.error(
                     "target not found {0} for node {1}".format(
                         edge.target, node.get_name()
                     )
@@ -297,11 +258,12 @@ class DrawioStrategy(BaseInputStrategy):
             # continue on the initial page
             return next_page
         else:
-            logger.warning(
-                "node {0} from page {1} doesnot have a valid link".format(
-                    node.label, page.label
+            logger.critical(
+                "node {0} from page {1} doesnot have a valid link: {2}".format(
+                    node.label, page.label, node.link
                 )
             )
+            exit(1)
 
     def walkthrough_link_out_node(
         self, node, page, pages, processed_nodes, current_path

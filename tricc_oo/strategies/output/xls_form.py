@@ -100,7 +100,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
         if start_pages["main"].root.form_id is not None:
             form_id = str(start_pages["main"].root.form_id)
         else:
-            logger.error("form id required in the first start node")
+            logger.critical("form id required in the first start node")
             exit(1)
         title = start_pages["main"].root.label
         file_name = form_id + ".xlsx"
@@ -141,7 +141,9 @@ class XLSFormStrategy(BaseOutPutStrategy):
     def process_export(self, start_pages, **kwargs):
         self.activity_export(start_pages["main"], **kwargs)
 
-    def activity_export(self, activity, processed_nodes=set(), **kwargs):
+    def activity_export(self, activity, processed_nodes=None, **kwargs):
+        if processed_nodes is None:
+            processed_nodes = set()
         stashed_nodes = OrderedSet()
         # The stashed node are all the node that have all their prevnode processed but not from the same group
         # This logic works only because the prev node are ordered by group/parent ..
@@ -159,6 +161,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
             stashed_nodes,
             path_len,
             cur_group=activity.root.group,
+            recursive=False,
             **self.get_kwargs()
         )
         end_group(self, cur_group=activity, groups=groups, **self.get_kwargs())
@@ -185,17 +188,8 @@ class XLSFormStrategy(BaseOutPutStrategy):
                 s_node = stashed_nodes.pop()
                 # while len(stashed_nodes)>0 and isinstance(s_node,TriccGroup):
                 #    s_node = stashed_nodes.pop()
-                if len(s_node.prev_nodes) > 0:
-                    path_len = (
-                        sorted(
-                            s_node.prev_nodes,
-                            key=lambda p_node: p_node.path_len,
-                            reverse=True,
-                        )[0].path_len
-                        + 1
-                    )
                 if s_node.group is None:
-                    logger.error(
+                    logger.critical(
                         "ERROR group is none for node {}".format(s_node.get_name())
                     )
                 start_group(
@@ -215,6 +209,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
                     path_len,
                     groups=groups,
                     cur_group=s_node.group,
+                    recursive=False,
                     **self.get_kwargs()
                 )
                 # add end group if new node where added OR if the previous end group was removed
@@ -231,10 +226,11 @@ class XLSFormStrategy(BaseOutPutStrategy):
                                 s_node.group.instance,
                             )
                         )
-                        df_survey_final.drop(
-                            index=df_survey_final.index[-1], axis=0, inplace=True
-                        )
-                        self.df_survey = self.df_survey[(1 + skip_header) :]
+                        if len(df_survey_final):
+                            df_survey_final.drop(
+                                index=df_survey_final.index[-1], axis=0, inplace=True
+                            )
+                            self.df_survey = self.df_survey[(1 + skip_header) :]
                         df_survey_final = pd.concat(
                             [df_survey_final, self.df_survey], ignore_index=True
                         )
@@ -301,7 +297,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
                             regex=True,
                         )
                 else:
-                    logger.error(
+                    logger.critical(
                         "duplicate reference not found for calculation: {}".format(
                             drop_calc["calculation"]
                         )
@@ -323,7 +319,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
             self.df_survey.duplicated(subset=["name"], keep="first")
         ]
         for index, duplicate in df_duplicate.iterrows(): 
-            logger.error(f"duplicate survey name: {duplicate['name']}")
+            logger.critical(f"duplicate survey name: {duplicate['name']}")
         self.df_survey.reset_index(drop=True, inplace=True)
         return processed_nodes
 
@@ -369,18 +365,18 @@ class XLSFormStrategy(BaseOutPutStrategy):
         return f"{ref_expressions[0]} mod {ref_expressions[1]}"
     def tricc_operation_minus(self, ref_expressions):
         if len(ref_expressions)>1:
-            return '-'.join(ref_expressions)
+            return ' - '.join(ref_expressions)
         elif len(ref_expressions)==1:
             return f'-{ref_expressions[0]}'
     def tricc_operation_plus(self, ref_expressions):
-        return '+'.join(ref_expressions)
+        return ' + '.join(ref_expressions)
     def tricc_operation_not(self, ref_expressions):
         return f"not({ref_expressions[0]})"
     def tricc_operation_and(self, ref_expressions):
         if len(ref_expressions) == 1:
             return ref_expressions[0]
         if len(ref_expressions)>1: 
-            ref_expressions = [f"({r})" if isinstance(r, str) and any(op in r for op in [' and ','+','-'])else r for r in ref_expressions]
+            ref_expressions = [f"({r})" if isinstance(r, str) and any(op in r for op in [' or ',' + ',' - '])else r for r in ref_expressions]
             return ' and '.join(map(str, ref_expressions))
         else:
             return '1'
@@ -389,7 +385,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
         if len(ref_expressions) == 1:
             return ref_expressions[0]
         if len(ref_expressions)>1: 
-            ref_expressions = [f"({r})" if isinstance(r, str) and any(op in r for op in [' or ','+','-'])else r for r in ref_expressions]
+            ref_expressions = [f"({r})" if isinstance(r, str) and any(op in r for op in [' and ',' + ',' - ']) else r for r in ref_expressions]
             return ' or '.join(map(str, ref_expressions))
         else:
             return '1'
@@ -409,7 +405,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
     def tricc_operation_istrue(self, ref_expressions):
         return f"{ref_expressions[0]}>0"
     def tricc_operation_isfalse(self, ref_expressions):
-        return f"{ref_expressions[0]}=0"
+        return f"{ref_expressions[0]}<=0"
     def tricc_operation_parenthesis(self, ref_expressions):
         return f"({ref_expressions[0]})"
     def tricc_operation_selected(self, ref_expressions):
@@ -436,6 +432,8 @@ class XLSFormStrategy(BaseOutPutStrategy):
         return f"{ref_expressions[0]}!={ref_expressions[1]}"
     def tricc_operation_isnull(self, ref_expressions):
         return f"{ref_expressions[0]}=''"
+    def tricc_operation_isnotnull(self, ref_expressions):
+        return f"{ref_expressions[0]}!=''"
     def tricc_operation_case(self, ref_expressions):
         ifs = 0
         parts = []
@@ -560,13 +558,13 @@ class XLSFormStrategy(BaseOutPutStrategy):
     def generate_xls_form_calculate(self, node, processed_nodes, stashed_nodes, **kwargs):
         if is_ready_to_process(node, processed_nodes):
             if node not in processed_nodes:
-                logger.debug("generation of calculate for node {}".format(node.get_name()))
+                if kwargs.get('warn', True):          
+                    logger.debug("generation of calculate for node {}".format(node.get_name()))
                 if hasattr(node, 'expression') and (node.expression is None) and issubclass(node.__class__,TriccNodeCalculateBase):
                     node.expression = get_node_expressions(node, processed_nodes)
                     # continue walk
                 return True
         return False
-    
     
     # function update the select node in the XLSFORM format
     # @param left part
@@ -639,4 +637,6 @@ class XLSFormStrategy(BaseOutPutStrategy):
             return f"${{{get_export_name(r)}}}" 
         else:
             raise NotImplementedError(f"This type of node {r.__class__} is not supported within an operation")
-        
+
+    def tricc_operation_concatenate(self, ref_expressions):
+        return f"concat({','.join(ref_expressions)})"

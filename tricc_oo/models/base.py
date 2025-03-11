@@ -9,8 +9,8 @@ from typing import Dict, ForwardRef, List, Optional, Union, Set, Annotated
 from pydantic import BaseModel, StringConstraints
 from strenum import StrEnum
 
-from tricc_oo.converters.utils import generate_id
-
+from tricc_oo.converters.utils import generate_id, get_rand_name
+from tricc_oo.models.ordered_set import OrderedSet
 
 logger = logging.getLogger("default")
 
@@ -103,10 +103,12 @@ media_nodes = [
 
 class TriccBaseModel(BaseModel):
     id: triccId
+    external_id: triccId = None
     tricc_type: TriccNodeType
-    #parent: Optional[triccId]#TODO: used ?
     instance: int = 1
     base_instance: Optional[TriccBaseModel] = None
+    last: bool = True
+    version: int = 1
 
     def make_instance(self, nb_instance, **kwargs):
         instance = self.copy()
@@ -137,19 +139,29 @@ class TriccBaseModel(BaseModel):
         return self.id
     
     def __str__(self):
+        return self.get_name()
+    
+    def __repr__(self):
         return f"{self.tricc_type}:{self.get_name()}({self.id})"
+    
+    def __init__(self, **data):
+        if 'id' not in data:
+            data['id'] = generate_id()
+        super().__init__(**data)
 
 
 class TriccEdge(TriccBaseModel):
     tricc_type: TriccNodeType = TriccNodeType.edge
     source: Union[triccId, TriccNodeBaseModel]
+    source_external_id: triccId = None
     target: Union[triccId, TriccNodeBaseModel]
+    target_external_id: triccId = None
     value: Optional[str]  = None
 
     def make_instance(self, instance_nb, activity=None):
         instance = super().make_instance(instance_nb, activity=activity)
         #if issubclass(self.source.__class__, TriccBaseModel):
-        instance.source = self.source if isinstance(self.source, str) else self.source.copy() #TODO should we copy  the nodes ?  
+        instance.source = self.source if isinstance(self.source, str) else self.source.copy()
         #if issubclass(self.target.__class__, TriccBaseModel):
         instance.target = self.target if isinstance(self.target, str) else self.target.copy()
         return instance
@@ -163,7 +175,7 @@ class TriccGroup(TriccBaseModel):
     label: Optional[Union[str, Dict[str,str]]] = None
     relevance: Optional[Union[Expression, TriccOperation]] = None
     path_len: int = 0
-    prev_nodes: List[TriccBaseModel] = []
+    prev_nodes: OrderedSet[TriccBaseModel] = OrderedSet()
     def __init__(self, **data):
         super().__init__(**data)
         if self.name is None:
@@ -194,8 +206,8 @@ class TriccNodeBaseModel(TriccBaseModel):
     name: Optional[str] = None
     export_name: Optional[str] = None
     label: Optional[Union[str, Dict[str,str]]] = None
-    next_nodes: Set[TriccNodeBaseModel] = set()
-    prev_nodes: Set[TriccNodeBaseModel] = set()
+    next_nodes: OrderedSet[TriccNodeBaseModel] = OrderedSet()
+    prev_nodes: OrderedSet[TriccNodeBaseModel] = OrderedSet()
     expression: Optional[Union[Expression, TriccOperation]] = None  # will be generated based on the input
     expression_inputs: List[Expression] = []
     activity: Optional[FwTriccNodeBaseModel] = None
@@ -203,6 +215,9 @@ class TriccNodeBaseModel(TriccBaseModel):
 
     class Config:
         use_enum_values = True  # <--
+    
+    def __hash__(self):
+        return hash(self.id )
 
     # to be updated while processing because final expression will be possible to build$
     # #only the last time the script will go through the node (all prev node expression would be created    
@@ -229,9 +244,9 @@ class TriccNodeBaseModel(TriccBaseModel):
         instance.group = activity
         if hasattr(self, 'activity') and activity is not None:
             instance.activity = activity
-        next_nodes = set()
+        next_nodes = OrderedSet()
         instance.next_nodes = next_nodes
-        prev_nodes = set()
+        prev_nodes = OrderedSet()
         instance.prev_nodes = prev_nodes
         expression_inputs = []
         instance.expression_inputs = expression_inputs
@@ -244,9 +259,9 @@ class TriccNodeBaseModel(TriccBaseModel):
 
     def gen_name(self):
         if self.name is None:
-            self.name = ''.join(random.choices(string.ascii_lowercase, k=8))
+            self.name = get_rand_name(self.id)
     def get_references(self):
-        return set([self])
+        return OrderedSet([self])
 
 class TriccStatic(BaseModel):
     value: Union[str, float, int, bool]
@@ -269,17 +284,23 @@ class TriccStatic(BaseModel):
     
     def __str__(self):
         return str(self.value)
+    
+    def __repr__(self):
+        return "TriccStatic:"+type(self.value)+':' +str(self.value)
 
     def get_references(self):
-        return set()
+        return OrderedSet()
 
 class TriccReference(TriccStatic):
     value: str
     def __copy__(self):
         return type(self)(self.value)
 
+    def copy(self):
+        return self.__copy__()
+
     def get_references(self):
-        return set([self])
+        return OrderedSet([self])
 
 
 class TriccOperator(StrEnum):    
@@ -315,6 +336,7 @@ class TriccOperator(StrEnum):
     MULTIPLIED = 'multiplied'
     COALESCE = 'coalesce'
     ISNULL = 'isnull'
+    ISNOTNULL= 'isnotnull'
     PLUS = 'plus'
     MINUS = 'minus'
     MODULO = 'modulo'
@@ -323,6 +345,7 @@ class TriccOperator(StrEnum):
     CAST_INTEGER = 'cast_integer'
     CAST_DATE = 'cast_date'
     PARENTHESIS = 'parenthesis'
+    CONCATENATE = 'concatenate'
 
 OPERATION_LIST = {
     '>=': TriccOperator.MORE_OR_EQUAL,
@@ -336,7 +359,7 @@ OPERATION_LIST = {
 class TriccOperation(BaseModel):
     tricc_type: TriccNodeType = TriccNodeType.operation
     operator: TriccOperator = TriccOperator.NATIVE
-    reference: List[
+    reference: OrderedSet[
         Union[
             TriccStatic, TriccNodeBaseModel, TriccOperation, TriccReference, Expression,
             List[Union[TriccStatic, TriccNodeBaseModel, TriccOperation, TriccReference, Expression]]
@@ -347,6 +370,9 @@ class TriccOperation(BaseModel):
         str_ref = map(str, self.reference)
         return f"{self.operator}({', '.join(map(str, str_ref))})"
     
+    def __repr__(self):
+        return "TriccOperation:"+self.__str__()
+    
     def __eq__(self, other):
         return self.__str__() == str(other)
     
@@ -354,7 +380,7 @@ class TriccOperation(BaseModel):
         super().__init__(operator=operator, reference=reference)
         
     def get_references(self):
-        predecessor = set()
+        predecessor = OrderedSet()
         if isinstance(self.reference, list):
             for reference in self.reference:
                 self._process_reference(reference, predecessor)
@@ -395,15 +421,24 @@ class TriccOperation(BaseModel):
                 self.replace_node(reference.select ,new_node.select)
         return reference
     
-    def __copy__(self):
+    def __copy__(self, keep_node=False):
         # Create a new instance
+        if keep_node:
+            reference = [e for e in self.reference]
+        else:
+            reference = [e.copy() if isinstance(e, (TriccReference, TriccOperation)) else (TriccReference(e.name) if hasattr(e, 'name') else e) for e in self.reference]
+        
         
         new_instance = type(self)(
             self.operator, 
-            [e.copy() if isinstance(e, (TriccReference, TriccOperation)) else e for e in self.reference] 
+            reference
         )
         # Copy attributes (shallow copy for mutable attributes)
+        
         return new_instance
+    
+    def copy(self, keep_node=False):
+        return self.__copy__(keep_node)
 
 
 TriccGroup.update_forward_refs()

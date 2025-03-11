@@ -15,6 +15,7 @@ FUNCTION_MAP = {
     'AgeInMonths': TriccOperator.AGE_MONTH,
     'AgeInDays': TriccOperator.AGE_DAY,
     'Coalesce': TriccOperator.COALESCE,
+    'Concatenate': TriccOperator.CONCATENATE,
     'Izscore': TriccOperator.IZSCORE,
     'Zscore': TriccOperator.ZSCORE,
     'DrugDosage':  TriccOperator.DRUG_DOSAGE,
@@ -24,6 +25,7 @@ FUNCTION_MAP = {
 # Min
 # Max
 # Round
+# this need to be done by contribution to DMN
 
 class cqlToXlsFormVisitor(cqlVisitor):
     def __init__(self):
@@ -35,12 +37,10 @@ class cqlToXlsFormVisitor(cqlVisitor):
         # look for the system, if not found fallback on default system
         # look for the code in the system
         # if no code or not found return None
-        # if code found, return f"${{{clean_name(arg)}}}"
         if arg.startswith('"') and arg.endswith('"'):
             return TriccReference(arg[1:-1])
         else:
             return TriccReference(arg)
-        #return f"${{{clean_name(arg[1:-1].lower())}}}"
         
     def translate(self, arg, type=ANY):
         return self.resolve_scv(arg) or str(arg)
@@ -318,7 +318,7 @@ class cqlToXlsFormVisitor(cqlVisitor):
         for child in ctx.getChildren():
             c = self.visit(child)
             if c:
-                op.reference.append(c)
+                op.append(c)
         return op
 
     def visitCaseExpressionItem(self, ctx):
