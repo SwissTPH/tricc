@@ -124,7 +124,17 @@ def create_activity(diagram, media_path, project):
                         )
         if images:
             project.images += images
-        
+        for node in list(filter(lambda p_node: isinstance(p_node, TriccNodeSelectNotAvailable),list(activity.nodes.values()))):
+            prev_node = None
+            prev_edges = list(filter(lambda p_e: p_e.target == node.id,list(activity.edges))) 
+            if len(prev_edges):
+                prev_node = [n for n in activity.nodes.values() if n.id in [p_e.source for p_e in prev_edges]]
+                if prev_node:
+                    node.parent = prev_node[0]
+            if not  node.parent :    
+                logger.critical(f"unable to find the parent of the NotApplicable node {node.get_name()}")
+                exit(1)
+
 
   
     else:
@@ -536,7 +546,7 @@ def inject_bridge_path(node, nodes):
     return calc
 
 
-def enrich_node(diagram, media_path, edge, node, activity):
+def enrich_node(diagram, media_path, edge, node, activity, help_before=False):
     if edge.target == node.id:
         # get node and process type
         type, message = get_message(diagram, edge.source_external_id)
@@ -550,7 +560,11 @@ def enrich_node(diagram, media_path, edge, node, activity):
                     required=None,
                 )
                 #node.help = message
-                inject_node_before(help, node, activity)
+                if help_before:
+                    inject_node_before(help, node, activity)
+                else:
+                    set_prev_next_node(node, help, edge_only=True, activity=activity)
+                    activity.nodes[help.id] = help
                 return help, None
 
             if type in (TriccNodeType.start, TriccNodeType.activity_start):

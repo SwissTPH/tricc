@@ -139,7 +139,7 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
                         node.parent.required = None  # "${{{0}}}=''".format(node.name)
                     else:
                         logger.warning("not available node {} does't have a single parent".format(node.get_name()))               
-                if isinstance(node.relevance, TriccOperation):
+                elif isinstance(node.relevance, TriccOperation):
                     relevance_reference = list(node.relevance.get_references())
                     for r in relevance_reference:
                         if issubclass(r.__class__, (TriccNodeDisplayCalculateBase )):
@@ -1167,7 +1167,8 @@ def set_prev_next_node(source_node, target_node, replaced_node=None, edge_only =
         set_next_node(source_node, target_node, replaced_node, edge_only)
          
     if activity and not any([(e.source == source_id) and ( e.target == target_id) for e in activity.edges]):
-        activity.edges.append(TriccEdge(id = generate_id(), source = source_id, target = target_id))
+        label = "continue" if issubclass(source_node.__class__, TriccNodeSelect) else None
+        activity.edges.append(TriccEdge(id = generate_id(), source = source_id, target = target_id, value = label))
 
 def remove_prev_next(prev_node, next_node, activity=None):
     activity = activity or prev_node.activity

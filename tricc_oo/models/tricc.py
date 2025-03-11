@@ -125,7 +125,13 @@ class TriccNodeActivity(TriccNodeBaseModel):
                 instance_node = instance.update_nodes(node)
                 if node in self.calculates and instance_node:
                     instance.calculates.append(instance_node)
-
+            # update parents        
+            for node in list(filter(lambda p_node: hasattr(p_node, 'parent'),list(instance.nodes.values()))):
+                new_parent = list(filter(lambda p_node: p_node.base_instance == node.parent,list(instance.nodes.values())))
+                if new_parent:
+                    node.parent = new_parent[0]
+                else:
+                    logger.error("Parent not found in the activity")
             for group in self.groups.values():
                 instance.update_groups(group)
                 # update parent group
