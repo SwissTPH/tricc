@@ -20,7 +20,7 @@ class XLSFormCDSSStrategy(XLSFormStrategy):
     def process_export(self, start_pages,  **kwargs):
         diags = []
         self.activity_export(start_pages[self.processes[0]], **kwargs)
-        self.add_tab_breaks_choice()
+        #self.add_tab_breaks_choice()
         self.add_wfx_choice()
     
     
