@@ -26,12 +26,16 @@ def get_max_version(dict):
             max_version = sim_node
     return max_version
 
+def get_versions(name, iterable):
+    return [n for n in iterable if ((name == 'tricc_end' and isinstance(n, TriccNodeEnd)) or  n.name == name) and not isinstance(n, TriccNodeSelectOption)]
+
+
 def get_last_version(name, processed_nodes,  _list=None):
     max_version = None
     if isinstance(_list, dict):
         _list = _list[name].values() if name in _list else []
     if _list is None:
-        _list = [n for n in processed_nodes if ((name == 'tricc_end' and isinstance(n, TriccNodeEnd)) or  n.name == name) and not isinstance(n, TriccNodeSelectOption)]
+        _list = get_versions(name, processed_nodes)
     if _list:
         for  sim_node in _list:
             # get the max version while not taking a node that have a next node before next calc
@@ -105,17 +109,46 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
             last_version = get_last_version(node.name, processed_nodes) if issubclass(node.__class__, (TriccNodeDisplayModel)) and not isinstance(node, TriccNodeSelectOption)  else  None
             if last_version:
                 # 0-100 for manually specified instance.  100-200 for auto instance 
-                node.version == last_version.version + 1
-                node.last = True
+                node.version = last_version.version + 1
                 last_version.last = False
-                if issubclass(node.__class__, TriccNodeInputModel):
-                    node.expression = TriccOperation(
-                        TriccOperator.COALESCE,
-                        [
-                            '$this',
-                            last_version
-                        ]
-                    )
+                node.path_len = max(node.path_len, last_version.path_len + 1)
+                # FIXME this is for XLS form where only calculate are evaluated for a activity that is not triggered
+                if issubclass(node.__class__, (TriccNodeCalculateBase, TriccNodeNote)):
+                    node.last = True
+                else:
+                    node.last = False
+                    # versions = get_versions(node.name, processed_nodes)
+                    # if the last version is already a coalesce no need to take all lat version
+                    # if len(versions)>1:
+                    #     if issubclass(last_version.__class__, TriccNodeCalculateBase):
+                    #         versions = [last_version]
+                    #     else:
+                    #         logger.warning(f"several version of {node.get_name()} without a coalesce wrap")
+                    calc = TriccNodeCalculate(
+                        id=generate_id(),
+                        name=node.name,
+                        path_len=node.path_len+1,
+                        version=last_version.version + 2,
+                        expression=TriccOperation(
+                            TriccOperator.COALESCE,
+                            [node, last_version, TriccStatic('')]
+                        ),
+                        last=True,
+                        activity=node.activity,
+                        group=node.group
+                        )
+                    node.activity.nodes[calc.id]=calc
+                    node.activity.calculates.append(calc)
+                    if issubclass(node.__class__, TriccNodeInputModel):
+                        node.expression = TriccOperation(
+                            TriccOperator.COALESCE,
+                            [
+                                '$this',
+                                last_version
+                            ]
+                        )
+                
+                
         # if has prev, create condition
             if hasattr(node, 'relevance') and (node.relevance is None or isinstance(node.relevance, TriccOperation)):
                 node.relevance = get_node_expressions(node, processed_nodes=processed_nodes)

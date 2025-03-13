@@ -203,10 +203,9 @@ def get_xfrom_trad(strategy, node, column, mapping, clean_html = False ):
         issubclass(node.__class__, TriccNodeDisplayCalculateBase) 
         and column == 'calculation'  
         and isinstance(value, str) and not value.startswith('number')
+        and not (value.startswith('coalesce(') and ')' not in value[:-1])
         and not re.search(pattern, value)
     ):
-    
-        
         value = f"number({value})" if str(value) not in ['0', '1'] else value
     if clean_html and isinstance(value, str):
         value = remove_html(value)

@@ -107,7 +107,7 @@ class TriccBaseModel(BaseModel):
     tricc_type: TriccNodeType
     instance: int = 1
     base_instance: Optional[TriccBaseModel] = None
-    last: bool = True
+    last: bool = None
     version: int = 1
 
     def make_instance(self, nb_instance, **kwargs):
