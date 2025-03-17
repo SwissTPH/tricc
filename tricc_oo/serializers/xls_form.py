@@ -429,7 +429,7 @@ def get_input_line(node):
     empty = langs.get_trads('', force_dict =True)
     return [
         'hidden',
-        clean_name(node.name),
+        clean_name(node.name, replace_dots=True),
         *list(empty.values()) ,
         *list(empty.values()) ,#hint
         *list(empty.values()) ,#help
