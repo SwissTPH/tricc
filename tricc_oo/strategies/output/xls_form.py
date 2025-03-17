@@ -395,7 +395,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
     def tricc_operation_native(self, ref_expressions):
         if len(ref_expressions)>0:
             if ref_expressions[0] =='GetChoiceName':
-                return f"jr:choice-name({ref_expressions[1]}, '{ref_expressions[2]}'))"
+                return f"jr:choice-name({ref_expressions[1]}, '{ref_expressions[2]}')"
             elif ref_expressions[0] =='GetFacilityParam':
                 return '0'
                 #return f"jr:choice-name({','.join(ref_expressions[1:])})"
