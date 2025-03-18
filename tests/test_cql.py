@@ -158,24 +158,40 @@ class TestCql(unittest.TestCase):
 
 
     def test_minus(self):
-        minus_cql ="""
-        "CHE.B23.DE68" is false and 
-"CHE.B23.DE69" is false and 
-"CHE.B23.DE70" is false and 
-"age_in_months" < 60 and
-case 
-when  "age_in_months" >= 6  then ( "WFL" >= -3 and "WFL" < -2)
-when ("CHE.B6.DE19" >= 115 and "CHE.B6.DE19" < 125) then true
-when "age_in_months" >= 24  then ("WFH" >= -3 and "WFH" < -2)
-else  ("WFL" >= -3 and "WFL" < -2) 
-end
-        """
+        minus_cql =""" "WFL" >= -3"""
         # minus_cql = """
         # ("age_in_months" < 6 and "WFL" >= -3 and "WFL" < -2) is true
         # """
         minus_operation = transform_cql_to_operation(minus_cql)
-        minus_expected = None
+        minus_expected = TriccOperation(
+            TriccOperator.MORE_OR_EQUAL,
+            [
+                TriccReference("WFL"),
+                TriccOperation(
+                    TriccOperator.MINUS,
+                    [TriccStatic(3)]
+                )
+            ]
+        )
         self.assertEqual(str(minus_operation), str(minus_expected))
-        
+
+    def test_not_in(self):
+        not_in_cql = "'code' not in \"identifier\""
+        dg_operation = transform_cql_to_operation(not_in_cql)
+        dg_expected = TriccOperation(
+            operator=TriccOperator.NOT,
+            reference=[
+                TriccOperation(
+                    operator=TriccOperator.SELECTED,
+                    reference=[
+                        TriccReference("identifier"),
+                        TriccStatic(value='code'),
+                    ]
+                )
+            ]
+        )
+        self.assertEqual(str(dg_operation), str(dg_expected))
+    
+
 if __name__ == '__main__':
     unittest.main()

@@ -1454,7 +1454,7 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
             logger.error(f"useless rhombus {node.get_name()}")
             expression = prev_exp
             negate_expression = prev_exp
-            critical
+            logger.critical(f"Rhombus without expression {node.get_name()}")
     elif hasattr(node, 'expression_reference') and isinstance(node.expression_reference, TriccOperation):
         # if issubclass(node.__class__, TriccNodeDisplayCalculateBase):
         #     expression = TriccOperation(
@@ -1941,7 +1941,7 @@ def get_calculation_terms( node, processed_nodes, is_calculate=False, negate=Fal
         expression =  get_prev_node_expression(node.activity, processed_nodes=processed_nodes, is_calculate=is_calculate, negate=negate)
     elif isinstance(node, (TriccNodeActivityStart, TriccNodeActivityEnd)):
         # the group have the relevance for the activity, not needed to replicate it
-        expression = None#return get_prev_node_expression(node.activity, processed_nodes, is_calculate=False, excluded_name=None)
+        expression = None #return get_prev_node_expression(node.activity, processed_nodes, is_calculate=False, excluded_name=None)
     elif isinstance(node, TriccNodeExclusive):
         if len(node.prev_nodes) == 1:
             iterator = iter(node.prev_nodes)
