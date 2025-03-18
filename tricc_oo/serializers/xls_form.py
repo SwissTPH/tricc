@@ -301,8 +301,8 @@ def get_attr_if_exists(strategy, node, column, map_array):
                 )
             ):
                 value = TriccOperation(
-                    TriccOperator.AND,
-                    [node.applicability, value]
+                    TriccOperator.IF,
+                    [node.applicability, value, TriccStatic('')]
                 )
             if column == 'name':
                 if issubclass(value.__class__, (TriccNodeBaseModel)):
