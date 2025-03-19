@@ -93,7 +93,7 @@ class DrawioStrategy(BaseInputStrategy):
                 id_tab = diagram.attrib.get("id")
                 name_tab = diagram.attrib.get("name")
                 if id_tab in project.pages:
-                    logger.critical(f"{id_tab} already found in pages")
+                    logger.critical(f"{id_tab} diagram (drawio tab) already loaded (Duplicate diagram ID ?)")
                     exit(1)
                 logger.info("Create the activity {0}::{1}".format(
                     id_tab, name_tab))

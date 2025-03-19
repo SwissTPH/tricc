@@ -1,6 +1,6 @@
-# Generated from cql.g4 by ANTLR 4.7.2
+# Generated from cql.g4 by ANTLR 4.13.2
 from antlr4 import *
-if __name__ is not None and "." in __name__:
+if "." in __name__:
     from .cqlParser import cqlParser
 else:
     from cqlParser import cqlParser
@@ -8,6 +8,11 @@ else:
 # This class defines a complete generic visitor for a parse tree produced by cqlParser.
 
 class cqlVisitor(ParseTreeVisitor):
+
+    # Visit a parse tree produced by cqlParser#definition.
+    def visitDefinition(self, ctx:cqlParser.DefinitionContext):
+        return self.visitChildren(ctx)
+
 
     # Visit a parse tree produced by cqlParser#library.
     def visitLibrary(self, ctx:cqlParser.LibraryContext):
@@ -159,6 +164,11 @@ class cqlVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by cqlParser#fluentModifier.
+    def visitFluentModifier(self, ctx:cqlParser.FluentModifierContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by cqlParser#functionDefinition.
     def visitFunctionDefinition(self, ctx:cqlParser.FunctionDefinitionContext):
         return self.visitChildren(ctx)
@@ -219,6 +229,11 @@ class cqlVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by cqlParser#codeComparator.
+    def visitCodeComparator(self, ctx:cqlParser.CodeComparatorContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by cqlParser#terminology.
     def visitTerminology(self, ctx:cqlParser.TerminologyContext):
         return self.visitChildren(ctx)
@@ -256,6 +271,16 @@ class cqlVisitor(ParseTreeVisitor):
 
     # Visit a parse tree produced by cqlParser#returnClause.
     def visitReturnClause(self, ctx:cqlParser.ReturnClauseContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by cqlParser#aggregateClause.
+    def visitAggregateClause(self, ctx:cqlParser.AggregateClauseContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by cqlParser#startingClause.
+    def visitStartingClause(self, ctx:cqlParser.StartingClauseContext):
         return self.visitChildren(ctx)
 
 
@@ -304,8 +329,13 @@ class cqlVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by cqlParser#simpleLiteral.
-    def visitSimpleLiteral(self, ctx:cqlParser.SimpleLiteralContext):
+    # Visit a parse tree produced by cqlParser#simpleStringLiteral.
+    def visitSimpleStringLiteral(self, ctx:cqlParser.SimpleStringLiteralContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by cqlParser#simpleNumberLiteral.
+    def visitSimpleNumberLiteral(self, ctx:cqlParser.SimpleNumberLiteralContext):
         return self.visitChildren(ctx)
 
 
@@ -391,6 +421,11 @@ class cqlVisitor(ParseTreeVisitor):
 
     # Visit a parse tree produced by cqlParser#impliesExpression.
     def visitImpliesExpression(self, ctx:cqlParser.ImpliesExpressionContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by cqlParser#negateMembershipExpression.
+    def visitNegateMembershipExpression(self, ctx:cqlParser.NegateMembershipExpressionContext):
         return self.visitChildren(ctx)
 
 
@@ -729,8 +764,18 @@ class cqlVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by cqlParser#longNumberLiteral.
+    def visitLongNumberLiteral(self, ctx:cqlParser.LongNumberLiteralContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by cqlParser#dateTimeLiteral.
     def visitDateTimeLiteral(self, ctx:cqlParser.DateTimeLiteralContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by cqlParser#dateLiteral.
+    def visitDateLiteral(self, ctx:cqlParser.DateLiteralContext):
         return self.visitChildren(ctx)
 
 

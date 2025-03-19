@@ -107,7 +107,7 @@ class TriccBaseModel(BaseModel):
     tricc_type: TriccNodeType
     instance: int = 1
     base_instance: Optional[TriccBaseModel] = None
-    last: bool = True
+    last: bool = None
     version: int = 1
 
     def make_instance(self, nb_instance, **kwargs):
@@ -286,7 +286,7 @@ class TriccStatic(BaseModel):
         return str(self.value)
     
     def __repr__(self):
-        return "TriccStatic:"+type(self.value)+':' +str(self.value)
+        return "TriccStatic:"+str(type(self.value))+':' +str(self.value)
 
     def get_references(self):
         return OrderedSet()

@@ -1,12 +1,21 @@
-# Generated from cql.g4 by ANTLR 4.7.2
+# Generated from cql.g4 by ANTLR 4.13.2
 from antlr4 import *
-if __name__ is not None and "." in __name__:
+if "." in __name__:
     from .cqlParser import cqlParser
 else:
     from cqlParser import cqlParser
 
 # This class defines a complete listener for a parse tree produced by cqlParser.
 class cqlListener(ParseTreeListener):
+
+    # Enter a parse tree produced by cqlParser#definition.
+    def enterDefinition(self, ctx:cqlParser.DefinitionContext):
+        pass
+
+    # Exit a parse tree produced by cqlParser#definition.
+    def exitDefinition(self, ctx:cqlParser.DefinitionContext):
+        pass
+
 
     # Enter a parse tree produced by cqlParser#library.
     def enterLibrary(self, ctx:cqlParser.LibraryContext):
@@ -278,6 +287,15 @@ class cqlListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by cqlParser#fluentModifier.
+    def enterFluentModifier(self, ctx:cqlParser.FluentModifierContext):
+        pass
+
+    # Exit a parse tree produced by cqlParser#fluentModifier.
+    def exitFluentModifier(self, ctx:cqlParser.FluentModifierContext):
+        pass
+
+
     # Enter a parse tree produced by cqlParser#functionDefinition.
     def enterFunctionDefinition(self, ctx:cqlParser.FunctionDefinitionContext):
         pass
@@ -386,6 +404,15 @@ class cqlListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by cqlParser#codeComparator.
+    def enterCodeComparator(self, ctx:cqlParser.CodeComparatorContext):
+        pass
+
+    # Exit a parse tree produced by cqlParser#codeComparator.
+    def exitCodeComparator(self, ctx:cqlParser.CodeComparatorContext):
+        pass
+
+
     # Enter a parse tree produced by cqlParser#terminology.
     def enterTerminology(self, ctx:cqlParser.TerminologyContext):
         pass
@@ -455,6 +482,24 @@ class cqlListener(ParseTreeListener):
 
     # Exit a parse tree produced by cqlParser#returnClause.
     def exitReturnClause(self, ctx:cqlParser.ReturnClauseContext):
+        pass
+
+
+    # Enter a parse tree produced by cqlParser#aggregateClause.
+    def enterAggregateClause(self, ctx:cqlParser.AggregateClauseContext):
+        pass
+
+    # Exit a parse tree produced by cqlParser#aggregateClause.
+    def exitAggregateClause(self, ctx:cqlParser.AggregateClauseContext):
+        pass
+
+
+    # Enter a parse tree produced by cqlParser#startingClause.
+    def enterStartingClause(self, ctx:cqlParser.StartingClauseContext):
+        pass
+
+    # Exit a parse tree produced by cqlParser#startingClause.
+    def exitStartingClause(self, ctx:cqlParser.StartingClauseContext):
         pass
 
 
@@ -539,12 +584,21 @@ class cqlListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by cqlParser#simpleLiteral.
-    def enterSimpleLiteral(self, ctx:cqlParser.SimpleLiteralContext):
+    # Enter a parse tree produced by cqlParser#simpleStringLiteral.
+    def enterSimpleStringLiteral(self, ctx:cqlParser.SimpleStringLiteralContext):
         pass
 
-    # Exit a parse tree produced by cqlParser#simpleLiteral.
-    def exitSimpleLiteral(self, ctx:cqlParser.SimpleLiteralContext):
+    # Exit a parse tree produced by cqlParser#simpleStringLiteral.
+    def exitSimpleStringLiteral(self, ctx:cqlParser.SimpleStringLiteralContext):
+        pass
+
+
+    # Enter a parse tree produced by cqlParser#simpleNumberLiteral.
+    def enterSimpleNumberLiteral(self, ctx:cqlParser.SimpleNumberLiteralContext):
+        pass
+
+    # Exit a parse tree produced by cqlParser#simpleNumberLiteral.
+    def exitSimpleNumberLiteral(self, ctx:cqlParser.SimpleNumberLiteralContext):
         pass
 
 
@@ -698,6 +752,15 @@ class cqlListener(ParseTreeListener):
 
     # Exit a parse tree produced by cqlParser#impliesExpression.
     def exitImpliesExpression(self, ctx:cqlParser.ImpliesExpressionContext):
+        pass
+
+
+    # Enter a parse tree produced by cqlParser#negateMembershipExpression.
+    def enterNegateMembershipExpression(self, ctx:cqlParser.NegateMembershipExpressionContext):
+        pass
+
+    # Exit a parse tree produced by cqlParser#negateMembershipExpression.
+    def exitNegateMembershipExpression(self, ctx:cqlParser.NegateMembershipExpressionContext):
         pass
 
 
@@ -1304,12 +1367,30 @@ class cqlListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by cqlParser#longNumberLiteral.
+    def enterLongNumberLiteral(self, ctx:cqlParser.LongNumberLiteralContext):
+        pass
+
+    # Exit a parse tree produced by cqlParser#longNumberLiteral.
+    def exitLongNumberLiteral(self, ctx:cqlParser.LongNumberLiteralContext):
+        pass
+
+
     # Enter a parse tree produced by cqlParser#dateTimeLiteral.
     def enterDateTimeLiteral(self, ctx:cqlParser.DateTimeLiteralContext):
         pass
 
     # Exit a parse tree produced by cqlParser#dateTimeLiteral.
     def exitDateTimeLiteral(self, ctx:cqlParser.DateTimeLiteralContext):
+        pass
+
+
+    # Enter a parse tree produced by cqlParser#dateLiteral.
+    def enterDateLiteral(self, ctx:cqlParser.DateLiteralContext):
+        pass
+
+    # Exit a parse tree produced by cqlParser#dateLiteral.
+    def exitDateLiteral(self, ctx:cqlParser.DateLiteralContext):
         pass
 
 
@@ -1547,3 +1628,5 @@ class cqlListener(ParseTreeListener):
         pass
 
 
+
+del cqlParser

@@ -461,16 +461,6 @@ def get_max_version(dict):
     return max_version
 
 
-# def get_last_version(dict, name):
-#     max_version = None
-#     if name in dict:
-#         for sim_node in dict[name].values():
-#             if max_version is None or max_version.path_len < sim_node.path_len:
-#                 max_version = sim_node
-#     return max_version
-
-
-
 def update_calc_version(calculates, name):
     if name in calculates and len(calculates[name]) > 1:
         ordered_list = sorted(list(calculates[name].values()), key=lambda x: x.path_len)

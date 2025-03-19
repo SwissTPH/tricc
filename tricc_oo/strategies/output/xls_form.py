@@ -61,6 +61,7 @@ langs = SingletonLangClass()
 
 
 class XLSFormStrategy(BaseOutPutStrategy):
+    pd.set_option('display.max_colwidth', None)
     df_survey = pd.DataFrame(columns=SURVEY_MAP.keys())
     df_calculate = pd.DataFrame(columns=SURVEY_MAP.keys())
     df_choice = pd.DataFrame(columns=CHOICE_MAP.keys())
@@ -395,7 +396,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
     def tricc_operation_native(self, ref_expressions):
         if len(ref_expressions)>0:
             if ref_expressions[0] =='GetChoiceName':
-                return f"jr:choice-name({ref_expressions[1]}, ${ref_expressions[2][2:-2]})"
+                return f"jr:choice-name({ref_expressions[1]}, '{ref_expressions[2]}')"
             elif ref_expressions[0] =='GetFacilityParam':
                 return '0'
                 #return f"jr:choice-name({','.join(ref_expressions[1:])})"

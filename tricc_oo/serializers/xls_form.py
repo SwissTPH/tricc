@@ -203,10 +203,9 @@ def get_xfrom_trad(strategy, node, column, mapping, clean_html = False ):
         issubclass(node.__class__, TriccNodeDisplayCalculateBase) 
         and column == 'calculation'  
         and isinstance(value, str) and not value.startswith('number')
+        and not (value.startswith('coalesce(') and ')' not in value[:-1])
         and not re.search(pattern, value)
     ):
-    
-        
         value = f"number({value})" if str(value) not in ['0', '1'] else value
     if clean_html and isinstance(value, str):
         value = remove_html(value)
@@ -302,8 +301,8 @@ def get_attr_if_exists(strategy, node, column, map_array):
                 )
             ):
                 value = TriccOperation(
-                    TriccOperator.AND,
-                    [node.applicability, value]
+                    TriccOperator.IF,
+                    [node.applicability, value, TriccStatic('')]
                 )
             if column == 'name':
                 if issubclass(value.__class__, (TriccNodeBaseModel)):
@@ -425,12 +424,12 @@ def generate_xls_form_export(strategy, node, processed_nodes, stashed_nodes, df_
             return True
     return False
 
-def get_input_line(node):
+def get_input_line(node, replace_dots=True):
     label = langs.get_trads(node.label, force_dict =True)
     empty = langs.get_trads('', force_dict =True)
     return [
         'hidden',
-        clean_name(node.name),
+        clean_name(node.name, replace_dots=True),
         *list(empty.values()) ,
         *list(empty.values()) ,#hint
         *list(empty.values()) ,#help
@@ -449,7 +448,7 @@ def get_input_line(node):
         ''
     ]   
 
-def get_input_calc_line(node):
+def get_input_calc_line(node, replace_dots=True):
     label = langs.get_trads(node.label, force_dict =True)
     empty = langs.get_trads('', force_dict =True)
     return [
@@ -467,7 +466,7 @@ def get_input_calc_line(node):
         '',#'required'
         *list(empty.values()) ,#'required message'
         '',#'read only'
-        '../inputs/contact/'+clean_name(node.name),#'expression'
+        '../inputs/contact/'+clean_name(node.name, replace_dots=replace_dots),#'expression'
         '',#'repeat_count'
         '',#'image' 
         ''#choice filter
