@@ -424,7 +424,7 @@ def generate_xls_form_export(strategy, node, processed_nodes, stashed_nodes, df_
             return True
     return False
 
-def get_input_line(node):
+def get_input_line(node, replace_dots=True):
     label = langs.get_trads(node.label, force_dict =True)
     empty = langs.get_trads('', force_dict =True)
     return [
@@ -448,7 +448,7 @@ def get_input_line(node):
         ''
     ]   
 
-def get_input_calc_line(node):
+def get_input_calc_line(node, replace_dots=True):
     label = langs.get_trads(node.label, force_dict =True)
     empty = langs.get_trads('', force_dict =True)
     return [
@@ -466,7 +466,7 @@ def get_input_calc_line(node):
         '',#'required'
         *list(empty.values()) ,#'required message'
         '',#'read only'
-        '../inputs/contact/'+clean_name(node.name),#'expression'
+        '../inputs/contact/'+clean_name(node.name, replace_dots=replace_dots),#'expression'
         '',#'repeat_count'
         '',#'image' 
         ''#choice filter

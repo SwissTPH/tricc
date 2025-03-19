@@ -61,6 +61,7 @@ langs = SingletonLangClass()
 
 
 class XLSFormStrategy(BaseOutPutStrategy):
+    pd.set_option('display.max_colwidth', None)
     df_survey = pd.DataFrame(columns=SURVEY_MAP.keys())
     df_calculate = pd.DataFrame(columns=SURVEY_MAP.keys())
     df_choice = pd.DataFrame(columns=CHOICE_MAP.keys())
