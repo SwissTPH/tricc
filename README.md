@@ -151,3 +151,44 @@ Then we calculate based on the previous nodes: [get_prev_node_expression]
     - if a "fake" calculate (Rhombus, exclusion) then get the underlying expression (should not depend of Calcualte = true) [get_calculation_terms]
     - if a Select, manage it as a calculate too (should not depend of Calcualte = true) [get_calculation_terms]
     - else get the expression via  [get_calculation_terms] [get_prev_node_expression , calculate = False] -> get_node_expression for the prev node
+
+# Running directly
+
+`tricc` is technically a python library, but you can run it directly via the [`build.py` script](./tests/build.py).
+
+## Running with Docker
+
+Alternatively, if you prefer to build/run the project with Docker, you can do the following.
+
+Start by building the Docker image:
+
+```shell
+git clone https://github.com/SwissTPH/tricc.git
+cd tricc
+
+docker build -t tricc .
+```
+
+Once you have the image built you can use it to convert local `.drawio` files by mapping the local directory to the `docker run` command. (Note that `--user` is specified to make sure the current host user has write access to the output files.)
+
+```shell
+docker run --rm -v "$PWD":/proj --user $(id -u):$(id -g) tricc --help
+```
+
+This command will convert all `.drawio` files in the current directory:
+
+```shell
+docker run --rm -v "$PWD":/proj --user $(id -u):$(id -g) tricc -i /proj -o /proj
+```
+
+You can also convert a single file:
+
+```shell
+docker run --rm -v "$PWD":/proj --user $(id -u):$(id -g) tricc -i /proj/demo.drawio -o /proj
+```
+
+Use the `-O` flag to specify the output strategy. For example to generate CHT files:
+
+```shell
+docker run --rm -v "$PWD":/proj --user $(id -u):$(id -g) tricc -i /proj -o /proj -O XLSFormCHTStrategy
+```
