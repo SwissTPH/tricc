@@ -203,8 +203,7 @@ def get_xfrom_trad(strategy, node, column, mapping, clean_html = False ):
         issubclass(node.__class__, TriccNodeDisplayCalculateBase) 
         and column == 'calculation'  
         and isinstance(value, str) and not value.startswith('number')
-        and not (value.startswith('coalesce(') and ')' not in value[:-1])
-        and not re.search(pattern, value)
+        and getattr(node, 'expression', None) and node.expression.get_datatype() in ('number', 'boolean')
     ):
         value = f"number({value})" if str(value) not in ['0', '1'] else value
     if clean_html and isinstance(value, str):
@@ -302,7 +301,7 @@ def get_attr_if_exists(strategy, node, column, map_array):
             ):
                 value = TriccOperation(
                     TriccOperator.IF,
-                    [node.applicability, value, TriccStatic('')]
+                    [node.applicability, value, TriccStatic(False) if node.applicability.get_datatype() == 'boolean' else  TriccStatic('')]
                 )
             if column == 'name':
                 if issubclass(value.__class__, (TriccNodeBaseModel)):
