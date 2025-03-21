@@ -63,7 +63,7 @@ def make_breakpoints(df, pausepoint, calculate_name=None, replace_dots=False):
     # Get hidden field names
 
     df_input.loc[mask_indices, 'type'] = 'hidden'
-    df_input.loc[mask_indices, 'calculation'] = 'hidden'    
+    df_input.loc[mask_indices, 'appearance'] = 'hidden'    
 
     # Handle label columns while preserving existing labels where needed
     label_cols = [col for col in df.columns if 'label' in col]

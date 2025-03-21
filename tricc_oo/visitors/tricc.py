@@ -1212,7 +1212,7 @@ def set_prev_next_node(source_node, target_node, replaced_node=None, edge_only =
         set_next_node(source_node, target_node, replaced_node, edge_only)
          
     if activity and not any([(e.source == source_id) and ( e.target == target_id) for e in activity.edges]):
-        label = "continue" if issubclass(source_node.__class__, TriccNodeSelect) else None
+        label = "continue" if issubclass(source_node.__class__, TriccNodeSelectYesNo) else None
         activity.edges.append(TriccEdge(id = generate_id(), source = source_id, target = target_id, value = label))
 
 def remove_prev_next(prev_node, next_node, activity=None):
@@ -1515,8 +1515,13 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
             ]
             for past_instance in past_instances:
                 add_sub_expression(expression_inputs, get_node_expression(past_instance, processed_nodes=processed_nodes, is_calculate=False, is_prev=True))
+            
+            if isinstance(node.applicability,(TriccStatic,TriccOperation, TriccReference)):
+                if expression:
+                    expression = and_join(node.applicability, expression)
+                else:
+                    expression = node.applicability
             if expression and expression_inputs:
-    
                 add_sub_expression(expression_inputs, expression)
                 expression = nand_join(expression, or_join(expression_inputs))
             elif expression_inputs:
@@ -1678,6 +1683,7 @@ def create_determine_diagnosis_activity(diags):
             name=d.name,
             label=d.label,
             list_name=f.list_name,
+            relevance=d.activity.applicability,
             select=f
         ) for d in diags
     ]
@@ -2013,16 +2019,16 @@ def add_sub_expression(array, sub):
 def clean_list_or(list_or, elm_and=None):
     if len(list_or) == 0:
         return []
-    if 'false()' in list_or:
-        list_or.remove('false()')
+    if 'false' in list_or:
+        list_or.remove('false')
     if TriccStatic(False) in list_or:
-        ist_or.remove(TriccStatic(False))
+        list_or.remove(TriccStatic(False))
     if (
         '1' in list_or 
         or 1 in list_or 
         or TriccStatic(True) in list_or 
         or True in list_or 
-        or 'True' in list_or
+        or 'true' in list_or
     ):
         list_or = [TriccStatic(True)]
         return list_or
@@ -2117,7 +2123,7 @@ def simple_and_join(left, right):
     if left_issue and right_issue:
         logger.critical("and with both terms empty")
     elif left_neg or right_neg:
-        return 'false()'
+        return 'false'
     elif left_issue:
         logger.debug('and with empty left term')
         return  right
