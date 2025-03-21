@@ -203,7 +203,7 @@ TYPE_MAP = {
     },
     TriccNodeType.input: {
         "objects": ["UserObject", "object"],
-        "attributes": ["save", "reference"],
+        "attributes": ["save", "reference","datatype"],
         "mandatory_attributes": [ "name", 'label'],
         "model": TriccNodeInput
     },

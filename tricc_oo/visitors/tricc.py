@@ -253,19 +253,31 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
                         #logger.debug("set last to false for node {}  and add its link it to next one".format(last_used_calc.get_name()))
                     if node.prev_nodes:    
                         set_prev_next_node(last_calc,node)
-                    elif isinstance(node.expression_reference, TriccOperation):
-                        if  isinstance(node, ( TriccNodeAdd, TriccNodeCount)):
-                            node.expression_reference = TriccOperation(
+                    else:
+                        expression = node.expression or node.expression_reference or node.relevance
+                        datatype = expression.get_datatype()
+                        if datatype == 'boolean':
+                            expression_reference = TriccOperation(
+                                TriccOperator.OR,
+                                [TriccOperation(TriccOperator.ISTRUE, [last_calc]), expression]
+                            )
+                        
+                        elif datatype == 'number':
+                            expression = TriccOperation(
                                 TriccOperator.PLUS,
-                                [last_calc, node.expression_reference]
+                                [last_version, expression] 
                             )
                         else:
-                            node.expression_reference = TriccOperation(
-                                TriccOperator.OR,
-                                [TriccOperation(TriccOperator.ISTRUE, [last_calc]), node.expression_reference]
+                            expression = TriccOperation(
+                                TriccOperator.COALESCE,
+                                [last_version, expression] 
                             )
-                    else:
-                        logger.error(f"not able to find how to prev calc should contribute to {node.get_name()}")
+                        if node.expression:
+                            node.expression = expression
+                        elif node.expression_reference:
+                            node.expression_reference = expression
+                        elif node.relevance:
+                            node.relevance = expression
                     last_calc.last = False
                     #update_calc_version(calculates,node_name)
             #if hasattr(node, 'next_nodes'):

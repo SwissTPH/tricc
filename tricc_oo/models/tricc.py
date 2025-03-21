@@ -17,7 +17,7 @@ class TriccNodeCalculateBase(TriccNodeBaseModel):
     reference: Union[List[Union[TriccNodeBaseModel,TriccStatic]], Expression, TriccStatic] = None
     expression_reference: Union[str, TriccOperation] = None
     last: bool = True
-
+    datatype: str = 'boolean'
     # to use the enum value of the TriccNodeType
     class Config:
         use_enum_values = True  # <--
@@ -248,6 +248,7 @@ class TriccNodeDisplayModel(TriccNodeBaseModel):
 
 class TriccNodeNote(TriccNodeDisplayModel):
     tricc_type: TriccNodeType = TriccNodeType.note
+    datatype: str = 'string'
 
 class TriccNodeInputModel(TriccNodeDisplayModel):
     required: Optional[Union[Expression, TriccOperation, TriccStatic]] = '1'
@@ -258,6 +259,7 @@ class TriccNodeInputModel(TriccNodeDisplayModel):
 
 class TriccNodeDate(TriccNodeInputModel):
     tricc_type: TriccNodeType = TriccNodeType.date
+    datatype: str = 'date'
 
 
 class TriccNodeMainStart(TriccNodeBaseModel):
@@ -265,21 +267,25 @@ class TriccNodeMainStart(TriccNodeBaseModel):
     form_id: Optional[str] = None
     process: Optional[str] = None
     relevance: Optional[Union[Expression, TriccOperation]] = None
+    datatype: str = 'boolean'
 
 
 class TriccNodeLinkIn(TriccNodeBaseModel):
     tricc_type: TriccNodeType = TriccNodeType.link_in
+    datatype: str = 'n/a'
 
 
 class TriccNodeLinkOut(TriccNodeBaseModel):
     tricc_type: TriccNodeType = TriccNodeType.link_out
     reference: Optional[Union[TriccNodeLinkIn, triccId]] = None
     # no need to copy
+    datatype: str = 'n/a'
 
 
 class TriccNodeGoTo(TriccNodeBaseModel):
     tricc_type: TriccNodeType = TriccNodeType.goto
     link: Union[TriccNodeActivity, triccId]
+    datatype: str = 'n/a'
 
     # no need ot copy
     def make_instance(self, instance_nb, activity, **kwargs):
@@ -296,6 +302,11 @@ class TriccNodeSelectOption(TriccNodeDisplayModel):
     save: Optional[str] = None
     select: TriccNodeInputModel
     list_name: str
+    def get_datatype(self):
+        if isnumeric(self.name):
+            return 'number'
+        else:
+            return 'string'
 
 
     def make_instance(self, instance_nb, activity, select, **kwargs):
@@ -314,7 +325,15 @@ class TriccNodeSelect(TriccNodeInputModel):
     filter: Optional[str] = None
     options: Dict[int, TriccNodeSelectOption] = {}
     list_name: str
-
+    def get_datatype(self):
+        rtype = set()
+        for k,o in options.items():
+            rtype.add(o.get_datatype())
+        if len(rtype)>1:
+            return 'mixed'
+        else:
+            return rtype.pop()
+            
     def make_instance(self, instance_nb, activity, **kwargs):
         # shallow copy, no copy of filter and list_name
         instance = super().make_instance(instance_nb, activity=activity)
@@ -351,11 +370,13 @@ class TriccNodeSelectMultiple(TriccNodeSelect):
 class TriccNodeNumber(TriccNodeInputModel):
     min: Optional[float] = None
     max: Optional[float] = None
+    datatype : str = 'number'
     # no need to copy min max in make isntance
 
 
 class TriccNodeDecimal(TriccNodeNumber):
     tricc_type: TriccNodeType = TriccNodeType.decimal
+
 
 
 class TriccNodeInteger(TriccNodeNumber):
@@ -364,9 +385,13 @@ class TriccNodeInteger(TriccNodeNumber):
 
 class TriccNodeText(TriccNodeInputModel):
     tricc_type: TriccNodeType = TriccNodeType.text
+    datatype : str = 'string'
+
 
 class TriccNodeMoreInfo(TriccNodeInputModel, TriccParentMixIn):
     tricc_type: TriccNodeType = TriccNodeType.help
+    datatype : str = 'n/a'
+
     
     
 class TriccProject(BaseModel):

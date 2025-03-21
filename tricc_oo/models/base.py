@@ -105,10 +105,13 @@ class TriccBaseModel(BaseModel):
     id: triccId
     external_id: triccId = None
     tricc_type: TriccNodeType
+    datatype: str = None
     instance: int = 1
     base_instance: Optional[TriccBaseModel] = None
     last: bool = None
     version: int = 1
+    def get_datatype(self):
+        return self.datatype or self.tricc_type
 
     def make_instance(self, nb_instance, **kwargs):
         instance = self.copy()
@@ -163,7 +166,6 @@ class TriccEdge(TriccBaseModel):
         #if issubclass(self.source.__class__, TriccBaseModel):
         instance.source = self.source if isinstance(self.source, str) else self.source.copy()
         #if issubclass(self.target.__class__, TriccBaseModel):
-        instance.target = self.target if isinstance(self.target, str) else self.target.copy()
         return instance
 
 
@@ -267,6 +269,14 @@ class TriccStatic(BaseModel):
     value: Union[str, float, int, bool]
     def __init__(self,value):
         super().__init__(value = value)
+        
+    def get_datatype(self):
+        if str(type(self.value)) == 'bool':
+            return 'boolean'
+        elif  str(self.value).isnumeric():
+            return 'number'
+        else:
+            return str(type(self.value))
     def __eq__(self, other):
         if isinstance(other, self.__class__):
             return self.value == other.value
@@ -318,39 +328,84 @@ class TriccOperator(StrEnum):
     NOT_EQUAL = 'not_equal'
     BETWEEN = 'between'
     LESS = 'less'
+    CONTAINS = 'contains' # ref, txt Does CONTAINS make sense, like Select with wildcard
+    EXISTS = 'exists'
+    NOT = 'not'
+    ISNULL = 'isnull'
+    ISNOTNULL= 'isnotnull'
+
     CASE = 'case' # ref (equal value, res), (equal value,res)
     IFS = 'ifs' #(cond, res), (cond,res)
     IF = 'if' # cond val_true, val_false
-    CONTAINS = 'contains' # ref, txt Does CONTAINS make sense, like Select with wildcard
-    EXISTS = 'exists'
+    
     # CDSS Specific
     HAS_QUALIFIER = 'has_qualifier'
+    
     ZSCORE = 'zscore' # left table_name, right Y, gender give Z
     IZSCORE = 'izscore' #left table_name, right Z, gender give Y
-    DRUG_DOSAGE = 'drug_dosage' # drug name, *param1 (ex: weight, age)
     AGE_DAY = 'age_day' # age from dob
     AGE_MONTH = 'age_month' # age from dob
     AGE_YEAR = 'age_year' # age from dob
-    NOT = 'not'
     DIVIDED = 'divided'
     MULTIPLIED = 'multiplied'
-    COALESCE = 'coalesce'
-    ISNULL = 'isnull'
-    ISNOTNULL= 'isnotnull'
     PLUS = 'plus'
     MINUS = 'minus'
     MODULO = 'modulo'
     COUNT = 'count'
     CAST_NUMBER = 'cast_number'
     CAST_INTEGER = 'cast_integer'
+    DRUG_DOSAGE = 'drug_dosage' # drug name, *param1 (ex: weight, age)
+    COALESCE = 'coalesce'
     CAST_DATE = 'cast_date'
     PARENTHESIS = 'parenthesis'
     CONCATENATE = 'concatenate'
+
+RETURNS_BOOLEAN =[
+    TriccOperator.ADD_OR,
+    TriccOperator.AND,
+    TriccOperator.OR,
+    TriccOperator.BETWEEN,
+    TriccOperator.CONTAINS,
+    TriccOperator.EXISTS,
+    TriccOperator.ISFALSE,
+    TriccOperator.ISNOTNULL,
+    TriccOperator.ISTRUE,
+    TriccOperator.SELECTED,
+    TriccOperator.HAS_QUALIFIER,
+    TriccOperator.NOT,
+    TriccOperator.NOT_EQUAL,
+    TriccOperator.MORE_OR_EQUAL,
+    TriccOperator.LESS_OR_EQUAL,
+    TriccOperator.EQUAL,
+    TriccOperator.MORE,
+    TriccOperator.LESS
+]
+
+RETURNS_NUMBER = [
+    TriccOperator.AGE_DAY,
+    TriccOperator.AGE_MONTH,
+    TriccOperator.AGE_YEAR,
+    TriccOperator.ZSCORE,
+    TriccOperator.IZSCORE,
+    TriccOperator.PLUS,
+    TriccOperator.MINUS,
+    TriccOperator.DIVIDED,
+    TriccOperator.MULTIPLIED,
+    TriccOperator.COUNT,
+    TriccOperator.MODULO,
+    TriccOperator.CAST_NUMBER,
+    TriccOperator.CAST_INTEGER
+]
+
+RETURNS_DATE =[
+    TriccOperator.CAST_DATE
+]
 
 OPERATION_LIST = {
     '>=': TriccOperator.MORE_OR_EQUAL,
     '<=': TriccOperator.LESS_OR_EQUAL,
     '==': TriccOperator.EQUAL,
+    '!=': TriccOperator.NOT_EQUAL,
     '=': TriccOperator.EQUAL,
     '>': TriccOperator.MORE,
     '<': TriccOperator.LESS
@@ -378,6 +433,43 @@ class TriccOperation(BaseModel):
     
     def __init__(self, operator, reference=[]):
         super().__init__(operator=operator, reference=reference)
+        
+    def get_datatype(self):
+        if self.operator in RETURNS_BOOLEAN:
+            return 'boolean'
+        elif self.operator in RETURNS_NUMBER:
+            return 'number'
+        elif self.operator in RETURNS_DATE:
+            return 'date'
+        elif self.operator == TriccOperator.CONCATENATE:
+            return 'string'
+        elif self.operator == TriccOperator.PARENTHESIS:
+            return self.get_reference_datatype(self.reference)
+        elif self.operator == TriccOperator.IF:
+            return self.get_reference_datatype(self.reference[1:])
+        elif self.operator in ( TriccOperator.IFS, TriccOperator.CASE):
+            rtype = set()
+            for rl in self.reference:
+                rtype.add(self.get_reference_datatype(self.reference[-2:]))
+            if len(rtype)>1:
+                return 'mixed'
+            else:
+                return rtype.pop()     
+  
+    def get_reference_datatype(self, references):
+        rtype = set()
+        for r in references:
+            if hasattr(r, 'get_datatype'):
+                rtype.add(r.get_datatype())
+            elif hasattr(r, 'value'):
+                return str(type(r.value))
+            else:
+                return str(type(r))
+            
+            if len(rtype)>1:
+                return 'mixed'
+            else:
+                return rtype.pop()         
         
     def get_references(self):
         predecessor = OrderedSet()

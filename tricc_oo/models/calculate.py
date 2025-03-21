@@ -42,10 +42,12 @@ class TriccNodeCalculate(TriccNodeDisplayCalculateBase):
 
 class TriccNodeAdd(TriccNodeDisplayCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.add
+    datatype: str = 'number'
 
 
 class TriccNodeCount(TriccNodeDisplayCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.count
+    datatype: str = 'number'
 
 
 class TriccNodeProposedDiagnosis(TriccNodeDisplayCalculateBase):
