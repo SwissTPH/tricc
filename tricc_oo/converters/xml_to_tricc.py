@@ -200,10 +200,10 @@ def process_edges(diagram, media_path, activity, nodes):
             processed = False
             calc = None
             if (
-                isinstance(nodes[edge.source], TriccNodeRhombus)
-                and label.lower() in TRICC_FOLLOW_LABEL
+                 label.lower() in TRICC_FOLLOW_LABEL
             ):
-                edge.source = nodes[edge.source].path.id
+                if isinstance(nodes[edge.source], TriccNodeRhombus):
+                    edge.source = nodes[edge.source].path.id
                 processed = True
             elif label.lower() in (TRICC_YES_LABEL) or label == "":
                 # do nothinbg for yes
@@ -217,6 +217,7 @@ def process_edges(diagram, media_path, activity, nodes):
                 calc = process_condition_edge(edge, nodes)
             else:
                 logger.warning(f"unsupported edge label {label} in {diagram.attrib.get('name', diagram.attrib['id'])}")
+                processed = True
             if calc is not None:
                 processed = True
                 nodes[calc.id] = calc
