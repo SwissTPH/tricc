@@ -1468,6 +1468,8 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
             expression = prev_exp
             negate_expression = prev_exp
             logger.critical(f"Rhombus without expression {node.get_name()}")
+    elif is_prev and issubclass(node.__class__, TriccNodeDisplayCalculateBase):
+        expression = TriccOperation(TriccOperator.ISTRUE, [node])
     elif hasattr(node, 'expression_reference') and isinstance(node.expression_reference, TriccOperation):
         # if issubclass(node.__class__, TriccNodeDisplayCalculateBase):
         #     expression = TriccOperation(
@@ -1491,8 +1493,6 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
                 TriccStatic(1)
             ]
         )
-    elif is_prev and issubclass(node.__class__, TriccNodeDisplayCalculateBase):
-        expression = TriccOperation(TriccOperator.ISTRUE, [node])
     elif issubclass(node.__class__, TriccNodeCalculateBase):
         if negate:
             negate_expression = get_calculation_terms(node, processed_nodes=processed_nodes, is_calculate=is_calculate, negate=True)
