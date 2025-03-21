@@ -839,19 +839,20 @@ def walktrhough_tricc_node_processed_stached(node, callback, processed_nodes, st
                         **kwargs
                     )
                 for c in node.activity.calculates:
-                    walktrhough_tricc_node_processed_stached(
-                        c,
-                        callback,
-                        processed_nodes=processed_nodes, 
-                        stashed_nodes=stashed_nodes, 
-                        path_len=path_len,
-                        recursive=recursive,
-                        warn = warn,
-                        node_path = node_path.copy(),
-                        **kwargs
-                    )            
+                    if len(c.prev_nodes)== 0:
+                        walktrhough_tricc_node_processed_stached(
+                            c,
+                            callback,
+                            processed_nodes=processed_nodes, 
+                            stashed_nodes=stashed_nodes, 
+                            path_len=path_len,
+                            recursive=recursive,
+                            warn = warn,
+                            node_path = node_path.copy(),
+                            **kwargs
+                        )            
             else:
-                stashed_nodes += node.activity.calculates 
+                stashed_nodes += [c for c in node.activity.calculates if len(c.prev_nodes)== 0] 
                 stashed_nodes += node.activity.groups.values()
         elif issubclass(node.__class__, TriccNodeSelect):
             for option in node.options.values():

@@ -137,11 +137,16 @@ class DrawioStrategy(BaseInputStrategy):
     def linking_nodes(self, node, page, pages, processed_nodes=set(), path=[]):
         # get the edges that have that node as source
 
+
         node_edge = list(
-            filter(lambda x: (x.source == node.id or x.source == node), page.edges)
+            filter(lambda x: (
+                (x.source_external_id and x.source_external_id == node.external_id) or 
+                ( x.source and x.source == node.id) or 
+                x.source == node
+            ), page.edges)
         )
         node.activity = page
-        # build current path
+                # build current path
         current_path = path + [node.id]
         # don't stop the walkthroug by default
         for edge in node_edge:
@@ -160,13 +165,15 @@ class DrawioStrategy(BaseInputStrategy):
                             current_path,
                         )
                         for c in target_node.calculates:
-                            self.linking_nodes(
-                                c,
-                                target_node,
-                                pages,
-                                processed_nodes,
-                                current_path,
-                            )
+                            if len(c.prev_nodes) == 0:
+                                self.linking_nodes(
+                                    c,
+                                    target_node,
+                                    pages,
+                                    processed_nodes,
+                                    current_path,
+                                )
+                        
                     elif isinstance(target_node, TriccNodeGoTo):
                         next_page = self.walkthrough_goto_node(
                             target_node, page, pages, processed_nodes, current_path
@@ -252,6 +259,17 @@ class DrawioStrategy(BaseInputStrategy):
                 self.linking_nodes(
                     next_page.root, next_page, pages, processed_nodes, current_path
                 )
+                for c in next_page.calculates:
+                    if len(c.prev_nodes) == 0:
+                        self.linking_nodes(
+                            c,
+                            next_page,
+                            pages,
+                            processed_nodes,
+                            current_path,
+                        )
+            
+                processed_nodes.add(next_page)
 
             replace_node(node, next_page, page)
 
