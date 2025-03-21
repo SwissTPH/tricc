@@ -338,7 +338,7 @@ class cqlToXlsFormVisitor(cqlVisitor):
         op.reference = []
         for child in ctx.getChildren():
             c = self.visit(child)
-            if c:
+            if c is not None:
                 op.append(c)
         return op
 

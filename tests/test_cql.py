@@ -109,9 +109,9 @@ class TestCql(unittest.TestCase):
     def test_ifs(self):
         case_cql = """
         case 
-        when AgeInMonths() <= 2 then 'newborn' 
-        when AgeInYears() > 5 then 'teen' 
-        else 'child' end
+        when AgeInMonths() <= 2 then true
+        when AgeInYears() > 5 then true
+        else false end
         """
         case_operation = transform_cql_to_operation(case_cql)
         case_expected = TriccOperation(
@@ -131,7 +131,7 @@ class TestCql(unittest.TestCase):
                         ]
                     ),
                     TriccStatic(
-                        value="newborn"
+                        value=True
                     )
                 ],
                 [
@@ -148,10 +148,10 @@ class TestCql(unittest.TestCase):
                         ]
                     ),
                     TriccStatic(
-                        value="teen"
+                        value=True
                     )
                 ],
-                TriccStatic(value='child'),
+                TriccStatic(value=False),
             ]
         )
         self.assertEqual(str(case_operation), str(case_expected))
