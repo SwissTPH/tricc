@@ -68,6 +68,12 @@ class XLSFormStrategy(BaseOutPutStrategy):
     calculates = {}
     # add save nodes and merge nodes
 
+
+    def clean_coalesce(self, expression):   
+        if re.match(r"^coalesce\(\${[^}]+},''\)$", expression):
+            return expression[9:-4]
+        return expression
+
     def generate_base(self, node, **kwargs):
         return self.generate_xls_form_condition(node, **kwargs) 
 
@@ -341,8 +347,8 @@ class XLSFormStrategy(BaseOutPutStrategy):
                 r_expr = self.get_tricc_operation_operand(r)
             if isinstance(r_expr, TriccStatic):
                 r_expr = r.value
-            if isinstance(r_expr, bool) or r_expr == 'True' or r_expr == 'False':
-                r_expr = 1 if r_expr is True or r_expr == 'True' else 0
+            if isinstance(r_expr, bool) or r_expr == 'true' or r_expr == 'false':
+                r_expr = 1 if r_expr is True or r_expr == 'true' else 0
             if isinstance(r_expr, TriccReference):
                 r_expr = self.get_tricc_operation_operand(r_expr)
             ref_expressions.append(r_expr)
@@ -361,7 +367,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
     def tricc_operation_modulo(self, ref_expressions):
         return f"{ref_expressions[0]} mod {ref_expressions[1]}"
     def tricc_operation_coalesce(self, ref_expressions):
-        return f"coalesce({','.join(ref_expressions)})"
+        return f"coalesce({','.join(map(self.clean_coalesce, ref_expressions))})"
     def tricc_operation_module(self, ref_expressions):
         return f"{ref_expressions[0]} mod {ref_expressions[1]}"
     def tricc_operation_minus(self, ref_expressions):
@@ -396,7 +402,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
     def tricc_operation_native(self, ref_expressions):
         if len(ref_expressions)>0:
             if ref_expressions[0] =='GetChoiceName':
-                return f"jr:choice-name({ref_expressions[1]}, '{ref_expressions[2]}')"
+                return f"jr:choice-name({self.clean_coalesce(ref_expressions[1])}, '{self.clean_coalesce(ref_expressions[2])}')"
             elif ref_expressions[0] =='GetFacilityParam':
                 return '0'
                 #return f"jr:choice-name({','.join(ref_expressions[1:])})"
@@ -412,7 +418,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
     def tricc_operation_selected(self, ref_expressions):
         parts = []
         for s in ref_expressions[1:]:
-            parts.append(f"selected({ref_expressions[0]}, {s})")
+            parts.append(f"selected({self.clean_coalesce(ref_expressions[0])}, {s})")
         if len(parts) == 1:
             return parts[0]
         else:
@@ -483,7 +489,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
         return f"if({ref_expressions[0]},{ref_expressions[1]},{ref_expressions[2]})"
     
     def tricc_operation_contains(self, ref_expressions):
-        return f"contains({ref_expressions[0]}, {ref_expressions[1]})"
+        return f"contains('{self.clean_coalesce(ref_expressions[0])}', '{self.clean_coalesce(ref_expressions[1])}')"
     
     def tricc_operation_exists(self, ref_expressions):
         parts = []
@@ -634,8 +640,10 @@ class XLSFormStrategy(BaseOutPutStrategy):
         elif isinstance(r, TriccNodeSelectOption):
             logger.warning(f"select option {r.get_name()} from {r.select.get_name()} was used as a reference")
             return f"'{r.name}'"
+        elif issubclass(r.__class__, TriccNodeInputModel):
+            return f"coalesce(${{{get_export_name(r)}}},'')"
         elif issubclass(r.__class__, TriccNodeBaseModel):
-            return f"${{{get_export_name(r)}}}" 
+            return f"${{{get_export_name(r)}}}"
         else:
             raise NotImplementedError(f"This type of node {r.__class__} is not supported within an operation")
 
