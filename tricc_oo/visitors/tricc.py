@@ -8,6 +8,10 @@ from tricc_oo.converters.datadictionnary import lookup_codesystems_code
 
 logger = logging.getLogger("default")
 
+
+TRICC_TRUE_VALUE = 'true'
+TRICC_FALSE_VALUE = 'false'
+
 def merge_node(from_node,to_node):
     if from_node.activity != to_node.activity:
         logger.critical("Cannot merge nodes from different activities")
@@ -769,7 +773,7 @@ def get_select_not_available_options(node,group,label):
 def get_select_yes_no_options(node, group):
     yes = TriccNodeSelectOption(
                 id = generate_id(),
-                name="1",
+                name=f"{TRICC_TRUE_VALUE}",
                 label="Yes",
                 select = node,
                 group = group,
@@ -777,7 +781,7 @@ def get_select_yes_no_options(node, group):
             )
     no = TriccNodeSelectOption(
                 id = generate_id(),
-                name="-1",
+                name=f"{TRICC_FALSE_VALUE}",
                 label="No",
                 select = node,
                 group = group,
@@ -1151,7 +1155,7 @@ def check_stashed_loop(stashed_nodes, prev_stashed_nodes, processed_nodes, len_p
                             es_node.__class__, 
                             es_node.get_name()))
                     if len(stashed_nodes) == len(prev_stashed_nodes):
-                        exit(-1)
+                        exit(1)
             else:
                 loop_count = 0
     else:
@@ -1517,11 +1521,11 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
             for past_instance in past_instances:
                 add_sub_expression(expression_inputs, get_node_expression(past_instance, processed_nodes=processed_nodes, is_calculate=False, is_prev=True))
             
-            if isinstance(node.applicability,(TriccStatic,TriccOperation, TriccReference)):
+            if isinstance(node.root.relevance,(TriccStatic,TriccOperation, TriccReference)):
                 if expression:
-                    expression = and_join(node.applicability, expression)
+                    expression = and_join([node.root.relevance, expression])
                 else:
-                    expression = node.applicability
+                    expression = node.root.relevance
             if expression and expression_inputs:
                 add_sub_expression(expression_inputs, expression)
                 expression = nand_join(expression, or_join(expression_inputs))
@@ -1605,7 +1609,7 @@ def get_diagnostic_node(code, display, severity, activity):
 def get_select_accept_reject_options(node, group):
     yes = TriccNodeSelectOption(
                 id = generate_id(),
-                name="1",
+                name=f"{TRICC_TRUE_VALUE}",
                 label="Accept",
                 select = node,
                 group = group,
@@ -1613,7 +1617,7 @@ def get_select_accept_reject_options(node, group):
             )
     no = TriccNodeSelectOption(
                 id = generate_id(),
-                name="-1",
+                name=f"{TRICC_FALSE_VALUE}",
                 label="Reject",
                 select = node,
                 group = group,

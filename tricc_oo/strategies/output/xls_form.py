@@ -24,7 +24,9 @@ from tricc_oo.visitors.tricc import (
     walktrhough_tricc_node_processed_stached,
     is_ready_to_process,
     process_reference,
-    get_node_expressions
+    get_node_expressions,
+    TRICC_TRUE_VALUE,
+    TRICC_FALSE_VALUE
 )
 from tricc_oo.serializers.xls_form import (
     CHOICE_MAP,
@@ -32,10 +34,13 @@ from tricc_oo.serializers.xls_form import (
     end_group,
     generate_xls_form_export,
     start_group,
+    BOOLEAN_MAP
 )
 from tricc_oo.strategies.output.base_output_strategy import BaseOutPutStrategy
 
 logger = logging.getLogger("default")
+
+
 
 """
     The XLSForm strategy is a strategy that will generate the XLSForm logic
@@ -345,10 +350,6 @@ class XLSFormStrategy(BaseOutPutStrategy):
                 r_expr = self.get_tricc_operation_expression(r)
             else:
                 r_expr = self.get_tricc_operation_operand(r)
-            if isinstance(r_expr, TriccStatic):
-                r_expr = r.value
-            if isinstance(r_expr, bool) or r_expr == 'true' or r_expr == 'false':
-                r_expr = 1 if r_expr is True or r_expr == 'true' else 0
             if isinstance(r_expr, TriccReference):
                 r_expr = self.get_tricc_operation_operand(r_expr)
             ref_expressions.append(r_expr)
@@ -410,15 +411,23 @@ class XLSFormStrategy(BaseOutPutStrategy):
                 return f"{ref_expressions[0]}({','.join(ref_expressions[1:])})"
         
     def tricc_operation_istrue(self, ref_expressions):
-        return f"{ref_expressions[0]}>0"
+        if str(BOOLEAN_MAP[str(TRICC_TRUE_VALUE)]).isnumeric():
+            return f"{ref_expressions[0]}>={BOOLEAN_MAP[str(TRICC_TRUE_VALUE)]}"
+        else:
+            return f"{ref_expressions[0]}={BOOLEAN_MAP[str(TRICC_TRUE_VALUE)]}"
     def tricc_operation_isfalse(self, ref_expressions):
-        return f"{ref_expressions[0]}<=0"
+        if str(BOOLEAN_MAP[str(TRICC_FALSE_VALUE)]).isnumeric():
+            return f"{ref_expressions[0]}={BOOLEAN_MAP[str(TRICC_FALSE_VALUE)]}"
+        else:
+            return f"{ref_expressions[0]}={BOOLEAN_MAP[str(TRICC_FALSE_VALUE)]}"
     def tricc_operation_parenthesis(self, ref_expressions):
         return f"({ref_expressions[0]})"
     def tricc_operation_selected(self, ref_expressions):
         parts = []
         for s in ref_expressions[1:]:
-            parts.append(f"selected({self.clean_coalesce(ref_expressions[0])}, {s})")
+            # for option with numeric value
+            cleaned_s = s if isinstance(s, str)  else '\''+str(s)+'\''
+            parts.append(f"selected({self.clean_coalesce(ref_expressions[0])}, {cleaned_s})")
         if len(parts) == 1:
             return parts[0]
         else:
@@ -503,8 +512,10 @@ class XLSFormStrategy(BaseOutPutStrategy):
         elif not ref_expressions or ref_expressions[0] == '':
             logger.warning("empty cast number")
             return '0'
-        elif ref_expressions[0] == 'True' or ref_expressions[0] is True:
-            return '1'
+        elif ref_expressions[0] == 'true' or ref_expressions[0] is True or ref_expressions[0] == BOOLEAN_MAP[str(TRICC_TRUE_VALUE)]:
+            return 1
+        elif ref_expressions[0] == 'false' or ref_expressions[0] is False or ref_expressions[0] == BOOLEAN_MAP[str(TRICC_FALSE_VALUE)]:
+            return 0
         else:
             return f"number({ref_expressions[0]})"
         
@@ -514,8 +525,10 @@ class XLSFormStrategy(BaseOutPutStrategy):
         elif not ref_expressions or ref_expressions[0] == '':
             logger.warning("empty cast number")
             return '0'
-        elif ref_expressions[0] == 'True' or ref_expressions[0] is True:
-            return '1'
+        elif ref_expressions[0] == 'true' or ref_expressions[0] is True or ref_expressions[0] == BOOLEAN_MAP[str(TRICC_TRUE_VALUE)]:
+            return 1
+        elif ref_expressions[0] == 'false' or ref_expressions[0] is False or ref_expressions[0] == BOOLEAN_MAP[str(TRICC_FALSE_VALUE)]:
+            return 0
         else:
             return f"int({ref_expressions[0]})"   
     def tricc_operation_zscore(self, ref_expressions):
@@ -627,10 +640,14 @@ class XLSFormStrategy(BaseOutPutStrategy):
             logger.warning(f"reference still used in the calculate {r.value}")
             return f"${{{get_export_name(r.value)}}}" 
         elif isinstance(r, TriccStatic):
+            if isinstance(r.value, bool) :#or r.value in ('true', 'false')
+                return BOOLEAN_MAP[str(TRICC_TRUE_VALUE)] if r.value else BOOLEAN_MAP[str(TRICC_FALSE_VALUE)]
+            if r.value == TRICC_TRUE_VALUE:
+                return BOOLEAN_MAP[str(TRICC_TRUE_VALUE)]
+            if r.value == TRICC_FALSE_VALUE:
+                return BOOLEAN_MAP[str(TRICC_FALSE_VALUE)]
             if isinstance(r.value, str):
                 return f"'{r.value}'"
-            if isinstance(r.value, bool):
-                return 1 if r.value else 0
             else:
                 return str(r.value)
         elif isinstance(r, str):

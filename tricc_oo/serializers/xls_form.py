@@ -9,11 +9,16 @@ from tricc_oo.converters.utils import clean_name, remove_html
 from tricc_oo.models.lang import SingletonLangClass
 from tricc_oo.models import *
 import re
-from tricc_oo.visitors.tricc import is_ready_to_process, process_reference, add_calculate
+from tricc_oo.visitors.tricc import is_ready_to_process, process_reference, add_calculate,    TRICC_TRUE_VALUE,    TRICC_FALSE_VALUE
 logger = logging.getLogger('default')
 
 langs = SingletonLangClass()
 TRICC_CALC_EXPRESSION = "${{{0}}}>0"
+
+BOOLEAN_MAP = {
+    str(TRICC_TRUE_VALUE): 1,
+    str(TRICC_FALSE_VALUE): 0,
+}
 
 def start_group( strategy, cur_group, groups, df_survey, df_calculate, relevance = False, **kwargs):
     name = get_export_name(cur_group)
@@ -308,6 +313,10 @@ def get_attr_if_exists(strategy, node, column, map_array):
                     return get_export_name(value)
                 else:
                     return get_export_name(node)
+            # convert value to boolean
+            if column == 'value' and node.list_name == 'yes_no':
+                return BOOLEAN_MAP[str(value)]
+                 
             elif isinstance(value, (TriccOperation, TriccStatic, TriccReference)):
                 expression =  strategy.get_tricc_operation_expression(value)
                 return expression.replace('$this', '.') if isinstance(expression, str) else expression
@@ -391,7 +400,7 @@ def generate_xls_form_export(strategy, node, processed_nodes, stashed_nodes, df_
                     for column in CHOICE_MAP:
                         values.append(get_xfrom_trad(strategy, node, column, CHOICE_MAP, True ))
                     # add only if not existing
-                    if len(df_choice[(df_choice['list_name'] == node.list_name) & (df_choice['value'] == node.name)])  == 0:
+                    if len(df_choice[(df_choice['list_name'] == node.list_name) & (df_choice['value'] == BOOLEAN_MAP.get(str(node.name), node.name))])  == 0:
                         df_choice.loc[len(df_choice)] = values
                 elif isinstance(node, TriccNodeMoreInfo):
                         df_survey.loc[len(df_survey)] = get_more_info_select(strategy, node)

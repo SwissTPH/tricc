@@ -112,47 +112,4 @@ def check_and_add_concept(code_system: CodeSystem, code: str, display: str, attr
     return new_concept
 
 
-def add_yeno_concepts(code_system: CodeSystem) -> ValueSet:
-    """
-    Adds 'yes' and 'no' concepts to the given CodeSystem after checking for duplicates.
-    Creates a ValueSet referencing these concepts.
-
-    Args:
-        code_system (CodeSystem): The CodeSystem to which 'yes' and 'no' concepts will be added.
-
-    Returns:
-        ValueSet: A FHIR ValueSet referencing the added concepts.
-
-    Raises:
-        ValueError: If a concept with the same code exists but has a different display.
-    """
-    # Add 'yes' and 'no' concepts after validation
-    
-    check_and_add_concept(code_system, "1", "Yes", {
-        'archetype': "options",
-        "datatype": 'Coded'
-        })
-                          
-    check_and_add_concept(code_system, "-1", "No", {
-        'archetype': "options",
-        "datatype": 'Coded'
-        })
-    # Create a ValueSet referencing the updated CodeSystem
-    value_set = ValueSet.construct(
-        url="http://example.org/fhir/ValueSet/yes-no",
-        name="YesNoValueSet",
-        status="active",
-        compose=ValueSetCompose.construct(
-            include=[
-                ValueSetComposeInclude.construct(
-                    system=code_system.url,
-                    concept=[
-                        {"code": "1", "display": "Yes"},
-                        {"code": "-1", "display": "No"}
-                    ]
-                )
-            ]
-        )
-    )
-
     return value_set

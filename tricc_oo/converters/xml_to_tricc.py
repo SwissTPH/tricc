@@ -973,7 +973,7 @@ def process_yesno_edge(edge, nodes):
     yes_option = None
     no_option = None
     for option in nodes[edge.source].options.values():
-        if option.name == "1":
+        if option.label.lower() == "yes":
             yes_option = option
         else:
             no_option = option
@@ -981,8 +981,10 @@ def process_yesno_edge(edge, nodes):
         pass
     elif label.lower() in TRICC_YES_LABEL:
         edge.source = yes_option.id
+        edge.source_external_id = None
     elif label.lower() in TRICC_NO_LABEL:
         edge.source = no_option.id
+        edge.source_external_id = None
     else:
         logger.warning(
             "edge {0} is coming from select {1}".format(
