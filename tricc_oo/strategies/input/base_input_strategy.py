@@ -38,7 +38,8 @@ class BaseInputStrategy:
                 if diag.name not in seen_diags:
                     unique_diags.append(diag)
                     seen_diags.add(diag.name)
-
+            severity_order = { "severe": 3, "moderate": 2, "mild":1, 'light': 0}
+            unique_diags = sorted(unique_diags, key=lambda x: (-getattr(severity_order, x.severity or 'light', 0), x.label))
             for process in self.processes:
                 if process in [p[0] for p in page_processes]:
                     sorted_pages[process] = [
