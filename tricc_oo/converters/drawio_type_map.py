@@ -18,7 +18,7 @@ TYPE_MAP = {
     },
     TriccNodeType.note: {
         "objects": ["UserObject", "object"],
-        "attributes": [],
+        "attributes": ['relevance'],
         "mandatory_attributes": ["label", "name"],
         "model": TriccNodeNote
     },
@@ -43,6 +43,8 @@ TYPE_MAP = {
             "filter",
             "constraint",
             "constraint_message",
+            "relevance",
+
         ],
         "mandatory_attributes": ["label", "name", "list_name"],
         "model": TriccNodeSelectOne
@@ -56,6 +58,7 @@ TYPE_MAP = {
             "filter",
             "constraint",
             "constraint_message",
+            "relevance",
         ],
         "mandatory_attributes": ["label", "name", "list_name"],
         "model": TriccNodeSelectMultiple
@@ -69,6 +72,7 @@ TYPE_MAP = {
             "save",
             "constraint_message",
             "required",
+            "relevance",
         ],
         "mandatory_attributes": ["label", "name"],
         "model": TriccNodeDecimal
@@ -82,6 +86,7 @@ TYPE_MAP = {
             "save",
             "constraint_message",
             "required",
+            "relevance",
         ],
         "mandatory_attributes": ["label", "name"],
         "model": TriccNodeInteger
@@ -89,13 +94,13 @@ TYPE_MAP = {
 
     TriccNodeType.text: {
         "objects": ["UserObject", "object"],
-        "attributes": [],
+        "attributes": ["relevance"],
         "mandatory_attributes": ["label", 'name'],
         "model": TriccNodeText
     },
     TriccNodeType.date: {
         "objects": ["UserObject", "object"],
-        "attributes": [],
+        "attributes": ["relevance"],
         "mandatory_attributes": ["label", "name"],
         "model": TriccNodeDate
     },
@@ -149,6 +154,7 @@ TYPE_MAP = {
             "filter",
             "constraint",
             "constraint_message",
+            "relevance",
         ],
         "mandatory_attributes": ["label", "name", "list_name"],
         "model": TriccNodeSelectYesNo
