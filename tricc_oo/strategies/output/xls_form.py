@@ -464,7 +464,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
                 else_found = True
                 parts.append(ref_expressions[i])
         #join the if
-        exp = ','.join(parts)
+        exp = ','.join(map(str,parts))
         # in case there is no default put ''
         if not else_found:
             exp += ",''"

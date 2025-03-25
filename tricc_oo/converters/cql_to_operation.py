@@ -85,9 +85,9 @@ class cqlToXlsFormVisitor(cqlVisitor):
     def visitBooleanLiteral(self, ctx):
         literal =  ctx.getChild(0).getText()
         if literal == 'true':
-            return True
+            return TriccStatic(True)
         elif literal == 'false':
-            return False
+            return TriccStatic(False)
         else:
             return None
    
