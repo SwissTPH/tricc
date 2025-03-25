@@ -314,7 +314,7 @@ def get_attr_if_exists(strategy, node, column, map_array):
                 else:
                     return get_export_name(node)
             # convert value to boolean
-            if column == 'value' and node.list_name == 'yes_no':
+            if column == 'value' and str(value) in BOOLEAN_MAP:
                 return BOOLEAN_MAP[str(value)]
                  
             elif isinstance(value, (TriccOperation, TriccStatic, TriccReference)):

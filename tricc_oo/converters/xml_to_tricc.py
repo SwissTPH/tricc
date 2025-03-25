@@ -67,6 +67,8 @@ def create_activity(diagram, media_path, project):
             label=name,
             form_id=form_id,
         )
+        if root.relevance is not None:
+            activity.applicability=root.relevance
         # activity definition is never instanciated
         if isinstance(root, TriccNodeActivityStart):
             activity.instance = 0
@@ -334,9 +336,9 @@ def get_nodes(diagram, activity):
         elif (
             issubclass(node.__class__, TriccNodeDisplayCalculateBase) 
             and not getattr(node, 'relevance', None)
-            and node.activity.root.relevance
+            and node.activity.applicability
         ):
-            node.applicability = node.activity.root.relevance
+            node.applicability = node.activity.applicability
             
 
     nodes.update(new_nodes)

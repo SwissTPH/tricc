@@ -1521,11 +1521,11 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
             for past_instance in past_instances:
                 add_sub_expression(expression_inputs, get_node_expression(past_instance, processed_nodes=processed_nodes, is_calculate=False, is_prev=True))
             
-            if isinstance(node.root.relevance,(TriccStatic,TriccOperation, TriccReference)):
+            if isinstance(node.applicability,(TriccStatic,TriccOperation, TriccReference)):
                 if expression:
-                    expression = and_join([node.root.relevance, expression])
+                    expression = and_join([node.applicability, expression])
                 else:
-                    expression = node.root.relevance
+                    expression = node.applicability
             if expression and expression_inputs:
                 add_sub_expression(expression_inputs, expression)
                 expression = nand_join(expression, or_join(expression_inputs))
@@ -1553,8 +1553,8 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
                 else:
                     expression = end_operation
 
-            elif node.root.relevance:
-                expression = and_join([expression, node.root.relevance])
+            elif node.applicability:
+                expression = and_join([expression, node.applicability])
               
     if negate:
         if negate_expression is not None:
