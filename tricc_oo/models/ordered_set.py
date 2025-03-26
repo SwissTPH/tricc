@@ -86,6 +86,39 @@ class OrderedSet(Sequence):
         sorted_keys = sorted(self._od.keys(), key=key, reverse=reverse)
         self._od = OrderedDict.fromkeys(sorted_keys)
         
+    def find_last(self, filter: callable):
+        # Iterate over items in reverse order
+        for item in reversed(list(self._od.keys())):
+            if filter(item):
+                return item
+        return None  # Return None if no matching item is found
+
+    def find_first(self, filter: callable):
+        for item in list(self._od.keys()):
+            if filter(item):
+                return item
+        return None  # Return None if no matching item is found
+
+
+    def find_prev(self, obj, filter: callable):
+        # Get the list of keys (items) in the OrderedSet
+        keys = list(self._od.keys())
+        
+        # If the object is not in the OrderedSet, start from the end
+        if obj not in self._od:
+            start_index = len(keys) - 1
+        else:
+            # Find the index of the given object
+            start_index = keys.index(obj)
+        
+        # Iterate backward from the start_index
+        for i in range(start_index - 1, -1, -1):
+            item = keys[i]
+            if filter(item):
+                return item
+        
+        return None  # Return None if no matching item is found before the object
+
     @classmethod
     def __get_pydantic_core_schema__(cls, source_type: type, handler: GetCoreSchemaHandler) -> CoreSchema:
         # Define how Pydantic should handle this type

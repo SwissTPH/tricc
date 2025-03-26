@@ -134,7 +134,7 @@ class DrawioStrategy(BaseInputStrategy):
 
         # do the calculation, expression ...
 
-    def linking_nodes(self, node, page, pages, processed_nodes=set(), path=[]):
+    def linking_nodes(self, node, page, pages, processed_nodes=OrderedSet(), path=[]):
         # get the edges that have that node as source
 
 

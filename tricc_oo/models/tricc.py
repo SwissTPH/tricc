@@ -16,7 +16,7 @@ class TriccNodeCalculateBase(TriccNodeBaseModel):
     #input: Dict[TriccOperation, TriccNodeBaseModel] = {}
     reference: Union[List[Union[TriccNodeBaseModel,TriccStatic]], Expression, TriccStatic] = None
     expression_reference: Union[str, TriccOperation] = None
-    last: bool = True
+    last: bool = None
     datatype: str = 'boolean'
     # to use the enum value of the TriccNodeType
     class Config:

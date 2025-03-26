@@ -155,7 +155,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
 
     def activity_export(self, activity, processed_nodes=None, **kwargs):
         if processed_nodes is None:
-            processed_nodes = set()
+            processed_nodes = OrderedSet()
         stashed_nodes = OrderedSet()
         # The stashed node are all the node that have all their prevnode processed but not from the same group
         # This logic works only because the prev node are ordered by group/parent ..

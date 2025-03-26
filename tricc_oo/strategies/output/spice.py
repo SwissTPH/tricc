@@ -285,7 +285,7 @@ class SpiceStrategy(BaseOutPutStrategy):
             )
 
 
-    def activity_export(self, activity, processed_nodes=set(), **kwargs):
+    def activity_export(self, activity, processed_nodes=OrderedSet(), **kwargs):
         stashed_nodes = OrderedSet()
         calculates = []
         cur_group = activity

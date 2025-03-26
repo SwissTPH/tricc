@@ -39,14 +39,17 @@ def get_last_version(name, processed_nodes,  _list=None):
     if isinstance(_list, dict):
         _list = _list[name].values() if name in _list else []
     if _list is None:
-        _list = get_versions(name, processed_nodes)
+        if isinstance(processed_nodes, OrderedSet):
+            return processed_nodes.find_last(lambda item: hasattr(item, 'name') and item.name == name and not isinstance(item, TriccNodeSelectOption))
+        else:    
+            _list = get_versions(name, processed_nodes)
     if _list:
         for  sim_node in _list:
             # get the max version while not taking a node that have a next node before next calc
             if ((max_version is None 
                 or  max_version.activity.path_len < sim_node.activity.path_len
                 or  max_version.path_len < sim_node.path_len 
-                or max_version.path_len == sim_node.path_len and hash(max_version.id) < hash(sim_node.id)
+                or (max_version.path_len == sim_node.path_len and hash(max_version.id) < hash(sim_node.id))
                 ) ):
                 max_version = sim_node
     if not max_version:
@@ -110,24 +113,53 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
         ):
             if kwargs.get('warn', True):
                 logger.debug('Processing relevance for node {0}'.format(node.get_name()))
-            last_version = get_last_version(node.name, processed_nodes) if issubclass(node.__class__, (TriccNodeDisplayModel)) and not isinstance(node, TriccNodeSelectOption)  else  None
+            last_version = get_last_version(node.name, processed_nodes) if issubclass(node.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase)) and not isinstance(node, TriccNodeSelectOption)  else  None
+            #last_version = processed_nodes.find_prev(node, lambda item: hasattr(item, 'name') and item.name == node.name)
             if last_version:
                 # 0-100 for manually specified instance.  100-200 for auto instance 
                 node.version = last_version.version + 1
                 last_version.last = False
                 node.path_len = max(node.path_len, last_version.path_len + 1)
                 # FIXME this is for XLS form where only calculate are evaluated for a activity that is not triggered
-                if issubclass(node.__class__, (TriccNodeCalculateBase, TriccNodeNote)):
+                if not issubclass(node.__class__, (TriccNodeInputModel)):
                     node.last = True
+                    if (
+                        issubclass(node.__class__, (TriccNodeDisplayCalculateBase )) and node.name is not None
+                    ):
+                        node_name = node.name if not isinstance(node, TriccNodeEnd) else 'tricc_end'
+
+                                #logger.debug("set last to false for node {}  and add its link it to next one".format(last_used_calc.get_name()))
+                        if node.prev_nodes:    
+                            set_prev_next_node(last_version, node)
+                        else:
+                            expression = node.expression or node.expression_reference or node.relevance
+                            datatype = expression.get_datatype()
+                            if datatype == 'boolean':
+                                expression_reference = TriccOperation(
+                                    TriccOperator.OR,
+                                    [TriccOperation(TriccOperator.ISTRUE, [last_version]), expression]
+                                )
+                            
+                            elif datatype == 'number':
+                                expression = TriccOperation(
+                                    TriccOperator.PLUS,
+                                    [last_version, expression] 
+                                )
+                            else:
+                                expression = TriccOperation(
+                                    TriccOperator.COALESCE,
+                                    [last_version, expression] 
+                                )
+                            if node.expression:
+                                node.expression = expression
+                            elif node.expression_reference:
+                                node.expression_reference = expression
+                            elif node.relevance:
+                                node.relevance = expression
                 else:
                     node.last = False
-                    # versions = get_versions(node.name, processed_nodes)
-                    # if the last version is already a coalesce no need to take all lat version
-                    # if len(versions)>1:
-                    #     if issubclass(last_version.__class__, TriccNodeCalculateBase):
-                    #         versions = [last_version]
-                    #     else:
-                    #         logger.warning(f"several version of {node.get_name()} without a coalesce wrap")
+                    
+                    
                     calc = TriccNodeCalculate(
                         id=generate_id(),
                         name=node.name,
@@ -151,8 +183,9 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
                                 last_version
                             ]
                         )
+                    
                 
-                
+
         # if has prev, create condition
             if hasattr(node, 'relevance') and (node.relevance is None or isinstance(node.relevance, TriccOperation)):
                 node.relevance = get_node_expressions(node, processed_nodes=processed_nodes)
@@ -182,28 +215,14 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
                         if issubclass(r.__class__, (TriccNodeDisplayCalculateBase )):
                             add_used_calculate(node, r, calculates, used_calculates, processed_nodes)
                 
-                generate_calculates(node,calculates, used_calculates,processed_nodes=processed_nodes)
-            if last_version:
+                generate_calculates(node,calculates, used_calculates,processed_nodes=processed_nodes)                
+            if last_version and hasattr(node, 'relevance'):
                 if isinstance(node, TriccNodeInputModel):
                     version_relevance =  TriccOperation(
                             TriccOperator.ISNULL,
                             [last_version]
                         )
                 elif last_version.relevance:
-                    if last_version.activity.relevance:
-                        version_relevance = TriccOperation(
-                                TriccOperator.NOT,
-                                [
-                                    TriccOperation(
-                                        TriccOperator.AND,
-                                        [
-                                            last_version.relevance,
-                                            last_version.activity.relevance
-                                        ]
-                                    )
-                                ]
-                            )
-                    else:
                         version_relevance = TriccOperation(
                                 TriccOperator.NOT,
                                 [
@@ -236,53 +255,6 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
                     elif hasattr(node, 'relevance'):
                         node.relevance = version_relevance
             
-            if (
-                issubclass(node.__class__, (TriccNodeDisplayCalculateBase )) and node.name is not None
-            ):
-                node_name = node.name if not isinstance(node, TriccNodeEnd) else 'tricc_end'
-                # generate the calc node version by looking in the processed calculate
-                # TODO the calculates should not be required with the latest version of get_last_version
-                last_calc = get_last_version(
-                    node_name,
-                    [p for p in processed_nodes if issubclass(p.__class__, (TriccNodeCalculateBase, TriccNodeDisplayCalculateBase))]
-                )
-                
-                # add calculate is added after the version collection so it is 0 in case there is no calc found_                add_calculate(calculates,node)  
-                # merge is there is unused version ->
-                # current node not yet in the list so 1 item is enough
-                node_to_delete = None
-                if last_calc is not None:
-                    node.path_len = max(node.path_len, last_calc.path_len + 1 )
-                    node.version = last_calc.version + 1
-                        #logger.debug("set last to false for node {}  and add its link it to next one".format(last_used_calc.get_name()))
-                    if node.prev_nodes:    
-                        set_prev_next_node(last_calc,node)
-                    else:
-                        expression = node.expression or node.expression_reference or node.relevance
-                        datatype = expression.get_datatype()
-                        if datatype == 'boolean':
-                            expression_reference = TriccOperation(
-                                TriccOperator.OR,
-                                [TriccOperation(TriccOperator.ISTRUE, [last_calc]), expression]
-                            )
-                        
-                        elif datatype == 'number':
-                            expression = TriccOperation(
-                                TriccOperator.PLUS,
-                                [last_version, expression] 
-                            )
-                        else:
-                            expression = TriccOperation(
-                                TriccOperator.COALESCE,
-                                [last_version, expression] 
-                            )
-                        if node.expression:
-                            node.expression = expression
-                        elif node.expression_reference:
-                            node.expression_reference = expression
-                        elif node.relevance:
-                            node.relevance = expression
-                    last_calc.last = False
                     #update_calc_version(calculates,node_name)
             #if hasattr(node, 'next_nodes'):
                 #node.next_nodes=reorder_node_list(node.next_nodes, node.group)
@@ -690,7 +662,7 @@ def process_operation_reference(operation, node, processed_nodes, calculates, us
                 last_found = node_in_act[0]
         else:
             last_found = get_last_version(name=ref, processed_nodes=processed_nodes)
-        if last_found is None:
+        if last_found is None:    
             if codesystems:
                 concept =  lookup_codesystems_code(codesystems, ref)
                 if not concept:
@@ -974,7 +946,7 @@ def get_data_for_log(node):
         node.instance)
 
 def stashed_node_func(node, callback, recursive=False, **kwargs):
-    processed_nodes = kwargs.get('processed_nodes', set())
+    processed_nodes = kwargs.get('processed_nodes', OrderedSet())
     stashed_nodes = kwargs.get('stashed_nodes', OrderedSet())
     path_len = 0
     walktrhough_tricc_node_processed_stached(node, callback, processed_nodes, stashed_nodes, path_len, recursive,
@@ -1574,7 +1546,7 @@ def export_proposed_diags(activity, diags=None, **kwargs):
         if isinstance(node, TriccNodeActivity):
             diags = export_proposed_diags(node, diags, **kwargs)
         if isinstance(node, TriccNodeProposedDiagnosis):
-            if node.last\
+            if node.last is not False\
                 and not any([diag.name  == node.name for diag in diags]):
                     diags.append(node)
     return diags
