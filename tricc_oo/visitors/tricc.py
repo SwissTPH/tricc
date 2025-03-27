@@ -31,8 +31,10 @@ def get_max_version(dict):
     return max_version
 
 def get_versions(name, iterable):
-    return [n for n in iterable if ((name == 'tricc_end' and isinstance(n, TriccNodeEnd)) or  n.name == name) and not isinstance(n, TriccNodeSelectOption)]
+    return [n for n in iterable if version_filter(name)(n)]
 
+def version_filter(name):
+    return lambda item: hasattr(item, 'name') and ( (name == 'tricc_end' and isinstance(item, TriccNodeEnd)) or item.name == name ) and not isinstance(item, TriccNodeSelectOption)
 
 def get_last_version(name, processed_nodes,  _list=None):
     max_version = None
@@ -40,7 +42,7 @@ def get_last_version(name, processed_nodes,  _list=None):
         _list = _list[name].values() if name in _list else []
     if _list is None:
         if isinstance(processed_nodes, OrderedSet):
-            return processed_nodes.find_last(lambda item: hasattr(item, 'name') and item.name == name and not isinstance(item, TriccNodeSelectOption))
+            return processed_nodes.find_last(version_filter(name))
         else:    
             _list = get_versions(name, processed_nodes)
     if _list:
