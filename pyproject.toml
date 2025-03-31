@@ -16,7 +16,7 @@ classifiers = [
 ]
 dependencies = [
     "lxml",
-    "html2text",
+    "markdownify",
     "pydantic",
     "babel",
     "xlsxwriter",
