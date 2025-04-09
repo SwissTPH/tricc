@@ -117,7 +117,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
         # pause
         ends = []
         for p in self.project.pages.values():
-            p_ends = list(filter(lambda x:  issubclass(x.__class__, TriccNodeEnd) and hasattr(x, 'hint'), p.nodes.values() ))
+            p_ends = list(filter(lambda x:  issubclass(x.__class__, TriccNodeEnd) and getattr(x, 'hint', None) is not None, p.nodes.values() ))
             if p_ends:
                 ends += p_ends
         if ends:
