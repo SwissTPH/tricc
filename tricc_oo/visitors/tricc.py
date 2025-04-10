@@ -115,7 +115,8 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
         ):
             if kwargs.get('warn', True):
                 logger.debug('Processing relevance for node {0}'.format(node.get_name()))
-            last_version = get_last_version(node.name, processed_nodes) if issubclass(node.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase)) and not isinstance(node, TriccNodeSelectOption)  else  None
+            node_name = node.name if not isinstance(node, TriccNodeEnd) else 'tricc_end'
+            last_version = get_last_version(node_name, processed_nodes) if issubclass(node.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase)) and not isinstance(node, TriccNodeSelectOption)  else  None
             #last_version = processed_nodes.find_prev(node, lambda item: hasattr(item, 'name') and item.name == node.name)
             if last_version:
                 # 0-100 for manually specified instance.  100-200 for auto instance 
