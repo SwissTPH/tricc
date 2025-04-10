@@ -224,7 +224,7 @@ class TriccNodeActivity(TriccNodeBaseModel):
             TriccNodeEnd,
             TriccNodeActivityEnd,
         )
-        return  list(filter(lambda x:  issubclass(x.__class__, (TriccNodeEnd,TriccNodeActivityEnd)), self.nodes.values()))
+        return  list(filter(lambda x:  isinstance(x, (TriccNodeActivityEnd)) or (isinstance(x, (TriccNodeEnd)) and isinstance(self.root, TriccNodeMainStart )), self.nodes.values()))
 
 
 

@@ -29,7 +29,11 @@ TRICC_FOLLOW_LABEL = ["follow", "suivre", "continue"]
 NO_LABEL = "NO_LABEL"
 TRICC_LIST_NAME = "list_{0}"
 import logging
-
+DISPLAY_ATTRIBUTES = [
+    'label',
+    'hint',
+    'help'
+]
 logger = logging.getLogger("default")
 
 
@@ -182,7 +186,7 @@ def process_edges(diagram, media_path, activity, nodes):
             if image is not None:
                 images.append({"file_path": enriched, "image_content": image})
 
-        elif isinstance(nodes[edge.target], (TriccNodeActivityEnd, TriccNodeEnd)):
+        elif isinstance(nodes[edge.target], (TriccNodeActivityEnd)) or (isinstance(nodes[edge.target], (TriccNodeEnd)) and isinstance(activity.root, TriccNodeMainStart )):
             end_found = True
         if (
             edge.target in nodes
@@ -236,7 +240,7 @@ def process_edges(diagram, media_path, activity, nodes):
                     )
                 )
     if not end_found:
-        fake_end = TriccNodeActivityEnd(id=generate_id(), activity=activity, group=activity)
+        fake_end = TriccNodeActivityEnd(id=generate_id(f"e{activity.name}"), activity=activity, group=activity)
         last_nodes = [
             n for n in list(activity.nodes.values())
             if (
@@ -486,8 +490,9 @@ def get_max_named_version(calculates, name):
 
 
 def inject_bridge_path(node, nodes):
-    calc_id = generate_id()
-    calc_name = "path_" + calc_id
+    calc_name = "p" + node.id
+    calc_id = generate_id(calc_name)
+    
     data = {
         "id": calc_id,
         "group": node.group,
@@ -753,10 +758,12 @@ def set_mandatory_attribute(elm, mandatory_attributes, diagram=None):
             exit(1)
         if attributes == "link":
             param[attributes] = clean_link(attribute_value)
-        elif attributes in ("parent", "id", "source", "target"):
-            param[attributes] = attribute_value
+
         elif attribute_value is not None:
-            param[attributes] = remove_html(attribute_value.strip())
+            if attributes in DISPLAY_ATTRIBUTES:
+                param[attributes] = remove_html(attribute_value.strip())
+            else:
+                param[attributes] = attribute_value.strip() if isinstance(attribute_value, str) else attribute_value
     return param
 
 
