@@ -62,4 +62,5 @@ def remove_html(string):
 
     for key, original in placeholders.items():
         text = text.replace(key, original)
+        text = text.replace("_", "\\_")
     return text
