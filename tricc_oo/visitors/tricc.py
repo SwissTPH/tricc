@@ -115,7 +115,8 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
         ):
             if kwargs.get('warn', True):
                 logger.debug('Processing relevance for node {0}'.format(node.get_name()))
-            last_version = get_last_version(node.name, processed_nodes) if issubclass(node.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase)) and not isinstance(node, TriccNodeSelectOption)  else  None
+            node_name = node.name if not isinstance(node, TriccNodeEnd) else 'tricc_end'
+            last_version = get_last_version(node_name, processed_nodes) if issubclass(node.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase)) and not isinstance(node, TriccNodeSelectOption)  else  None
             #last_version = processed_nodes.find_prev(node, lambda item: hasattr(item, 'name') and item.name == node.name)
             if last_version:
                 # 0-100 for manually specified instance.  100-200 for auto instance 
@@ -128,9 +129,7 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
                     if (
                         issubclass(node.__class__, (TriccNodeDisplayCalculateBase )) and node.name is not None
                     ):
-                        node_name = node.name if not isinstance(node, TriccNodeEnd) else 'tricc_end'
-
-                                #logger.debug("set last to false for node {}  and add its link it to next one".format(last_used_calc.get_name()))
+                        #logger.debug("set last to false for node {}  and add its link it to next one".format(last_used_calc.get_name()))
                         if node.prev_nodes:    
                             set_prev_next_node(last_version, node)
                         else:
@@ -163,7 +162,7 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
                     
                     
                     calc = TriccNodeCalculate(
-                        id=generate_id(),
+                        id=generate_id(f"save{node.id}"),
                         name=node.name,
                         path_len=node.path_len+1,
                         version=last_version.version + 2,
@@ -305,7 +304,7 @@ def get_max_named_version(calculates,name):
     return max
 
 def get_count_node(node):
-    count_id = generate_id()
+    count_id = generate_id(f"count{node.id}")
     count_name = "cnt_"+count_id
     return TriccNodeCount(
         id = count_id,
@@ -332,7 +331,7 @@ def get_activity_wait(prev_nodes, nodes_to_wait, next_nodes, replaced_node = Non
  
     activity = activity or prev_node.activity
     calc_node = TriccNodeWait(
-            id = "ar_"+generate_id(),
+            id = generate_id(f"ar{''.join([x.id for x in nodes_to_wait])}{activity.id}"),
             reference = nodes_to_wait,
             activity = activity,
             group = activity,
@@ -360,7 +359,7 @@ def get_bridge_path(prev_nodes, node=None,edge_only=False):
     p_p_node = next(iterator)    
     if node is None:
         node = p_p_node
-    calc_id  = generate_id()
+    calc_id  = generate_id(f"br{''.join([x.id for x in prev_nodes])}{node.id}")
     calc_name = "path_"+calc_id
     data = {
         'id': calc_id,
@@ -479,7 +478,7 @@ def generate_calculates(node,calculates, used_calculates,processed_nodes):
             calc_node.name=calculate_name
             calc_node.label =  "save select: " +node.get_name()        
         else:
-            calc_id = generate_id()
+            calc_id = generate_id(f"autosave{node.id}")
             calc_node = TriccNodeCalculate(
                 name=calculate_name,
                 id = calc_id,
@@ -736,7 +735,7 @@ def add_used_calculate(node, prev_node, calculates, used_calculates, processed_n
         
 def get_select_not_available_options(node,group,label):
     return {0:TriccNodeSelectOption(
-                id = generate_id(),
+                id = generate_id(f"notavaialble{node.id}"),
                 name="1",
                 label=label,
                 select = node,
@@ -746,7 +745,7 @@ def get_select_not_available_options(node,group,label):
         
 def get_select_yes_no_options(node, group):
     yes = TriccNodeSelectOption(
-                id = generate_id(),
+                id = generate_id(f'yes{node.id}'),
                 name=f"{TRICC_TRUE_VALUE}",
                 label="Yes",
                 select = node,
@@ -754,7 +753,7 @@ def get_select_yes_no_options(node, group):
                 list_name = node.list_name
             )
     no = TriccNodeSelectOption(
-                id = generate_id(),
+                id = generate_id(f'no{node.id}'),
                 name=f"{TRICC_FALSE_VALUE}",
                 label="No",
                 select = node,
@@ -1113,21 +1112,38 @@ def check_stashed_loop(stashed_nodes, prev_stashed_nodes, processed_nodes, len_p
                     logger.critical("Stashed node list was unchanged: loop likely or unresolved dependence")
                     waited, looped =  get_all_dependant(stashed_nodes, stashed_nodes, processed_nodes)               
                     logger.debug(f"{len(looped)} nodes waiting stashed nodes")
-                    logger.info("looped nodes")
-                    for es_node in looped:
+                    logger.info("unresolved reference")
+                    for es_node in [n for n in stashed_nodes if isinstance(n, TriccReference)]:
                         logger.info("Stashed node {}:{}|{} {}".format(
                             es_node.activity.get_name() if hasattr(es_node,'activity') else '' ,
                             es_node.activity.instance if hasattr(es_node,'activity') else '',
                             es_node.__class__, 
                             es_node.get_name()))
+                    logger.info("looped nodes")
+                    for dep_list in looped:
+                        for d in looped[dep_list]:
+                            if d.get_name() == dep_list:
+                                logger.critical("[{}] depends on itself".format(
+                                    dep_list, 
+                                    ))
+                            logger.error("[{}] depends on [{}]".format(
+                                dep_list, str(d)
+                                ))
+                        if dep_list in waited:
+                            for d in waited[dep_list]:
+                                logger.warning("[{}] depends on [{}]".format(
+                                    dep_list, str(d)
+                                    ))
+                        
                         #reverse_walkthrough(es_node, es_node, print_trace, processed_nodes, stashed_nodes)
                     logger.info("waited nodes")
-                    for es_node in waited:
-                        logger.info("Stashed node {}:{}|{} {}".format(
-                            es_node.activity.get_name() if hasattr(es_node,'activity') else '' ,
-                            es_node.activity.instance if hasattr(es_node,'activity') else '',
-                            es_node.__class__, 
-                            es_node.get_name()))
+                    for dep_list in waited:
+                        if dep_list not in looped:
+                            for d in waited[dep_list]:
+                                logger.warning("[{}] depends on [{}]".format(
+                                    dep_list, d.get_name()
+                                    ))
+                            
                     if len(stashed_nodes) == len(prev_stashed_nodes):
                         exit(1)
             else:
@@ -1136,12 +1152,25 @@ def check_stashed_loop(stashed_nodes, prev_stashed_nodes, processed_nodes, len_p
         loop_count = 0
     return loop_count
 
+
+def add_to_tree(tree, n, d):
+    n_str = str(n)
+    if n_str not in tree:
+        tree[n_str] = []
+    if d not in tree[n_str]:
+        tree[n_str].append(d)
+    return tree
+
         
-def get_all_dependant(loop, stashed_nodes, processed_nodes, depth=0, waited=[] , looped=[]):
+def get_all_dependant(loop, stashed_nodes, processed_nodes, depth=0, waited=None , looped=None):
+    if looped is None:
+        looped = {}
+    if waited is None:
+        waited = {}
     for n in loop:
         dependant = OrderedSet()
         i=0
-        logger.critical(f"{i}: {n.__class__}::{n.get_name()}::{getattr(n,'instance','')}::{process_reference(n, processed_nodes, [])}")
+        #logger.critical(f"{i}: {n.__class__}::{n.get_name()}::{getattr(n,'instance','')}::{process_reference(n, processed_nodes, [])}")
         i += 1
         if hasattr(n, 'prev_nodes') and n.prev_nodes:
             dependant =  dependant | n.prev_nodes
@@ -1156,16 +1185,15 @@ def get_all_dependant(loop, stashed_nodes, processed_nodes, depth=0, waited=[] ,
                 if isinstance(d, TriccReference):
                     if not any(n.name == d.value for n in processed_nodes):
                         if not any(n.name == d.value for n in stashed_nodes):
-                            waited.append(d)
+                            waited = add_to_tree(waited, n, d) 
                         else :
-                            looped.append(d)
+                            looped = add_to_tree(looped, n, d)
                 
                 elif d  not in processed_nodes:
-                    
-                    if d not in stashed_nodes:
-                        waited.append(d)
+                    if d in stashed_nodes:
+                        looped = add_to_tree(looped, n, d) 
                     else :
-                        looped.append(d)
+                        waited = add_to_tree(waited, n, d) 
     if depth < MAX_DRILL:
         return get_all_dependant(waited, stashed_nodes, processed_nodes, depth+1, waited , looped)
 
@@ -1556,7 +1584,7 @@ def export_proposed_diags(activity, diags=None, **kwargs):
 
 def get_accept_diagnostic_node(code, display, severity, activity):
     node = TriccNodeAcceptDiagnostic(
-        id=generate_id(),
+        id=generate_id("pre_final." + code),
         name="pre_final." + code,
         label=display,
         list_name="acc_rej",
@@ -1569,7 +1597,7 @@ def get_accept_diagnostic_node(code, display, severity, activity):
 
 def get_diagnostic_node(code, display, severity, activity):
     node = TriccNodeAcceptDiagnostic(
-        id=generate_id(),
+        id=generate_id("final." + code),
         name="final." + code,
         label=display,
         list_name="acc_rej",
@@ -1582,7 +1610,7 @@ def get_diagnostic_node(code, display, severity, activity):
 
 def get_select_accept_reject_options(node, group):
     yes = TriccNodeSelectOption(
-                id = generate_id(),
+                id = generate_id(f'accept{node.id}'),
                 name=f"{TRICC_TRUE_VALUE}",
                 label="Accept",
                 select = node,
@@ -1590,7 +1618,7 @@ def get_select_accept_reject_options(node, group):
                 list_name = node.list_name
             )
     no = TriccNodeSelectOption(
-                id = generate_id(),
+                id = generate_id(f'reject{node.id}'),
                 name=f"{TRICC_FALSE_VALUE}",
                 label="Reject",
                 select = node,
@@ -1601,13 +1629,13 @@ def get_select_accept_reject_options(node, group):
 
 def create_determine_diagnosis_activity(diags):
     start = TriccNodeActivityStart(
-        id=generate_id(),
+        id=generate_id('start.determine-diagnosis'),
         name="start.determine-diagnosis"
     )
 
     
     activity = TriccNodeActivity(
-        id=generate_id(),
+        id=generate_id('activity-determine-diagnosis'),
         name='determine-diagnosis',
         label='Diagnosis',
         root=start,
@@ -1619,7 +1647,7 @@ def create_determine_diagnosis_activity(diags):
     diags_conf = []
     r_diags_conf = []
     end = TriccNodeActivityEnd(
-        id=generate_id(),
+        id=generate_id("end.determine-diagnosis"),
         name="end.determine-diagnosis",
         activity=activity,
         group=activity,
@@ -1629,7 +1657,7 @@ def create_determine_diagnosis_activity(diags):
         d = get_diagnostic_node(proposed.name, proposed.label, proposed.severity, activity)
         diags_conf.append(d)
         r = TriccNodeRhombus(
-            id=generate_id(),
+            id=generate_id(f"proposed-rhombus{proposed.id}"),
             expression_reference=TriccOperation(
                 TriccOperator.ISTRUE,
                 [TriccReference(proposed.name)]

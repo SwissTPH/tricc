@@ -102,7 +102,7 @@ class TriccRhombusMixIn():
                     exit(1)
         instance.reference = reference
         instance.expression_reference = expression_reference
-        instance.name = get_rand_name()
+        instance.name = get_rand_name(self.id)
         return instance
 
 

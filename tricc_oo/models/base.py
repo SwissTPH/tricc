@@ -116,7 +116,7 @@ class TriccBaseModel(BaseModel):
     def make_instance(self, nb_instance, **kwargs):
         instance = self.copy()
         # change the id to avoid collision of name
-        instance.id = generate_id()
+        instance.id = generate_id(f"{self.id}{nb_instance}")
         instance.instance = int(nb_instance)
         instance.base_instance = self
 
@@ -149,7 +149,7 @@ class TriccBaseModel(BaseModel):
     
     def __init__(self, **data):
         if 'id' not in data:
-            data['id'] = generate_id()
+            data['id'] = generate_id(str(data))
         super().__init__(**data)
 
 
@@ -181,7 +181,7 @@ class TriccGroup(TriccBaseModel):
     def __init__(self, **data):
         super().__init__(**data)
         if self.name is None:
-            self.name = generate_id()
+            self.name = generate_id(str(data))
 
     def get_name(self):
         result = str(super().get_name())

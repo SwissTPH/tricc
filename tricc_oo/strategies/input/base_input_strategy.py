@@ -53,14 +53,14 @@ class BaseInputStrategy:
                     project.start_pages['determine-diagnosis'] = diags_activity
             root_process = sorted_pages[list(sorted_pages.keys())[0]][0].root
             root = TriccNodeMainStart(
-                id=generate_id(),
+                id=generate_id('s-determine-diagnosis'),
                 form_id=root_process.form_id,
                 label=root_process.label
             )
             nodes = {}
             nodes[root.id] = root
             app = TriccNodeActivity(
-                id=generate_id(),
+                id=generate_id('a-determine-diagnosis'),
                 name=root_process.name,
                 root=root,
                 nodes=nodes
