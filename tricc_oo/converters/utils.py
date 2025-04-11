@@ -58,9 +58,15 @@ def remove_html(string):
 
     protected_text = re.sub(r"\${.*?\}", replace_placeholders, string)
 
-    text = md(protected_text, strip=["img", "table", "a"])
+    text = md(
+        protected_text,
+        strip=["img", "table", "a"],
+        strong_em_symbol="*",
+        escape_underscores=False,
+        escape_asterisks=False,
+        bullets=["-", "*"],
+    )
 
     for key, original in placeholders.items():
         text = text.replace(key, original)
-        text = text.replace("_", "\\_")
     return text
