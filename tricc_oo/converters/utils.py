@@ -49,17 +49,8 @@ def get_rand_name(name=None, length=8):
 
 # the soup.text strips off the html formatting also
 def remove_html(string):
-    placeholders = {}
-
-    def replace_placeholders(match):
-        key = f"__PLACEHOLDER_{len(placeholders)}__"
-        placeholders[key] = match.group(0)
-        return key
-
-    protected_text = re.sub(r"\${.*?\}", replace_placeholders, string)
-
     text = md(
-        protected_text,
+        string,
         strip=["img", "table", "a"],
         strong_em_symbol="*",
         escape_underscores=False,
@@ -67,6 +58,4 @@ def remove_html(string):
         bullets=["-", "*"],
     )
 
-    for key, original in placeholders.items():
-        text = text.replace(key, original)
     return text
