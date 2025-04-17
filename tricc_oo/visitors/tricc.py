@@ -7,7 +7,7 @@ from tricc_oo.visitors.tricc import *
 from tricc_oo.converters.datadictionnary import lookup_codesystems_code
 
 logger = logging.getLogger("default")
-
+ONE_QUESTION_AT_A_TIME = False
 
 TRICC_TRUE_VALUE = 'true'
 TRICC_FALSE_VALUE = 'false'
@@ -1504,7 +1504,7 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
             negate_expression = get_calculation_terms(node, processed_nodes=processed_nodes, is_calculate=is_calculate, negate=True)
         else:
             expression = get_calculation_terms(node, processed_nodes=processed_nodes, is_calculate=is_calculate)
-    elif is_prev and not is_calculate and hasattr(node, 'required') and node.required:
+    elif ONE_QUESTION_AT_A_TIME and is_prev and not is_calculate and hasattr(node, 'required') and node.required:
         expression = get_required_node_expression(node)
     if expression is None:
         expression = get_prev_node_expression(node, processed_nodes=processed_nodes, is_calculate=is_calculate)
