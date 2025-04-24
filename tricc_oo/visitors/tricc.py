@@ -1794,7 +1794,8 @@ def get_prev_node_expression( node, processed_nodes, is_calculate=False, exclude
         # if isinstance(node,  TriccNodeExclusive):
         #    expression =  TRICC_NEGATE.format(expression)
     # only used for activityStart 
-    
+    else:
+        expression = TriccStatic(True)
     return expression
 
 def get_activity_end_terms( node, processed_nodes, process=None):
