@@ -11,6 +11,7 @@ from tricc_oo.visitors.tricc import (
     stashed_node_func,
     TriccProject
 )
+from tricc_oo.visitors.utils import PROCESSES
 from tricc_oo.converters.codesystem_to_ocl import transform_fhir_to_ocl
 
 from tricc_oo.models import *
@@ -22,23 +23,7 @@ logger = logging.getLogger("default")
 
 class DrawioStrategy(BaseInputStrategy):
 
-    processes = [
-        "triage",
-        "registration",
-        "emergency-care",
-        "local-urgent-care",
-        "actue-tertiary-care",
-        "history-and-physical",
-        "diagnostic-testing",
-        "determine-diagnosis",
-        "provide-counseling",
-        "dispense-medications",
-        "monitor-and-follow-up-of-patient",
-        "alerts-reminders-education",
-        "discharge-referral-of-patient",
-        "charge-for-service",
-        "record-and-report",
-    ]
+    processes = PROCESSES
 
     def process_pages(self, start_page, project):
         # create the graph

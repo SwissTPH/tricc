@@ -4,6 +4,7 @@ import logging
 from tricc_oo.converters.utils import *
 from tricc_oo.models import *
 from tricc_oo.visitors.tricc import *
+from tricc_oo.visitors.utils import PROCESSES
 from tricc_oo.converters.datadictionnary import lookup_codesystems_code
 
 logger = logging.getLogger("default")
@@ -117,7 +118,7 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
             if kwargs.get('warn', True):
                 logger.debug('Processing relevance for node {0}'.format(node.get_name()))
             node_name = node.name if not isinstance(node, TriccNodeEnd) else node.get_reference()
-            last_version = get_last_version(node_name, processed_nodes) if issubclass(node.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase)) and not isinstance(node, TriccNodeSelectOption)  else  None
+            last_version = get_last_version(node_name, processed_nodes) if issubclass(node.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase, TriccNodeEnd)) and not isinstance(node, TriccNodeSelectOption)  else  None
             #last_version = processed_nodes.find_prev(node, lambda item: hasattr(item, 'name') and item.name == node.name)
             if last_version:
                 # 0-100 for manually specified instance.  100-200 for auto instance 
@@ -128,7 +129,7 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
                 if not issubclass(node.__class__, (TriccNodeInputModel)):
                     node.last = True
                     if (
-                        issubclass(node.__class__, (TriccNodeDisplayCalculateBase )) and node.name is not None
+                        issubclass(node.__class__, (TriccNodeDisplayCalculateBase, TriccNodeEnd)) and node.name is not None
                     ):
                         #logger.debug("set last to false for node {}  and add its link it to next one".format(last_used_calc.get_name()))
                         if node.prev_nodes:    
@@ -1593,31 +1594,27 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
             elif expression_inputs:
                 expression =  negate_term(or_join(expression_inputs))
         if not is_prev:
-
-            end_node = get_last_end_node(processed_nodes)
-            if end_node:
-                end_operation = TriccOperation(
-                    TriccOperator.NOT, 
-                    [
-                        TriccOperation(
-                            TriccOperator.ISTRUE,
-                            [end_node]
-                        )
-                    ]
-                )
+            end_expressions = []
+            f_end_expression = get_end_expression(processed_nodes)
+            if f_end_expression:
+                end_expressions.append(f_end_expression)
+            if process in PROCESSES:
+                for p in PROCESSES[PROCESSES.index(current_process)+1:]:
+                    p_end_expression = get_end_expression(processed_nodes, process)
+                    if p_end_expression:
+                        end_expressions.append(p_end_expression)
+            if end_expressions:
                 if  expression:
-                    expression = TriccOperation(
-                        TriccOperator.AND, [
-                                end_operation,
-                                expression
-                        ]
-                    )
+                        end_expressions.append(expression)
+                if len(end_expressions) == 1:
+                    expression = end_expressions[0]
                 else:
-                    expression = end_operation
-
-            elif node.applicability:
+                    expression = TriccOperation(
+                        TriccOperator.AND,  end_expressions,
+                    )
+            if node.applicability:
                 expression = and_join([expression, node.applicability])
-              
+                
     if negate:
         if negate_expression is not None:
             return negate_expression
@@ -1628,7 +1625,22 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
             # exit(1)
     else:
         return expression
-    
+
+def get_end_expression(processed_nodes, process=None):
+    end_node = get_last_end_node(processed_nodes, process)
+    if end_node:
+        return TriccOperation(
+            TriccOperator.NOT, 
+            [
+                TriccOperation(
+                    TriccOperator.ISTRUE,
+                    [end_node]
+                )
+            ]
+        )
+                    
+
+
 def export_proposed_diags(activity, diags=None, **kwargs):
     if diags is None:
         diags = []

@@ -1,0 +1,17 @@
+PROCESSES = [
+        "triage",
+        "registration",
+        "emergency-care",
+        "local-urgent-care",
+        "acute-tertiary-care",
+        "history-and-physical",
+        "diagnostic-testing",
+        "determine-diagnosis",
+        "provide-counseling",
+        "dispense-medications",
+        "monitor-and-follow-up-of-patient",
+        "alerts-reminders-education",
+        "discharge-referral-of-patient",
+        "charge-for-service",
+        "record-and-report",
+    ]

@@ -4,8 +4,9 @@ import random
 import string
 import hashlib
 from markdownify import markdownify as md
-
-
+import warnings
+from bs4 import MarkupResemblesLocatorWarning
+warnings.filterwarnings("ignore", category=MarkupResemblesLocatorWarning)
 logger = logging.getLogger("default")
 
 
@@ -49,6 +50,7 @@ def get_rand_name(name=None, length=8):
 
 # the soup.text strips off the html formatting also
 def remove_html(string):
+    
     if ' ' in string:
         text = md(
             string,
