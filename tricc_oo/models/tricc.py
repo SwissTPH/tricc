@@ -32,8 +32,6 @@ class TriccNodeCalculateBase(TriccNodeBaseModel):
             instance.reference = [e.copy() if isinstance(e, (TriccReference, TriccOperation)) else (TriccReference(e.name) if hasattr(e, 'name') else e) for e in self.reference]
         else:
             instance.reference = None
-        if self.expression_reference:
-            instance.expression_reference = self.expression_reference.copy()
         version = self.version + 1
         instance.version = version
         return instance
@@ -237,11 +235,6 @@ class TriccNodeDisplayModel(TriccNodeBaseModel):
     group: Optional[Union[TriccGroup, TriccNodeActivity]] = None
     relevance: Optional[Union[Expression, TriccOperation]] = None
 
-    def make_instance(self, instance_nb, activity=None):
-        instance = super().make_instance(instance_nb, activity=activity)
-        instance.relevance = self.relevance.copy() if self.relevance else None
-       
-        return instance
 
     # to use the enum value of the TriccNodeType
 

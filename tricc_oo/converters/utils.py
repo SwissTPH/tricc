@@ -49,13 +49,15 @@ def get_rand_name(name=None, length=8):
 
 # the soup.text strips off the html formatting also
 def remove_html(string):
-    text = md(
-        string,
-        strip=["img", "table", "a"],
-        strong_em_symbol="*",
-        escape_underscores=False,
-        escape_asterisks=False,
-        bullets=["-", "*"],
-    )
+    if ' ' in string:
+        text = md(
+            string,
+            strip=["img", "table", "a"],
+            strong_em_symbol="*",
+            escape_underscores=False,
+            escape_asterisks=False,
+            bullets=["-", "*"],
+        )
 
-    return text
+        return text
+    return string

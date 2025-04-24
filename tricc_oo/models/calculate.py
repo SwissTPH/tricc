@@ -182,7 +182,7 @@ class TriccNodeEnd(TriccNodeDisplayCalculateBase):
     process: str = None
     def __init__(self, **data):
         if data.get('name', None) is None:
-            data['name'] = 'tricc_end_'
+            data['name'] = 'tricc_end_' + data.get('process', '') 
         super().__init__(**data)
         # FOR END
         
@@ -190,9 +190,11 @@ class TriccNodeEnd(TriccNodeDisplayCalculateBase):
 
     def set_name(self):
         if self.name is None:
-            self.name = 'tricc_end'
+            self.name = self.get_reference()
         #self.name = END_NODE_FORMAT.format(self.activity.id)
 
+    def get_reference(self):
+        return 'tricc_end_' + (self.process or '')
 
 class TriccNodeActivityStart(TriccNodeFakeCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.activity_start

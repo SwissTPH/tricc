@@ -581,7 +581,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
                 if kwargs.get('warn', True):          
                     logger.debug("generation of calculate for node {}".format(node.get_name()))
                 if hasattr(node, 'expression') and (node.expression is None) and issubclass(node.__class__,TriccNodeCalculateBase):
-                    node.expression = get_node_expressions(node, processed_nodes)
+                    node.expression = get_node_expressions(node, processed_nodes, process=kwargs.get('process', 'main '))
                     # continue walk
                 return True
         return False

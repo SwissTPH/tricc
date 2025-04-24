@@ -55,7 +55,8 @@ class BaseInputStrategy:
             root = TriccNodeMainStart(
                 id=generate_id('s-determine-diagnosis'),
                 form_id=root_process.form_id,
-                label=root_process.label
+                label=root_process.label,
+                process='main'
             )
             nodes = {}
             nodes[root.id] = root

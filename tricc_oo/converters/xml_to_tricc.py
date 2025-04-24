@@ -118,6 +118,7 @@ def create_activity(diagram, media_path, project):
                         activity.root.process == "main" or activity.root.process is None
                     ):
                         project.start_pages["main"] = activity
+                        activity.root.process = 'main'
                     elif activity.root.process is not None:
                         if activity.root.process not in project.start_pages:
                             project.start_pages[activity.root.process] = []
@@ -373,7 +374,7 @@ def create_root_node(diagram):
             label=elm.attrib.get("label"),
             form_id=elm.attrib.get("form_id"),
             relevance=elm.attrib.get("relevance"),
-            process=elm.attrib.get("process") or 'main',
+            process=elm.attrib.get('process', 'main'),
         )
     else:
         elm = get_tricc_type(diagram, "object", TriccNodeType.activity_start)

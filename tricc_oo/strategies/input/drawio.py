@@ -57,7 +57,8 @@ class DrawioStrategy(BaseInputStrategy):
             used_calculates=used_calculates,
             calculates=calculates,
             recursive=False,
-            codesystems=project.code_systems
+            codesystems=project.code_systems,
+            process=start_page.root.process
         )
 
         logger.info("# check if all edges (arrow) where used")

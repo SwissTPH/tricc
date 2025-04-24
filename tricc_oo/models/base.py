@@ -113,13 +113,25 @@ class TriccBaseModel(BaseModel):
     def get_datatype(self):
         return self.datatype or self.tricc_type
 
+    def to_dict(self):
+        return {key: value for key, value in vars(self).items() if not key.startswith('_')}
+
     def make_instance(self, nb_instance, **kwargs):
         instance = self.copy()
         # change the id to avoid collision of name
         instance.id = generate_id(f"{self.id}{nb_instance}")
         instance.instance = int(nb_instance)
         instance.base_instance = self
-
+        attr_dict = self.to_dict()
+        for attr, value in attr_dict.items():
+            if not attr.startswith('_') and value is not None:
+                try:
+                    if hasattr(value, 'copy'):
+                        setattr(instance, attr, value.copy())
+                    else:
+                        setattr(instance, attr, value)
+                except Exception as e:
+                    logger.warning(f"Warning: Could not copy attribute {attr}: {e}")
         # assign the defualt group
         # if activity is not None and self.group == activity.base_instance:
         #    instance.group = instance
@@ -161,12 +173,6 @@ class TriccEdge(TriccBaseModel):
     target_external_id: triccId = None
     value: Optional[str]  = None
 
-    def make_instance(self, instance_nb, activity=None):
-        instance = super().make_instance(instance_nb, activity=activity)
-        #if issubclass(self.source.__class__, TriccBaseModel):
-        instance.source = self.source if isinstance(self.source, str) else self.source.copy()
-        #if issubclass(self.target.__class__, TriccBaseModel):
-        return instance
 
 
 class TriccGroup(TriccBaseModel):
