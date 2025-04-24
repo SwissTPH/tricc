@@ -1448,7 +1448,7 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
     expression = None
     negate_expression = None
     node = in_node
-    if isinstance(node, (TriccNodeActivityStart,TriccNodeMainStart, TriccNodeActivityEnd, TriccNodeEnd)):
+    if isinstance(node, (TriccNodeActivityStart,TriccNodeMainStart, TriccNodeActivityEnd)):
         if is_prev and is_calculate:
             expression = get_node_expression(
                 node.activity,
