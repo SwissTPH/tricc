@@ -3,7 +3,7 @@ from tricc_oo.converters.cql.cqlLexer import cqlLexer
 from tricc_oo.converters.cql.cqlParser import cqlParser
 from tricc_oo.converters.cql.cqlVisitor import cqlVisitor
 from tricc_oo.converters.utils import clean_name
-from tricc_oo.models.base import  TriccOperator, TriccOperation, TriccStatic, TriccReference
+from tricc_oo.models.base import  TriccOperator, TriccOperation, TriccStatic, TriccReference, not_clean, or_join, and_join
 import logging
 
 logger = logging.getLogger("default")
@@ -148,7 +148,7 @@ class cqlToXlsFormVisitor(cqlVisitor):
     
     def visitNegateMembershipExpression(self, ctx):
         function_name = ctx.getChild(2).getText()
-        return TriccOperation(TriccOperator.NOT,[self._get_membership_expression(ctx, function_name)])
+        return not_clean(self._get_membership_expression(ctx, function_name))
     
 
     def visitBetweenExpression(self, ctx):
@@ -174,10 +174,7 @@ class cqlToXlsFormVisitor(cqlVisitor):
         if params[0] == 'not':
             if isinstance(op, TriccStatic) and isinstance(op.value, str):
                 logger.warning(f"not operator on a string {op.value}")
-            op = TriccOperation(
-                operator = TriccOperator.NOT,
-                reference = [op]
-            )
+            op = not_clean(op)
     
         return op
 
@@ -200,23 +197,16 @@ class cqlToXlsFormVisitor(cqlVisitor):
         elif hasattr(ctx, 'expressionTerm'):
             left = self.visit(ctx.expressionTerm(0))
             right = self.visit(ctx.expressionTerm(1))
-        if isinstance(left, TriccOperation)   and left.operator ==  operator and operator in (TriccOperator.OR, TriccOperator.AND):
-            left.append(right)
-            return left
-        if isinstance(right, TriccOperation)   and right.operator ==  operator and operator in (TriccOperator.OR, TriccOperator.AND):
-            left.append(left)
-            return right
-        op = TriccOperation(operator)
-        op.reference = [left, right]
-        return op
+        if  operator == TriccOperator.AND:
+            return and_join([left, right])
+        elif  operator == TriccOperator.OR:
+            return or_join([left, right])  
+        else:
+            op = TriccOperation(operator, [left, right])
+            return op
 
     def visitNotExpression(self, ctx):
-        expr = self.visit(ctx.expression())
-        op = TriccOperation(TriccOperator.NOT)
-        if isinstance(expr, TriccStatic) and isinstance(expr.value, str):
-            logger.warning(f"not operator on a string {expr.value}")
-        op.reference = [expr]
-        return op
+        return not_clean(self.visit(ctx.expression()))
 
     def visitIsTrueOrFalseExpression(self, ctx):
         expr = self.visit(ctx.expression())
@@ -245,7 +235,7 @@ class cqlToXlsFormVisitor(cqlVisitor):
             '>': TriccOperator.MORE,
             '>=': TriccOperator.MORE_OR_EQUAL,
             '=': TriccOperator.EQUAL,
-            '!=': TriccOperator.NOT_EQUAL
+            '!=': TriccOperator.NOTEQUAL
         }
         op = TriccOperation(op_map[op_text])
         op.reference = [left, right]

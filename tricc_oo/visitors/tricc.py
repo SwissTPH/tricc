@@ -226,35 +226,24 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
                             [last_version]
                         )
                 elif last_version.relevance:
-                        version_relevance = TriccOperation(
-                                TriccOperator.NOT,
-                                [
-
-                                    last_version.relevance,
-
-                                ]
+                        version_relevance = not_clean(
+                                last_version.relevance
                             )
                 elif last_version.activity.relevance:
-                    version_relevance = TriccOperation(
-                        TriccOperator.NOT,
-                        [
-
+                    version_relevance = not_clean(
                             last_version.activity.relevance,
-
-                        ]
                     )
                 else:
                     version_relevance = None
                 
                 if version_relevance:
                     if getattr(node, 'relevance', None):
-                        node.relevance = TriccOperation(
-                            TriccOperator.AND,
+                        node.relevance = and_join(
                             [
                                 version_relevance,
                                 node.relevance
-                            ]
-                        )
+                            ])
+                        
                     elif hasattr(node, 'relevance'):
                         node.relevance = version_relevance
             
@@ -541,8 +530,7 @@ def process_reference(node, processed_nodes, calculates, used_calculates=None,  
             if len(node.reference) == 1 :
                 operation = node.reference[0]
             else:
-                operation = TriccOperation(
-                        TriccOperator.AND,
+                operation = and_join(
                         node.reference
                     )
             modified_expression = process_operation_reference(
@@ -1494,7 +1482,7 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
         #     )
         # else:
         expression = get_rhombus_terms(node, processed_nodes, process=process)  # if issubclass(node.__class__, TricNodeDisplayCalulate) else TRICC_CALC_EXPRESSION.format(get_export_name(node)) #
-        negate_expression = TriccOperation(TriccOperator.NOT,[expression])
+        negate_expression = not_clean(expression)
         if node.path is None :
             if len(node.prev_nodes) == 1:
                 node.path = list(node.prev_nodes)[0]
@@ -1508,17 +1496,12 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
             is_prev=True,
             process=process)
         if prev_exp and expression:
-            expression = TriccOperation(
-                TriccOperator.AND,
-                [prev_exp, expression]
-            )
-            negate_expression = TriccOperation(
-                TriccOperator.AND,
-                [
+            expression = and_join([prev_exp, expression])
+            negate_expression = and_join([
                     prev_exp, 
                     negate_expression
-                ]
-            )
+                ])
+
         elif prev_exp:
             
             logger.error(f"useless rhombus {node.get_name()}")
@@ -1557,6 +1540,7 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
             expression = get_calculation_terms(node, processed_nodes=processed_nodes, is_calculate=is_calculate, process=process)
     elif ONE_QUESTION_AT_A_TIME and is_prev and not is_calculate and hasattr(node, 'required') and node.required:
         expression = get_required_node_expression(node)
+    
     if expression is None:
         expression = get_prev_node_expression(node, processed_nodes=processed_nodes, is_calculate=is_calculate, process=process)
             # in_node not in processed_nodes is need for calculates that can but run after the end of the activity
@@ -1603,17 +1587,17 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
                     p_end_expression = get_end_expression(processed_nodes, process)
                     if p_end_expression:
                         end_expressions.append(p_end_expression)
+            if node.applicability:
+                end_expressions.append(node.applicability)
             if end_expressions:
-                if  expression:
-                        end_expressions.append(expression)
+                if expression:
+                    end_expressions.append(expression)
                 if len(end_expressions) == 1:
                     expression = end_expressions[0]
                 else:
-                    expression = TriccOperation(
-                        TriccOperator.AND,  end_expressions,
-                    )
-            if node.applicability:
-                expression = and_join([expression, node.applicability])
+                    expression = and_join(end_expressions)
+                    
+            
                 
     if negate:
         if negate_expression is not None:
@@ -1630,14 +1614,10 @@ def get_end_expression(processed_nodes, process=None):
     end_node = get_last_end_node(processed_nodes, process)
     if end_node:
         return TriccOperation(
-            TriccOperator.NOT, 
-            [
-                TriccOperation(
-                    TriccOperator.ISTRUE,
+                    TriccOperator.ISNOTTRUE,
                     [end_node]
                 )
-            ]
-        )
+
                     
 
 
@@ -1781,7 +1761,7 @@ def get_prev_node_expression( node, processed_nodes, is_calculate=False, exclude
     # when getting the prev node, we calculate the
     if hasattr(node, 'expression_inputs') and len(node.expression_inputs) > 0:
         expression_inputs = node.expression_inputs
-        expression_inputs = clean_list_or(expression_inputs)
+        expression_inputs = clean_or_list(expression_inputs)
     else:
         expression_inputs = []        
     for prev_node in node.prev_nodes:
@@ -1795,12 +1775,12 @@ def get_prev_node_expression( node, processed_nodes, is_calculate=False, exclude
                 is_prev=True,
                 process=process))
             # avoid void is there is not conditions to avoid looping too much itme
-    expression_inputs = clean_list_or(
-        [
-            get_tricc_operation_operand(e) 
-            if isinstance(expression, TriccOperation) 
-            else e 
-            for e in expression_inputs])
+    # expression_inputs = clean_or_list(
+    #     [
+    #         get_tricc_operation_operand(e) 
+    #         if isinstance(expression, TriccOperation) 
+    #         else e 
+    #         for e in expression_inputs])
     
     expression = None
     if len(expression_inputs) == 1:
@@ -1980,7 +1960,7 @@ def get_rhombus_terms( node, processed_nodes, is_calculate=False, negate=False, 
         if isinstance(node.reference, set):
             node.reference = list(node.reference)
         # calcualte the expression only for select muzltiple and fake calculate
-        if  issubclass(node.reference.__class__, list):
+        if  issubclass(node.reference.__class__, (list,OrderedSet)):
             if node.expression_reference is None and len(node.reference) == 1:
                 ref = node.reference[0]
                 if issubclass(ref.__class__, TriccNodeBaseModel):
@@ -2005,8 +1985,12 @@ def get_rhombus_terms( node, processed_nodes, is_calculate=False, negate=False, 
             elif node.expression_reference is not None and node.expression_reference != '':
                 if isinstance(node.expression_reference, TriccOperation):
                     return node.expression_reference
-                else:
+                elif isinstance(node.expression_reference, str):
                     expression = node.expression_reference.format(*get_list_names(node.reference))
+                else:
+                    logger.critical('expression_reference {0} unsuported type {1}'.format(node.expression_reference, node.expression_reference.__class__.__name__))
+                    exit(1)
+
             else:
                 logger.warning("missing expression for node {}".format(node.get_name()))
         else:
@@ -2147,175 +2131,14 @@ def add_sub_expression(array, sub):
     # elif sub is None:
     #     array.append(TriccStatic(True))
         
-       
-# function that generate remove unsure condition
-# @param list_or
-# @param and elm use upstream
-def clean_list_or(list_or, elm_and=None):
-    if len(list_or) == 0:
-        return []
-    if 'false' in list_or:
-        list_or.remove('false')
-    if TriccStatic(False) in list_or:
-        list_or.remove(TriccStatic(False))
-    if (
-        '1' in list_or 
-        or 1 in list_or 
-        or TriccStatic(True) in list_or 
-        or True in list_or 
-        or 'true' in list_or
-    ):
-        list_or = [TriccStatic(True)]
-        return list_or
-    if elm_and is not None:
-            if negate_term(elm_and) in list_or:
-                # we remove x and not X
-                list_or.remove(negate_term(elm_and))
-            if elm_and in list_or:
-                # we remove  x and x
-                list_or.remove(elm_and)
-    
-    if elm_and is not None:
-        if str(negate_term(elm_and)) in [str(s) for s in list_or]:
-            # we remove x and not X
-            list_or.remove(negate_term(elm_and))
-    for exp_prev in list_or:
-        if negate_term(exp_prev) in list_or:
-            # if there is x and not(X) in an OR list them the list is always true
-            list_or = [TriccStatic(True)]
-        else:
-                # if (
-                #     re.search(exp_prev, ' and ') in list_or
-                #     and exp_prev.replace('and ', 'and not') in list_or
-                # ):
-                #     right = exp_prev.split(' and ')[0]
-                #     list_or.remove(exp_prev)
-                #     list_or.remove(exp_prev.replace('and ', 'and not'))
-                #     list_or.append(right)
-
-                if  str(negate_term(exp_prev)) == str(elm_and) or str(exp_prev) == (elm_and):
-                    list_or.remove(exp_prev)
-   
-    return sorted(list_or, key=str)
+ 
 
     # function that negate terms
 # @param expression to negate
 def negate_term(expression):            
-    if expression is None or isinstance(expression, str) and expression == '':
-        return TriccStatic(False)
-    elif isinstance(expression, TriccStatic) and expression == TriccStatic(False):
-        return TriccStatic(True)
-    elif isinstance(expression, TriccStatic) and expression == TriccStatic(True):
-        return TriccStatic(False)
-    else:
-        if isinstance(expression, TriccOperation) or issubclass(expression.__class__, TriccNodeDisplayCalculateBase):
-            return TriccOperation(
-                operator=TriccOperator.NOT,
-                reference=[expression]
-            )
-        if issubclass(expression.__class__, TriccNodeDisplayModel):
-            return TriccOperation(
-                operator=TriccOperator.NOT,
-                reference=[TriccOperation(
-                    operator=TriccOperator.EXISTS,
-                    reference=[expression]
-                )]
-            )
-        else:
-            return TRICC_NEGATE.format((expression))
-        
-# function that make multipat  and
-# @param argv list of expression to join with and
-def and_join(argv):
-    #argv=add_bracket_to_list_elm(argv)
-    if len(argv) == 0:
-        return ''
-    elif len(argv) == 1:
-        return argv[0]
-    elif len(argv) == 2:
-        return simple_and_join(argv[0], argv[1])
-    else:
-        return  TriccOperation(
-            TriccOperator.AND,
-            argv
-        )
+    
+    return not_clean(expression)
 
-# function that make a 2 part and
-# @param left part
-# @param right part
-def simple_and_join(left, right):
-    expression = None
-    # no term is considered as True
-    left_issue = left is None or left == ''
-    right_issue = right is None or right == ''
-    left_neg = left is False or left == 0 or left == '0' or left == TriccStatic(False) or left is True
-    right_neg = right is False or right == 0 or right == '0' or right == TriccStatic(False) or right is False
-    if issubclass(left.__class__, TriccNodeBaseModel):
-        left = get_export_name(left)
-    if issubclass(right.__class__, TriccNodeBaseModel):
-        right = get_export_name(right)    
-    
-    if left_issue and right_issue:
-        logger.critical("and with both terms empty")
-    elif left_neg or right_neg:
-        return 'false'
-    elif left_issue:
-        logger.debug('and with empty left term')
-        return  right
-    elif left == '1' or left == 1 or left == TriccStatic(True) or left is True:
-        return  right
-    elif right_issue:
-        logger.debug('and with empty right term')
-        return  left
-    elif right == '1' or right == 1 or right == TriccStatic(True) or right is True:
-        return  left
-    else:
-        return  TriccOperation(
-            TriccOperator.AND,
-            [left, right]
-        )
-
-def or_join(list_or, elm_and=None):
-    cleaned_list  = clean_list_or(list_or, elm_and)
-    if len(cleaned_list) == 1:
-        return cleaned_list[0]
-    if len(cleaned_list)>1: 
-        return TriccOperation(
-            TriccOperator.OR,
-            cleaned_list
-        )
-    
-    
-    
-# function that make a 2 part NAND
-# @param left part
-# @param right part
-def nand_join(left, right):
-    # no term is considered as True
-    left_issue = left is None or left == ''
-    right_issue = right is None or right == ''
-    left_neg = left == False or left == 0 or left == '0' or left == TriccStatic(False)
-    right_neg = right == False or right == 0 or right == '0' or right == TriccStatic(False)
-    if issubclass(left.__class__, TriccNodeBaseModel):
-        left = get_export_name(left)
-    if issubclass(right.__class__, TriccNodeBaseModel):
-        right = get_export_name(right) 
-    if left_issue and right_issue:
-        logger.critical("and with both terms empty")
-    elif left_issue:
-        logger.debug('and with empty left term')
-        return  negate_term(right)
-    elif left == '1' or left == 1 or left == TriccStatic(True):
-        return  negate_term(right)
-    elif right_issue :
-        logger.debug('and with empty right term')
-        return  TriccStatic(False)
-    elif right == '1' or right == 1 or left_neg or right == TriccStatic(True):
-        return  TriccStatic(False)
-    elif right_neg:
-        return left
-    else:
-        return  and_join([left, negate_term(right)])
 
 
 

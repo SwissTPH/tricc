@@ -325,16 +325,19 @@ class TriccOperator(StrEnum):
     OR = 'or' # or between left and rights
     NATIVE = 'native' #default left is native expression
     ISTRUE = 'istrue' # left is right 
+    ISNOTTRUE = 'isnottrue' 
     ISFALSE = 'isfalse' # left is false
+    ISNOTFALSE = 'isnotfalse' # left is false
     SELECTED = 'selected' # right must be la select and one or several options
     MORE_OR_EQUAL = 'more_or_equal'
     LESS_OR_EQUAL = 'less_or_equal'
     EQUAL = 'equal'
     MORE = 'more'
-    NOT_EQUAL = 'not_equal'
+    NOTEQUAL = 'not_equal'
     BETWEEN = 'between'
     LESS = 'less'
     CONTAINS = 'contains' # ref, txt Does CONTAINS make sense, like Select with wildcard
+    NOTEXISTS = 'notexists'
     EXISTS = 'exists'
     NOT = 'not'
     ISNULL = 'isnull'
@@ -373,13 +376,16 @@ RETURNS_BOOLEAN =[
     TriccOperator.BETWEEN,
     TriccOperator.CONTAINS,
     TriccOperator.EXISTS,
+    TriccOperator.NOTEXISTS,
     TriccOperator.ISFALSE,
+    TriccOperator.ISNOTFALSE,
     TriccOperator.ISNOTNULL,
     TriccOperator.ISTRUE,
+    TriccOperator.ISNOTTRUE,
     TriccOperator.SELECTED,
     TriccOperator.HAS_QUALIFIER,
     TriccOperator.NOT,
-    TriccOperator.NOT_EQUAL,
+    TriccOperator.NOTEQUAL,
     TriccOperator.MORE_OR_EQUAL,
     TriccOperator.LESS_OR_EQUAL,
     TriccOperator.EQUAL,
@@ -411,7 +417,7 @@ OPERATION_LIST = {
     '>=': TriccOperator.MORE_OR_EQUAL,
     '<=': TriccOperator.LESS_OR_EQUAL,
     '==': TriccOperator.EQUAL,
-    '!=': TriccOperator.NOT_EQUAL,
+    '!=': TriccOperator.NOTEQUAL,
     '=': TriccOperator.EQUAL,
     '>': TriccOperator.MORE,
     '<': TriccOperator.LESS
@@ -431,6 +437,9 @@ class TriccOperation(BaseModel):
         str_ref = map(str, self.reference)
         return f"{self.operator}({', '.join(map(str, str_ref))})"
     
+    def __hash__(self):
+        return hash(self.__repr__())
+
     def __repr__(self):
         return "TriccOperation:"+self.__str__()
     
@@ -537,6 +546,186 @@ class TriccOperation(BaseModel):
     
     def copy(self, keep_node=False):
         return self.__copy__(keep_node)
+
+# function that make multipat  and
+# @param argv list of expression to join with and
+def clean_and_list(argv):
+    for a in list(argv):
+        if isinstance(a, TriccOperation) and a.operator == TriccOperator.AND:
+            argv.remove(a)
+            return clean_and_list([*argv,*a.reference])
+        elif a == TriccStatic(True) or a == True:
+            argv.remove(a)
+        elif a == TriccStatic(False) :
+            return [TriccStatic(False)]
+        
+    internal = list(set(argv))
+    for a in internal:
+        for b in internal[internal.index(a)+1:]:
+            if not_clean(b) == a:
+                return [TriccStatic(False)]
+    return sorted(list(set(argv)), key=str)
+            
+def not_clean(a):
+    new_operator = None
+    if a is None or isinstance(a, str) and a == '':
+        return TriccStatic(False)
+    elif isinstance(a, TriccStatic) and a == TriccStatic(False):
+        return TriccStatic(True)
+    elif isinstance(a, TriccStatic) and a == TriccStatic(True):
+        return TriccStatic(False)
+    elif isinstance(a, TriccOperation) and a.operator == TriccOperator.ISTRUE:
+        new_operator = TriccOperator.ISNOTTRUE
+    elif isinstance(a, TriccOperation) and a.operator == TriccOperator.ISNOTTRUE:
+        new_operator = TriccOperator.ISTRUE
+    elif isinstance(a, TriccOperation) and a.operator == TriccOperator.ISFALSE:
+        new_operator = TriccOperator.ISNOTFALSE
+    elif isinstance(a, TriccOperation) and a.operator == TriccOperator.ISNOTFALSE:
+        new_operator = TriccOperator.ISFALSE
+    elif isinstance(a, TriccOperation) and a.operator == TriccOperator.ISNULL:
+        new_operator = TriccOperator.ISNOTNULL
+    elif isinstance(a, TriccOperation) and a.operator == TriccOperator.ISNOTNULL:
+        new_operator = TriccOperator.ISNULL
+    elif isinstance(a, TriccOperation) and a.operator == TriccOperator.LESS:
+        new_operator = TriccOperator.MORE_OR_EQUAL
+    elif isinstance(a, TriccOperation) and a.operator == TriccOperator.MORE:
+        new_operator = TriccOperator.LESS_OR_EQUAL
+    elif isinstance(a, TriccOperation) and a.operator == TriccOperator.LESS_OR_EQUAL:
+        new_operator = TriccOperator.MORE
+    elif isinstance(a, TriccOperation) and a.operator == TriccOperator.MORE_OR_EQUAL:
+        new_operator = TriccOperator.LESS
+    elif isinstance(a, TriccOperation) and a.operator == TriccOperator.NOT:
+        return a.reference[0]
+    
+    if new_operator:
+        return TriccOperation(
+            new_operator,
+            a.reference
+        )
+    
+    elif not isinstance(a, TriccOperation) and issubclass(a.__class__, object):
+        return TriccOperation(
+                operator=TriccOperator.NOTEXISTS,
+                reference=[a]
+            )
+    else:
+        return TriccOperation(
+            TriccOperator.NOT,
+            [a]
+        )
+        
+    
+      
+# function that generate remove unsure condition
+# @param list_or
+# @param and elm use upstream
+def clean_or_list(list_or, elm_and=None):
+    for a in list(list_or):
+        if isinstance(a, TriccOperation) and a.operator == TriccOperator.OR:
+            list_or.remove(a)
+            return clean_or_list([*list_or,*a.reference])
+        elif a == TriccStatic(False) or a == False or a == 0:
+            list_or.remove(a)
+        elif a == TriccStatic(True) or a == True or a == 1 or (elm_and is not None and not_clean(a) in list_or):
+            return [TriccStatic(True)]
+            # if there is x and not(X) in an OR list them the list is always true
+        elif elm_and is not None and  (not_clean(a) == elm_and or a == elm_and ):
+            list_or.remove(a)
+    internal = list(list_or)    
+    for a in internal:
+        for b in internal[internal.index(a)+1:]:
+            if not_clean(b) == a:
+                return [TriccStatic(True)]
+    if len(list_or) == 0:
+        return []
+
+    return sorted(list(set(list_or)), key=str)
+
+def and_join(argv):
+    argv=clean_and_list(argv)
+    if len(argv) == 0:
+        return ''
+    elif len(argv) == 1:
+        return argv[0]
+    else:
+        return  TriccOperation(
+            TriccOperator.AND,
+            argv
+        )
+
+# function that make a 2 part and
+# @param left part
+# @param right part
+def simple_and_join(left, right):
+    expression = None
+    # no term is considered as True
+    left_issue = left is None or left == ''
+    right_issue = right is None or right == ''
+    left_neg = not_clean(left)
+    right_neg = not_clean(right)
+    if left_issue and right_issue:
+        logger.critical("and with both terms empty")
+    elif left_neg == right or right_neg == left:
+        return TriccStatic(False)
+    elif left_issue:
+        logger.debug('and with empty left term')
+        return  right
+    elif left == '1' or left == 1 or left == TriccStatic(True) or left is True:
+        return  right
+    elif right_issue:
+        logger.debug('and with empty right term')
+        return  left
+    elif right == '1' or right == 1 or right == TriccStatic(True) or right is True:
+        return  left
+    else:
+        return  TriccOperation(
+            TriccOperator.AND,
+            [left, right]
+        )
+
+def or_join(list_or, elm_and=None):
+    cleaned_list  = clean_or_list(list_or, elm_and)
+    if len(cleaned_list) == 1:
+        return cleaned_list[0]
+    elif len(cleaned_list)>1: 
+        return TriccOperation(
+            TriccOperator.OR,
+            cleaned_list
+        )
+    else:
+        logger.error("empty or list")
+    
+    
+    
+# function that make a 2 part NAND
+# @param left part
+# @param right part
+def nand_join(left, right):
+    # no term is considered as True
+    left_issue = left is None or left == ''
+    right_issue = right is None or right == ''
+    left_neg = left == False or left == 0 or left == '0' or left == TriccStatic(False)
+    right_neg = right == False or right == 0 or right == '0' or right == TriccStatic(False)
+    if issubclass(left.__class__, TriccNodeBaseModel):
+        left = get_export_name(left)
+    if issubclass(right.__class__, TriccNodeBaseModel):
+        right = get_export_name(right) 
+    if left_issue and right_issue:
+        logger.critical("and with both terms empty")
+    elif left_issue:
+        logger.debug('and with empty left term')
+        return  negate_term(right)
+    elif left == '1' or left == 1 or left == TriccStatic(True):
+        return  negate_term(right)
+    elif right_issue :
+        logger.debug('and with empty right term')
+        return  TriccStatic(False)
+    elif right == '1' or right == 1 or left_neg or right == TriccStatic(True):
+        return  TriccStatic(False)
+    elif right_neg:
+        return left
+    else:
+        return  and_join([left, negate_term(right)])
 
 
 TriccGroup.update_forward_refs()

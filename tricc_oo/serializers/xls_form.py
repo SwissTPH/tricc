@@ -59,7 +59,7 @@ def start_group(
             relevance_expression
         )
     elif isinstance(relevance_expression, TriccStatic):
-        relevance_expression = str(relevance.value)
+        relevance_expression = str(relevance_expression.value)
 
     # elif is_activity:
     #    relevance_expression = TRICC_CALC_EXPRESSION.format(get_export_name(cur_group.root))

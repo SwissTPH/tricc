@@ -450,6 +450,22 @@ class XLSFormStrategy(BaseOutPutStrategy):
         return f"{ref_expressions[0]}=''"
     def tricc_operation_isnotnull(self, ref_expressions):
         return f"{ref_expressions[0]}!=''"
+    
+    def tricc_operation_isnottrue(self, ref_expressions):
+        if str(BOOLEAN_MAP[str(TRICC_TRUE_VALUE)]).isnumeric():
+            return f"{ref_expressions[0]}<{BOOLEAN_MAP[str(TRICC_TRUE_VALUE)]}"
+        else:
+            return f"{ref_expressions[0]}!={BOOLEAN_MAP[str(TRICC_TRUE_VALUE)]}"
+    def tricc_operation_isnotfalse(self, ref_expressions):
+        if str(BOOLEAN_MAP[str(TRICC_FALSE_VALUE)]).isnumeric():
+            return f"{ref_expressions[0]}>{BOOLEAN_MAP[str(TRICC_FALSE_VALUE)]}"
+        else:
+            return f"{ref_expressions[0]}!={BOOLEAN_MAP[str(TRICC_FALSE_VALUE)]}"
+    def tricc_operation_notexist(self, ref_expressions):
+        return f"{ref_expressions[0]}=''"
+
+    
+    
     def tricc_operation_case(self, ref_expressions):
         ifs = 0
         parts = []

@@ -3,7 +3,7 @@ import re
 
 from tricc_oo.converters.utils import clean_str,clean_name
 from tricc_oo.models import *
-from tricc_oo.visitors.tricc import clean_list_or, negate_term
+from tricc_oo.visitors.tricc import clean_or_list, negate_term
 
 # from babel import _
 
