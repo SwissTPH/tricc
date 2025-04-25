@@ -803,7 +803,10 @@ def walktrhough_tricc_node_processed_stached(node, callback, processed_nodes, st
             reorder_node_list(stashed_nodes, node.group, processed_nodes)
         if isinstance(node, (TriccNodeActivityStart, TriccNodeMainStart)):
             if getattr(node, 'process', None):
-                process = node.process
+                if process is None:
+                    process = [node.process]
+                else:
+                    process[0] = node.process
             if recursive:
                 for gp in node.activity.groups.values():
                     walktrhough_tricc_node_processed_stached(
@@ -849,7 +852,10 @@ def walktrhough_tricc_node_processed_stached(node, callback, processed_nodes, st
                 if node.root is not None:
                     node.root.path_len = max(path_len,  node.root.path_len)
                     if getattr(node.root, 'process', None):
-                        process = node.root.process
+                        if process is None:
+                            process = [node.root.process]
+                        else:
+                            process[0] = node.root.process
                     if recursive:
                         walktrhough_tricc_node_processed_stached(node.root, callback, processed_nodes, stashed_nodes, path_len,
                                                             recursive, warn = warn,node_path = node_path.copy(),**kwargs)
@@ -953,7 +959,7 @@ def get_data_for_log(node):
 def stashed_node_func(node, callback, recursive=False, **kwargs):
     processed_nodes = kwargs.pop('processed_nodes', OrderedSet())
     stashed_nodes = kwargs.pop('stashed_nodes', OrderedSet())
-    process = kwargs.pop('process', 'main')
+    process = kwargs.pop('process', ['main'])
     path_len = 0
     
     walktrhough_tricc_node_processed_stached(
@@ -1582,9 +1588,9 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
             f_end_expression = get_end_expression(processed_nodes)
             if f_end_expression:
                 end_expressions.append(f_end_expression)
-            if process in PROCESSES:
-                for p in PROCESSES[PROCESSES.index(current_process)+1:]:
-                    p_end_expression = get_end_expression(processed_nodes, process)
+            if process[0] in PROCESSES:
+                for p in PROCESSES[PROCESSES.index(process[0])+1:]:
+                    p_end_expression = get_end_expression(processed_nodes, p)
                     if p_end_expression:
                         end_expressions.append(p_end_expression)
             if node.applicability:
