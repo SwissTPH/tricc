@@ -1,10 +1,10 @@
 PROCESSES = [
         "triage",
-        "registration",
         "emergency-care",
+        "registration",
+        "history-and-physical",
         "local-urgent-care",
         "acute-tertiary-care",
-        "history-and-physical",
         "diagnostic-testing",
         "determine-diagnosis",
         "provide-counseling",

@@ -291,9 +291,10 @@ def get_xfrom_trad(strategy, node, column, mapping, clean_html=False):
 
 
 def gen_operation_hash(op):
-    h = hashlib.blake2b(digest_size=6)
-    h.update(str(op).encode("utf-8"))
-    return h.hexdigest()
+    if op:
+        h = hashlib.blake2b(digest_size=6)
+        h.update(str(op).encode("utf-8"))
+        return h.hexdigest()
 
 
 def generate_choice_filter(strategy, node):
@@ -359,18 +360,21 @@ def get_attr_if_exists(strategy, node, column, map_array):
                     (TriccOperation, TriccStatic, TriccReference),
                 )
             ):
-                value = TriccOperation(
-                    TriccOperator.IF,
-                    [
-                        node.applicability,
-                        value,
-                        (
-                            TriccStatic(False)
-                            if node.applicability.get_datatype() == "boolean"
-                            else TriccStatic("")
-                        ),
-                    ],
-                )
+                if value.get_datatype() == "boolean" and node.applicability.get_datatype() == "boolean":
+                    value = and_join([node.applicability, value])
+                else:
+                    value = TriccOperation(
+                        TriccOperator.IF,
+                        [
+                            node.applicability,
+                            value,
+                            (
+                                TriccStatic(False)
+                                if node.applicability.get_datatype() == "boolean"
+                                else TriccStatic("")
+                            ),
+                        ],
+                    )
             if column == "name":
                 if issubclass(value.__class__, (TriccNodeBaseModel)):
                     return get_export_name(value)

@@ -145,7 +145,7 @@ if __name__ == "__main__":
     if in_filepath is None:
         print_help()
         sys.exit(2)
-
+    in_filepath_list = in_filepath.split(',')
     if not download_dir:
         download_dir = out_path
     debug_path = os.fspath(out_path + "/debug.log")
@@ -163,30 +163,31 @@ if __name__ == "__main__":
         setup_logger("default", debug_file_path, logging.DEBUG)
     else:
         setup_logger("default", debug_file_path, logging.INFO)
-
-    pre, ext = os.path.splitext(in_filepath)
-
-    if out_path is None:
-        # if output file path not specified, just chagne the extension
-        out_path = os.path.dirname(pre)
-
     file_content = []
     files = []
-    if os.path.isdir(in_filepath):
-        files = [
-            os.path.join(in_filepath, f)
-            for f in os.listdir(in_filepath) 
-            if f.endswith(".drawio")
-        ]
-    elif os.path.isfile(in_filepath) and in_filepath.endswith(".drawio"):
-        files = [in_filepath]
-        
-    for f in files:
-        with open(f, 'r') as s:
-            content = s.read()
-            # present issue with some drawio file that miss the XML header
+    for in_filepath in in_filepath_list:
+        pre, ext = os.path.splitext(in_filepath)
 
-            file_content.append(content)
+        if out_path is None:
+            # if output file path not specified, just chagne the extension
+            out_path = os.path.dirname(pre)
+
+
+        if os.path.isdir(in_filepath):
+            files = [
+                os.path.join(in_filepath, f)
+                for f in os.listdir(in_filepath) 
+                if f.endswith(".drawio")
+            ]
+        elif os.path.isfile(in_filepath) and in_filepath.endswith(".drawio"):
+            files = [in_filepath]
+            
+        for f in files:
+            with open(f, 'r') as s:
+                content = s.read()
+                # present issue with some drawio file that miss the XML header
+
+                file_content.append(content)
     if not file_content:
         logger.critical(f"{in_filepath} is neither a drawio file nor a directory containing drawio files")
         exit(1)

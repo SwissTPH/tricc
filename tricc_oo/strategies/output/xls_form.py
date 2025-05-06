@@ -64,6 +64,16 @@ logger = logging.getLogger("default")
 """
 langs = SingletonLangClass()
 
+OPERATOR_COALESCE_FALLBACK = {
+    TriccOperator.ISTRUE: 0,
+    TriccOperator.ISFALSE: 1,
+    TriccOperator.ISNOTTRUE: 0,
+    TriccOperator.ISNOTFALSE: 1,
+    TriccOperator.MORE: -2147483648,
+    TriccOperator.MORE_OR_EQUAL: -2147483648,
+    TriccOperator.LESS: 2147483647,
+    TriccOperator.LESS_OR_EQUAL: 2147483647
+}
 
 class XLSFormStrategy(BaseOutPutStrategy):
     pd.set_option('display.max_colwidth', None)
@@ -339,19 +349,22 @@ class XLSFormStrategy(BaseOutPutStrategy):
         ref_expressions = []
         if not hasattr(operation, 'reference'):
             return self.get_tricc_operation_operand(operation) 
+        
+        operator = getattr(operation, 'operator', '')
+        coalesce_fallback = OPERATOR_COALESCE_FALLBACK[operator] if operator in OPERATOR_COALESCE_FALLBACK else  "''"
         for r in operation.reference:
             if isinstance(r, list):
                 r_expr = [
                     self.get_tricc_operation_expression(sr) if isinstance(sr, TriccOperation)
-                    else self.get_tricc_operation_operand(sr) 
+                    else self.get_tricc_operation_operand(sr,coalesce_fallback) 
                     for sr in r
                 ]
             elif isinstance(r, TriccOperation):
                 r_expr = self.get_tricc_operation_expression(r)
             else:
-                r_expr = self.get_tricc_operation_operand(r)
+                r_expr = self.get_tricc_operation_operand(r,coalesce_fallback)
             if isinstance(r_expr, TriccReference):
-                r_expr = self.get_tricc_operation_operand(r_expr)
+                r_expr = self.get_tricc_operation_operand(r_expr,coalesce_fallback)
             ref_expressions.append(r_expr)
         
         # build lower level
@@ -649,7 +662,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
 
     # function transform an object to XLSFORM value
     # @param r reference to be translated    
-    def get_tricc_operation_operand(self,r):
+    def get_tricc_operation_operand(self,r, coalesce_fallback="''"):
         if isinstance(r, TriccOperation):
             return self.get_tricc_operation_expression(r) 
         elif isinstance(r, TriccReference):
@@ -674,7 +687,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
             logger.warning(f"select option {r.get_name()} from {r.select.get_name()} was used as a reference")
             return f"'{r.name}'"
         elif issubclass(r.__class__, TriccNodeInputModel):
-            return f"coalesce(${{{get_export_name(r)}}},'')"
+            return f"coalesce(${{{get_export_name(r)}}},{coalesce_fallback})"
         elif issubclass(r.__class__, TriccNodeBaseModel):
             return f"${{{get_export_name(r)}}}"
         else:

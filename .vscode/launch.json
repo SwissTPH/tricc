@@ -9,7 +9,7 @@
       "program": "tests/build.py",
       "args": [
         "-i",
-        "/home/delcpa/Development/global-almanach/L2",
+        "/home/delcpa/Development/global-almanach/L2/yi,/home/delcpa/Development/global-almanach/L2/common",
         "-l",
         "d",
         "-o",
@@ -18,7 +18,7 @@
         "-O",
         "XLSFormCHTHFStrategy",
         "-D",
-        "/home/delcpa/Development/tricc-mage/output"
+        "/home/delcpa/Development/global-almanach/output"
       ],
       "console": "integratedTerminal",
       "justMyCode": true,

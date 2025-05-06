@@ -170,7 +170,7 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
                         version=last_version.version + 2,
                         expression=TriccOperation(
                             TriccOperator.COALESCE,
-                            [node, last_version, TriccStatic('')]
+                            [node, last_version, TriccStatic("''")]
                         ),
                         last=True,
                         activity=node.activity,
@@ -1686,9 +1686,10 @@ def get_select_accept_reject_options(node, group):
     return {0:yes, 1:no }
 
 def create_determine_diagnosis_activity(diags):
-    start = TriccNodeActivityStart(
+    start = TriccNodeMainStart(
         id=generate_id('start.determine-diagnosis'),
-        name="start.determine-diagnosis"
+        name="start.determine-diagnosis",
+        process='determine-diagnosis'
     )
 
     
@@ -1928,7 +1929,7 @@ def get_add_terms( node, processed_nodes, is_calculate=False, negate=False, proc
                     TriccOperator.COALESCE,
                     [
                         prev_node,
-                        TriccStatic("''")
+                        TriccStatic(0)
                     ]
                 )
             )
