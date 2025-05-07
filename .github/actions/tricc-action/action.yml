@@ -75,11 +75,6 @@ runs:
         in_filepath_list = in_filepath.split(',')
         for in_filepath in in_filepath_list:
             pre, ext = os.path.splitext(in_filepath)
-
-            if out_path is None:
-                out_path = os.path.dirname(pre)
-
-
             if os.path.isdir(in_filepath):
                 files = [
                     os.path.join(in_filepath, f)
