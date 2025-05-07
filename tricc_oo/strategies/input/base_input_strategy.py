@@ -73,29 +73,30 @@ class BaseInputStrategy:
             # setting the activity/group to main
             prev_bridge = root
             prev_process = None
-            for process in sorted_pages:
-                nodes = {page.id: page for page in sorted_pages[process]}
-                if prev_process:
-                    prev_bridge = get_activity_wait(
-                        prev_bridge,
-                        sorted_pages[prev_process],
-                        nodes.values(),
-                        activity=app,
-                    )
-                else:
-                    for a in nodes:
-                         set_prev_next_node(
+            for process in self.processes:
+                if process in sorted_pages:
+                    nodes = {page.id: page for page in sorted_pages[process]}
+                    if prev_process:
+                        prev_bridge = get_activity_wait(
                             prev_bridge,
-                            a,
-                            edge_only=True
+                            sorted_pages[prev_process],
+                            nodes.values(),
+                            activity=app,
                         )
-                app.nodes[prev_bridge.id] = prev_bridge
-                
-                for n in nodes.values():
-                    n.activity = app
-                    n.group = app
-                    app.nodes[n.id] = n
-                prev_process = process
+                    else:
+                        for a in nodes:
+                            set_prev_next_node(
+                                prev_bridge,
+                                a,
+                                edge_only=True
+                            )
+                    app.nodes[prev_bridge.id] = prev_bridge
+                    
+                    for n in nodes.values():
+                        n.activity = app
+                        n.group = app
+                        app.nodes[n.id] = n
+                    prev_process = process
 
 
             return app

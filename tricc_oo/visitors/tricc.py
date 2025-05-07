@@ -768,7 +768,13 @@ def walktrhough_tricc_node_processed_stached(node, callback, processed_nodes, st
         references = node.get_references()
         if references:
             path_len = max(path_len, *[0,*[getattr(n,'path_len',0) + 1 for n in references]])
-    node.path_len = max(node.path_len, path_len)    
+    node.path_len = max(node.path_len, path_len)
+    prev_process = process[0] if process else None
+    if isinstance(node, TriccNodeActivity) and getattr(node.root, 'process', None):
+        if process is None:
+            process = [node.root.process]
+        else:
+            process[0] = node.root.process
     if (
         callback(
             node, 
@@ -802,11 +808,6 @@ def walktrhough_tricc_node_processed_stached(node, callback, processed_nodes, st
         if not recursive:
             reorder_node_list(stashed_nodes, node.group, processed_nodes)
         if isinstance(node, (TriccNodeActivityStart, TriccNodeMainStart)):
-            if getattr(node, 'process', None):
-                if process is None:
-                    process = [node.process]
-                else:
-                    process[0] = node.process
             if recursive:
                 for gp in node.activity.groups.values():
                     walktrhough_tricc_node_processed_stached(
@@ -851,11 +852,6 @@ def walktrhough_tricc_node_processed_stached(node, callback, processed_nodes, st
             if node.root not in processed_nodes:
                 if node.root is not None:
                     node.root.path_len = max(path_len,  node.root.path_len)
-                    if getattr(node.root, 'process', None):
-                        if process is None:
-                            process = [node.root.process]
-                        else:
-                            process[0] = node.root.process
                     if recursive:
                         walktrhough_tricc_node_processed_stached(node.root, callback, processed_nodes, stashed_nodes, path_len,
                                                             recursive, warn = warn,node_path = node_path.copy(),**kwargs)
@@ -897,6 +893,8 @@ def walktrhough_tricc_node_processed_stached(node, callback, processed_nodes, st
         
                 
     else:
+        if prev_process and process and prev_process != process[0]:
+            process[0] = prev_process
         if node not in processed_nodes and node not in stashed_nodes:
             if node not in stashed_nodes:
                 stashed_nodes.insert_at_bottom(node)
@@ -2033,7 +2031,7 @@ def get_rhombus_terms( node, processed_nodes, is_calculate=False, negate=False, 
                 ]
             )
         else:
-            if left_term is not None and re.search(" (\+)|(\-)|(or)|(and) ", expression):
+            if left_term is not None and re.search(" (+)|(-)|(or)|(and) ", expression):
                 expression = "({0}){1}".format(expression, left_term)
             else:
                 expression = "{0}{1}".format(expression, left_term)

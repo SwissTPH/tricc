@@ -145,7 +145,7 @@ if __name__ == "__main__":
     if in_filepath is None:
         print_help()
         sys.exit(2)
-    in_filepath_list = in_filepath.split(',')
+    
     if not download_dir:
         download_dir = out_path
     debug_path = os.fspath(out_path + "/debug.log")
@@ -165,6 +165,7 @@ if __name__ == "__main__":
         setup_logger("default", debug_file_path, logging.INFO)
     file_content = []
     files = []
+    in_filepath_list = in_filepath.split(',')
     for in_filepath in in_filepath_list:
         pre, ext = os.path.splitext(in_filepath)
 
