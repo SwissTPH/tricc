@@ -84,9 +84,9 @@ runs:
                 files = [
                     os.path.join(in_filepath, f)
                     for f in os.listdir(in_filepath) 
-                    if f.endswith(".drawio")
+                    if f.endswith('.drawio')
                 ]
-            elif os.path.isfile(in_filepath) and in_filepath.endswith(".drawio"):
+            elif os.path.isfile(in_filepath) and in_filepath.endswith('.drawio'):
                 files = [in_filepath]
                 
             for f in files:
