@@ -150,6 +150,13 @@ class cqlToXlsFormVisitor(cqlVisitor):
         function_name = ctx.getChild(2).getText()
         return not_clean(self._get_membership_expression(ctx, function_name))
     
+    def visitInvocationExpressionTerm(self, ctx):
+        result = super().visitInvocationExpressionTerm(ctx)
+        if isinstance(result, list) and all(isinstance(x, TriccStatic) for x in result):
+            value = '.'.join([x.value for x in result])
+            logger.warning(f"guessed reference for '{value}'")
+            return TriccReference(value)
+        return result
 
     def visitBetweenExpression(self, ctx):
         ref = self.visit(ctx.expression(0))

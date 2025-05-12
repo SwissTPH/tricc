@@ -35,6 +35,7 @@ DISPLAY_ATTRIBUTES = [
     'help'
 ]
 logger = logging.getLogger("default")
+import html2text
 
 
 
@@ -219,7 +220,7 @@ def process_edges(diagram, media_path, activity, nodes):
                 calc = process_factor_edge(edge, nodes)
             elif label.lower() in TRICC_NO_LABEL:
                 calc = process_exclusive_edge(edge, nodes)
-            elif  any(reserved in label.lower() for reserved in ([str(o) for o in list(TriccOperator)] + list(OPERATION_LIST.keys()) + ['$this'])):
+            elif  any(reserved in html2text.html2text(label.lower()) for reserved in ([str(o) for o in list(TriccOperator)] + list(OPERATION_LIST.keys()) + ['$this'])):
                 # manage comment
                 calc = process_condition_edge(edge, nodes)
             else:
