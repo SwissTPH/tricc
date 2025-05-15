@@ -96,7 +96,9 @@ class TriccNodeActivity(TriccNodeBaseModel):
             return self.instances[instance_nb]
         else:
             instance = super().make_instance(instance_nb, activity=None)
-            self.instances[instance_nb] = instance
+            base_instance = (self.base_instance or self)
+            base_instance.instances[instance_nb] = instance
+            instance.base_instance = base_instance
             # instance.base_instance = self
             # we duplicate all the related nodes (not the calculate, duplication is manage in calculate version code)
             nodes = {}
@@ -124,7 +126,7 @@ class TriccNodeActivity(TriccNodeBaseModel):
                 if node in self.calculates and instance_node:
                     instance.calculates.append(instance_node)
             # update parents        
-            for node in list(filter(lambda p_node: hasattr(p_node, 'parent'),list(instance.nodes.values()))):
+            for node in list(filter(lambda p_node: getattr(p_node, 'parent', None) is not None, list(instance.nodes.values()))):
                 new_parent = list(filter(lambda p_node: p_node.base_instance == node.parent,list(instance.nodes.values())))
                 if new_parent:
                     node.parent = new_parent[0]
@@ -179,6 +181,7 @@ class TriccNodeActivity(TriccNodeBaseModel):
             if issubclass(node_instance.__class__, TriccRhombusMixIn):
                 old_path = node_origin.path
                 if old_path is not None:
+                    node_instance.path = None
                     for n in node_instance.activity.nodes.values():
                         if n.base_instance.id == old_path.id:
                             node_instance.path = n

@@ -118,10 +118,6 @@ class TriccBaseModel(BaseModel):
 
     def make_instance(self, nb_instance, **kwargs):
         instance = self.copy()
-        # change the id to avoid collision of name
-        instance.id = generate_id(f"{self.id}{nb_instance}")
-        instance.instance = int(nb_instance)
-        instance.base_instance = self
         attr_dict = self.to_dict()
         for attr, value in attr_dict.items():
             if not attr.startswith('_') and value is not None:
@@ -132,6 +128,13 @@ class TriccBaseModel(BaseModel):
                         setattr(instance, attr, value)
                 except Exception as e:
                     logger.warning(f"Warning: Could not copy attribute {attr}: {e}")
+        
+        # change the id to avoid collision of name
+        instance.id = generate_id(f"{self.id}{nb_instance}")
+        instance.instance = int(nb_instance)
+        instance.base_instance = self
+        
+        
         # assign the defualt group
         # if activity is not None and self.group == activity.base_instance:
         #    instance.group = instance
@@ -269,7 +272,7 @@ class TriccNodeBaseModel(TriccBaseModel):
         if self.name is None:
             self.name = get_rand_name(self.id)
     def get_references(self):
-        return OrderedSet([self])
+        return OrderedSet()
 
 class TriccStatic(BaseModel):
     value: Union[str, float, int, bool]
@@ -706,17 +709,13 @@ def nand_join(left, right):
     right_issue = right is None or right == ''
     left_neg = left == False or left == 0 or left == '0' or left == TriccStatic(False)
     right_neg = right == False or right == 0 or right == '0' or right == TriccStatic(False)
-    if issubclass(left.__class__, TriccNodeBaseModel):
-        left = get_export_name(left)
-    if issubclass(right.__class__, TriccNodeBaseModel):
-        right = get_export_name(right) 
     if left_issue and right_issue:
         logger.critical("and with both terms empty")
     elif left_issue:
         logger.debug('and with empty left term')
-        return  negate_term(right)
+        return  not_clean(right)
     elif left == '1' or left == 1 or left == TriccStatic(True):
-        return  negate_term(right)
+        return  not_clean(right)
     elif right_issue :
         logger.debug('and with empty right term')
         return  TriccStatic(False)
@@ -725,7 +724,7 @@ def nand_join(left, right):
     elif right_neg:
         return left
     else:
-        return  and_join([left, negate_term(right)])
+        return  and_join([left, not_clean(right)])
 
 
 TriccGroup.update_forward_refs()
