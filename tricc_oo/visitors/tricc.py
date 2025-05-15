@@ -657,7 +657,7 @@ def process_operation_reference(operation, node, processed_nodes, calculates, us
             if codesystems:
                 concept =  lookup_codesystems_code(codesystems, ref)
                 if not concept:
-                    logger.critical(f"reference {ref} not found in the project")
+                    logger.critical(f"reference {ref} not found in the project for{str(node)} ")
                     exit(1)
                 else:
                     if warn:
@@ -1144,28 +1144,39 @@ def check_stashed_loop(stashed_nodes, prev_stashed_nodes, processed_nodes, len_p
                             es_node.activity.instance if hasattr(es_node,'activity') else '',
                             es_node.__class__, 
                             es_node.get_name()))
+                    for es_node in [  l for l in [k for k in looped ] if isinstance(l, TriccReference)]:
+                        logger.info("Stashed node {}:{}|{} {}".format(
+                            es_node.activity.get_name() if hasattr(es_node,'activity') else '' ,
+                            es_node.activity.instance if hasattr(es_node,'activity') else '',
+                            es_node.__class__, 
+                            es_node.get_name()))
+                    for es_node in [  l for l in [k for k in waited ] if isinstance(l, TriccReference)]:
+                        logger.info("Stashed node {}:{}|{} {}".format(
+                            es_node.activity.get_name() if hasattr(es_node,'activity') else '' ,
+                            es_node.activity.instance if hasattr(es_node,'activity') else '',
+                            es_node.__class__, 
+                            es_node.get_name()))
                     logger.info("looped nodes")
                     for dep_list in looped:
                         for d in looped[dep_list]:
-                            if d.get_name() == dep_list:
-                                logger.critical("[{}] depends on itself".format(
-                                    dep_list, 
-                                    ))
-                            logger.error("[{}] depends on [{}]".format(
-                                dep_list, str(d)
-                                ))
-                        if dep_list in waited:
-                            for d in waited[dep_list]:
-                                logger.warning("[{}] depends on [{}]".format(
+                            if str(d) in looped:
+                                logger.critical("[{}] needed by on [{}]".format(
                                     dep_list, str(d)
                                     ))
-                        
-                        #reverse_walkthrough(es_node, es_node, print_trace, processed_nodes, stashed_nodes)
+                            else:
+                                logger.error("[{}] depends on [{}]".format(
+                                    dep_list, str(d)
+                                    ))
+                        if dep_list in waited:
+                            for d in waited[dep_list]:
+                                logger.warning("[{}] needed by{}]".format(
+                                    dep_list, str(d)
+                                    ))
                     logger.info("waited nodes")
                     for dep_list in waited:
                         if dep_list not in looped:
                             for d in waited[dep_list]:
-                                logger.warning("[{}] depends on [{}]".format(
+                                logger.warning("[{}] neede by [{}]".format(
                                     dep_list, d.get_name()
                                     ))
                             
@@ -1177,7 +1188,6 @@ def check_stashed_loop(stashed_nodes, prev_stashed_nodes, processed_nodes, len_p
         loop_count = 0
     return loop_count
 
-
 def add_to_tree(tree, n, d):
     n_str = str(n)
     if n_str not in tree:
@@ -1187,12 +1197,16 @@ def add_to_tree(tree, n, d):
     return tree
 
         
-def get_all_dependant(loop, stashed_nodes, processed_nodes, depth=0, waited=None , looped=None):
+def get_all_dependant(loop, stashed_nodes, processed_nodes, depth=0, waited=None , looped=None, path = None):
+    if path is None:
+        path =[] 
     if looped is None:
         looped = {}
     if waited is None:
         waited = {}
     for n in loop:
+        cur_path = path.copy()
+        cur_path.append(n)
         dependant = OrderedSet()
         i=0
         #logger.critical(f"{i}: {n.__class__}::{n.get_name()}::{getattr(n,'instance','')}::{process_reference(n, processed_nodes, [])}")
@@ -1204,28 +1218,30 @@ def get_all_dependant(loop, stashed_nodes, processed_nodes, depth=0, waited=None
         if not isinstance(dependant, list):
             pass
         for d in dependant:
+            if d in path:
+                logger.warning(f"loop {str(d)} already in path {'::'.join(map(path, str))}  ")
             if isinstance(d, TriccNodeSelectOption):
                 d = d.select
-            if d not in waited and d not in looped:
-                if isinstance(d, TriccReference):
-                    if not any(n.name == d.value for n in processed_nodes):
-                        if not any(n.name == d.value for n in stashed_nodes):
-                            waited = add_to_tree(waited, n, d) 
-                        else :
-                            looped = add_to_tree(looped, n, d)
-                
-                elif d  not in processed_nodes:
-                    if d in stashed_nodes:
-                        looped = add_to_tree(looped, n, d) 
+            
+            if isinstance(d, TriccReference):
+                if not any(n.name == d.value for n in processed_nodes):
+                    if not any(n.name == d.value for n in stashed_nodes):
+                        waited = add_to_tree(waited, d, n) 
                     else :
-                        waited = add_to_tree(waited, n, d) 
+                        looped = add_to_tree(looped, d, n)
+            
+            elif d not in processed_nodes:
+                if d in stashed_nodes:
+                    looped = add_to_tree(looped, d, n) 
+                else :
+                    waited = add_to_tree(waited, d, n) 
     if depth < MAX_DRILL:
-        return get_all_dependant(waited, stashed_nodes, processed_nodes, depth+1, waited , looped)
+        return get_all_dependant(looped, stashed_nodes, processed_nodes, depth+1, waited , looped, path=cur_path)
 
     return waited, looped
 
 
-MAX_DRILL = 1
+MAX_DRILL = 3
 
 def get_last_end_node(processed_nodes, process=None):
     end_name = 'tricc_end_'
