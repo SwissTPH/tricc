@@ -212,6 +212,7 @@ def process_edges(diagram, media_path, activity, nodes):
             ):
                 if isinstance(nodes[edge.source], TriccNodeRhombus):
                     edge.source = nodes[edge.source].path.id
+                    edge.source_external_id = None
                 processed = True
             elif label.lower() in (TRICC_YES_LABEL) or label == "":
                 # do nothinbg for yes

@@ -126,8 +126,8 @@ class DrawioStrategy(BaseInputStrategy):
 
         node_edge = list(
             filter(lambda x: (
-                (x.source_external_id and x.source_external_id == node.external_id) or 
                 ( x.source and x.source == node.id) or 
+                (not x.source and x.source_external_id and x.source_external_id == node.external_id) or 
                 x.source == node
             ), page.edges)
         )
