@@ -18,6 +18,9 @@ from tricc_oo.visitors.tricc import (
     add_calculate,
     TRICC_TRUE_VALUE,
     TRICC_FALSE_VALUE,
+    get_applicability_expression,
+    get_prev_instance_skip_expression,
+    get_process_skip_expression,
 )
 
 logger = logging.getLogger("default")
@@ -32,7 +35,7 @@ BOOLEAN_MAP = {
 
 
 def start_group(
-    strategy, cur_group, groups, df_survey, df_calculate, relevance=False, **kwargs
+    strategy, cur_group, groups, df_survey, df_calculate, processed_nodes, process, relevance=False, **kwargs
 ):
     name = get_export_name(cur_group)
 
@@ -46,12 +49,17 @@ def start_group(
     relevance = (
         relevance and cur_group.relevance is not None and cur_group.relevance != ""
     )
+    
 
     group_calc_required = (
         False and relevance and not is_activity and len(relevance) > 100
     )
 
     relevance_expression = cur_group.relevance
+    relevance_expression = get_applicability_expression(cur_group, processed_nodes, process, relevance_expression)
+    relevance_expression = get_prev_instance_skip_expression(cur_group, processed_nodes, process, relevance_expression)
+    relevance_expression = get_process_skip_expression(cur_group, processed_nodes, process, relevance_expression)
+    
     if not relevance:
         relevance_expression = ""
     elif isinstance(relevance_expression, TriccOperation):
@@ -628,118 +636,3 @@ def get_input_calc_line(node, replace_dots=True):
     ]
 
 
-def get_diagnostic_start_group_line():
-    label = langs.get_trads("List of diagnostics", force_dict=True)
-    empty = langs.get_trads("", force_dict=True)
-    return [
-        "begin group",
-        "l_diag_list25",
-        *list(label.values()),
-        *list(empty.values()),  # hint
-        *list(empty.values()),  # help
-        "",  # default
-        "field-list",  #'appearance',
-        "",  #'constraint',
-        *list(empty.values()),  #'constraint_message'
-        "",  #'relevance'
-        "",  #'disabled'
-        "",  #'required'
-        *list(empty.values()),  #'required message'
-        "",  #'read only'
-        "",  #'expression'
-        "",  #'repeat_count'
-        "",  #'image'
-        "",
-    ]
-
-
-def get_diagnostic_add_line(diags, df_choice):
-    for diag in diags:
-        df_choice.loc[len(df_choice)] = [
-            "tricc_diag_add",
-            get_export_name(diag),
-            *list(langs.get_trads(diag.label, True).values()),
-            "",  # filter
-            "",  # min y
-            "",  # max Y
-            "",  # l
-            "",  # m
-            "",  # s
-        ]
-    label = langs.get_trads("Add a missing diagnostic", force_dict=True)
-    empty = langs.get_trads("", force_dict=True)
-    return [
-        "select_multiple tricc_diag_add",
-        "new_diag",
-        *list(label.values()),
-        *list(empty.values()),  # hint
-        *list(empty.values()),  # help
-        "",  # default
-        "minimal",  #'appearance',
-        "",  #'constraint',
-        *list(empty.values()),  #'constraint_message',
-        "",  #'relevance'
-        "",  #'disabled'
-        "",  #'required'
-        *list(empty.values()),  #'required message'
-        "",  #'read only'
-        "",  #'expression'
-        "",  #'repeat_count'
-        "",  #'image'
-        "",
-    ]
-
-
-def get_diagnostic_none_line(diags):
-    relevance = ""
-    for diag in diags:
-        relevance += TRICC_CALC_EXPRESSION.format(get_export_name(diag)) + " or "
-    label = langs.get_trads(
-        "Aucun diagnostic trouvé par l'outil mais cela ne veut pas dire que le patient est en bonne santé",
-        force_dict=True,
-    )
-    empty = langs.get_trads("", force_dict=True)
-    return [
-        "note",
-        "l_diag_none25",
-        *list(label.values()),
-        *list(empty.values()),
-        *list(empty.values()),
-        "",  # default
-        "",  #'appearance',
-        "",  #'constraint',
-        *list(empty.values()),
-        f"not({relevance[:-4]})",  #'relevance'
-        "",  #'disabled'
-        "",  #'required'
-        *list(empty.values()),
-        "",  #'read only'
-        "",  #'expression'
-        "",  #'repeat_count'
-        "",  #'image'  TRICC_NEGATE
-        "",
-    ]
-
-
-def get_diagnostic_stop_group_line():
-    label = langs.get_trads("", force_dict=True)
-    return [
-        "end group",
-        "l_diag_list25",
-        *list(label.values()),
-        *list(label.values()),
-        *list(label.values()),  # help
-        "",  # default
-        "",  #'appearance',
-        "",  #'constraint',
-        *list(label.values()),
-        "",  #'relevance'
-        "",  #'disabled'
-        "",  #'required'
-        *list(label.values()),
-        "",  #'read only'
-        "",  #'expression'
-        "",  #'repeat_count'
-        "",  #'image'
-        "",
-    ]

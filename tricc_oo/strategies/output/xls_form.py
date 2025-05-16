@@ -174,8 +174,9 @@ class XLSFormStrategy(BaseOutPutStrategy):
         cur_group = activity
         groups[activity.id] = 0
         path_len = 0
+        process = ['main']
         # keep the vesrions on the group id, max version
-        start_group(self, cur_group=cur_group, groups=groups, **self.get_kwargs())
+        start_group(self, cur_group=cur_group, groups=groups, processed_nodes=processed_nodes, process=process,  **self.get_kwargs())
         walktrhough_tricc_node_processed_stached(
             activity.root,
             self.generate_export,
@@ -183,6 +184,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
             stashed_nodes,
             path_len,
             cur_group=activity.root.group,
+            process=process,
             recursive=False,
             **self.get_kwargs()
         )
@@ -218,6 +220,8 @@ class XLSFormStrategy(BaseOutPutStrategy):
                     self,
                     cur_group=s_node.group,
                     groups=groups,
+                    processed_nodes=processed_nodes,
+                    process=process,
                     relevance=True,
                     **self.get_kwargs()
                 )

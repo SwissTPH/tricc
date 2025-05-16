@@ -16,6 +16,10 @@ logger = logging.getLogger("default")
 
 
 def lookup_codesystems_code(codesystems, ref):
+    if ref.startswith('final.'):
+        concept = lookup_codesystems_code(codesystems, ref[6:])
+        if concept:
+            return concept
     for code_system in codesystems.values():
         for concept in code_system.concept or []:
             if concept.code == ref:

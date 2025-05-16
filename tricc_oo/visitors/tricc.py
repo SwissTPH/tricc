@@ -1144,14 +1144,14 @@ def check_stashed_loop(stashed_nodes, prev_stashed_nodes, processed_nodes, len_p
                             es_node.activity.instance if hasattr(es_node,'activity') else '',
                             es_node.__class__, 
                             es_node.get_name()))
-                    for es_node in [  l for l in [k for k in looped ] if isinstance(l, TriccReference)]:
-                        logger.info("Stashed node {}:{}|{} {}".format(
+                    for es_node in [node for node_list in looped.values() for node in node_list if isinstance(node, TriccReference)]:
+                        logger.info("looped node {}:{}|{} {}".format(
                             es_node.activity.get_name() if hasattr(es_node,'activity') else '' ,
                             es_node.activity.instance if hasattr(es_node,'activity') else '',
                             es_node.__class__, 
                             es_node.get_name()))
-                    for es_node in [  l for l in [k for k in waited ] if isinstance(l, TriccReference)]:
-                        logger.info("Stashed node {}:{}|{} {}".format(
+                    for es_node in [node for node_list in waited.values() for node in node_list if isinstance(node, TriccReference)]:
+                        logger.info("waited node {}:{}|{} {}".format(
                             es_node.activity.get_name() if hasattr(es_node,'activity') else '' ,
                             es_node.activity.instance if hasattr(es_node,'activity') else '',
                             es_node.__class__, 
@@ -1160,7 +1160,7 @@ def check_stashed_loop(stashed_nodes, prev_stashed_nodes, processed_nodes, len_p
                     for dep_list in looped:
                         for d in looped[dep_list]:
                             if str(d) in looped:
-                                logger.critical("[{}] needed by on [{}]".format(
+                                logger.critical("[{}] depends on [{}]".format(
                                     dep_list, str(d)
                                     ))
                             else:
@@ -1169,14 +1169,14 @@ def check_stashed_loop(stashed_nodes, prev_stashed_nodes, processed_nodes, len_p
                                     ))
                         if dep_list in waited:
                             for d in waited[dep_list]:
-                                logger.warning("[{}] needed by{}]".format(
+                                logger.warning("[{}] depends on [{}]".format(
                                     dep_list, str(d)
                                     ))
                     logger.info("waited nodes")
                     for dep_list in waited:
                         if dep_list not in looped:
                             for d in waited[dep_list]:
-                                logger.warning("[{}] neede by [{}]".format(
+                                logger.warning("[{}] depends on [{}]".format(
                                     dep_list, d.get_name()
                                     ))
                             
@@ -1226,15 +1226,15 @@ def get_all_dependant(loop, stashed_nodes, processed_nodes, depth=0, waited=None
             if isinstance(d, TriccReference):
                 if not any(n.name == d.value for n in processed_nodes):
                     if not any(n.name == d.value for n in stashed_nodes):
-                        waited = add_to_tree(waited, d, n) 
+                        waited = add_to_tree(waited, n, d)
                     else :
-                        looped = add_to_tree(looped, d, n)
+                        looped = add_to_tree(looped, n, d)
             
             elif d not in processed_nodes:
                 if d in stashed_nodes:
-                    looped = add_to_tree(looped, d, n) 
+                    looped = add_to_tree(looped, n, d)
                 else :
-                    waited = add_to_tree(waited, d, n) 
+                    waited = add_to_tree(waited, n, d)
     if depth < MAX_DRILL:
         return get_all_dependant(looped, stashed_nodes, processed_nodes, depth+1, waited , looped, path=cur_path)
 
@@ -1564,61 +1564,10 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
     if expression is None:
         expression = get_prev_node_expression(node, processed_nodes=processed_nodes, is_calculate=is_calculate, process=process)
             # in_node not in processed_nodes is need for calculates that can but run after the end of the activity
-
-    
-    if isinstance(node, TriccNodeActivity):
-        
-        
-        if node.base_instance is not None and not is_prev:
-            activity = node
-            expression_inputs = []
-            past_instances = [
-                n for n in processed_nodes if getattr(n.base_instance, 'id', None) == node.base_instance.id
-            ]
-            for past_instance in past_instances:
-                add_sub_expression(
-                    expression_inputs, 
-                    get_node_expression(
-                        past_instance,
-                        processed_nodes=processed_nodes,
-                        is_calculate=False,
-                        is_prev=True,
-                        process=process
-                    )
-                )
-            
-            if isinstance(node.applicability,(TriccStatic,TriccOperation, TriccReference)):
-                if expression:
-                    expression = and_join([node.applicability, expression])
-                else:
-                    expression = node.applicability
-            if expression and expression_inputs:
-                add_sub_expression(expression_inputs, expression)
-                expression = nand_join(expression, or_join(expression_inputs))
-            elif expression_inputs:
-                expression =  negate_term(or_join(expression_inputs))
-        if not is_prev:
-            end_expressions = []
-            f_end_expression = get_end_expression(processed_nodes)
-            if f_end_expression:
-                end_expressions.append(f_end_expression)
-            if process[0] in PROCESSES:
-                for p in PROCESSES[PROCESSES.index(process[0])+1:]:
-                    p_end_expression = get_end_expression(processed_nodes, p)
-                    if p_end_expression:
-                        end_expressions.append(p_end_expression)
-            if node.applicability:
-                end_expressions.append(node.applicability)
-            if end_expressions:
-                if expression:
-                    end_expressions.append(expression)
-                if len(end_expressions) == 1:
-                    expression = end_expressions[0]
-                else:
-                    expression = and_join(end_expressions)
-                    
-            
-                
+    #if isinstance(node, TriccNodeActivitiy) and not prev:
+        # expression = get_applicability_expression(node, processed_nodes, process, expression)
+        # expression = get_prev_instance_skip_expression(node, processed_nodes, process, expression)
+        # expression = get_process_skip_expression(node, processed_nodes, process, expression)
     if negate:
         if negate_expression is not None:
             return negate_expression
@@ -1629,7 +1578,67 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
             # exit(1)
     else:
         return expression
+    
+def get_applicability_expression(node, processed_nodes, process, expression=None):
+    if isinstance(node.applicability,(TriccStatic,TriccOperation, TriccReference)):
+        if expression:
+            expression = and_join([node.applicability, expression])
+        else:
+            expression = node.applicability
+    
+    return expression
+    
 
+
+        
+        
+def get_prev_instance_skip_expression(node, processed_nodes, process, expression=None):
+    if node.base_instance is not None:
+        activity = node
+        expression_inputs = []
+        past_instances = [
+            n for n in processed_nodes if getattr(n.base_instance, 'id', None) == node.base_instance.id
+        ]
+        for past_instance in past_instances:
+            add_sub_expression(
+                expression_inputs, 
+                get_node_expression(
+                    past_instance,
+                    processed_nodes=processed_nodes,
+                    is_calculate=False,
+                    is_prev=True,
+                    process=process
+                )
+            )
+        if expression and expression_inputs:
+            add_sub_expression(expression_inputs, expression)
+            expression = nand_join(expression, or_join(expression_inputs))
+        elif expression_inputs:
+            expression =  negate_term(or_join(expression_inputs))
+    return expression
+
+
+# end def
+def get_process_skip_expression(node, processed_nodes, process, expression=None):
+    
+    end_expressions = []
+    f_end_expression = get_end_expression(processed_nodes)
+    if f_end_expression:
+        end_expressions.append(f_end_expression)
+    if process[0] in PROCESSES:
+        for p in PROCESSES[PROCESSES.index(process[0])+1:]:
+            p_end_expression = get_end_expression(processed_nodes, p)
+            if p_end_expression:
+                end_expressions.append(p_end_expression)
+    if end_expressions:
+        if expression:
+            end_expressions.append(expression)
+        if len(end_expressions) == 1:
+            expression = end_expressions[0]
+        else:
+            expression = and_join(end_expressions)
+    return expression
+        
 def get_end_expression(processed_nodes, process=None):
     end_node = get_last_end_node(processed_nodes, process)
     if end_node:

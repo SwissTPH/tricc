@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tricc-oo"
-version = "1.4.17"
+version = "1.4.18"
 description = "Python library that converts CDSS L2 in L3"
 readme = "README.md"
 
@@ -19,6 +19,7 @@ dependencies = [
     "pydantic",
     "babel",
     "xlsxwriter",
+    "html2text",
     "pandas",
     "polib",
     "strenum",

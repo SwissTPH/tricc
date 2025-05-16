@@ -1,10 +1,6 @@
 import logging
 from tricc_oo.models.tricc import TriccNodeActivity
 from tricc_oo.models.calculate import TriccNodeProposedDiagnosis, TriccNodeInput
-from tricc_oo.serializers.xls_form import (
-                                        get_diagnostic_none_line,
-                                        get_diagnostic_start_group_line,
-                                        get_diagnostic_stop_group_line)
 from tricc_oo.converters.tricc_to_xls_form import get_export_name
 from tricc_oo.strategies.output.xls_form import XLSFormStrategy
 from tricc_oo.models.lang import SingletonLangClass
