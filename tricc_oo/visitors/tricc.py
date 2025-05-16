@@ -120,7 +120,7 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
             node_name = node.name if not isinstance(node, TriccNodeEnd) else node.get_reference()
             last_version = get_last_version(node_name, processed_nodes) if issubclass(node.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase, TriccNodeEnd)) and not isinstance(node, TriccNodeSelectOption)  else  None
             #last_version = processed_nodes.find_prev(node, lambda item: hasattr(item, 'name') and item.name == node.name)
-            if last_version:
+            if last_version and getattr(node, 'process', '') != 'pause':
                 # 0-100 for manually specified instance.  100-200 for auto instance 
                 node.version = last_version.version + 1
                 last_version.last = False
@@ -526,12 +526,15 @@ def process_reference(node, processed_nodes, calculates, used_calculates=None,  
             node.reference = list(modified_expression.get_references())
             node.expression_reference = modified_expression
     elif getattr(node, 'reference', None):
-        if isinstance(node.reference, list):
+        reference = node.reference
+        if isinstance(reference, list):
+            if isinstance(node, TriccNodeWait):
+                reference = [TriccOperation(TriccOperator.ISTRUE,[n]) for n in reference]
             if len(node.reference) == 1 :
-                operation = node.reference[0]
+                operation = reference[0]
             else:
                 operation = and_join(
-                        node.reference
+                        reference
                     )
             modified_expression = process_operation_reference(
                 operation, 
@@ -1468,7 +1471,7 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
     expression = None
     negate_expression = None
     node = in_node
-    if isinstance(node, (TriccNodeActivityStart,TriccNodeMainStart, TriccNodeActivityEnd)):
+    if isinstance(node, (TriccNodeActivityStart,TriccNodeMainStart)):
         if is_prev and is_calculate:
             expression = get_node_expression(
                 node.activity,
@@ -1478,7 +1481,9 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
                 negate=negate,
                 process=process
             )
-        elif  isinstance(node, (TriccNodeActivityStart)):
+            if isinstance(node, TriccNodeMainStart):
+                expression =  get_applicability_expression(node.activity, processed_nodes, process, expression )
+        elif isinstance(node, (TriccNodeActivityStart)):
             return None
         
     elif isinstance(node, TriccNodeWait):
@@ -1538,7 +1543,7 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
         # else:    
         expression = node.expression_reference
     elif not is_prev and hasattr(node, 'relevance') and isinstance(node.relevance, TriccOperation):
-        expression = node.relevance  
+        expression = node.relevance     
     elif is_prev and isinstance(node, TriccNodeSelectOption):
         if negate:
             negate_expression = get_selected_option_expression(node, negate)
@@ -1625,6 +1630,9 @@ def get_process_skip_expression(node, processed_nodes, process, expression=None)
     f_end_expression = get_end_expression(processed_nodes)
     if f_end_expression:
         end_expressions.append(f_end_expression)
+    b_end_expression = get_end_expression(processed_nodes, 'pause')
+    if b_end_expression:
+        end_expressions.append(b_end_expression)        
     if process[0] in PROCESSES:
         for p in PROCESSES[PROCESSES.index(process[0])+1:]:
             p_end_expression = get_end_expression(processed_nodes, p)

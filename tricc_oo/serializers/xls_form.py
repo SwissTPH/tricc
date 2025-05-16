@@ -62,12 +62,11 @@ def start_group(
     
     if not relevance:
         relevance_expression = ""
-    elif isinstance(relevance_expression, TriccOperation):
+    elif isinstance(relevance_expression, (TriccOperation, TriccStatic)):
         relevance_expression = strategy.get_tricc_operation_expression(
             relevance_expression
         )
-    elif isinstance(relevance_expression, TriccStatic):
-        relevance_expression = str(relevance_expression.value)
+
 
     # elif is_activity:
     #    relevance_expression = TRICC_CALC_EXPRESSION.format(get_export_name(cur_group.root))

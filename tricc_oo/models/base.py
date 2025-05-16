@@ -305,7 +305,7 @@ class TriccStatic(BaseModel):
         return str(self.value)
     
     def __repr__(self):
-        return "TriccStatic:"+str(type(self.value))+':' +str(self.value)
+        return self.__class__.__name__+":"+str(type(self.value))+':' +str(self.value)
 
     def get_references(self):
         return OrderedSet()

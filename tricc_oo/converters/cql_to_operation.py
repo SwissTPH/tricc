@@ -33,6 +33,7 @@ FUNCTION_MAP = {
 class cqlToXlsFormVisitor(cqlVisitor):
     def __init__(self):
         self.xlsform_rows = []
+        self.errors= []
         
     def resolve_scv(self, arg):
         
@@ -42,8 +43,14 @@ class cqlToXlsFormVisitor(cqlVisitor):
         # if no code or not found return None
         if arg.startswith('"') and arg.endswith('"'):
             return TriccReference(arg[1:-1])
-        else:
+        elif arg.lower() in ['true', 'false']:
+            return TriccStatic(arg.lower() == 'true')
+        elif arg != 'runner':
+            self.errors.append(f"'{arg}' will be poccessed as reference ")
             return TriccReference(arg)
+        
+        else:
+            return 'runner'
         
     def translate(self, arg, type=ANY):
         return self.resolve_scv(arg) or str(arg)
@@ -368,13 +375,13 @@ class CQLErrorListener(ErrorListener):
         self.errors.append(error)
 
 def transform_cql_to_operation(cql_input, context=None):
-    cql_input = f"""
+    lib_input = f"""
     library runner
     
     define "calc":
         {cql_input.replace('−', '-')}
     """
-    input_stream = InputStream(chr(10).join(cql_input.split('\n')))
+    input_stream = InputStream(chr(10).join(lib_input.split('\n')))
     lexer = cqlLexer(input_stream)
     stream = CommonTokenStream(lexer)
     parser = cqlParser(stream)
@@ -390,12 +397,18 @@ def transform_cql_to_operation(cql_input, context=None):
     # Check for errors
     if error_listener.errors:
         for error in error_listener.errors:
-            print(f"CQL Grammar Error: {error}")
+            print(f"CQL Grammar Error: {error} \n in:\n {cql_input}")
         return None  # Or handle errors as appropriate for your use case
 
     # If no errors, proceed with visitor
     visitor = cqlToXlsFormVisitor()
+    
     visitor.visit(tree)
+    if visitor.errors:
+        logger.warning(f"while visiting cql: \n{cql_input}")
+        for e in visitor.errors:
+            logger.warning(e)
+        
     return visitor.xlsform_rows[0]['calculation']
 
 def transform_cql_lib_to_operations(cql_input):
