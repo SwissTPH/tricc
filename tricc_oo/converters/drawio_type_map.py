@@ -94,13 +94,13 @@ TYPE_MAP = {
 
     TriccNodeType.text: {
         "objects": ["UserObject", "object"],
-        "attributes": ["relevance"],
+        "attributes": ["save", "relevance"],
         "mandatory_attributes": ["label", 'name'],
         "model": TriccNodeText
     },
     TriccNodeType.date: {
         "objects": ["UserObject", "object"],
-        "attributes": ["relevance"],
+        "attributes": ["save", "relevance"],
         "mandatory_attributes": ["label", "name"],
         "model": TriccNodeDate
     },

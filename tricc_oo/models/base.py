@@ -112,7 +112,14 @@ class TriccBaseModel(BaseModel):
     version: int = 1
     def get_datatype(self):
         return self.datatype or self.tricc_type
-
+    
+    def get_next_instance(self):
+        if getattr(self, 'instances', None):
+            return max(100, *[n.instance for n in self.instances.values()]) + 1
+        if getattr(self, 'base_instance', None) and getattr(self.base_instance, 'instances', None):
+            return max(100, *[n.instance for n in self.base_instance.instances.values()]) + 1
+        return max(100,self.instance) + 1 
+    
     def to_dict(self):
         return {key: value for key, value in vars(self).items() if not key.startswith('_')}
 
@@ -233,20 +240,20 @@ class TriccNodeBaseModel(TriccBaseModel):
     # to be updated while processing because final expression will be possible to build$
     # #only the last time the script will go through the node (all prev node expression would be created    
     def get_name(self):
-        result = str(super().get_name())
+        result = self.__class__.__name__[9:]# str(super().get_name())
         name =  getattr(self, 'name', None) 
         label =  getattr(self, 'label', None)
     
         if name:
-            result = result + "::" + name
+            result += name
         if label:
-            result = result + "::" + (
+            result += "::" + (
                 next(iter(self.label.values())) if isinstance(self.label, Dict) else self.label
             )
-        if len(result) < 50:
+        if len(result) < 80:
             return result
         else:
-            return result[:50]        
+            return result[:80]        
         
 
 

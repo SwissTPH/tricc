@@ -93,6 +93,81 @@ def get_node_expressions(node, processed_nodes, process=None):
         expression = TriccStatic(True)
     return expression
 
+def set_last_version_false(node, processed_nodes):
+    node_name = node.name if not isinstance(node, TriccNodeEnd) else node.get_reference()
+    last_version = get_last_version(node_name, processed_nodes) if issubclass(node.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase, TriccNodeEnd)) and not isinstance(node, TriccNodeSelectOption)  else  None
+    #last_version = processed_nodes.find_prev(node, lambda item: hasattr(item, 'name') and item.name == node.name)
+    if last_version and getattr(node, 'process', '') != 'pause':
+        # 0-100 for manually specified instance.  100-200 for auto instance 
+        node.version = last_version.version + 1
+        last_version.last = False
+        node.path_len = max(node.path_len, last_version.path_len + 1)
+    return last_version
+        
+def get_version_inheritance(node, last_version, processed_nodes):
+        # FIXME this is for XLS form where only calculate are evaluated for a activity that is not triggered
+        if not issubclass(node.__class__, (TriccNodeInputModel)):
+            node.last = True
+            if (
+                issubclass(node.__class__, (TriccNodeDisplayCalculateBase, TriccNodeEnd)) and node.name is not None
+            ):
+                #logger.debug("set last to false for node {}  and add its link it to next one".format(last_used_calc.get_name()))
+                if node.prev_nodes:    
+                    set_prev_next_node(last_version, node)
+                else:
+                    expression = node.expression or node.expression_reference or getattr(node, 'relevance', None)
+                    datatype = expression.get_datatype()
+                    if datatype == 'boolean':
+                        expression_reference = TriccOperation(
+                            TriccOperator.OR,
+                            [TriccOperation(TriccOperator.ISTRUE, [last_version]), expression]
+                        )
+                    
+                    elif datatype == 'number':
+                        expression = TriccOperation(
+                            TriccOperator.PLUS,
+                            [last_version, expression] 
+                        )
+                    else:
+                        expression = TriccOperation(
+                            TriccOperator.COALESCE,
+                            [last_version, expression] 
+                        )
+                    if node.expression:
+                        node.expression = expression
+                    elif node.expression_reference:
+                        node.expression_reference = expression
+                    elif node.relevance:
+                        node.relevance = expression
+        else:
+            node.last = False
+            
+            
+            calc = TriccNodeCalculate(
+                id=generate_id(f"save{node.id}"),
+                name=node.name,
+                path_len=node.path_len+1,
+                version=get_next_version(node.name, processed_nodes, node.version+2),
+                expression=TriccOperation(
+                    TriccOperator.COALESCE,
+                    [node, last_version, TriccStatic("''")]
+                ),
+                last=True,
+                activity=node.activity,
+                group=node.group
+                )
+            node.activity.nodes[calc.id]=calc
+            node.activity.calculates.append(calc)
+            set_last_version_false(calc, processed_nodes)
+            processed_nodes.add(calc)
+            if issubclass(node.__class__, TriccNodeInputModel):
+                node.expression = TriccOperation(
+                    TriccOperator.COALESCE,
+                    [
+                        '$this',
+                        last_version
+                    ]
+                )
 
 def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calculates, 
                       warn = False, process=None, **kwargs ):
@@ -117,76 +192,11 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
         ):
             if kwargs.get('warn', True):
                 logger.debug('Processing relevance for node {0}'.format(node.get_name()))
-            node_name = node.name if not isinstance(node, TriccNodeEnd) else node.get_reference()
-            last_version = get_last_version(node_name, processed_nodes) if issubclass(node.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase, TriccNodeEnd)) and not isinstance(node, TriccNodeSelectOption)  else  None
-            #last_version = processed_nodes.find_prev(node, lambda item: hasattr(item, 'name') and item.name == node.name)
-            if last_version and getattr(node, 'process', '') != 'pause':
-                # 0-100 for manually specified instance.  100-200 for auto instance 
-                node.version = last_version.version + 1
-                last_version.last = False
-                node.path_len = max(node.path_len, last_version.path_len + 1)
-                # FIXME this is for XLS form where only calculate are evaluated for a activity that is not triggered
-                if not issubclass(node.__class__, (TriccNodeInputModel)):
-                    node.last = True
-                    if (
-                        issubclass(node.__class__, (TriccNodeDisplayCalculateBase, TriccNodeEnd)) and node.name is not None
-                    ):
-                        #logger.debug("set last to false for node {}  and add its link it to next one".format(last_used_calc.get_name()))
-                        if node.prev_nodes:    
-                            set_prev_next_node(last_version, node)
-                        else:
-                            expression = node.expression or node.expression_reference or node.relevance
-                            datatype = expression.get_datatype()
-                            if datatype == 'boolean':
-                                expression_reference = TriccOperation(
-                                    TriccOperator.OR,
-                                    [TriccOperation(TriccOperator.ISTRUE, [last_version]), expression]
-                                )
-                            
-                            elif datatype == 'number':
-                                expression = TriccOperation(
-                                    TriccOperator.PLUS,
-                                    [last_version, expression] 
-                                )
-                            else:
-                                expression = TriccOperation(
-                                    TriccOperator.COALESCE,
-                                    [last_version, expression] 
-                                )
-                            if node.expression:
-                                node.expression = expression
-                            elif node.expression_reference:
-                                node.expression_reference = expression
-                            elif node.relevance:
-                                node.relevance = expression
-                else:
-                    node.last = False
-                    
-                    
-                    calc = TriccNodeCalculate(
-                        id=generate_id(f"save{node.id}"),
-                        name=node.name,
-                        path_len=node.path_len+1,
-                        version=last_version.version + 2,
-                        expression=TriccOperation(
-                            TriccOperator.COALESCE,
-                            [node, last_version, TriccStatic("''")]
-                        ),
-                        last=True,
-                        activity=node.activity,
-                        group=node.group
-                        )
-                    node.activity.nodes[calc.id]=calc
-                    node.activity.calculates.append(calc)
-                    if issubclass(node.__class__, TriccNodeInputModel):
-                        node.expression = TriccOperation(
-                            TriccOperator.COALESCE,
-                            [
-                                '$this',
-                                last_version
-                            ]
-                        )
-                    
+            last_version =  set_last_version_false(node, processed_nodes)
+            if last_version:
+                last_version = get_version_inheritance(node, last_version, processed_nodes)
+            generate_calculates(node,calculates, used_calculates,processed_nodes=processed_nodes)                
+       
                 
 
         # if has prev, create condition
@@ -218,7 +228,6 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
                         if issubclass(r.__class__, (TriccNodeDisplayCalculateBase )):
                             add_used_calculate(node, r, calculates, used_calculates, processed_nodes)
                 
-                generate_calculates(node,calculates, used_calculates,processed_nodes=processed_nodes)                
             if last_version and hasattr(node, 'relevance'):
                 if isinstance(node, TriccNodeInputModel):
                     version_relevance =  TriccOperation(
@@ -468,16 +477,23 @@ def generate_calculates(node,calculates, used_calculates,processed_nodes):
             calc_node.path_len += 1
             calc_node.name=calculate_name
             calc_node.label =  "save select: " +node.get_name()        
-        else:
+        elif node.name != calculate_name:
             calc_id = generate_id(f"autosave{node.id}")
+            
             calc_node = TriccNodeCalculate(
                 name=calculate_name,
                 id = calc_id,
                 group = node.group,
+                version=get_next_version(calculate_name, processed_nodes, node.version+2),
                 activity = node.activity,
                 label =  "save: " +node.get_name(),
-                path_len=node.path_len+ 1
+                path_len=node.path_len+ 1,
+                last=True
             )
+            node.activity.nodes[calc_node.id]=calc_node
+            node.activity.calculates.append(calc_node)
+            set_last_version_false(calc_node, processed_nodes)
+            processed_nodes.add(calc_node)
         logger.debug("generate_save_calculate:{}:{} as {}".format(calc_node.tricc_type, node.name if hasattr(node,'name') else node.id, calculate_name))
         if isinstance(node, TriccNodeSelectYesNo):
             yesNode =  node.options[0]
@@ -948,6 +964,9 @@ def walkthrough_tricc_option(node, callback, processed_nodes, stashed_nodes, pat
                                                                         warn = warn,
                                                                         node_path = node_path.copy(), **kwargs)
 
+def get_next_version(name, processed_nodes, version=0,):
+    return max(version, 100,*[(getattr(n,'version',0) or getattr(n,'instance',0) or 0) for n in get_versions(name, processed_nodes)])
+
 
 def get_data_for_log(node):
     return "{}:{}|{} {}:{}".format(
@@ -1207,6 +1226,7 @@ def get_all_dependant(loop, stashed_nodes, processed_nodes, depth=0, waited=None
         looped = {}
     if waited is None:
         waited = {}
+    all_dependant = OrderedSet()
     for n in loop:
         cur_path = path.copy()
         cur_path.append(n)
@@ -1222,7 +1242,7 @@ def get_all_dependant(loop, stashed_nodes, processed_nodes, depth=0, waited=None
             pass
         for d in dependant:
             if d in path:
-                logger.warning(f"loop {str(d)} already in path {'::'.join(map(path, str))}  ")
+                logger.warning(f"loop {str(d)} already in path {'::'.join(map(str, path))}  ")
             if isinstance(d, TriccNodeSelectOption):
                 d = d.select
             
@@ -1238,9 +1258,10 @@ def get_all_dependant(loop, stashed_nodes, processed_nodes, depth=0, waited=None
                     looped = add_to_tree(looped, n, d)
                 else :
                     waited = add_to_tree(waited, n, d)
+            all_dependant = all_dependant.union(dependant)
     if depth < MAX_DRILL:
-        return get_all_dependant(looped, stashed_nodes, processed_nodes, depth+1, waited , looped, path=cur_path)
-
+        waited, looped =  get_all_dependant(all_dependant, stashed_nodes, processed_nodes, depth+1, waited , looped, path=cur_path)
+        
     return waited, looped
 
 
