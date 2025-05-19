@@ -35,12 +35,12 @@ def get_export_name(node, replace_dots=True):
         node.gen_name()
         if isinstance(node, TriccNodeSelectOption):
                 node.export_name = node.name
-        elif isinstance(node,  TriccNodeActivityStart):
-            node.export_name =  clean_name(node.name +  INSTANCE_SEPARATOR + str(node.instance), replace_dots=replace_dots)
-        elif isinstance(node, TriccNodeInput):
-            node.export_name = clean_name('load.' +node.name, replace_dots=replace_dots)
         elif node.last == False:
             node.export_name = clean_name(node.name + VERSION_SEPARATOR + str(node.version), replace_dots=replace_dots)
+        elif node.activity.instance>1:
+            node.export_name =  clean_name(node.name +  INSTANCE_SEPARATOR + str(node.activity.instance), replace_dots=replace_dots)
+        elif isinstance(node, TriccNodeInput):
+            node.export_name = clean_name('load.' +node.name, replace_dots=replace_dots)
         else:
             node.export_name = clean_name(node.name, replace_dots=replace_dots)
             
