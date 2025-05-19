@@ -299,7 +299,7 @@ class TriccNodeSelectOption(TriccNodeDisplayModel):
     select: TriccNodeInputModel
     list_name: str
     def get_datatype(self):
-        if isnumeric(self.name):
+        if self.name.isnumeric():
             return 'number'
         else:
             return 'string'
@@ -323,7 +323,7 @@ class TriccNodeSelect(TriccNodeInputModel):
     list_name: str
     def get_datatype(self):
         rtype = set()
-        for k,o in options.items():
+        for k,o in self.options.items():
             rtype.add(o.get_datatype())
         if len(rtype)>1:
             return 'mixed'

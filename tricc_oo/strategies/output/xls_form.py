@@ -26,7 +26,8 @@ from tricc_oo.visitors.tricc import (
     process_reference,
     get_node_expressions,
     TRICC_TRUE_VALUE,
-    TRICC_FALSE_VALUE
+    TRICC_FALSE_VALUE,
+    set_last_version_false
 )
 from tricc_oo.serializers.xls_form import (
     CHOICE_MAP,
@@ -607,14 +608,16 @@ class XLSFormStrategy(BaseOutPutStrategy):
     # function update the calcualte in the XLSFORM format
     # @param left part
     # @param right part        
-    def generate_xls_form_calculate(self, node, processed_nodes, stashed_nodes, **kwargs):
-        if is_ready_to_process(node, processed_nodes):
+    def generate_xls_form_calculate(self, node, processed_nodes, stashed_nodes, calculates, **kwargs):
+        if is_ready_to_process(node, processed_nodes, strict=False) and process_reference(node, processed_nodes, calculates, replace_reference=False, codesystems= kwargs.get('codesystems', None)):
             if node not in processed_nodes:
                 if kwargs.get('warn', True):          
                     logger.debug("generation of calculate for node {}".format(node.get_name()))
                 if hasattr(node, 'expression') and (node.expression is None) and issubclass(node.__class__,TriccNodeCalculateBase):
                     node.expression = get_node_expressions(node, processed_nodes, process=kwargs.get('process', 'main '))
                     # continue walk
+                if issubclass(node.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase, TriccNodeEnd)):
+                    last_version =  set_last_version_false(node, processed_nodes)
                 return True
         return False
     

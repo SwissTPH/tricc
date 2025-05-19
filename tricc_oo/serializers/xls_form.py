@@ -21,6 +21,8 @@ from tricc_oo.visitors.tricc import (
     get_applicability_expression,
     get_prev_instance_skip_expression,
     get_process_skip_expression,
+    get_next_version,
+    set_last_version_false,
 )
 
 logger = logging.getLogger("default")

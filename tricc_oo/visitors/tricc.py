@@ -95,11 +95,11 @@ def get_node_expressions(node, processed_nodes, process=None):
 
 def set_last_version_false(node, processed_nodes):
     node_name = node.name if not isinstance(node, TriccNodeEnd) else node.get_reference()
-    last_version = get_last_version(node_name, processed_nodes) if issubclass(node.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase, TriccNodeEnd)) and not isinstance(node, TriccNodeSelectOption)  else  None
-    #last_version = processed_nodes.find_prev(node, lambda item: hasattr(item, 'name') and item.name == node.name)
+    #last_version = get_last_version(node_name, processed_nodes) if issubclass(node.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase, TriccNodeEnd)) and not isinstance(node, TriccNodeSelectOption)  else  None
+    last_version = processed_nodes.find_prev(node, lambda item: item.id != node.id and hasattr(item, 'name') and item.name == node.name and  issubclass(node.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase, TriccNodeEnd)) and not isinstance(node, TriccNodeSelectOption))
     if last_version and getattr(node, 'process', '') != 'pause':
         # 0-100 for manually specified instance.  100-200 for auto instance 
-        node.version = last_version.version + 1
+        node.version = get_next_version(node.name, processed_nodes, last_version.version + 1)
         last_version.last = False
         node.path_len = max(node.path_len, last_version.path_len + 1)
     return last_version
@@ -116,23 +116,7 @@ def get_version_inheritance(node, last_version, processed_nodes):
                     set_prev_next_node(last_version, node)
                 else:
                     expression = node.expression or node.expression_reference or getattr(node, 'relevance', None)
-                    datatype = expression.get_datatype()
-                    if datatype == 'boolean':
-                        expression_reference = TriccOperation(
-                            TriccOperator.OR,
-                            [TriccOperation(TriccOperator.ISTRUE, [last_version]), expression]
-                        )
-                    
-                    elif datatype == 'number':
-                        expression = TriccOperation(
-                            TriccOperator.PLUS,
-                            [last_version, expression] 
-                        )
-                    else:
-                        expression = TriccOperation(
-                            TriccOperator.COALESCE,
-                            [last_version, expression] 
-                        )
+                    expression = merge_expression(expression, last_version)
                     if node.expression:
                         node.expression = expression
                     elif node.expression_reference:
@@ -141,24 +125,20 @@ def get_version_inheritance(node, last_version, processed_nodes):
                         node.relevance = expression
         else:
             node.last = False
-            
-            
             calc = TriccNodeCalculate(
                 id=generate_id(f"save{node.id}"),
                 name=node.name,
                 path_len=node.path_len+1,
-                version=get_next_version(node.name, processed_nodes, node.version+2),
-                expression=TriccOperation(
-                    TriccOperator.COALESCE,
-                    [node, last_version, TriccStatic("''")]
-                ),
+                #version=get_next_version(node.name, processed_nodes, node.version+2),
+                expression= merge_expression(node, last_version),
+                label= f"merge{node.id}",
                 last=True,
                 activity=node.activity,
                 group=node.group
                 )
             node.activity.nodes[calc.id]=calc
             node.activity.calculates.append(calc)
-            set_last_version_false(calc, processed_nodes)
+            #set_last_version_false(calc, processed_nodes)
             processed_nodes.add(calc)
             if issubclass(node.__class__, TriccNodeInputModel):
                 node.expression = TriccOperation(
@@ -168,6 +148,26 @@ def get_version_inheritance(node, last_version, processed_nodes):
                         last_version
                     ]
                 )
+                
+def merge_expression(expression, last_version):
+    datatype = expression.get_datatype()
+    if datatype == 'boolean':
+        expression = TriccOperation(
+            TriccOperator.OR,
+            [TriccOperation(TriccOperator.ISTRUE, [last_version]), expression]
+        )
+    
+    elif datatype == 'number':
+        expression = TriccOperation(
+            TriccOperator.PLUS,
+            [last_version, expression] 
+        )
+    else:
+        expression = TriccOperation(
+            TriccOperator.COALESCE,
+            [last_version, expression] 
+        )
+    return expression
 
 def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calculates, 
                       warn = False, process=None, **kwargs ):
@@ -472,38 +472,31 @@ def generate_calculates(node,calculates, used_calculates,processed_nodes):
     if hasattr(node, 'save') and node.save is not None and node.save != '':
         # get fragments type.name.icdcode
         calculate_name=node.save   
-        if not isinstance(node, TriccNodeSelectYesNo) and  issubclass(node.__class__, (TriccNodeSelect)):
-            calc_node = get_count_node(node)
-            calc_node.path_len += 1
-            calc_node.name=calculate_name
-            calc_node.label =  "save select: " +node.get_name()        
-        elif node.name != calculate_name:
+        if node.name != calculate_name:
             calc_id = generate_id(f"autosave{node.id}")
             
             calc_node = TriccNodeCalculate(
                 name=calculate_name,
                 id = calc_id,
                 group = node.group,
-                version=get_next_version(calculate_name, processed_nodes, node.version+2),
+                #version=get_next_version(calculate_name, processed_nodes, node.version+2),
                 activity = node.activity,
                 label =  "save: " +node.get_name(),
                 path_len=node.path_len+ 1,
-                last=True
+                last=True,
+                expression=get_node_expression(node,processed_nodes,True,True)
             )
-            node.activity.nodes[calc_node.id]=calc_node
             node.activity.calculates.append(calc_node)
-            set_last_version_false(calc_node, processed_nodes)
+            last_version = set_last_version_false(calc_node, processed_nodes)
+            if last_version:
+                calc_node.expression = merge_expression(calc_node.expression, last_version)
             processed_nodes.add(calc_node)
-        logger.debug("generate_save_calculate:{}:{} as {}".format(calc_node.tricc_type, node.name if hasattr(node,'name') else node.id, calculate_name))
-        if isinstance(node, TriccNodeSelectYesNo):
-            yesNode =  node.options[0]
-            set_prev_next_node(yesNode,calc_node)
-        else:
-            set_prev_next_node(node,calc_node)
-        list_calc.append(calc_node)
-        #add_save_calculate(calc_node, calculates, used_calculates,processed_nodes)
-        for calc in list_calc:
-            node.activity.nodes[calc.id] = calc
+            logger.debug("generate_save_calculate:{}:{} as {}".format(calc_node.tricc_type, node.name if hasattr(node,'name') else node.id, calculate_name))
+            
+            list_calc.append(calc_node)
+            #add_save_calculate(calc_node, calculates, used_calculates,processed_nodes)
+            for calc in list_calc:
+                node.activity.nodes[calc.id] = calc
     return list_calc
 
 
@@ -964,8 +957,8 @@ def walkthrough_tricc_option(node, callback, processed_nodes, stashed_nodes, pat
                                                                         warn = warn,
                                                                         node_path = node_path.copy(), **kwargs)
 
-def get_next_version(name, processed_nodes, version=0,):
-    return max(version, 100,*[(getattr(n,'version',0) or getattr(n,'instance',0) or 0) for n in get_versions(name, processed_nodes)])
+def get_next_version(name, processed_nodes, version=0, min=100):
+    return max(version, min,*[(getattr(n,'version',None) or getattr(n,'instance',0) or 0) for n in get_versions(name, processed_nodes)])
 
 
 def get_data_for_log(node):
@@ -1556,6 +1549,8 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
             logger.critical(f"Rhombus without expression {node.get_name()}")
     elif is_prev and issubclass(node.__class__, TriccNodeDisplayCalculateBase):
         expression = TriccOperation(TriccOperator.ISTRUE, [node])
+    elif is_prev and is_calculate and (issubclass(node.__class__, TriccNodeSelect) or isinstance(node, TriccNodeSelectNotAvailable)):
+        expression = get_count_terms_details( node,  processed_nodes, is_calculate, negate, process)
     elif hasattr(node, 'expression_reference') and isinstance(node.expression_reference, TriccOperation):
         # if issubclass(node.__class__, TriccNodeDisplayCalculateBase):
         #     expression = TriccOperation(
@@ -1874,7 +1869,28 @@ def get_activity_end_terms( node, processed_nodes, process=None):
 
 def get_count_terms( node, processed_nodes, is_calculate, negate=False, process=None):
     terms = []
+    
     for prev_node in node.prev_nodes:
+        term = get_count_terms_details( prev_node, processed_nodes, is_calculate, negate, process)
+        if term:
+            terms.append(term)
+    if len(terms) == 1:
+        return TriccOperation(
+            TriccOperator.CAST_NUMBER,
+            [terms[0]]
+        )
+    elif len(terms) > 0:
+        return TriccOperation(
+            TriccOperator.PLUS,
+            [
+                TriccOperation(
+                    TriccOperator.CAST_NUMBER,
+                    [term]
+                ) for term in terms
+            ]
+        )
+        
+def get_count_terms_details( prev_node, processed_nodes, is_calculate, negate=False, process=None):
         operation_none = TriccOperation(
             TriccOperator.SELECTED,
             [
@@ -1882,12 +1898,20 @@ def get_count_terms( node, processed_nodes, is_calculate, negate=False, process=
                 TriccStatic('opt_none')
             ]
         )
-        if isinstance(prev_node, TriccNodeSelectMultiple):
+        if isinstance(prev_node, TriccNodeSelectYesNo):
+            return TriccOperation(
+                TriccOperator.SELECTED,
+                [
+                    prev_node,
+                    TriccStatic(prev_node.options[0].name)
+                ]
+            )
+        elif issubclass(prev_node.__class__, TriccNodeSelect):
             if negate:
-                terms.append()
+                return
                 #terms.append(TRICC_SELECT_MULTIPLE_CALC_NONE_EXPRESSION.format(get_export_name(prev_node)))
             else:
-                terms.append(TriccOperation(
+                return TriccOperation(
                     TriccOperator.MINUS,
                     [
                         TriccOperation(
@@ -1902,23 +1926,22 @@ def get_count_terms( node, processed_nodes, is_calculate, negate=False, process=
                                 operation_none
                             ]
                         )
-                ]))
+                ])
                 #terms.append(TRICC_SELECT_MULTIPLE_CALC_EXPRESSION.format(get_export_name(prev_node)))
-        elif isinstance(prev_node, (TriccNodeSelectYesNo, TriccNodeSelectNotAvailable)):
-            terms.append(TriccOperation(
+        elif isinstance(prev_node, (TriccNodeSelectNotAvailable)):
+            return TriccOperation(
                 TriccOperator.SELECTED,
                 [
                     prev_node,
                     TriccStatic('1')
                 ]
-            ))
+            )
             #terms.append(TRICC_SELECTED_EXPRESSION.format(get_export_name(prev_node), '1'))
         elif isinstance(prev_node, TriccNodeSelectOption):
-            terms.append(get_selected_option_expression(prev_node, negate))
+            return get_selected_option_expression(prev_node, negate)
         else:
             if negate:
-                terms.append(
-                    TriccOperation(
+                return TriccOperation(
                         TriccOperator.CAST_NUMBER,
                         [
                             TriccOperation(
@@ -1939,10 +1962,9 @@ def get_count_terms( node, processed_nodes, is_calculate, negate=False, process=
                             )
                         ]
                     )
-                )
+                
             else:
-                terms.append(
-                    TriccOperation(
+                return TriccOperation(
                         TriccOperator.CAST_NUMBER,
                         [
                             get_node_expression(
@@ -1952,22 +1974,8 @@ def get_count_terms( node, processed_nodes, is_calculate, negate=False, process=
                                 is_prev=True,
                                 process=process)
                         ]
-                    ))
-    if len(terms) == 1:
-        return TriccOperation(
-            TriccOperator.CAST_NUMBER,
-            [terms[0]]
-        )
-    elif len(terms) > 0:
-        return TriccOperation(
-            TriccOperator.PLUS,
-            [
-                TriccOperation(
-                    TriccOperator.CAST_NUMBER,
-                    [term]
-                ) for term in terms
-            ]
-        )
+                    )
+    
         
     
 def get_add_terms( node, processed_nodes, is_calculate=False, negate=False, process=None):
