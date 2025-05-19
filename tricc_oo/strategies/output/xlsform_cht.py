@@ -32,44 +32,326 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
         self.df_survey = pd.concat([cht_input_df, self.df_survey ,self.get_cht_summary() ], ignore_index=True)
  
     def get_cht_input(self, start_pages, **kwargs):
+        empty = langs.get_trads('', force_dict =True)
         df_input = pd.DataFrame(columns=SURVEY_MAP.keys())
          #[ #type, '',#name ''#label, '',#hint '',#help '',#default '',#'appearance',  '',#'constraint',  '',#'constraint_message' '',#'relevance' '',#'disabled' '',#'required' '',#'required message' '',#'read only' '',#'expression' '',#'repeat_count' ''#'image' ],
-        df_input.loc[len(df_input)] = [ 'begin group', 'inputs' ,*list(langs.get_trads('Inputs', force_dict = True).values()), *list(langs.get_trads('', force_dict = True).values()), *list(langs.get_trads('', force_dict = True).values()), '',  'field-list',  '', *list(langs.get_trads('', force_dict = True).values()), './source = "user"', '','', *list(langs.get_trads('', force_dict = True).values()) ,'', '', '', '', '' ]
-        df_input.loc[len(df_input)] = [ 'hidden', 'source', *list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', '',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()) ,'', '', '', '', '' ]
-        df_input.loc[len(df_input)] = [ 'hidden', 'source_id',*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', '',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()) ,'', '', '', '', '' ]
+        df_input.loc[len(df_input)] = [ 
+            'begin_group', 'inputs',
+            *list(langs.get_trads('NO_LABEL', force_dict = True).values()),
+            *list(empty.values()),
+            *list(empty.values()),
+            '',  'field-list',  '',
+            *list(empty.values()),
+            './source = "user"', '','',
+            *list(empty.values())
+            ,'', '', '', '' ,''
+        ]
+        df_input.loc[len(df_input)] = [ 
+            'hidden', 'source',
+            *list(langs.get_trads('Source', force_dict = True).values()),
+            *list(empty.values()),
+            *list(empty.values()),
+            'user',  'hidden',  '',
+            *list(empty.values()),
+            '', '','',
+            *list(empty.values())
+            ,'', '', '', '' ,''
+        ]
+        df_input.loc[len(df_input)] = [ 
+            'hidden', 'source_id',
+            *list(langs.get_trads('Source ID', force_dict = True).values()),
+            *list(empty.values()),
+            *list(empty.values()),
+            '',  'hidden',  '',
+            *list(empty.values()),
+            '', '','',
+            *list(empty.values())
+            ,'', '', '', '' ,''
+        ]
+        
+
+        df_input.loc[len(df_input)] = [ 
+            'begin_group', 'user',
+            *list(langs.get_trads('NO_LABEL', force_dict = True).values()),
+            *list(empty.values()),
+            *list(empty.values()),
+            '',  'field-list',  '',
+            *list(empty.values()),
+            '', '','',
+            *list(empty.values())
+            ,'', '', '', '' ,''
+        ]
+        df_input.loc[len(df_input)] = [ 
+            'string', 'contact_id',
+            *list(langs.get_trads('NO_LABEL', force_dict = True).values()),
+            *list(empty.values()),
+            *list(empty.values()),
+            '',  'hidden',  '',
+            *list(empty.values()),
+            '', '','',
+            *list(empty.values())
+            ,'', '', '', '' ,''
+        ]
+        df_input.loc[len(df_input)] = [ 
+            'string', 'facility_id',
+            *list(langs.get_trads('NO_LABEL', force_dict = True).values()),
+            *list(empty.values()),
+            *list(empty.values()),
+            '',  'hidden',  '',
+            *list(empty.values()),
+            '', '','',
+            *list(empty.values())
+            ,'', '', '', '' ,''
+        ]
+        df_input.loc[len(df_input)] = [ 
+            'string', 'name',
+            *list(langs.get_trads('NO_LABEL', force_dict = True).values()),
+            *list(empty.values()),
+            *list(empty.values()),
+            '',  'hidden',  '',
+            *list(empty.values()),
+            '', '','',
+            *list(empty.values())
+            ,'', '', '', '' ,''
+        ]
+        df_input.loc[len(df_input)] = [
+            'end_group', 'user end' ,
+            *list(empty.values()),
+            *list(empty.values()),
+            *list(empty.values()),
+            '', '',  '',
+            *list(empty.values()),
+            '', '', '',
+            *list(empty.values()),
+            '', '', '', '',''
+        ]
+        df_input.loc[len(df_input)] = [ 
+            'begin_group', 'contact',
+            *list(langs.get_trads('NO_LABEL', force_dict = True).values()),
+            *list(empty.values()),
+            *list(empty.values()),
+            '',  'field-list',  '',
+            *list(empty.values()),
+            '', '','',
+            *list(empty.values())
+            ,'', '', '', '' ,''
+        ]
+        self.get_contact_inputs(df_input)
         inputs = self.export_inputs( start_pages[self.processes[0]],  **kwargs)
         for input in inputs:
             df_input.loc[len(df_input)] = get_input_line(input)
         df_input.loc[len(df_input)] = [ 
-            'hidden', 'data_load',
+            'hidden', 'external_id',
             *list(langs.get_trads('NO_LABEL', force_dict = True).values()),
-            *list(langs.get_trads('', force_dict = True).values()),
-            *list(langs.get_trads('', force_dict = True).values()),
+            *list(empty.values()),
+            *list(empty.values()),
             '',  'hidden',  '',
-            *list(langs.get_trads('', force_dict = True).values()),
+            *list(empty.values()),
             '', '','',
-            *list(langs.get_trads('', force_dict = True).values())
-            ,'', '', '', '' 
+            *list(empty.values())
+            ,'', '', '', '' ,''
+        ]
+        
+        df_input.loc[len(df_input)] = [ 
+            'string', '_id',
+            *list(langs.get_trads('NO_LABEL', force_dict = True).values()),
+            *list(empty.values()),
+            *list(empty.values()),
+            '',  'hidden',  '',
+            *list(empty.values()),
+            '', '','',
+            *list(empty.values())
+            ,'', '', '', '' ,''
         ]      
-        df_input.loc[len(df_input)] = [ 'hidden', 'task_id' ,*list(langs.get_trads('Task ID', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', '',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()) ,'', '', '', '', '' ]
-        df_input.loc[len(df_input)] = [ 'begin group	', 'contact' ,*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', '',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()) ,'', '', '', '', '' ]
-        df_input.loc[len(df_input)] = [ 'db:person', '_id', *list(langs.get_trads('Patient ID', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', 'db-object',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()) ,'', '', '', '', '' ]
-        df_input.loc[len(df_input)] = [ 'string', 'patient_id' ,*list(langs.get_trads('Medic ID', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', 'hidden',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()) ,'', '', '', '', '' ]
-        df_input.loc[len(df_input)] = [ 'string', 'patient_name',*list(langs.get_trads('Patient Name', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', 'hidden',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()) ,'', '', '', '', '' ]
-        df_input.loc[len(df_input)] = [ 'date', 'date_of_birth',*list(langs.get_trads('Date of birth', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', 'hidden',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()) ,'', '', '', '', '' ]
-        df_input.loc[len(df_input)] = [ 'string', 'sex',*list(langs.get_trads('Patient Sex', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', 'hidden',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()) ,'', '', '', '', '' ]
-        df_input.loc[len(df_input)] = [ 'end group', '' ,*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', '',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()) ,'', '', '', '', '' ]
-        df_input.loc[len(df_input)] = [ 'end group', '' ,*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', '',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()) ,'', '', '', '', '' ]
-        df_input.loc[len(df_input)] = [ 'calculate', '_id' ,*list(langs.get_trads('label', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', '',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()), '',  '../inputs/contact/_id', '', '' , '' ]
-        df_input.loc[len(df_input)] = [ 'calculate', 'patient_uuid' ,*list(langs.get_trads('label', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', '',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()), '',  '../inputs/contact/patient_id', '', '' , '' ]
-        df_input.loc[len(df_input)] = [ 'calculate', 'p_name' ,*list(langs.get_trads('label', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', '',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()), '', '../inputs/contact/patient_name', '', '' , '' ]
+        
+        df_input.loc[len(df_input)] = [
+            'end_group', 'contact end' ,
+            *list(empty.values()),
+            *list(empty.values()),
+            *list(empty.values()),
+            '', '',  '',
+            *list(empty.values()),
+            '', '', '',
+            *list(empty.values()),
+            '', '', '', '',''
+        ]
+        
+        df_input.loc[len(df_input)] = [
+            'end_group', 'input end' ,
+            *list(empty.values()),
+            *list(empty.values()),
+            *list(empty.values()),
+            '', '',  '',
+            *list(empty.values()),
+            '', '', '',
+            *list(empty.values()),
+            '', '', '', '',''
+        ]
+        df_input.loc[len(df_input)] = [
+            'calculate',
+            'created_by_person_uuid',
+            *list(empty.values()) ,
+            *list(empty.values()) ,#hint
+            *list(empty.values()) ,#help
+            '',#default
+            '',#'appearance', clean_name
+            '',#'constraint', 
+            *list(empty.values()) ,#'constraint_message'
+            '',#'relevance'
+            '',#'disabled'
+            '',#'required'
+            *list(empty.values()) ,#'required message'
+            '',#'read only'
+            '../inputs/user/contact_id',#'expression'
+            '',#'repeat_count'
+            '',#'image'
+            '' # choice filter
+        ] 
+        df_input.loc[len(df_input)] = [
+            'calculate',
+            'created_by_place_uuid_user',
+            *list(empty.values()) ,
+            *list(empty.values()) ,#hint
+            *list(empty.values()) ,#help
+            '',#default
+            '',#'appearance', clean_name
+            '',#'constraint', 
+            *list(empty.values()) ,#'constraint_message'
+            '',#'relevance'
+            '',#'disabled'
+            '',#'required'
+            *list(empty.values()) ,#'required message'
+            '',#'read only'
+            '../inputs/user/facility_id',#'expression'
+            '',#'repeat_count'
+             '',#'image'
+            '' # choice filter        
+        ] 
+        df_input.loc[len(df_input)] = [
+            'calculate',
+            'created_by',
+            *list(empty.values()) ,
+            *list(empty.values()) ,#hint
+            *list(empty.values()) ,#help
+            '',#default
+            '',#'appearance', clean_name
+            '',#'constraint', 
+            *list(empty.values()) ,#'constraint_message'
+            '',#'relevance'
+            '',#'disabled'
+            '',#'required'
+            *list(empty.values()) ,#'required message'
+            '',#'read only'
+            '../inputs/user/name',#'expression'
+            '',#'repeat_count'
+            '',#'image'
+            '' # choice filter
+        ] 
+        df_input.loc[len(df_input)] = [
+            'calculate',
+            'created_by_place_uuid',
+            *list(empty.values()) ,
+            *list(empty.values()) ,#hint
+            *list(empty.values()) ,#help
+            '',#default
+            '',#'appearance', clean_name
+            '',#'constraint', 
+            *list(empty.values()) ,#'constraint_message'
+            '',#'relevance'
+            '',#'disabled'
+            '',#'required'
+            *list(empty.values()) ,#'required message'
+            '',#'read only'
+            '../inputs/contact/_id',#'expression'
+            '',#'repeat_count'
+            '',#'image'
+            '' # choice filter 
+        ] 
 
-        df_input.loc[len(df_input)] = [ 'calculate', 'p_age_days' ,*list(langs.get_trads('label', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', '',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()), '', 'int((today()-date(${date_of_birth})))', '', '' , '' ]
-        df_input.loc[len(df_input)] = [ 'calculate', 'p_age_months' ,*list(langs.get_trads('label', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', '',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()), '', 'int(${id.age_day} div 30.4)', '', '' , '' ]
-        df_input.loc[len(df_input)] = [ 'calculate', 'p_age_years' ,*list(langs.get_trads('label', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', '',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()), '', 'int(${p_age_month} div 12)', '', '' , '' ]
-        df_input.loc[len(df_input)] = [ 'calculate', 'p_sex' ,*list(langs.get_trads('label', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', '',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()), '', '../inputs/contact/sex', '', '' , '' ]
-        df_input.loc[len(df_input)] = [ 'calculate', 'p_dob',*list(langs.get_trads('Date of birth', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()),*list(langs.get_trads('', force_dict = True).values()), '', '',  '',  *list(langs.get_trads('', force_dict = True).values()), '', '', '', *list(langs.get_trads('', force_dict = True).values()), '', 'date(../inputs/contact/date_of_birth)',  '','' , '' ]
+        df_input.loc[len(df_input)] = [
+            'calculate',
+            'source_id',
+            *list(empty.values()) ,
+            *list(empty.values()) ,#hint
+            *list(empty.values()) ,#help
+            '',#default
+            '',#'appearance', clean_name
+            '',#'constraint', 
+            *list(empty.values()) ,#'constraint_message'
+            '',#'relevance'
+            '',#'disabled'
+            '',#'required'
+            *list(empty.values()) ,#'required message'
+            '',#'read only'
+            '../inputs/source_id',#'expression'
+            '',#'repeat_count'
+            '',#'image'
+            '' # choice filter 
+        ] 
+        df_input.loc[len(df_input)] = [
+            'calculate',
+            'patient_uuid',
+            *list(empty.values()) ,
+            *list(empty.values()) ,#hint
+            *list(empty.values()) ,#help
+            '',#default
+            '',#'appearance', clean_name
+            '',#'constraint', 
+            *list(empty.values()) ,#'constraint_message'
+            '',#'relevance'
+            '',#'disabled'
+            '',#'required'
+            *list(empty.values()) ,#'required message'
+            '',#'read only'
+            '../inputs/user/facility_id',#'expression'
+            '',#'repeat_count'
+            '',#'image'
+            '' # choice filter
+        ] 
+        df_input.loc[len(df_input)] = [ 
+            'string', 'data_load',
+            *list(langs.get_trads('NO_LABEL', force_dict = True).values()),
+            *list(empty.values()),
+            *list(empty.values()),
+            '',  'hidden',  '',
+            *list(empty.values()),
+            '', '','',
+            *list(empty.values())
+            ,'', '', '', '' ,''
+        ]  
+        
+        for input in inputs:
+            df_input.loc[len(df_input)] = get_input_calc_line(input)        
 
+        
+        
+        return df_input
+        
+    def get_contact_inputs(self, df_input): 
+        empty = langs.get_trads('', force_dict =True)
+
+        df_input.loc[len(df_input)] = [ 
+            'calculate', 'patient_sex',
+            *list(langs.get_trads('Sex', force_dict = True).values()),
+            *list(empty.values()),
+            *list(empty.values()),
+            '',  'hidden',  '',
+            *list(empty.values()),
+            '', '','',
+            *list(empty.values())
+            ,'', '../inputs/contact/sex', '', '' ,''
+        ]  
+        df_input.loc[len(df_input)] = [ 
+            'calculate', 'patient_dob',
+            *list(langs.get_trads('Date of birth', force_dict = True).values()),
+            *list(empty.values()),
+            *list(empty.values()),
+            '',  'hidden',  '',
+            *list(empty.values()),
+            '', '','',
+            *list(empty.values())
+            ,'', 'date(../inputs/contact/date_of_birth)', '', '' ,''
+        ]  
         
         return df_input
         
