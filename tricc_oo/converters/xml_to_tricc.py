@@ -242,6 +242,10 @@ def process_edges(diagram, media_path, activity, nodes):
                         "not management found",
                     )
                 )
+        elif edge.source in  nodes and isinstance(nodes[edge.source], TriccNodeRhombus):
+            logger.critical(
+                "rhombus {} node with labelless edges".format(nodes[edge.source].get_name())
+            )
     if not end_found:
         fake_end = TriccNodeActivityEnd(id=generate_id(f"e{activity.name}"), activity=activity, group=activity)
         last_nodes = [
@@ -976,7 +980,7 @@ def process_exclusive_edge(edge, nodes):
 
 
 def process_yesno_edge(edge, nodes):
-    if edge.value is None:
+    if not edge.value:
         logger.critical(
             "yesNo {} node with labelless edges".format(nodes[edge.source].get_name())
         )

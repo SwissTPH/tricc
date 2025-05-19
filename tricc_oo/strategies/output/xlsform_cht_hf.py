@@ -16,7 +16,7 @@ logger = logging.getLogger("default")
 class XLSFormCHTHFStrategy(XLSFormCHTStrategy):
 
    
-    def get_contact_inputs(df_inputs):
+    def get_contact_inputs(self, df_inputs):
        return None
         
     def get_cht_summary(self):
