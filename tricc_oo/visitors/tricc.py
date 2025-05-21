@@ -74,7 +74,7 @@ def get_node_expressions(node, processed_nodes, process=None):
         expression = get_node_expression(node, processed_nodes=processed_nodes, is_calculate=is_calculate, process=process)
         
     if is_calculate:
-        if expression  and (not isinstance(expression, str) or expression != '') and  expression is not True  :
+        if expression  and (not isinstance(expression, str) or expression != '') and  expression is not True :
             num_expression = TriccOperation(
                 TriccOperator.CAST_NUMBER,
                 [expression]
@@ -99,7 +99,7 @@ def set_last_version_false(node, processed_nodes):
     last_version = processed_nodes.find_prev(node, lambda item: item.id != node.id and hasattr(item, 'name') and item.name == node.name and  issubclass(node.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase, TriccNodeEnd)) and not isinstance(node, TriccNodeSelectOption))
     if last_version and getattr(node, 'process', '') != 'pause':
         # 0-100 for manually specified instance.  100-200 for auto instance 
-        node.version = get_next_version(node.name, processed_nodes, last_version.version + 1)
+        node.version = get_next_version(node.name, processed_nodes, last_version.version + 1, 0)
         last_version.last = False
         node.path_len = max(node.path_len, last_version.path_len + 1)
     return last_version
@@ -152,8 +152,7 @@ def get_version_inheritance(node, last_version, processed_nodes):
 def merge_expression(expression, last_version):
     datatype = expression.get_datatype()
     if datatype == 'boolean':
-        expression = TriccOperation(
-            TriccOperator.OR,
+        expression = or_join(
             [TriccOperation(TriccOperator.ISTRUE, [last_version]), expression]
         )
     
@@ -958,7 +957,7 @@ def walkthrough_tricc_option(node, callback, processed_nodes, stashed_nodes, pat
                                                                         node_path = node_path.copy(), **kwargs)
 
 def get_next_version(name, processed_nodes, version=0, min=100):
-    return max(version, min,*[(getattr(n,'version',None) or getattr(n,'instance',0) or 0) for n in get_versions(name, processed_nodes)])
+    return max(version, min,*[(getattr(n,'version',None) or getattr(n,'instance',None) or 0) for n in get_versions(name, processed_nodes)])+1
 
 
 def get_data_for_log(node):
@@ -1498,7 +1497,7 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
             if isinstance(node, TriccNodeMainStart):
                 expression =  get_applicability_expression(node.activity, processed_nodes, process, expression )
         elif isinstance(node, (TriccNodeActivityStart)):
-            return None
+            return TriccStatic(True)
         
     elif isinstance(node, TriccNodeWait):
         if is_prev:
@@ -1557,9 +1556,7 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
         #         TriccOperator.CAST_NUMBER,
         #         [node.expression_reference])
         # else:    
-        expression = node.expression_reference
-    elif not is_prev and hasattr(node, 'relevance') and isinstance(node.relevance, TriccOperation):
-        expression = node.relevance     
+        expression = node.expression_reference  
     elif is_prev and isinstance(node, TriccNodeSelectOption):
         if negate:
             negate_expression = get_selected_option_expression(node, negate)
@@ -1579,9 +1576,12 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
             negate_expression = get_calculation_terms(node, processed_nodes=processed_nodes, is_calculate=is_calculate, negate=True, process=process)
         else:
             expression = get_calculation_terms(node, processed_nodes=processed_nodes, is_calculate=is_calculate, process=process)
+    
+    elif (not is_prev or not ONE_QUESTION_AT_A_TIME) and hasattr(node, 'relevance') and isinstance(node.relevance, (TriccOperation, TriccStatic)):
+        expression = node.relevance  
     elif ONE_QUESTION_AT_A_TIME and is_prev and not is_calculate and hasattr(node, 'required') and node.required:
         expression = get_required_node_expression(node)
-    
+ 
     if expression is None:
         expression = get_prev_node_expression(node, processed_nodes=processed_nodes, is_calculate=is_calculate, process=process)
             # in_node not in processed_nodes is need for calculates that can but run after the end of the activity
@@ -1841,8 +1841,7 @@ def get_prev_node_expression( node, processed_nodes, is_calculate=False, exclude
         expression = expression_inputs[0]
     
     elif expression_inputs:
-        expression = TriccOperation(
-            TriccOperator.OR,
+        expression = or_join(
             expression_inputs
         )
         # if isinstance(node,  TriccNodeExclusive):
@@ -2188,7 +2187,7 @@ def get_calculation_terms( node, processed_nodes, is_calculate=False, negate=Fal
     
 # Function that add element to array is not None or ''
 def add_sub_expression(array, sub):
-    if isinstance(sub, TriccOperation) or  sub:
+    if isinstance(sub, (TriccOperation, TriccStatic)):
         not_sub = negate_term(sub)
         if not_sub in array:
             # avoid having 2 conditions that are complete opposites
@@ -2196,6 +2195,8 @@ def add_sub_expression(array, sub):
             array.append(TriccStatic(True))
         else:
             array.append(sub)
+    else:
+        pass
     # elif sub is None:
     #     array.append(TriccStatic(True))
         

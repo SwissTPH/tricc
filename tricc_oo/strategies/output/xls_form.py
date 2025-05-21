@@ -633,8 +633,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
                     # we don't overright if define in the diagram
                     if node.constraint is None:
                         if isinstance(node, TriccNodeSelectMultiple):
-                            node.constraint = TriccOperation(
-                                TriccOperator.OR,
+                            node.constraint = or_join(
                                 [
                                     TriccOperation(TriccOperator.EQUAL, ['$this', TriccStatic('opt_none')]),
                                     TriccOperation(TriccOperator.NOT, [

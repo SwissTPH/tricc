@@ -630,6 +630,8 @@ def not_clean(a):
 # @param list_or
 # @param and elm use upstream
 def clean_or_list(list_or, elm_and=None):
+    if TriccStatic(True) in list_or:
+        return [TriccStatic(True)]
     for a in list(list_or):
         if isinstance(a, TriccOperation) and a.operator == TriccOperator.OR:
             list_or.remove(a)
@@ -694,7 +696,7 @@ def simple_and_join(left, right):
         )
 
 def or_join(list_or, elm_and=None):
-    cleaned_list  = clean_or_list(list_or, elm_and)
+    cleaned_list  = clean_or_list(set(list_or), elm_and)
     if len(cleaned_list) == 1:
         return cleaned_list[0]
     elif len(cleaned_list)>1: 

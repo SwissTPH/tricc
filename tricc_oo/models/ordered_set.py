@@ -106,7 +106,7 @@ class OrderedSet(Sequence):
         
         # If the object is not in the OrderedSet, start from the end
         if obj not in self._od:
-            start_index = len(keys) - 1
+            start_index = len(keys)
         else:
             # Find the index of the given object
             start_index = keys.index(obj)

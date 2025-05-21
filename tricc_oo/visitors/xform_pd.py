@@ -173,7 +173,7 @@ def get_tasksstrings(hidden_names, df_survey):
 
 
 def get_task_js(form_id, calculate_name, title, form_types, hidden_names, df_survey, repalce_dots=False, task_title="'id: '+getField(report, 'g_registration.p_id')+'; age: '+getField(report, 'p_age')+getField(report, 'g_registration.p_gender')+' months; '+getField(report, 'p_weight') + 'kg; ' + getField(report, 'g_fever.p_temp')+'°'"):
-    task_name = f"{form_id}_{calculate_name}"
+    task_name = f"{form_id}"
     task_name_upper = task_name.upper()
 
     
@@ -181,17 +181,16 @@ def get_task_js(form_id, calculate_name, title, form_types, hidden_names, df_sur
 /* eslint-disable no-use-before-define */
 /* eslint-disable */
 
-const {{injectDataFromForm, isFormArrayHasSourceId}} = require('./stph-extras'); -> isFormArrayHasSourceId was missing from the imports
+const {{injectDataFromForm, isFormArrayHasSourceId}} = require('./stph-extras');
 
 const CASE_DATA = ['{"','".join(hidden_names)}'];
     
-const {{injectDataFromForm}} = require('./stph-extras');
 
 const {task_name_upper}_FORMS = ['{"','".join(form_types)}'];
 
 var task_title = "{task_title}"
 
-const {task_name_upper}_TASK_FORM = '{form_id}_{calculate_name}';
+const {task_name_upper}_TASK_FORM = '{form_id}';
 
 const {task_name}Content =  function (content, contact, report){{
 
@@ -213,9 +212,12 @@ function {task_name}ContactLabel (){{
 
 
 function {task_name}ResolveIf(contact, report, event, dueDate) {{
-  return isFormArrayHasSourceId( report, contact.reports, event, dueDate, {task_name_upper}_TASK_FORMS);
+  return isFormArrayHasSourceId( report, contact.reports, event, dueDate, {task_name_upper}_TASK_FORM);
 }}
 
+function {task_name}AppliesIf(contact, report, event, dueDate) {{
+  return report.{calculate_name};
+}}
 
 module.exports = {{
   {task_name_upper}_TASK_FORM,
@@ -223,6 +225,7 @@ module.exports = {{
   {task_name}Content,
   {task_name}ContactLabel,
   {task_name}ResolveIf,
+  {task_name}AppliesIf,
 }}
 // 
 //// to be copied in task
@@ -232,7 +235,8 @@ module.exports = {{
 //  {task_name_upper}_FORMS,
 //  {task_name}Content,
 //  {task_name}ContactLabel,
-//  {task_name}ResolveIf, }} = require('./{task_name}');
+//  {task_name}ResolveIf, 
+//  {task_name}AppliesIf, }} = require('./{task_name}');
 //
 //module.exports = [
 //
@@ -242,6 +246,7 @@ module.exports = {{
 //        title: 'diagnostic',
 //        appliesTo: 'reports',
 //        appliesToType: {task_name_upper}_FORMS,
+//        appliesIf: {task_name}AppliesIf,
 //        actions: [
 //            {{
 //                type: 'report',
