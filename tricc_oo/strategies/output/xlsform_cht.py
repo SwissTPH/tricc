@@ -7,6 +7,7 @@ import pandas as pd
 
 from tricc_oo.models.lang import SingletonLangClass
 from tricc_oo.models.calculate import TriccNodeEnd
+from tricc_oo.models.tricc import TriccNodeDisplayModel
 from tricc_oo.serializers.xls_form import SURVEY_MAP, get_input_line, get_input_calc_line
 from tricc_oo.strategies.output.xlsform_cdss import XLSFormCDSSStrategy
 from tricc_oo.converters.tricc_to_xls_form import get_export_name
@@ -366,6 +367,23 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
         #df_summary.loc[len(df_summary)] = [ 'end group', '' ,'', '', '', '',  '',  '', '', '', '', '', '', '', '','', '' ]
         return df_summary
     
+    def get_last_prev_index(self, df, e, depth=0):
+        latest = None
+        for p in e.prev_nodes:
+            if issubclass(p.__class__, (TriccNodeDisplayModel)):
+                if hasattr(p, 'select'):
+                    p = latest.select
+                index = df.index[df['name'] == get_export_name(p)].tolist()
+            
+                if not latest or ( index and index[-1] > latest) :
+                    latest = index[-1]
+        if latest is None and depth > 5:
+            for p in e.prev_nodes:
+                index = get_last_prev_index(df, e, depth+1)
+                if not latest and index and index > latest :
+                    latest = index
+        return latest
+    
     def export(self, start_pages, version, **kwargs):
         form_id = None
         if start_pages[self.processes[0]].root.form_id is not None:
@@ -406,15 +424,13 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             ends_prev = []
             for e in ends:
                 
-                latest = None
-                for p in e.prev_nodes:
-                    if not latest or latest.path_len < p.path_len:
-                        latest = p
-                if hasattr(latest, 'select'):
-                    latest = latest.select 
-                ends_prev.append(
-                    (int(self.df_survey[self.df_survey.name == latest.export_name].index.values[0]), e,)
-                )
+                latest = self.get_last_prev_index(self.df_survey, e)
+                if latest:    
+                    ends_prev.append(
+                        (int(latest), e,)
+                    )
+                else:
+                    logger.critical(f"impossible to get last index before pause: {e.get_name()}")
             forms = [form_id]
             for i, e in ends_prev:
                 new_form_id = f"{form_id}_{clean_name(e.name)}"

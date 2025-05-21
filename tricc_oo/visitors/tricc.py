@@ -74,13 +74,13 @@ def get_node_expressions(node, processed_nodes, process=None):
         expression = get_node_expression(node, processed_nodes=processed_nodes, is_calculate=is_calculate, process=process)
         
     if is_calculate:
-        if expression  and (not isinstance(expression, str) or expression != '') and  expression is not True :
+        if expression  and (not isinstance(expression, str) or expression != '') and  expression is not TriccStatic(True) :
             num_expression = TriccOperation(
                 TriccOperator.CAST_NUMBER,
                 [expression]
             )
-        elif expression is True or (not expression and is_calculate):
-            expression = TriccStatic(1)                
+        elif expression is TriccStatic(True)  or (not expression and is_calculate):
+            expression = TriccStatic(True)               
         else:
             expression = ''
     if (
@@ -96,7 +96,7 @@ def get_node_expressions(node, processed_nodes, process=None):
 def set_last_version_false(node, processed_nodes):
     node_name = node.name if not isinstance(node, TriccNodeEnd) else node.get_reference()
     #last_version = get_last_version(node_name, processed_nodes) if issubclass(node.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase, TriccNodeEnd)) and not isinstance(node, TriccNodeSelectOption)  else  None
-    last_version = processed_nodes.find_prev(node, lambda item: item.id != node.id and hasattr(item, 'name') and item.name == node.name and  issubclass(node.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase, TriccNodeEnd)) and not isinstance(node, TriccNodeSelectOption))
+    last_version = processed_nodes.find_prev(node, version_filter(node_name))
     if last_version and getattr(node, 'process', '') != 'pause':
         # 0-100 for manually specified instance.  100-200 for auto instance 
         node.version = get_next_version(node.name, processed_nodes, last_version.version + 1, 0)

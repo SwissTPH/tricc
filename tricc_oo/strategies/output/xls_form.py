@@ -87,8 +87,8 @@ class XLSFormStrategy(BaseOutPutStrategy):
 
     def clean_coalesce(self, expression):   
         if re.match(r"^coalesce\(\${[^}]+},''\)$", str(expression)):
-            return expression[9:-4]
-        return expression
+            return str(expression[9:-4])
+        return str(expression)
 
     def generate_base(self, node, **kwargs):
         return self.generate_xls_form_condition(node, **kwargs) 

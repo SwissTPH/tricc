@@ -226,7 +226,7 @@ class TriccNodeBaseModel(TriccBaseModel):
     label: Optional[Union[str, Dict[str,str]]] = None
     next_nodes: OrderedSet[TriccNodeBaseModel] = OrderedSet()
     prev_nodes: OrderedSet[TriccNodeBaseModel] = OrderedSet()
-    expression: Optional[Union[Expression, TriccOperation]] = None  # will be generated based on the input
+    expression: Optional[Union[Expression, TriccOperation, TriccStatic]] = None  # will be generated based on the input
     expression_inputs: List[Expression] = []
     activity: Optional[FwTriccNodeBaseModel] = None
     ref_def: Optional[Union[int,str]]  = None# for medal creator

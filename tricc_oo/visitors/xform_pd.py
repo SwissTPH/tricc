@@ -41,7 +41,8 @@ def make_breakpoints(df, pausepoint, calculate_name=None, replace_dots=False):
         raise ValueError("input end field not found in input dataframe")
     end_inputs_loc = df.index[df['name'] == 'input end'][0]
     next_begin_group_loc = min([i for i in df.index[df['type'] == 'begin group'] if i > end_inputs_loc])
-        
+    next_pause_point_begin_group_loc = min([i for i in df.index[df['type'] == 'begin group'] if i > pausepoint])
+    
     df_input = df.loc[next_begin_group_loc:pausepoint]
     
     # Define field types to handle
@@ -125,9 +126,8 @@ def make_breakpoints(df, pausepoint, calculate_name=None, replace_dots=False):
     ]).reset_index(drop=True)
     
     # Handle post-break section
-    df_after = df.loc[pausepoint+1:].reset_index(drop=True)
-    if df_after.iloc[0,0] == 'end group':
-        df_after = df_after.iloc[1:]
+    df_after = df.loc[next_pause_point_begin_group_loc:].reset_index(drop=True)
+
     
     # Final concatenation
     final_df = pd.concat([df_combined, df_after])
@@ -216,7 +216,7 @@ function {task_name}ResolveIf(contact, report, event, dueDate) {{
 }}
 
 function {task_name}AppliesIf(contact, report, event, dueDate) {{
-  return report.{calculate_name};
+  return report.{calculate_name} === '1';
 }}
 
 module.exports = {{
