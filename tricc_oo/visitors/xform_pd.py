@@ -43,7 +43,7 @@ def make_breakpoints(df, pausepoint, calculate_name=None, replace_dots=False):
     next_begin_group_loc = min([i for i in df.index[df['type'] == 'begin group'] if i > end_inputs_loc])
     next_pause_point_begin_group_loc = min([i for i in df.index[df['type'] == 'begin group'] if i > pausepoint])
     
-    df_input = df.loc[next_begin_group_loc:pausepoint]
+    df_input = df.loc[next_begin_group_loc:next_pause_point_begin_group_loc]
     
     # Define field types to handle
     typesconvert = ['integer', 'decimal', 'select_', 'text']

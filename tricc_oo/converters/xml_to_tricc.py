@@ -518,7 +518,7 @@ def inject_bridge_path(node, nodes):
             )
         )
     ]
-    if (
+    if ( len(prev_nodes)>1 and 
         sum(
             [
                 (

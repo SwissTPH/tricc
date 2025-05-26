@@ -67,7 +67,7 @@ def get_last_version(name, processed_nodes,  _list=None):
 # node is the node to calculate
 # processed_nodes are the list of processed nodes
 def get_node_expressions(node, processed_nodes, process=None):
-    is_calculate = issubclass(node.__class__, TriccNodeCalculateBase)
+    is_calculate = issubclass(node.__class__, TriccNodeCalculateBase) and not issubclass(node.__class__, (TriccNodeDisplayBridge,TriccNodeBridge))
     expression = None
     # in case of recursive call processed_nodes will be None
     if processed_nodes is None or is_ready_to_process(node, processed_nodes=processed_nodes):
@@ -369,7 +369,7 @@ def get_bridge_path(prev_nodes, node=None,edge_only=False):
         'path_len': node.path_len + 1 * (node == p_p_node)
     }
     
-    if sum([0 if issubclass(n.__class__, (TriccNodeDisplayCalculateBase, TriccNodeRhombus)) else 1 for n in prev_nodes])>0 : #and len(node.prev_nodes)>1:
+    if len(prev_nodes)>1 and sum([0 if issubclass(n.__class__, (TriccNodeDisplayCalculateBase, TriccNodeRhombus)) else 1 for n in prev_nodes])>0 :
         calc= TriccNodeDisplayBridge( **data)
     else:
         calc =  TriccNodeBridge( **data)
@@ -1530,7 +1530,7 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
         prev_exp = get_node_expression(
             node.path,
             processed_nodes=processed_nodes,
-            is_calculate=is_calculate,
+            is_calculate=False,
             is_prev=True,
             process=process)
         if prev_exp and expression:
@@ -2068,7 +2068,7 @@ def get_rhombus_terms( node, processed_nodes, is_calculate=False, negate=False, 
         exit(1)
 
     if expression is not None:
-        if isinstance(expression, TriccOperation):
+        if isinstance(expression, (TriccOperation, TriccStatic)):
             return expression
         elif issubclass(expression.__class__ , TriccNodeCalculateBase):
             return TriccOperation(
