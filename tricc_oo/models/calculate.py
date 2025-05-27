@@ -53,6 +53,7 @@ class TriccNodeCount(TriccNodeDisplayCalculateBase):
 class TriccNodeProposedDiagnosis(TriccNodeDisplayCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.proposed_diagnosis
     severity: str = None
+    priority: Union[float, int, None] = None
     
 class TriccNodeFakeCalculateBase(TriccNodeCalculateBase):
     ...
@@ -130,6 +131,7 @@ class TriccNodeRhombus(TriccNodeCalculateBase,TriccRhombusMixIn):
 class TriccNodeDiagnosis(TriccNodeDisplayCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.diagnosis
     severity: str = None
+    priority: Union[float, int, None] = None
     def __init__(self, **data):
         data['reference'] = f'"final.{data["name"]}" is true'
         super().__init__(**data)

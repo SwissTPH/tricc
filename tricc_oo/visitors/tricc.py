@@ -1416,31 +1416,30 @@ def reorder_node_list(list_node, group, processed_nodes):
     
     # Define a lambda to assign numeric priorities
     def filter_logic(l_node):
-        
+        priority = (getattr(l_node, "priority", None) or 0) / 100
         if (
             isinstance(l_node, TriccNodeWait)
             and any(isinstance(rn, TriccNodeActivity) and any(sn.activity == rn for sn in list_node) for rn in l_node.reference)
         ):
-            return 7
+            pass
         elif group is not None and hasattr(l_node, 'group') and l_node.group and l_node.group.id == group.id:
-            return 0  # Highest priority: Same group
+            priority += 7  # Highest priority: Same group
         elif issubclass(l_node.__class__, TriccRhombusMixIn) :
-            return 6
+            priority += 1
         elif hasattr(group, 'group') and group.group and l_node.group and l_node.group.id == group.group.id:
-            return 1  # Second priority: Parent group
+            priority += 6  # Second priority: Parent group
         elif not isinstance(l_node.activity.root, TriccNodeActivityStart) and l_node.activity in active_activities:
-            return 2  # Third priority: Active activities
+            priority += 5  # Third priority: Active activities
         elif not isinstance(l_node.activity.root, TriccNodeActivityStart):
-            return 3  # Third priority: Active activities
+            priority += 4  # Third priority: Active activities
         elif l_node.activity in active_activities:
-            return 4  # Third priority: Active activities
- 
-
+            priority += 3 # Third priority: Active activities
         else:
-            return 5  # Lowest priority: Others
+            priority += 2  # Lowest priority: Others
+        return priority
     
     # Sort list_node in place using filter_logic as the key
-    list_node.sort(key=filter_logic, reverse=False)
+    list_node.sort(key=filter_logic, reverse=True)
     return None
     
 def loop_info(loop, **kwargs):
@@ -1700,7 +1699,7 @@ def get_accept_diagnostic_node(code, display, severity, activity):
     node.options = get_select_accept_reject_options(node, node.activity)
     return node
 
-def get_diagnostic_node(code, display, severity, activity):
+def get_diagnostic_node(code, display, severity, priority, activity):
     node = TriccNodeAcceptDiagnostic(
         id=generate_id("final." + code),
         name="final." + code,
@@ -1708,7 +1707,9 @@ def get_diagnostic_node(code, display, severity, activity):
         list_name="acc_rej",
         activity=activity,
         group=activity,
-        severity=severity
+        severity=severity,
+        priority=priority
+        
     )
     node.options = get_select_accept_reject_options(node, node.activity)
     return node
@@ -1760,7 +1761,7 @@ def create_determine_diagnosis_activity(diags):
     )
     activity.nodes[end.id]=end
     for proposed in diags:
-        d = get_diagnostic_node(proposed.name, proposed.label, proposed.severity, activity)
+        d = get_diagnostic_node(proposed.name, proposed.label, proposed.severity, proposed.priority, activity)
         diags_conf.append(d)
         r = TriccNodeRhombus(
             id=generate_id(f"proposed-rhombus{proposed.id}"),
@@ -1782,7 +1783,7 @@ def create_determine_diagnosis_activity(diags):
     # fallback
     f = TriccNodeSelectMultiple(
         name="tricc.manual.diag",
-        label="Add a diagnostic",
+        label="Add diagnosis",
         list_name='manual_diag',
         id=generate_id("tricc.manual.diag"),
         activity=activity,
@@ -1817,17 +1818,42 @@ def get_prev_node_expression( node, processed_nodes, is_calculate=False, exclude
         expression_inputs = node.expression_inputs
         expression_inputs = clean_or_list(expression_inputs)
     else:
-        expression_inputs = []        
+        expression_inputs = []  
+    prev_activities = {}
     for prev_node in node.prev_nodes:
-        if excluded_name is None or prev_node != excluded_name or (
-                isinstance(excluded_name, str) and hasattr(prev_node, 'name') and prev_node.name != excluded_name): # or isinstance(prev_node, TriccNodeActivityEnd):
-            # the rhombus should calculate only reference
-            add_sub_expression(expression_inputs, get_node_expression(
-                prev_node,
-                processed_nodes=processed_nodes,
-                is_calculate=is_calculate,
-                is_prev=True,
-                process=process))
+        if prev_node.activity.id not in prev_activities:
+            prev_activities[prev_node.activity.id]=[]
+        prev_activities[prev_node.activity.id].append(prev_node)
+    
+    for act_id in prev_activities:
+        for prev_node in prev_activities[act_id]:
+            act_expression_inputs = [] 
+            if excluded_name is None or prev_node != excluded_name or (
+                    isinstance(excluded_name, str) and hasattr(prev_node, 'name') and prev_node.name != excluded_name): # or isinstance(prev_node, TriccNodeActivityEnd):
+                # the rhombus should calculate only reference
+                sub = get_node_expression(
+                    prev_node,
+                    processed_nodes=processed_nodes,
+                    is_calculate=is_calculate,
+                    is_prev=True,
+                    process=process)
+                if not isinstance(node, TriccNodeActivity):
+                    add_sub_expression(expression_inputs, sub )
+                else:
+                    add_sub_expression(act_expression_inputs, sub )
+                
+        if act_expression_inputs:
+            act_sub = or_join(act_expression_inputs)
+            if act_sub == TriccStatic(True): 
+                        act_sub = get_node_expression(
+                        prev_node.activity,
+                        processed_nodes=processed_nodes,
+                        is_calculate=True,
+                        is_prev=True,
+                        negate=False,
+                        process=process
+                    )
+            add_sub_expression(expression_inputs, act_sub )
             # avoid void is there is not conditions to avoid looping too much itme
     # expression_inputs = clean_or_list(
     #     [
@@ -1836,12 +1862,8 @@ def get_prev_node_expression( node, processed_nodes, is_calculate=False, exclude
     #         else e 
     #         for e in expression_inputs])
     
-    expression = None
-    if len(expression_inputs) == 1:
-        expression = expression_inputs[0]
-    
-    elif expression_inputs:
-        expression = or_join(
+    if expression_inputs:
+        expression =  or_join(
             expression_inputs
         )
         # if isinstance(node,  TriccNodeExclusive):

@@ -182,6 +182,7 @@ def get_task_js(form_id, calculate_name, title, form_types, hidden_names, df_sur
 /* eslint-disable */
 
 const {{injectDataFromForm, isFormArrayHasSourceId}} = require('./stph-extras');
+const {{getField}} = require("./nools-extras");
 
 const CASE_DATA = ['{"','".join(hidden_names)}'];
     
@@ -216,7 +217,9 @@ function {task_name}ResolveIf(contact, report, event, dueDate) {{
 }}
 
 function {task_name}AppliesIf(contact, report, event, dueDate) {{
-  return report.{calculate_name} === '1';
+    return getField(report, "source_id") === "" &&
+    getField(report, "pause_test") === "1"
+
 }}
 
 module.exports = {{
@@ -247,6 +250,7 @@ module.exports = {{
 //        appliesTo: 'reports',
 //        appliesToType: {task_name_upper}_FORMS,
 //        appliesIf: {task_name}AppliesIf,
+//        contactLabel: {task_name}ContactLabel,
 //        actions: [
 //            {{
 //                type: 'report',

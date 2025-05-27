@@ -237,7 +237,7 @@ class TriccNodeDisplayModel(TriccNodeBaseModel):
     help: Optional[Union[str, TriccNodeBaseModel]] = None
     group: Optional[Union[TriccGroup, TriccNodeActivity]] = None
     relevance: Optional[Union[Expression, TriccOperation]] = None
-
+    priority: Union[float, int, None] = None
 
     # to use the enum value of the TriccNodeType
 
@@ -348,6 +348,7 @@ class TriccNodeSelectYesNo(TriccNodeSelectOne):
 
 class TriccNodeAcceptDiagnostic(TriccNodeSelectOne):
     severity: Optional[str] = None
+    priority: Union[float, int, None] = None
 
 
 class TriccParentMixIn(BaseModel):
