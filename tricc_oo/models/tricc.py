@@ -32,8 +32,8 @@ class TriccNodeCalculateBase(TriccNodeBaseModel):
             instance.reference = [e.copy() if isinstance(e, (TriccReference, TriccOperation)) else (TriccReference(e.name) if hasattr(e, 'name') else e) for e in self.reference]
         else:
             instance.reference = None
-        version = self.version + 1
-        instance.version = version
+        if instance.base_instance != self:
+            instance.version = self.version + 1
         return instance
 
     def __init__(self, **data):
@@ -85,7 +85,7 @@ class TriccNodeActivity(TriccNodeBaseModel):
     applicability: Optional[Union[Expression, TriccOperation]] = None
 
     # redefine 
-    def make_instance(self, instance_nb, **kwargs):
+    def make_instance(self, instance_nb=None, **kwargs):
         from tricc_oo.models.calculate import (
             TriccNodeDisplayBridge,
             TriccNodeBridge,

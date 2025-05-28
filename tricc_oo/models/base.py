@@ -106,7 +106,7 @@ class TriccBaseModel(BaseModel):
     external_id: triccId = None
     tricc_type: TriccNodeType
     datatype: str = None
-    instance: int = 1
+    instance: int = 0
     base_instance: Optional[TriccBaseModel] = None
     last: bool = None
     version: int = 1
@@ -123,7 +123,9 @@ class TriccBaseModel(BaseModel):
     def to_dict(self):
         return {key: value for key, value in vars(self).items() if not key.startswith('_')}
 
-    def make_instance(self, nb_instance, **kwargs):
+    def make_instance(self, nb_instance=None, **kwargs):
+        if nb_instance == None:
+            nb_instance = self.get_next_instance()
         instance = self.copy()
         attr_dict = self.to_dict()
         for attr, value in attr_dict.items():
@@ -257,7 +259,7 @@ class TriccNodeBaseModel(TriccBaseModel):
         
 
 
-    def make_instance(self, instance_nb, activity=None):
+    def make_instance(self, instance_nb=None, activity=None):
         instance = super().make_instance(instance_nb)
         instance.group = activity
         if hasattr(self, 'activity') and activity is not None:
@@ -630,6 +632,8 @@ def not_clean(a):
 # @param list_or
 # @param and elm use upstream
 def clean_or_list(list_or, elm_and=None):
+    if len(list_or) == 1:
+        return list(list_or)
     if TriccStatic(True) in list_or:
         return [TriccStatic(True)]
     for a in list(list_or):

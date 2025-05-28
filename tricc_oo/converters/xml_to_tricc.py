@@ -475,17 +475,6 @@ def get_max_version(dict):
     return max_version
 
 
-def update_calc_version(calculates, name):
-    if name in calculates and len(calculates[name]) > 1:
-        ordered_list = sorted(list(calculates[name].values()), key=lambda x: x.path_len)
-        i = 1
-        len_max = len(calculates[name])
-        for elm in ordered_list:
-            elm.version = i
-            elm.last = (i == len_max)
-            i += 1
-
-
 def get_max_named_version(calculates, name):
     max = 0
     if name in calculates:

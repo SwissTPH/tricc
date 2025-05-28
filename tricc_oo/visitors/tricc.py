@@ -67,22 +67,22 @@ def get_last_version(name, processed_nodes,  _list=None):
 # node is the node to calculate
 # processed_nodes are the list of processed nodes
 def get_node_expressions(node, processed_nodes, process=None):
-    is_calculate = issubclass(node.__class__, TriccNodeCalculateBase) and not issubclass(node.__class__, (TriccNodeDisplayBridge,TriccNodeBridge))
+    get_overall_exp = issubclass(node.__class__, TriccNodeCalculateBase) and not issubclass(node.__class__, (TriccNodeDisplayBridge,TriccNodeBridge))
     expression = None
     # in case of recursive call processed_nodes will be None
     if processed_nodes is None or is_ready_to_process(node, processed_nodes=processed_nodes):
-        expression = get_node_expression(node, processed_nodes=processed_nodes, is_calculate=is_calculate, process=process)
+        expression = get_node_expression(node, processed_nodes=processed_nodes, get_overall_exp=get_overall_exp, process=process)
         
-    if is_calculate:
-        if expression  and (not isinstance(expression, str) or expression != '') and  expression is not TriccStatic(True) :
-            num_expression = TriccOperation(
-                TriccOperator.CAST_NUMBER,
-                [expression]
-            )
-        elif expression is TriccStatic(True)  or (not expression and is_calculate):
-            expression = TriccStatic(True)               
-        else:
-            expression = ''
+    # if get_overall_exp:
+    #     if expression  and (not isinstance(expression, str) or expression != '') and  expression is not TriccStatic(True) :
+    #         num_expression = TriccOperation(
+    #             TriccOperator.CAST_NUMBER,
+    #             [expression]
+    #         )
+    #     elif expression is TriccStatic(True)  or (not expression and get_overall_exp):
+    #         expression = TriccStatic(True)               
+    #     else:
+    #         expression = None
     if (
         issubclass(node.__class__, TriccNodeCalculateBase) 
         and not isinstance(expression, (TriccStatic, TriccReference, TriccOperation)) 
@@ -99,7 +99,7 @@ def set_last_version_false(node, processed_nodes):
     last_version = processed_nodes.find_prev(node, version_filter(node_name))
     if last_version and getattr(node, 'process', '') != 'pause':
         # 0-100 for manually specified instance.  100-200 for auto instance 
-        node.version = get_next_version(node.name, processed_nodes, last_version.version + 1, 0)
+        node.version = get_next_version(node.name, processed_nodes, last_version.version, 0)
         last_version.last = False
         node.path_len = max(node.path_len, last_version.path_len + 1)
     return last_version
@@ -194,7 +194,7 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
             last_version =  set_last_version_false(node, processed_nodes)
             if last_version:
                 last_version = get_version_inheritance(node, last_version, processed_nodes)
-            generate_calculates(node,calculates, used_calculates,processed_nodes=processed_nodes)                
+            generate_calculates(node,calculates, used_calculates,processed_nodes=processed_nodes, process=process)               
        
                 
 
@@ -254,8 +254,7 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
                         
                     elif hasattr(node, 'relevance'):
                         node.relevance = version_relevance
-            
-                    #update_calc_version(calculates,node_name)
+
             #if hasattr(node, 'next_nodes'):
                 #node.next_nodes=reorder_node_list(node.next_nodes, node.group)
             process_reference(
@@ -283,16 +282,7 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
 
     return False
       
-def update_calc_version(calculates,name):
-    if name in calculates and len(calculates[name])>1:
-        ordered_list = sorted(list(calculates[name].values()), key=lambda x:x.path_len)
-        i = 1
-        len_max=len(calculates[name])
-        for elm in ordered_list:
-            elm.version=i
-            elm.last= (i == len_max)
-            i+=1
-        
+
 
 def get_max_named_version(calculates,name):
     max = 0
@@ -417,7 +407,7 @@ def inject_node_before(before, node, activity):
 
     
     
-def generate_calculates(node,calculates, used_calculates,processed_nodes):
+def generate_calculates(node,calculates, used_calculates,processed_nodes, process):
     list_calc = []
     count_node = None
     ## add select calcualte
@@ -473,7 +463,10 @@ def generate_calculates(node,calculates, used_calculates,processed_nodes):
         calculate_name=node.save   
         if node.name != calculate_name:
             calc_id = generate_id(f"autosave{node.id}")
-            
+            if issubclass(node.__class__, TriccNodeSelect) or isinstance(node, TriccNodeSelectNotAvailable):
+                expression = get_count_terms_details( node,  processed_nodes, True, False, process)
+            else:
+                expression = get_node_expression(node,processed_nodes,True,True)
             calc_node = TriccNodeCalculate(
                 name=calculate_name,
                 id = calc_id,
@@ -483,7 +476,7 @@ def generate_calculates(node,calculates, used_calculates,processed_nodes):
                 label =  "save: " +node.get_name(),
                 path_len=node.path_len+ 1,
                 last=True,
-                expression=get_node_expression(node,processed_nodes,True,True)
+                expression=expression
             )
             node.activity.calculates.append(calc_node)
             last_version = set_last_version_false(calc_node, processed_nodes)
@@ -1416,26 +1409,26 @@ def reorder_node_list(list_node, group, processed_nodes):
     
     # Define a lambda to assign numeric priorities
     def filter_logic(l_node):
-        priority = (getattr(l_node, "priority", None) or 0) / 100
+        priority = int(getattr(l_node, "priority", None) or 400)
         if (
             isinstance(l_node, TriccNodeWait)
             and any(isinstance(rn, TriccNodeActivity) and any(sn.activity == rn for sn in list_node) for rn in l_node.reference)
         ):
             pass
         elif group is not None and hasattr(l_node, 'group') and l_node.group and l_node.group.id == group.id:
-            priority += 7  # Highest priority: Same group
+            priority += 7000  # Highest priority: Same group
         elif issubclass(l_node.__class__, TriccRhombusMixIn) :
-            priority += 1
+            priority += 1000
         elif hasattr(group, 'group') and group.group and l_node.group and l_node.group.id == group.group.id:
-            priority += 6  # Second priority: Parent group
+            priority += 6000  # Second priority: Parent group
         elif not isinstance(l_node.activity.root, TriccNodeActivityStart) and l_node.activity in active_activities:
-            priority += 5  # Third priority: Active activities
+            priority += 5000  # Third priority: Active activities
         elif not isinstance(l_node.activity.root, TriccNodeActivityStart):
-            priority += 4  # Third priority: Active activities
+            priority += 4000  # Third priority: Active activities
         elif l_node.activity in active_activities:
-            priority += 3 # Third priority: Active activities
+            priority += 3000 # Third priority: Active activities
         else:
-            priority += 2  # Lowest priority: Others
+            priority += 2000  # Lowest priority: Others
         return priority
     
     # Sort list_node in place using filter_logic as the key
@@ -1478,17 +1471,17 @@ def get_extended_next_nodes(node):
     
 
 # calculate or retrieve a node expression
-def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=False, negate=False, process=None):
+def get_node_expression( in_node, processed_nodes, get_overall_exp=False, is_prev=False, negate=False, process=None):
     # in case of calculate we only use the select multiple if none is not selected
     expression = None
     negate_expression = None
     node = in_node
     if isinstance(node, (TriccNodeActivityStart,TriccNodeMainStart)):
-        if is_prev and is_calculate:
+        if is_prev and get_overall_exp:
             expression = get_node_expression(
                 node.activity,
                 processed_nodes=processed_nodes,
-                is_calculate=is_calculate,
+                get_overall_exp=True,
                 is_prev=is_prev,
                 negate=negate,
                 process=process
@@ -1504,7 +1497,7 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
             return get_node_expression(
                 node.path,
                 processed_nodes=processed_nodes,
-                is_calculate=is_calculate,
+                get_overall_exp=get_overall_exp,
                 is_prev=True,
                 process=process
                 )
@@ -1529,7 +1522,7 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
         prev_exp = get_node_expression(
             node.path,
             processed_nodes=processed_nodes,
-            is_calculate=False,
+            get_overall_exp=get_overall_exp,
             is_prev=True,
             process=process)
         if prev_exp and expression:
@@ -1547,8 +1540,6 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
             logger.critical(f"Rhombus without expression {node.get_name()}")
     elif is_prev and issubclass(node.__class__, TriccNodeDisplayCalculateBase):
         expression = TriccOperation(TriccOperator.ISTRUE, [node])
-    elif is_prev and is_calculate and (issubclass(node.__class__, TriccNodeSelect) or isinstance(node, TriccNodeSelectNotAvailable)):
-        expression = get_count_terms_details( node,  processed_nodes, is_calculate, negate, process)
     elif hasattr(node, 'expression_reference') and isinstance(node.expression_reference, TriccOperation):
         # if issubclass(node.__class__, TriccNodeDisplayCalculateBase):
         #     expression = TriccOperation(
@@ -1572,17 +1563,17 @@ def get_node_expression( in_node, processed_nodes, is_calculate=False, is_prev=F
         )
     elif issubclass(node.__class__, TriccNodeCalculateBase):
         if negate:
-            negate_expression = get_calculation_terms(node, processed_nodes=processed_nodes, is_calculate=is_calculate, negate=True, process=process)
+            negate_expression = get_calculation_terms(node, processed_nodes=processed_nodes, get_overall_exp=get_overall_exp, negate=True, process=process)
         else:
-            expression = get_calculation_terms(node, processed_nodes=processed_nodes, is_calculate=is_calculate, process=process)
+            expression = get_calculation_terms(node, processed_nodes=processed_nodes, get_overall_exp=get_overall_exp, process=process)
     
     elif (not is_prev or not ONE_QUESTION_AT_A_TIME) and hasattr(node, 'relevance') and isinstance(node.relevance, (TriccOperation, TriccStatic)):
         expression = node.relevance  
-    elif ONE_QUESTION_AT_A_TIME and is_prev and not is_calculate and hasattr(node, 'required') and node.required:
+    elif ONE_QUESTION_AT_A_TIME and is_prev and not get_overall_exp and hasattr(node, 'required') and node.required:
         expression = get_required_node_expression(node)
  
     if expression is None:
-        expression = get_prev_node_expression(node, processed_nodes=processed_nodes, is_calculate=is_calculate, process=process)
+        expression = get_prev_node_expression(node, processed_nodes=processed_nodes, get_overall_exp=get_overall_exp, process=process)
             # in_node not in processed_nodes is need for calculates that can but run after the end of the activity
     #if isinstance(node, TriccNodeActivitiy) and not prev:
         # expression = get_applicability_expression(node, processed_nodes, process, expression)
@@ -1625,7 +1616,7 @@ def get_prev_instance_skip_expression(node, processed_nodes, process, expression
                 get_node_expression(
                     past_instance,
                     processed_nodes=processed_nodes,
-                    is_calculate=False,
+                    get_overall_exp=True,
                     is_prev=True,
                     process=process
                 )
@@ -1809,7 +1800,7 @@ def create_determine_diagnosis_activity(diags):
     
     return activity
     
-def get_prev_node_expression( node, processed_nodes, is_calculate=False, excluded_name=None, process=None):
+def get_prev_node_expression( node, processed_nodes, get_overall_exp=False, excluded_name=None, process=None):
     expression = None
     if node is None:
         pass
@@ -1826,33 +1817,33 @@ def get_prev_node_expression( node, processed_nodes, is_calculate=False, exclude
         prev_activities[prev_node.activity.id].append(prev_node)
     
     for act_id in prev_activities:
+        act_expression_inputs = []
         for prev_node in prev_activities[act_id]:
-            act_expression_inputs = [] 
             if excluded_name is None or prev_node != excluded_name or (
                     isinstance(excluded_name, str) and hasattr(prev_node, 'name') and prev_node.name != excluded_name): # or isinstance(prev_node, TriccNodeActivityEnd):
                 # the rhombus should calculate only reference
                 sub = get_node_expression(
                     prev_node,
                     processed_nodes=processed_nodes,
-                    is_calculate=is_calculate,
+                    get_overall_exp=get_overall_exp,
                     is_prev=True,
                     process=process)
-                if not isinstance(node, TriccNodeActivity):
-                    add_sub_expression(expression_inputs, sub )
-                else:
+                if  isinstance(node, TriccNodeActivity) or get_overall_exp:
                     add_sub_expression(act_expression_inputs, sub )
+                else:
+                    add_sub_expression(expression_inputs, sub )
                 
         if act_expression_inputs:
             act_sub = or_join(act_expression_inputs)
             if act_sub == TriccStatic(True): 
-                        act_sub = get_node_expression(
-                        prev_node.activity,
-                        processed_nodes=processed_nodes,
-                        is_calculate=True,
-                        is_prev=True,
-                        negate=False,
-                        process=process
-                    )
+                 act_sub = get_node_expression(
+                    prev_node.activity,
+                    processed_nodes=processed_nodes,
+                    get_overall_exp=True,
+                    is_prev=True,
+                    negate=False,
+                    process=process
+                )
             add_sub_expression(expression_inputs, act_sub )
             # avoid void is there is not conditions to avoid looping too much itme
     # expression_inputs = clean_or_list(
@@ -1882,17 +1873,17 @@ def get_activity_end_terms( node, processed_nodes, process=None):
             get_node_expression(
                 end_node,
                 processed_nodes=processed_nodes,
-                is_calculate=False,
+                get_overall_exp=False,
                 is_prev=True,
                 process=process))
 
     return  or_join(expression_inputs)
 
-def get_count_terms( node, processed_nodes, is_calculate, negate=False, process=None):
+def get_count_terms( node, processed_nodes, get_overall_exp, negate=False, process=None):
     terms = []
     
     for prev_node in node.prev_nodes:
-        term = get_count_terms_details( prev_node, processed_nodes, is_calculate, negate, process)
+        term = get_count_terms_details( prev_node, processed_nodes, get_overall_exp, negate, process)
         if term:
             terms.append(term)
     if len(terms) == 1:
@@ -1911,7 +1902,7 @@ def get_count_terms( node, processed_nodes, is_calculate, negate=False, process=
             ]
         )
         
-def get_count_terms_details( prev_node, processed_nodes, is_calculate, negate=False, process=None):
+def get_count_terms_details( prev_node, processed_nodes, get_overall_exp, negate=False, process=None):
         operation_none = TriccOperation(
             TriccOperator.SELECTED,
             [
@@ -1974,7 +1965,7 @@ def get_count_terms_details( prev_node, processed_nodes, is_calculate, negate=Fa
                                         get_node_expression(
                                             prev_node,
                                             processed_nodes=processed_nodes,
-                                            is_calculate=False,
+                                            get_overall_exp=True,
                                             is_prev=True,
                                             process=process)
                                     ]),
@@ -1991,7 +1982,7 @@ def get_count_terms_details( prev_node, processed_nodes, is_calculate, negate=Fa
                             get_node_expression(
                                 prev_node,
                                 processed_nodes=processed_nodes,
-                                is_calculate=False,
+                                get_overall_exp=True,
                                 is_prev=True,
                                 process=process)
                         ]
@@ -1999,7 +1990,7 @@ def get_count_terms_details( prev_node, processed_nodes, is_calculate, negate=Fa
     
         
     
-def get_add_terms( node, processed_nodes, is_calculate=False, negate=False, process=None):
+def get_add_terms( node, processed_nodes, get_overall_exp=False, negate=False, process=None):
     if negate:
         logger.warning("negate not supported for Add node {}".format(node.get_name()))
     terms = []
@@ -2022,7 +2013,7 @@ def get_add_terms( node, processed_nodes, is_calculate=False, negate=False, proc
                         get_node_expression(
                             prev_node,
                             processed_nodes=processed_nodes,
-                            is_calculate=False,
+                            get_overall_exp=True,
                             is_prev=True, 
                             process=process)
                     ]
@@ -2041,7 +2032,7 @@ def get_add_terms( node, processed_nodes, is_calculate=False, negate=False, proc
                 )
         return operation
     
-def get_rhombus_terms( node, processed_nodes, is_calculate=False, negate=False, process=None):
+def get_rhombus_terms( node, processed_nodes, get_overall_exp=False, negate=False, process=None):
     expression = None
     left_term = None
     operator = None
@@ -2059,7 +2050,7 @@ def get_rhombus_terms( node, processed_nodes, is_calculate=False, negate=False, 
                         expression = get_node_expression(
                             ref,
                             processed_nodes=processed_nodes,
-                            is_calculate=True,
+                            get_overall_exp=True,
                             is_prev=True,
                             process=process
                         )
@@ -2099,7 +2090,7 @@ def get_rhombus_terms( node, processed_nodes, is_calculate=False, negate=False, 
                     get_node_expression(
                         expression,
                         processed_nodes=processed_nodes,
-                        is_calculate=True,
+                        get_overall_exp=True,
                         is_prev=True,
                         process=process
                     )
@@ -2129,9 +2120,9 @@ def get_rhombus_terms( node, processed_nodes, is_calculate=False, negate=False, 
 # function that generate the calculation terms return by calculate node
 # @param node calculate node to assess
 # @param processed_nodes list of node already processed, importnat because only processed node could be use
-# @param is_calculate used when this funciton is called in the evaluation of another calculate
+# @param get_overall_exp used when this funciton is called in the evaluation of another calculate
 # @param negate use to retriece the negation of a calculation
-def get_calculation_terms( node, processed_nodes, is_calculate=False, negate=False, process=None):
+def get_calculation_terms( node, processed_nodes, get_overall_exp=False, negate=False, process=None):
     # returns something directly only if the negate is managed
     expression = None
     if isinstance(node, TriccNodeAdd):
@@ -2142,7 +2133,7 @@ def get_calculation_terms( node, processed_nodes, is_calculate=False, negate=Fal
         return get_rhombus_terms(
             node,
             processed_nodes=processed_nodes,
-            is_calculate=False,
+            get_overall_exp=False,
             negate=negate,
             process=process
         )
@@ -2151,11 +2142,11 @@ def get_calculation_terms( node, processed_nodes, is_calculate=False, negate=Fal
         expression = None
     # in case of calulate expression evaluation, we need to get the relevance of the activity 
     # because calculate are not the the activity group
-    elif isinstance(node, (TriccNodeActivityStart)) and is_calculate:
-        expression =  get_prev_node_expression(node.activity, processed_nodes=processed_nodes, is_calculate=is_calculate, negate=negate, process=process)
+    elif isinstance(node, (TriccNodeActivityStart)) and get_overall_exp:
+        expression =  get_prev_node_expression(node.activity, processed_nodes=processed_nodes, get_overall_exp=get_overall_exp, negate=negate, process=process)
     elif isinstance(node, (TriccNodeActivityStart, TriccNodeActivityEnd)):
         # the group have the relevance for the activity, not needed to replicate it
-        expression = None #return get_prev_node_expression(node.activity, processed_nodes, is_calculate=False, excluded_name=None)
+        expression = None #return get_prev_node_expression(node.activity, processed_nodes, get_overall_exp=False, excluded_name=None)
     elif isinstance(node, TriccNodeExclusive):
         if len(node.prev_nodes) == 1:
             iterator = iter(node.prev_nodes)
@@ -2167,6 +2158,7 @@ def get_calculation_terms( node, processed_nodes, is_calculate=False, negate=Fal
                 return get_node_expression(
                     node_to_negate,
                     processed_nodes=processed_nodes,
+                    get_overall_exp=True,
                     is_prev=True,
                     negate=True,
                     process=process
@@ -2175,7 +2167,7 @@ def get_calculation_terms( node, processed_nodes, is_calculate=False, negate=Fal
                 return get_node_expression(
                     node_to_negate,
                     processed_nodes=processed_nodes,
-                    is_calculate=False,
+                    get_overall_exp=True,
                     is_prev=True,
                     negate=True,
                     process=process
@@ -2191,14 +2183,14 @@ def get_calculation_terms( node, processed_nodes, is_calculate=False, negate=Fal
     if isinstance(node.expression_reference, (TriccOperation, TriccStatic)):
         expression = node.expression_reference
     elif node.reference is not None and node.expression_reference is not None :
-        expression = get_prev_node_expression(node, processed_nodes=processed_nodes, is_calculate=is_calculate, process=process)
+        expression = get_prev_node_expression(node, processed_nodes=processed_nodes, get_overall_exp=get_overall_exp, process=process)
         ref_expression = node.expression_reference.format(*[get_export_name(ref) for ref in node.reference])
         if expression is not None and expression != '':
             expression =  and_join([expression,ref_expression])
         else:
             expression = ref_expression
     elif expression is None:
-        expression =  get_prev_node_expression(node, processed_nodes=processed_nodes, is_calculate=is_calculate, process=process)
+        expression =  get_prev_node_expression(node, processed_nodes=processed_nodes, get_overall_exp=get_overall_exp, process=process)
     
     # manage the generic negation
     if negate:

@@ -230,7 +230,7 @@ class DrawioStrategy(BaseInputStrategy):
                     if int(other_page.instance) > int(max_instance):
                         max_instance = other_page.instance
                 # auto instance starts at 101
-                next_page = next_page.make_instance(max(100, max_instance) + 1)
+                next_page = next_page.make_instance()
             else:
                 # return existing instance if any
                 next_page = next_page.make_instance(node.instance)

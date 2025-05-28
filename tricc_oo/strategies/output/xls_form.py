@@ -227,7 +227,6 @@ class XLSFormStrategy(BaseOutPutStrategy):
                     **self.get_kwargs()
                 )
                 # arrange empty group
-                
                 walktrhough_tricc_node_processed_stached(
                     s_node,
                     self.generate_export,
@@ -237,6 +236,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
                     groups=groups,
                     cur_group=s_node.group,
                     recursive=False,
+                    process = process,
                     **self.get_kwargs()
                 )
                 # add end group if new node where added OR if the previous end group was removed

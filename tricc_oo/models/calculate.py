@@ -182,6 +182,7 @@ class TriccNodeActivityEnd(TriccNodeFakeCalculateBase):
 class TriccNodeEnd(TriccNodeDisplayCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.end
     process: str = None
+    priority: int = 1000
     def __init__(self, **data):
         if data.get('name', None) is None:
             data['name'] = 'tricc_end_' + data.get('process', '') 
