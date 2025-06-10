@@ -305,14 +305,14 @@ def gen_operation_hash(op):
 
 
 def generate_choice_filter(strategy, node):
-    if isinstance(node, TriccNodeSelectOption) and node.relevance:
+    if isinstance(node, TriccNodeSelectOption) and node.relevance and node.relevance != TriccStatic(True):
         return gen_operation_hash(node.relevance)
     if not isinstance(node, (TriccNodeSelectMultiple, TriccNodeSelectOne)):
         return
     relevances = {}
     option_filter = {}
     for o in node.options.values():
-        if o.relevance:
+        if o.relevance and o.relevance != TriccStatic(True):
             key = gen_operation_hash(o.relevance)
             if key not in relevances:
                 relevances[key] = o.relevance
