@@ -94,6 +94,8 @@ def get_node_expressions(node, processed_nodes, process=None):
     return expression
 
 def set_last_version_false(node, processed_nodes):
+    if isinstance(node, (TriccNodeDiagnosis, TriccNodeSelectOption)):
+        return
     node_name = node.name if not isinstance(node, TriccNodeEnd) else node.get_reference()
     #last_version = get_last_version(node_name, processed_nodes) if issubclass(node.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase, TriccNodeEnd)) and not isinstance(node, TriccNodeSelectOption)  else  None
     last_version = processed_nodes.find_prev(node, version_filter(node_name))
@@ -191,9 +193,12 @@ def process_calculate(node,processed_nodes, stashed_nodes, calculates, used_calc
         ):
             if kwargs.get('warn', True):
                 logger.debug('Processing relevance for node {0}'.format(node.get_name()))
+            # tricc diagnostic have the same name as proposed diag but will be serialised with different names
+
             last_version =  set_last_version_false(node, processed_nodes)
             if last_version:
                 last_version = get_version_inheritance(node, last_version, processed_nodes)
+
             generate_calculates(node,calculates, used_calculates,processed_nodes=processed_nodes, process=process)               
        
                 
@@ -1270,7 +1275,7 @@ def set_prev_next_node(source_node, target_node, replaced_node=None, edge_only =
         set_next_node(source_node, target_node, replaced_node, edge_only)
          
     if activity and not any([(e.source == source_id) and ( e.target == target_id) for e in activity.edges]):
-        label = "continue" if issubclass(source_node.__class__, TriccNodeSelectYesNo) else None
+        label = "continue" if issubclass(source_node.__class__, TriccNodeSelect) else None
         activity.edges.append(TriccEdge(id = generate_id(), source = source_id, target = target_id, value = label))
 
 def remove_prev_next(prev_node, next_node, activity=None):
@@ -1431,11 +1436,11 @@ def reorder_node_list(node_list, group, processed_nodes):
         # Check for parent group
         elif hasattr(group, "group") and group.group and node_group and node_group.id == group.group.id:
             priority += PARENT_GROUP_PRIORITY
-        # Check for active activities (not start nodes)
-        elif activity and not isinstance(activity.root, TriccNodeActivityStart) and activity in active_activities:
+        # Check for active activities (not main)
+        elif activity and isinstance(activity.root, TriccNodeActivityStart) and activity in active_activities:
             priority += ACTIVE_ACTIVITY_PRIORITY
-        # Check for non-start activities
-        elif activity and not isinstance(activity.root, TriccNodeActivityStart):
+        # Check for non main activities
+        elif activity and isinstance(activity.root, TriccNodeActivityStart):
             priority += NON_START_ACTIVITY_PRIORITY
         # Check for active activities (lower priority)
         elif activity and activity in active_activities:
@@ -1799,12 +1804,15 @@ def create_determine_diagnosis_activity(diags):
         activity.calculates.append(r)
         activity.calculates.append(c)
         set_prev_next_node(r, d, edge_only=False)
-        set_prev_next_node(d, f, edge_only=False)
+        set_prev_next_node(d, end, edge_only=False)
+        wait2 = get_activity_wait([activity.root], diags_conf, [f], edge_only=False)
         activity.nodes[d.options[0].id] = d.options[0]
         activity.nodes[d.options[1].id] = d.options[1]
         activity.nodes[d.id]=d
         activity.nodes[r.id]=r
         activity.nodes[c.id]=c
+        activity.nodes[f.id]=f
+        activity.nodes[wait2.id]=wait2
     # fallback
 
     options = [
