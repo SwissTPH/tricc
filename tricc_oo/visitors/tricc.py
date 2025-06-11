@@ -809,8 +809,6 @@ def walktrhough_tricc_node_processed_stached(node, callback, processed_nodes, st
         # put the stached node from that group first
         # if has next, walkthrough them (support options)
         # if len(stashed_nodes)>1:
-        if not recursive:
-            reorder_node_list(stashed_nodes, node.group, processed_nodes)
         if isinstance(node, (TriccNodeActivityStart, TriccNodeMainStart)):
             if recursive:
                 for gp in node.activity.groups.values():
@@ -894,6 +892,9 @@ def walktrhough_tricc_node_processed_stached(node, callback, processed_nodes, st
                 for nn in node.next_nodes:
                     if nn not in stashed_nodes:
                         stashed_nodes.insert_at_top(nn)
+        if not recursive:
+            reorder_node_list(stashed_nodes, node.group, processed_nodes)
+ 
         
                 
     else:
@@ -1403,37 +1404,52 @@ def replace_next_node(prev_node,next_node,old_node):
     for n_p_node in list_nodes:
         if n_p_node == old_node :
             set_prev_next_node(prev_node, next_node, old_node)
-    
-def reorder_node_list(list_node, group, processed_nodes):
-    active_activities = set(n.activity for n in processed_nodes)
-    
-    # Define a lambda to assign numeric priorities
-    def filter_logic(l_node):
-        priority = int(getattr(l_node, "priority", None) or 400)
-        if (
-            isinstance(l_node, TriccNodeWait)
-            and any(isinstance(rn, TriccNodeActivity) and any(sn.activity == rn for sn in list_node) for rn in l_node.reference)
-        ):
-            pass
-        elif group is not None and hasattr(l_node, 'group') and l_node.group and l_node.group.id == group.id:
-            priority += 7000  # Highest priority: Same group
-        elif issubclass(l_node.__class__, TriccRhombusMixIn) :
-            priority += 1000
-        elif hasattr(group, 'group') and group.group and l_node.group and l_node.group.id == group.group.id:
-            priority += 6000  # Second priority: Parent group
-        elif not isinstance(l_node.activity.root, TriccNodeActivityStart) and l_node.activity in active_activities:
-            priority += 5000  # Third priority: Active activities
-        elif not isinstance(l_node.activity.root, TriccNodeActivityStart):
-            priority += 4000  # Third priority: Active activities
-        elif l_node.activity in active_activities:
-            priority += 3000 # Third priority: Active activities
+
+
+# Priority constants
+SAME_GROUP_PRIORITY = 7000
+PARENT_GROUP_PRIORITY = 6000
+ACTIVE_ACTIVITY_PRIORITY = 5000
+NON_START_ACTIVITY_PRIORITY = 4000
+ACTIVE_ACTIVITY_LOWER_PRIORITY = 3000
+RHOMBUS_PRIORITY = 1000
+DEFAULT_PRIORITY = 2000
+
+def reorder_node_list(node_list, group, processed_nodes):
+    # Cache active activities for O(1) lookup
+    active_activities = {n.activity for n in processed_nodes}
+
+    def get_priority(node):
+        # Cache attributes to avoid repeated getattr calls
+        priority = int(getattr(node, "priority", 0) or 0)
+        node_group = getattr(node, "group", None)
+        activity = getattr(node, "activity", None)
+
+        # Check for same group
+        if group is not None and node_group and node_group.id == group.id:
+            priority += SAME_GROUP_PRIORITY
+        # Check for parent group
+        elif hasattr(group, "group") and group.group and node_group and node_group.id == group.group.id:
+            priority += PARENT_GROUP_PRIORITY
+        # Check for active activities (not start nodes)
+        elif activity and not isinstance(activity.root, TriccNodeActivityStart) and activity in active_activities:
+            priority += ACTIVE_ACTIVITY_PRIORITY
+        # Check for non-start activities
+        elif activity and not isinstance(activity.root, TriccNodeActivityStart):
+            priority += NON_START_ACTIVITY_PRIORITY
+        # Check for active activities (lower priority)
+        elif activity and activity in active_activities:
+            priority += ACTIVE_ACTIVITY_LOWER_PRIORITY
+        # Check for rhombus nodes
+        elif issubclass(node.__class__, TriccRhombusMixIn):
+            priority += RHOMBUS_PRIORITY
         else:
-            priority += 2000  # Lowest priority: Others
+            priority += DEFAULT_PRIORITY
+
         return priority
-    
-    # Sort list_node in place using filter_logic as the key
-    list_node.sort(key=filter_logic, reverse=True)
-    return None
+
+    # Sort in place, highest priority first
+    node_list.sort(key=get_priority, reverse=True)
     
 def loop_info(loop, **kwargs):
     logger.critical("dependency details")
@@ -1677,7 +1693,7 @@ def export_proposed_diags(activity, diags=None, **kwargs):
     return diags
     
 
-def get_accept_diagnostic_node(code, display, severity, activity):
+def get_accept_diagnostic_node(code, display, severity, priority, activity):
     node = TriccNodeAcceptDiagnostic(
         id=generate_id("pre_final." + code),
         name="pre_final." + code,
@@ -1685,24 +1701,28 @@ def get_accept_diagnostic_node(code, display, severity, activity):
         list_name="acc_rej",
         activity=activity,
         group=activity,
-        severity=severity
+        severity=severity,
+        priority=priority
     )
     node.options = get_select_accept_reject_options(node, node.activity)
     return node
 
 def get_diagnostic_node(code, display, severity, priority, activity):
-    node = TriccNodeAcceptDiagnostic(
+    node = TriccNodeCalculate(
         id=generate_id("final." + code),
         name="final." + code,
         label=display,
-        list_name="acc_rej",
         activity=activity,
         group=activity,
-        severity=severity,
-        priority=priority
-        
+        priority=priority,
+        expression_reference=or_join([
+            TriccOperation(TriccOperator.ISTRUE, [TriccReference("pre_final." + code)]), 
+            TriccOperation(
+                TriccOperator.SELECTED,
+                [TriccReference('tricc.manual.diag'), TriccStatic(code)]
+            )
+        ])
     )
-    node.options = get_select_accept_reject_options(node, node.activity)
     return node
 
 def get_select_accept_reject_options(node, group):
@@ -1743,7 +1763,6 @@ def create_determine_diagnosis_activity(diags):
     start.activity = activity
     start.group = activity
     diags_conf = []
-    r_diags_conf = []
     end = TriccNodeActivityEnd(
         id=generate_id("end.determine-diagnosis"),
         name="end.determine-diagnosis",
@@ -1751,27 +1770,7 @@ def create_determine_diagnosis_activity(diags):
         group=activity,
     )
     activity.nodes[end.id]=end
-    for proposed in diags:
-        d = get_diagnostic_node(proposed.name, proposed.label, proposed.severity, proposed.priority, activity)
-        diags_conf.append(d)
-        r = TriccNodeRhombus(
-            id=generate_id(f"proposed-rhombus{proposed.id}"),
-            expression_reference=TriccOperation(
-                TriccOperator.ISTRUE,
-                [TriccReference(proposed.name)]
-            ),
-            reference=[TriccReference(proposed.name)],
-            activity=activity,
-            group=activity        )
-        r_diags_conf.append(r)
-        set_prev_next_node(start, r, edge_only=False)
-        set_prev_next_node(r, d, edge_only=False)
-        set_prev_next_node(d, end, edge_only=False)
-        activity.nodes[d.options[0].id] = d.options[0]
-        activity.nodes[d.options[1].id] = d.options[1]
-        activity.nodes[d.id]=d
-        activity.nodes[r.id]=r
-    # fallback
+    
     f = TriccNodeSelectMultiple(
         name="tricc.manual.diag",
         label="Add diagnosis",
@@ -1782,6 +1781,32 @@ def create_determine_diagnosis_activity(diags):
         required=TriccStatic(False),
         
     )
+    for proposed in diags:
+        d = get_accept_diagnostic_node(proposed.name, proposed.label, proposed.severity, proposed.priority, activity)
+        c = get_diagnostic_node(proposed.name, proposed.label, proposed.severity, proposed.priority, activity)
+        diags_conf.append(d)
+        r = TriccNodeRhombus(
+            path=start,
+            id=generate_id(f"proposed-rhombus{proposed.id}"),
+            expression_reference=TriccOperation(
+                TriccOperator.ISTRUE,
+                [TriccReference(proposed.name)]
+            ),
+            reference=[TriccReference(proposed.name)],
+            activity=activity,
+            priority=proposed.priority,
+            group=activity)
+        activity.calculates.append(r)
+        activity.calculates.append(c)
+        set_prev_next_node(r, d, edge_only=False)
+        set_prev_next_node(d, f, edge_only=False)
+        activity.nodes[d.options[0].id] = d.options[0]
+        activity.nodes[d.options[1].id] = d.options[1]
+        activity.nodes[d.id]=d
+        activity.nodes[r.id]=r
+        activity.nodes[c.id]=c
+    # fallback
+
     options = [
         TriccNodeSelectOption(
             id=generate_id(d.name),
@@ -1793,10 +1818,8 @@ def create_determine_diagnosis_activity(diags):
         ) for d in diags
     ]
     f.options=dict(zip(range(0, len(options)), options))
-    wait2 = get_activity_wait([activity.root], diags_conf, [f], edge_only=False)
-    activity.nodes[wait2.id]=wait2
     activity.nodes[f.id]=f
-
+    set_prev_next_node(f, end, edge_only=False)
     
     return activity
     
