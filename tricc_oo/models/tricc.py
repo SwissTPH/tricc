@@ -18,6 +18,7 @@ class TriccNodeCalculateBase(TriccNodeBaseModel):
     expression_reference: Union[str, TriccOperation] = None
     last: bool = None
     datatype: str = 'boolean'
+    priority: Union[float, int, None] = None
     # to use the enum value of the TriccNodeType
     class Config:
         use_enum_values = True  # <--
