@@ -494,6 +494,7 @@ def generate_calculates(node,calculates, used_calculates,processed_nodes, proces
             #add_save_calculate(calc_node, calculates, used_calculates,processed_nodes)
             for calc in list_calc:
                 node.activity.nodes[calc.id] = calc
+                add_calculate(calculates, calc)
     return list_calc
 
 
@@ -679,6 +680,8 @@ def process_operation_reference(operation, node, processed_nodes, calculates, us
             node_reference.append(last_found)
             reference.append(TriccReference(ref))
             if replace_reference:
+                if not issubclass(last_found.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase, TriccNodeInput)):
+                    last_found = get_node_expression(last_found, processed_nodes, is_prev=True)
                 if isinstance(operation, (TriccOperation)):
                     if modified_operation is None:
                         modified_operation = operation.copy(keep_node=True)
@@ -694,9 +697,13 @@ def process_operation_reference(operation, node, processed_nodes, calculates, us
                     if warn:
                         logger.warning(f"Could not resolve label '{option_label}' for reference {ref}")
                     return False
-            
-                
-            node.path_len = max(node.path_len, last_found.path_len)
+            if hasattr(last_found, 'path_len'):
+                path_len = last_found.path_len  
+            elif isinstance(last_found, TriccOperation):
+                path_len =  max(getattr(n, 'path_len', 0) for n in last_found.get_references())
+            else:
+                path_len = 0
+            node.path_len = max(node.path_len, path_len)
     for ref in real_ref_list:
         if is_prev_processed(ref, node, processed_nodes=processed_nodes, local=False) is False:
             return False

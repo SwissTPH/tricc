@@ -390,7 +390,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
         return f"{ref_expressions[0]} mod {ref_expressions[1]}"
     def tricc_operation_minus(self, ref_expressions):
         if len(ref_expressions)>1:
-            return ' - '.join(ref_expressions)
+            return ' - '.join(map(str,ref_expressions))
         elif len(ref_expressions)==1:
             return f'-{ref_expressions[0]}'
     def tricc_operation_plus(self, ref_expressions):

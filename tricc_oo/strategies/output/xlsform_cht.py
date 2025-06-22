@@ -223,10 +223,10 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             "",
             "",
         ]
-        self.get_contact_inputs(df_input)
         inputs = self.export_inputs(start_pages[self.processes[0]], **kwargs)
         for input in inputs:
             df_input.loc[len(df_input)] = get_input_line(input)
+        self.get_contact_inputs(df_input)        
         df_input.loc[len(df_input)] = [
             "hidden",
             "external_id",
@@ -310,6 +310,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             "",
             "",
         ]
+        self.get_contact_inputs_calculate(df_input)
         df_input.loc[len(df_input)] = [
             "calculate",
             "created_by_person_uuid",
@@ -459,7 +460,54 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
 
     def get_contact_inputs(self, df_input):
         empty = langs.get_trads("", force_dict=True)
+        if not len(df_input[df_input['name'] == 'sex']):
+            df_input.loc[len(df_input)] = [
+                "hidden",
+                "sex",
+                *list(langs.get_trads("Sex", force_dict=True).values()),
+                *list(empty.values()),
+                *list(empty.values()),
+                "",
+                "hidden",
+                "",
+                *list(empty.values()),
+                "",
+                "",
+                "",
+                *list(empty.values()),
+                "",
+                "",
+                "",
+                "",
+                "",
+            ]
+        if not len(df_input[df_input['name'] == 'date_of_birth']):
+            df_input.loc[len(df_input)] = [
+                "hidden",
+                "date_of_birth",
+                *list(langs.get_trads("Date of birth", force_dict=True).values()),
+                *list(empty.values()),
+                *list(empty.values()),
+                "",
+                "hidden",
+                "",
+                *list(empty.values()),
+                "",
+                "",
+                "",
+                *list(empty.values()),
+                "",
+                "",
+                "",
+                "",
+                "",
+            ]
 
+            return df_input
+
+
+    def get_contact_inputs_calculate(self, df_input):
+        empty = langs.get_trads("", force_dict=True)
         df_input.loc[len(df_input)] = [
             "calculate",
             "patient_sex",

@@ -98,7 +98,6 @@ class TriccNodeActivity(TriccNodeBaseModel):
         else:
             instance = super().make_instance(instance_nb, activity=None)
             base_instance = (self.base_instance or self)
-            base_instance.instances[instance_nb] = instance
             instance.base_instance = base_instance
             # instance.base_instance = self
             # we duplicate all the related nodes (not the calculate, duplication is manage in calculate version code)
@@ -283,6 +282,7 @@ class TriccNodeGoTo(TriccNodeBaseModel):
     tricc_type: TriccNodeType = TriccNodeType.goto
     link: Union[TriccNodeActivity, triccId]
     datatype: str = 'n/a'
+    instance: int = 1
 
     # no need ot copy
     def make_instance(self, instance_nb, activity, **kwargs):

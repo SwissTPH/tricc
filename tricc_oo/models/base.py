@@ -142,6 +142,8 @@ class TriccBaseModel(BaseModel):
         instance.id = generate_id(f"{self.id}{nb_instance}")
         instance.instance = int(nb_instance)
         instance.base_instance = self
+        if hasattr(self, 'instances'):
+            self.instances[nb_instance] = instance
         
         
         # assign the defualt group

@@ -905,12 +905,13 @@ def get_edges(diagram):
 def process_factor_edge(edge, nodes):
     factor = edge.value.strip()
     if factor != 1:
+        source = nodes[edge.source]
         return TriccNodeCalculate(
             id=edge.id,
-            expression_reference=TriccOperation(TriccOperator.MULTIPLIED, [nodes[edge.source],TriccStatic(factor)]),
-            reference=[nodes[edge.source]],
-            activity=nodes[edge.source].activity,
-            group=nodes[edge.source].group,
+            expression_reference=TriccOperation(TriccOperator.MULTIPLIED, [TriccReference(nodes[edge.source].name),TriccStatic(float(factor))]),
+            reference=[TriccReference(source.name)],
+            activity=source.activity,
+            group=source.group,
             label="factor {}".format(factor),
         )
     return None

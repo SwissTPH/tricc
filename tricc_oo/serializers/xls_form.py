@@ -275,7 +275,7 @@ def get_xfrom_trad(strategy, node, column, mapping, clean_html=False):
     elif column == "appearance":
         if (
             isinstance(node, TriccNodeSelect)
-            and len(node.options) > 9
+            and len(node.options) > 13
             and not any(o.image or o.hint for o in node.options.values())
         ):
             value = "autocomplete"
