@@ -18,7 +18,10 @@ class XLSFormCHTHFStrategy(XLSFormCHTStrategy):
    
     def get_contact_inputs(self, df_inputs):
        return None
-        
+
+    def get_contact_inputs_calculate(self, df_inputs):
+        return None
+       
     def get_cht_summary(self):
         
         df_summary = pd.DataFrame(columns=SURVEY_MAP.keys())
