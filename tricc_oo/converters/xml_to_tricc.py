@@ -644,6 +644,8 @@ def add_tricc_base_node(
 
 
 def load_expressions(node):
+    if getattr(node, 'constraint', None):
+        node.constraint = parse_expression('', node.constraint)
     if getattr(node, 'expression', None):
         node.expression = parse_expression('', node.expression)
     if getattr(node, 'relevance', None):

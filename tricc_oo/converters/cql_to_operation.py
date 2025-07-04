@@ -305,9 +305,7 @@ class cqlToXlsFormVisitor(cqlVisitor):
     def visitUnionExpression(self, ctx):
         raise NotImplementedError('union not supported')
 
-    def visitThisInvocation(self, ctx):
-        # TODO
-        raise NotImplementedError('Implies not supported')
+    
 
     def visitQuantity(self, ctx):
         # TODO
