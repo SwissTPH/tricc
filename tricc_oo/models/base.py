@@ -192,6 +192,7 @@ class TriccEdge(TriccBaseModel):
 class TriccGroup(TriccBaseModel):
     tricc_type: TriccNodeType = TriccNodeType.page
     group: Optional[TriccBaseModel] = None
+    activity: TriccBaseModel
     name: Optional[str] = None
     export_name:Optional[str] = None
     label: Optional[Union[str, Dict[str,str]]] = None

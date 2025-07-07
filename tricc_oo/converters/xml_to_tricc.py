@@ -774,15 +774,15 @@ def clean_link(link):
         return link_parts[1]
 
 
-def get_groups(diagram, nodes, parent_group):
+def get_groups(diagram, nodes, activity):
     groups = {}
     list = get_tricc_type_list(diagram, "object", TriccNodeType.page)
     for elm in list:
-        add_group(elm, diagram, nodes, groups, parent_group)
+        add_group(elm, diagram, nodes, groups, activity, activity)
     return groups
 
 
-def add_group(elm, diagram, nodes, groups, parent_group):
+def add_group(elm, diagram, nodes, groups, parent_group, activity):
     external_id = elm.attrib.get("id")
     id = get_id(external_id, diagram.attrib.get("id"))
     if id not in groups:
@@ -792,6 +792,7 @@ def add_group(elm, diagram, nodes, groups, parent_group):
             id=id,
             external_id=external_id,
             group=parent_group,
+            activity=activity
         )
         # get elememt witn parent = id and tricc_type defiend
         list_child = get_tricc_type_list(
