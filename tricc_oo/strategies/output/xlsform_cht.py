@@ -61,6 +61,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             "",
             "",
             "",
+            "",
         ]
         df_input.loc[len(df_input)] = [
             "hidden",
@@ -81,6 +82,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             "",
             "",
             "",
+            "",
         ]
         df_input.loc[len(df_input)] = [
             "hidden",
@@ -96,6 +98,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             "",
             "",
             *list(empty.values()),
+            "",
             "",
             "",
             "",
@@ -122,6 +125,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             "",
             "",
             "",
+            "",
         ]
         df_input.loc[len(df_input)] = [
             "string",
@@ -137,6 +141,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             "",
             "",
             *list(empty.values()),
+            "",
             "",
             "",
             "",
@@ -162,6 +167,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             "",
             "",
             "",
+            "",
         ]
         df_input.loc[len(df_input)] = [
             "string",
@@ -177,6 +183,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             "",
             "",
             *list(empty.values()),
+            "",
             "",
             "",
             "",
@@ -202,6 +209,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             "",
             "",
             "",
+            "",
         ]
         df_input.loc[len(df_input)] = [
             "begin_group",
@@ -217,6 +225,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             "",
             "",
             *list(empty.values()),
+            "",
             "",
             "",
             "",
@@ -246,6 +255,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             "",
             "",
             "",
+            "",
         ]
 
         df_input.loc[len(df_input)] = [
@@ -262,6 +272,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             "",
             "",
             *list(empty.values()),
+            "",
             "",
             "",
             "",
@@ -288,6 +299,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             "",
             "",
             "",
+            "",
         ]
 
         df_input.loc[len(df_input)] = [
@@ -304,6 +316,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             "",
             "",
             *list(empty.values()),
+            "",
             "",
             "",
             "",
@@ -327,6 +340,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             *list(empty.values()),  #'required message'
             "",  #'read only'
             "../inputs/user/contact_id",  #'expression'
+            "",
             "",  #'repeat_count'
             "",  #'image'
             "",  # choice filter
@@ -347,6 +361,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             *list(empty.values()),  #'required message'
             "",  #'read only'
             "../inputs/user/facility_id",  #'expression'
+            "",
             "",  #'repeat_count'
             "",  #'image'
             "",  # choice filter
@@ -367,6 +382,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             *list(empty.values()),  #'required message'
             "",  #'read only'
             "../inputs/user/name",  #'expression'
+            "",
             "",  #'repeat_count'
             "",  #'image'
             "",  # choice filter
@@ -387,6 +403,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             *list(empty.values()),  #'required message'
             "",  #'read only'
             "../inputs/contact/_id",  #'expression'
+            "",
             "",  #'repeat_count'
             "",  #'image'
             "",  # choice filter
@@ -408,6 +425,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             *list(empty.values()),  #'required message'
             "",  #'read only'
             "../inputs/source_id",  #'expression'
+            "",
             "",  #'repeat_count'
             "",  #'image'
             "",  # choice filter
@@ -428,6 +446,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             *list(empty.values()),  #'required message'
             "",  #'read only'
             "../inputs/user/facility_id",  #'expression'
+            "",
             "",  #'repeat_count'
             "",  #'image'
             "",  # choice filter
@@ -446,6 +465,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             "",
             "",
             *list(empty.values()),
+            "",
             "",
             "",
             "",
@@ -480,6 +500,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
                 "",
                 "",
                 "",
+                "",
             ]
         if not len(df_input[df_input['name'] == 'date_of_birth']):
             df_input.loc[len(df_input)] = [
@@ -496,6 +517,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
                 "",
                 "",
                 *list(empty.values()),
+                "",
                 "",
                 "",
                 "",
@@ -527,6 +549,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             "",
             "",
             "",
+            "",
         ]
         df_input.loc[len(df_input)] = [
             "calculate",
@@ -544,6 +567,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             *list(empty.values()),
             "",
             "date(../inputs/contact/date_of_birth)",
+            "",
             "",
             "",
             "",

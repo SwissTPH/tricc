@@ -70,6 +70,7 @@ class XLSFormCDSSStrategy(XLSFormStrategy):
             *list(empty.values()) ,#'required message'
             '',#'read only'
             '',#'expression'
+            "",
             '',#'repeat_count'
             '',#'image' 
             ''
@@ -90,6 +91,7 @@ class XLSFormCDSSStrategy(XLSFormStrategy):
             *list(empty.values()) ,#'required message'
             '',#'read only'
             '',#'expression'
+            "",
             '',#'repeat_count'
             '',#'image' 
             ''
@@ -110,6 +112,7 @@ class XLSFormCDSSStrategy(XLSFormStrategy):
             *list(empty.values()) ,#'required message'
             '',#'read only'
             '',#'expression'
+            "",
             '',#'repeat_count'
             '',#'image' 
             ''
@@ -133,6 +136,7 @@ class XLSFormCDSSStrategy(XLSFormStrategy):
             '1',#'required'
             *list(empty.values()) ,#'required message'
             '',#'read only'
+            "",
             '',#'expression'
             '',#'repeat_count'
             '',#'image' 

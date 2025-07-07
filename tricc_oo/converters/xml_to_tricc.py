@@ -650,6 +650,8 @@ def load_expressions(node):
         node.expression = parse_expression('', node.expression)
     if getattr(node, 'relevance', None):
         node.relevance = parse_expression('', node.relevance)
+    if getattr(node, 'trigger', None):
+        node.trigger = parse_expression('', node.trigger)
     if getattr(node, 'default', None):
         node.default = parse_expression('', node.default)
     if getattr(node, 'reference', None):

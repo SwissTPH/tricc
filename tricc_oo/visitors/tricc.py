@@ -591,6 +591,22 @@ def process_reference(node, processed_nodes, calculates, used_calculates=None,  
             return False
         elif modified_expression and replace_reference:
             node.relevance = modified_expression
+            
+    if isinstance(getattr(node, 'trigger', None), (TriccOperation, TriccReference)):
+        modified_expression = process_operation_reference(
+            node.trigger, 
+            node, 
+            processed_nodes=processed_nodes,
+            calculates=calculates, 
+            used_calculates=used_calculates, 
+            replace_reference=replace_reference,
+            warn=warn, 
+            codesystems=codesystems
+        )
+        if modified_expression is False:
+            return False
+        elif modified_expression and replace_reference:
+            node.trigger = modified_expression
     
     if isinstance(getattr(node, 'default', None), (TriccOperation, TriccReference)):
         modified_expression = process_operation_reference(
@@ -2101,7 +2117,7 @@ def get_rhombus_terms( node, processed_nodes, get_overall_exp=False, negate=Fals
                                                                                                         node.get_name()))
                     exit(1)
             elif node.expression_reference is not None and node.expression_reference != '':
-                if isinstance(node.expression_reference, TriccOperation):
+                if isinstance(node.expression_reference, (TriccOperation, TriccReference, TriccStatic)):
                     return node.expression_reference
                 elif isinstance(node.expression_reference, str):
                     expression = node.expression_reference.format(*get_list_names(node.reference))

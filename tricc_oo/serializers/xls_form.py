@@ -231,6 +231,7 @@ SURVEY_MAP = {
     **langs.get_trads_map("required_message"),
     "read only": "read only",
     "calculation": "expression",
+    "trigger": "trigger",
     "repeat_count": "repeat_count",
     "media::image": "image",
     "choice_filter": "",
@@ -602,6 +603,7 @@ def get_input_line(node, replace_dots=True):
         "",  #'required'
         *list(empty.values()),  #'required message'
         "",  #'read only'
+        "",
         "",  #'expression'
         "",  #'repeat_count'
         "",  #'image'
@@ -629,6 +631,7 @@ def get_input_calc_line(node, replace_dots=True):
         "",  #'read only'
         "../inputs/contact/"
         + clean_name(node.name, replace_dots=replace_dots),  #'expression'
+        "",
         "",  #'repeat_count'
         "",  #'image'
         "",  # choice filter

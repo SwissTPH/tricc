@@ -20,7 +20,8 @@ class TriccNodeDisplayCalculateBase(TriccNodeCalculateBase):
     save: Optional[str] = None  # contribute to another calculate
     hint: Optional[str] = None  # for diagnostic display
     help: Optional[str] = None  # for diagnostic display
-    applicability: Optional[Union[Expression, TriccOperation]] = None
+    trigger: Optional[Union[Expression, TriccOperation, TriccReference]] = None
+    applicability: Optional[Union[Expression, TriccOperation, TriccReference]] = None
     # no need to copy save
     def to_fake(self):
         data = vars(self)
@@ -75,10 +76,10 @@ class TriccRhombusMixIn():
         reference = []
         expression_reference = None
         instance.path = None
-        if isinstance(self.expression_reference, (str, TriccOperation)):
+        if isinstance(self.expression_reference, (str, TriccOperation, TriccReference, TriccStatic)):
             expression_reference = self.expression_reference.copy()
             reference = list(expression_reference.get_references())
-        if isinstance(self.reference, (str, TriccOperation)):
+        if isinstance(self.reference, (str, TriccOperation, TriccReference, TriccStatic)):
             expression_reference = self.reference.copy()
             reference = list(expression_reference.get_references())
         elif isinstance(self.reference, list):

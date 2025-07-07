@@ -237,6 +237,8 @@ class TriccNodeDisplayModel(TriccNodeBaseModel):
     help: Optional[Union[str, TriccNodeBaseModel]] = None
     group: Optional[Union[TriccGroup, TriccNodeActivity]] = None
     relevance: Optional[Union[Expression, TriccOperation]] = None
+    default: Optional[Union[Expression, TriccOperation, TriccReference, TriccStatic]] = None
+    trigger: Optional[Union[Expression, TriccOperation, TriccReference]] = None
     priority: Union[float, int, None] = None
 
     # to use the enum value of the TriccNodeType

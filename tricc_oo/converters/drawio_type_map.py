@@ -44,7 +44,7 @@ TYPE_MAP = {
             "constraint",
             "constraint_message",
             "relevance",
-            "priority"
+            "priority", "trigger", "default"
 
         ],
         "mandatory_attributes": ["label", "name", "list_name"],
@@ -60,7 +60,7 @@ TYPE_MAP = {
             "constraint",
             "constraint_message",
             "relevance",
-            "priority"
+            "priority", "trigger", "default"
         ],
         "mandatory_attributes": ["label", "name", "list_name"],
         "model": TriccNodeSelectMultiple
@@ -75,7 +75,7 @@ TYPE_MAP = {
             "constraint_message",
             "required",
             "relevance",
-            "priority"
+            "priority", "trigger", "default"
         ],
         "mandatory_attributes": ["label", "name"],
         "model": TriccNodeDecimal
@@ -90,7 +90,7 @@ TYPE_MAP = {
             "constraint_message",
             "required",
             "relevance",
-            "priority"
+            "priority", "trigger", "default"
             
         ],
         "mandatory_attributes": ["label", "name"],
@@ -99,43 +99,43 @@ TYPE_MAP = {
 
     TriccNodeType.text: {
         "objects": ["UserObject", "object"],
-        "attributes": ["save", "relevance","priority"],
+        "attributes": ["save", "relevance","priority", "trigger", "default"],
         "mandatory_attributes": ["label", 'name'],
         "model": TriccNodeText
     },
     TriccNodeType.date: {
         "objects": ["UserObject", "object"],
-        "attributes": ["save", "relevance","priority"],
+        "attributes": ["save", "relevance","priority", "trigger", "default"],
         "mandatory_attributes": ["label", "name"],
         "model": TriccNodeDate
     },
     TriccNodeType.add: {
         "objects": ["UserObject", "object"],
-        "attributes": ["save", "expression"],
+        "attributes": ["save", "expression", "trigger"],
         "mandatory_attributes": ['label', "name"],
         "model": TriccNodeAdd
     },
     TriccNodeType.count: {
         "objects": ["UserObject", "object"],
-        "attributes": ["save", "expression"],
+        "attributes": ["save", "expression", "trigger"],
         "mandatory_attributes": ['label', "name"],
         "model": TriccNodeCount
     },
     TriccNodeType.calculate: {
         "objects": ["UserObject", "object"],
-        "attributes": ["save", "reference"],
+        "attributes": ["save", "reference", "trigger"],
         "mandatory_attributes": [ "name", 'label'],
         "model": TriccNodeCalculate
     },
     TriccNodeType.rhombus: {
         "objects": ["UserObject", "object"],
-        "attributes": ["save", "expression", 'label','priority'],
+        "attributes": ["save", "expression", 'label','priority', "trigger"],
         "mandatory_attributes": ["reference"],
         "model": TriccNodeRhombus
     },
     TriccNodeType.wait: {
         "objects": ["UserObject", "object"],
-        "attributes": ["save", "expression"],
+        "attributes": ["save", "expression", "trigger"],
         "mandatory_attributes": ["reference", "name", 'label'],
         "model": TriccNodeWait
     },
@@ -159,7 +159,7 @@ TYPE_MAP = {
             "filter",
             "constraint",
             "constraint_message",
-            "relevance","priority"
+            "relevance","priority", "trigger", "default"
         ],
         "mandatory_attributes": ["label", "name", "list_name"],
         "model": TriccNodeSelectYesNo
@@ -208,7 +208,7 @@ TYPE_MAP = {
     },
     TriccNodeType.proposed_diagnosis: {
         "objects": ["UserObject", "object"],
-        "attributes": ["save", "reference", "severity", "priority"],
+        "attributes": ["save", "reference", "severity", "priority", "trigger"],
         "mandatory_attributes": [ "name", 'label'],
         "model": TriccNodeProposedDiagnosis
     },
