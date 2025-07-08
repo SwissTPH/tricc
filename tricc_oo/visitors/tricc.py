@@ -1675,26 +1675,32 @@ def get_prev_instance_skip_expression(node, processed_nodes, process, expression
 
 # end def
 def get_process_skip_expression(node, processed_nodes, process, expression=None):
-    
-    end_expressions = []
-    f_end_expression = get_end_expression(processed_nodes)
-    if f_end_expression:
-        end_expressions.append(f_end_expression)
-    b_end_expression = get_end_expression(processed_nodes, 'pause')
-    if b_end_expression:
-        end_expressions.append(b_end_expression)        
-    if process[0] in PROCESSES:
-        for p in PROCESSES[PROCESSES.index(process[0])+1:]:
-            p_end_expression = get_end_expression(processed_nodes, p)
-            if p_end_expression:
-                end_expressions.append(p_end_expression)
-    if end_expressions:
-        if expression:
-            end_expressions.append(expression)
-        if len(end_expressions) == 1:
-            expression = end_expressions[0]
-        else:
-            expression = and_join(end_expressions)
+    list_ends = OrderedSet(
+                filter(
+                    lambda x: issubclass(x.__class__, TriccNodeEnd),
+                    processed_nodes
+                )
+            )
+    if list_ends:
+        end_expressions = []
+        f_end_expression = get_end_expression(list_ends)
+        if f_end_expression:
+            end_expressions.append(f_end_expression)
+        b_end_expression = get_end_expression(list_ends, 'pause')
+        if b_end_expression:
+            end_expressions.append(b_end_expression)        
+        if process[0] in PROCESSES:
+            for p in PROCESSES[PROCESSES.index(process[0])+1:]:
+                p_end_expression = get_end_expression(list_ends, p)
+                if p_end_expression:
+                    end_expressions.append(p_end_expression)
+        if end_expressions:
+            if expression:
+                end_expressions.append(expression)
+            if len(end_expressions) == 1:
+                expression = end_expressions[0]
+            else:
+                expression = and_join(end_expressions)
     return expression
         
 def get_end_expression(processed_nodes, process=None):
