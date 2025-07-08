@@ -456,7 +456,8 @@ class TriccOperation(BaseModel):
         return hash(self.__repr__())
 
     def __repr__(self):
-        return "TriccOperation:"+self.__str__()
+        str_ref = map(repr, self.reference)
+        return f"TriccOperation:{self.operator}({', '.join(map(str, str_ref))})"
     
     def __eq__(self, other):
         return self.__str__() == str(other)
@@ -658,7 +659,7 @@ def clean_or_list(list_or, elm_and=None):
     if len(list_or) == 0:
         return []
 
-    return sorted(list(set(list_or)), key=str)
+    return sorted(list(set(list_or)), key=repr)
 
 def and_join(argv):
     argv=clean_and_list(argv)
