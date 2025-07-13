@@ -131,6 +131,10 @@ class BaseOutPutStrategy:
         raise NotImplementedError(f"This type of opreration  is not supported in this strategy")
     def tricc_operation_zscore(self, ref_expressions):
         raise NotImplementedError(f"This type of opreration  is not supported in this strategy")
+    def tricc_operation_datetime_to_decimal(self, ref_expressions):
+        raise NotImplementedError(f"This type of opreration  is not supported in this strategy")
+    def tricc_operation_round(self, ref_expressions):
+        raise NotImplementedError(f"This type of opreration  is not supported in this strategy")
     def tricc_operation_izscore(self, ref_expressions):
         raise NotImplementedError(f"This type of opreration  is not supported in this strategy")
     def tricc_operation_age_day(self, ref_expressions):

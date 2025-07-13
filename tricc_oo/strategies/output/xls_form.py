@@ -569,6 +569,13 @@ class XLSFormStrategy(BaseOutPutStrategy):
         #  return ((Math.pow((y / m), l) - 1) / (s * l));
         return f"(pow({y} div ({m}), {ll}) -1) div (({s}) div ({ll}))"
    
+    def tricc_operation_datetime_to_decimal(self, ref_expressions):
+        return f"decimal-date-time({ref_expressions[0]})"
+    
+    def tricc_operation_round(self, ref_expressions):
+        return f"round({ref_expressions[0]})"
+   
+       
     
     def tricc_operation_izscore(self, ref_expressions):
         z, ll, m, s = self.get_zscore_params(ref_expressions)
@@ -671,7 +678,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
         if isinstance(r, TriccOperation):
             return self.get_tricc_operation_expression(r) 
         elif isinstance(r, TriccReference):
-            logger.warning(f"reference still used in the calculate {r.value}")
+            logger.warning(f"reference `{r.value}` still used in a calculate")
             return f"${{{get_export_name(r.value)}}}" 
         elif isinstance(r, TriccStatic):
             if isinstance(r.value, bool) :#or r.value in ('true', 'false')

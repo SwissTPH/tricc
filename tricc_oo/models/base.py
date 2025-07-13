@@ -357,6 +357,7 @@ class TriccOperator(StrEnum):
     NOT = 'not'
     ISNULL = 'isnull'
     ISNOTNULL= 'isnotnull'
+    ROUND = 'round'
 
     CASE = 'case' # ref (equal value, res), (equal value,res)
     IFS = 'ifs' #(cond, res), (cond,res)
@@ -364,7 +365,6 @@ class TriccOperator(StrEnum):
     
     # CDSS Specific
     HAS_QUALIFIER = 'has_qualifier'
-    
     ZSCORE = 'zscore' # left table_name, right Y, gender give Z
     IZSCORE = 'izscore' #left table_name, right Z, gender give Y
     AGE_DAY = 'age_day' # age from dob
@@ -383,6 +383,7 @@ class TriccOperator(StrEnum):
     CAST_DATE = 'cast_date'
     PARENTHESIS = 'parenthesis'
     CONCATENATE = 'concatenate'
+    DATETIME_TO_DECIMAL = 'datetime_to_decimal'
 
 RETURNS_BOOLEAN =[
     TriccOperator.ADD_OR,
@@ -414,6 +415,8 @@ RETURNS_NUMBER = [
     TriccOperator.AGE_YEAR,
     TriccOperator.ZSCORE,
     TriccOperator.IZSCORE,
+    TriccOperator.ROUND,
+    TriccOperator.DATETIME_TO_DECIMAL,
     TriccOperator.PLUS,
     TriccOperator.MINUS,
     TriccOperator.DIVIDED,

@@ -264,7 +264,7 @@ def get_xfrom_trad(strategy, node, column, mapping, clean_html=False):
         issubclass(node.__class__, TriccNodeDisplayCalculateBase)
         and column == "calculation"
         and isinstance(value, str)
-        and not value.startswith("number")
+        and not (value.startswith("number") or value.startswith("round"))
         and getattr(node, "expression", None)
         and node.expression.get_datatype() in ("number", "boolean")
     ):

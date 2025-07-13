@@ -607,6 +607,21 @@ def process_reference(node, processed_nodes, calculates, used_calculates=None,  
             return False
         elif modified_expression and replace_reference:
             node.trigger = modified_expression
+    if isinstance(getattr(node, 'constraint', None), (TriccOperation, TriccReference)):
+        modified_expression = process_operation_reference(
+            node.constraint, 
+            node, 
+            processed_nodes=processed_nodes,
+            calculates=calculates, 
+            used_calculates=used_calculates, 
+            replace_reference=replace_reference,
+            warn=warn, 
+            codesystems=codesystems
+        )
+        if modified_expression is False:
+            return False
+        elif modified_expression and replace_reference:
+            node.constraint = modified_expression
     
     if isinstance(getattr(node, 'default', None), (TriccOperation, TriccReference)):
         modified_expression = process_operation_reference(

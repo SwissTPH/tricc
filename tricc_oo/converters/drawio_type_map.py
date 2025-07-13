@@ -45,7 +45,6 @@ TYPE_MAP = {
             "constraint_message",
             "relevance",
             "priority", "trigger", "default"
-
         ],
         "mandatory_attributes": ["label", "name", "list_name"],
         "model": TriccNodeSelectOne
@@ -99,13 +98,13 @@ TYPE_MAP = {
 
     TriccNodeType.text: {
         "objects": ["UserObject", "object"],
-        "attributes": ["save", "relevance","priority", "trigger", "default"],
+        "attributes": ["save", "relevance","priority", "trigger", "default", "constraint", "constraint_message"],
         "mandatory_attributes": ["label", 'name'],
         "model": TriccNodeText
     },
     TriccNodeType.date: {
         "objects": ["UserObject", "object"],
-        "attributes": ["save", "relevance","priority", "trigger", "default"],
+        "attributes": ["save", "relevance","priority", "trigger", "default", "constraint", "constraint_message"],
         "mandatory_attributes": ["label", "name"],
         "model": TriccNodeDate
     },

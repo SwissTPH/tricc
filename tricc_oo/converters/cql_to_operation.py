@@ -21,8 +21,10 @@ FUNCTION_MAP = {
     'Concatenate': TriccOperator.CONCATENATE,
     'Izscore': TriccOperator.IZSCORE,
     'Zscore': TriccOperator.ZSCORE,
+    'Round': TriccOperator.ROUND,
     'DrugDosage':  TriccOperator.DRUG_DOSAGE,
     'HasQualifier': TriccOperator.HAS_QUALIFIER,
+    'DateTimeToDecimal' : TriccOperator.DATETIME_TO_DECIMAL
 }
 # TODO
 # Min
