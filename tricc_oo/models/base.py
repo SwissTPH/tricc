@@ -336,7 +336,8 @@ class TriccReference(TriccStatic):
 
 class TriccOperator(StrEnum):    
     AND = 'and' # and between left and rights
-    ADD_OR =  'and_or' # left and one of the righs  
+    ADD_OR =  'and_or' # left and one of the righs 
+    #ADD_STRING: 'add_string'
     OR = 'or' # or between left and rights
     NATIVE = 'native' #default left is native expression
     ISTRUE = 'istrue' # left is right 
@@ -675,6 +676,30 @@ def and_join(argv):
             TriccOperator.AND,
             argv
         )
+        
+        
+def string_join(left: Union[str, TriccOperation], right: Union[str, TriccOperation]) -> TriccOperation:
+    """
+    Concatenates two arguments (strings or TriccOperation) into a TriccOperation with CONCATENATE operator.
+    If either argument is a TriccOperation with CONCATENATE operator, its operands are merged into the result.
+    """
+    # Initialize operands list for the new TriccOperation
+    operands: List[Union[str, TriccOperation]] = []
+
+    # Check if left is a TriccOperation with CONCATENATE
+    if isinstance(left, TriccOperation) and left.operator == TriccOperator.CONCATENATE:
+        operands.extend(left.reference)  # Merge left's operands
+    else:
+        operands.append(left)  # Add left as-is
+
+    # Check if right is a TriccOperation with CONCATENATE
+    if isinstance(right, TriccOperation) and right.operator == TriccOperator.CONCATENATE:
+        operands.extend(right.reference)  # Merge right's operands
+    else:
+        operands.append(right)  # Add right as-is
+
+    # Return a new TriccOperation with the merged operands
+    return TriccOperation(operator=TriccOperator.CONCATENATE, reference=operands)
 
 # function that make a 2 part and
 # @param left part

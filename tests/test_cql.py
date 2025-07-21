@@ -11,13 +11,8 @@ class TestCql(unittest.TestCase):
             operator=TriccOperator.AND,
             reference=[
                 TriccOperation(
-                    operator=TriccOperator.NOT,
-                    reference=[
-                        TriccOperation(
-                            operator=TriccOperator.ISNULL,
-                            reference=[TriccReference("p_weight")]
-                        )
-                    ]
+                    operator=TriccOperator.ISNOTNULL,
+                    reference=[TriccReference("p_weight")]
                 ),
                 TriccOperation(
                     operator=TriccOperator.MORE,
@@ -45,6 +40,21 @@ class TestCql(unittest.TestCase):
             ]
         )
         self.assertEqual(str(dg_operation), str(dg_expected))
+    
+    def test_implied_concat(self):
+        if_cql = "'A' & \"B\" & 'C'"
+        cc_operation = transform_cql_to_operation(if_cql)
+        cc_expected = TriccOperation(
+            operator=TriccOperator.CONCATENATE,
+            reference=[
+                TriccStatic(value='A'),
+                TriccReference("B"),
+                TriccStatic(value='C')
+            ]
+        )
+        self.assertEqual(str(cc_operation), str(cc_expected))
+    
+    
     
     def test_if(self):
         if_cql = "if AgeInDays() < 60 then 'newborn' else 'child'"

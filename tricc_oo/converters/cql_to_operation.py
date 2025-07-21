@@ -3,7 +3,7 @@ from tricc_oo.converters.cql.cqlLexer import cqlLexer
 from tricc_oo.converters.cql.cqlParser import cqlParser
 from tricc_oo.converters.cql.cqlVisitor import cqlVisitor
 from tricc_oo.converters.utils import clean_name
-from tricc_oo.models.base import  TriccOperator, TriccOperation, TriccStatic, TriccReference, not_clean, or_join, and_join
+from tricc_oo.models.base import  TriccOperator, TriccOperation, TriccStatic, TriccReference, not_clean, or_join, and_join, string_join
 import logging
 
 logger = logging.getLogger("default")
@@ -216,7 +216,11 @@ class cqlToXlsFormVisitor(cqlVisitor):
         if  operator == TriccOperator.AND:
             return and_join([left, right])
         elif  operator == TriccOperator.OR:
-            return or_join([left, right])  
+            return or_join([left, right])
+        elif operator == TriccOperator.CONCATENATE:
+            left = "" if left is None else left
+            right = "" if right is None else right
+            return string_join(left, right)
         else:
             op = TriccOperation(operator, [left, right])
             return op
@@ -287,10 +291,10 @@ class cqlToXlsFormVisitor(cqlVisitor):
         op_map = {
             '+': TriccOperator.PLUS,
             '-': TriccOperator.MINUS,
-            '&': TriccOperator.AND
+            '&': TriccOperator.CONCATENATE
         }
         return self.__std_operator(op_map.get(op_text), ctx)
-
+        
     
     def visitTypeExpression(self, ctx):
         to_type = ctx.getChild(2).getText()
