@@ -203,7 +203,11 @@ class TriccGroup(TriccBaseModel):
         super().__init__(**data)
         if self.name is None:
             self.name = generate_id(str(data))
-
+    
+    def gen_name(self):
+        if self.name is None:
+            self.name = get_rand_name(self.id)
+            
     def get_name(self):
         result = str(super().get_name())
         name =  getattr(self, 'name', None) 
