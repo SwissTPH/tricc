@@ -301,6 +301,28 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             "",
             "",
         ]
+        
+        df_input.loc[len(df_input)] = [
+            "hidden",
+            "data_load",
+            *list(langs.get_trads("NO_LABEL", force_dict=True).values()),
+            *list(empty.values()),
+            *list(empty.values()),
+            "",
+            "hidden",
+            "",
+            *list(empty.values()),
+            "",
+            "",
+            "",
+            *list(empty.values()),
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+        ]
 
         df_input.loc[len(df_input)] = [
             "end_group",
@@ -451,27 +473,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             "",  #'image'
             "",  # choice filter
         ]
-        df_input.loc[len(df_input)] = [
-            "hidden",
-            "data_load",
-            *list(langs.get_trads("NO_LABEL", force_dict=True).values()),
-            *list(empty.values()),
-            *list(empty.values()),
-            "",
-            "hidden",
-            "",
-            *list(empty.values()),
-            "",
-            "",
-            "",
-            *list(empty.values()),
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-        ]
+        
 
         for input in inputs:
             df_input.loc[len(df_input)] = get_input_calc_line(input)
