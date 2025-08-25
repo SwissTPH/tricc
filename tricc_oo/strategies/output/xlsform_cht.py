@@ -302,14 +302,16 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             "",
         ]
         
+
+
         df_input.loc[len(df_input)] = [
-            "hidden",
-            "data_load",
-            *list(langs.get_trads("NO_LABEL", force_dict=True).values()),
+            "end_group",
+            "input end",
+            *list(empty.values()),
             *list(empty.values()),
             *list(empty.values()),
             "",
-            "hidden",
+            "",
             "",
             *list(empty.values()),
             "",
@@ -323,15 +325,15 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             "",
             "",
         ]
-
+        
         df_input.loc[len(df_input)] = [
-            "end_group",
-            "input end",
-            *list(empty.values()),
+            "hidden",
+            "data_load",
+            *list(langs.get_trads("NO_LABEL", force_dict=True).values()),
             *list(empty.values()),
             *list(empty.values()),
             "",
-            "",
+            "hidden",
             "",
             *list(empty.values()),
             "",
