@@ -90,7 +90,7 @@ TYPE_MAP = {
             "required",
             "relevance",
             "priority", "trigger", "default"
-            
+
         ],
         "mandatory_attributes": ["label", "name"],
         "model": TriccNodeInteger
@@ -207,7 +207,7 @@ TYPE_MAP = {
     },
     TriccNodeType.proposed_diagnosis: {
         "objects": ["UserObject", "object"],
-        "attributes": ["save", "reference", "severity", "priority", "trigger"],
+        "attributes": ["save","remote_reference", "reference", "severity", "priority", "trigger"],
         "mandatory_attributes": [ "name", 'label'],
         "model": TriccNodeProposedDiagnosis
     },

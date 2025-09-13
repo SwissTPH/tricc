@@ -44,7 +44,7 @@ END_NODE_FORMAT = "end_{}"
 
 
 class TriccNodeType(StrEnum):
-    #replace with auto ? 
+    #replace with auto ?
     note = 'note'
     calculate = 'calculate',
     output = 'output',
@@ -82,6 +82,7 @@ class TriccNodeType(StrEnum):
     diagnosis = 'diagnosis'
     proposed_diagnosis = 'proposed_diagnosis'
     input = 'input'
+    remote_reference = 'remote_reference'
 
     def __iter__(self):
         return iter(self.__members__.values())
@@ -112,14 +113,14 @@ class TriccBaseModel(BaseModel):
     version: int = 1
     def get_datatype(self):
         return self.datatype or self.tricc_type
-    
+
     def get_next_instance(self):
         if getattr(self, 'instances', None):
             return max(100, *[n.instance for n in self.instances.values()]) + 1
         if getattr(self, 'base_instance', None) and getattr(self.base_instance, 'instances', None):
             return max(100, *[n.instance for n in self.base_instance.instances.values()]) + 1
-        return max(100,self.instance) + 1 
-    
+        return max(100,self.instance) + 1
+
     def to_dict(self):
         return {key: value for key, value in vars(self).items() if not key.startswith('_')}
 
@@ -137,15 +138,15 @@ class TriccBaseModel(BaseModel):
                         setattr(instance, attr, value)
                 except Exception as e:
                     logger.warning(f"Warning: Could not copy attribute {attr}: {e}")
-        
+
         # change the id to avoid collision of name
         instance.id = generate_id(f"{self.id}{nb_instance}")
         instance.instance = int(nb_instance)
         instance.base_instance = self
         if hasattr(self, 'instances'):
             self.instances[nb_instance] = instance
-        
-        
+
+
         # assign the defualt group
         # if activity is not None and self.group == activity.base_instance:
         #    instance.group = instance
@@ -166,13 +167,13 @@ class TriccBaseModel(BaseModel):
 
     def get_name(self):
         return self.id
-    
+
     def __str__(self):
         return self.get_name()
-    
+
     def __repr__(self):
         return f"{self.tricc_type}:{self.get_name()}({self.id})"
-    
+
     def __init__(self, **data):
         if 'id' not in data:
             data['id'] = generate_id(str(data))
@@ -203,16 +204,16 @@ class TriccGroup(TriccBaseModel):
         super().__init__(**data)
         if self.name is None:
             self.name = generate_id(str(data))
-    
+
     def gen_name(self):
         if self.name is None:
             self.name = get_rand_name(self.id)
-            
+
     def get_name(self):
         result = str(super().get_name())
-        name =  getattr(self, 'name', None) 
+        name =  getattr(self, 'name', None)
         label =  getattr(self, 'label', None)
-    
+
         if name:
             result = result + "::" + name
         if label:
@@ -222,7 +223,7 @@ class TriccGroup(TriccBaseModel):
         if len(name) < 50:
             return result
         else:
-            return result[:50] 
+            return result[:50]
 
 FwTriccNodeBaseModel = ForwardRef('TriccNodeBaseModel')
 
@@ -242,17 +243,17 @@ class TriccNodeBaseModel(TriccBaseModel):
 
     class Config:
         use_enum_values = True  # <--
-    
+
     def __hash__(self):
         return hash(self.id )
 
     # to be updated while processing because final expression will be possible to build$
-    # #only the last time the script will go through the node (all prev node expression would be created    
+    # #only the last time the script will go through the node (all prev node expression would be created
     def get_name(self):
         result = self.__class__.__name__[9:]# str(super().get_name())
-        name =  getattr(self, 'name', None) 
+        name =  getattr(self, 'name', None)
         label =  getattr(self, 'label', None)
-    
+
         if name:
             result += name
         if label:
@@ -262,8 +263,8 @@ class TriccNodeBaseModel(TriccBaseModel):
         if len(result) < 80:
             return result
         else:
-            return result[:80]        
-        
+            return result[:80]
+
 
 
     def make_instance(self, instance_nb=None, activity=None):
@@ -277,11 +278,11 @@ class TriccNodeBaseModel(TriccBaseModel):
         instance.prev_nodes = prev_nodes
         expression_inputs = []
         instance.expression_inputs = expression_inputs
-        
-        for attr in ['expression', 'relevance', 'default', 'reference', 'expression_reference']:
+
+        for attr in ['expression', 'relevance', 'default', 'reference', 'remote_reference', 'expression_reference']:
             if getattr(self, attr, None):
-                setattr(instance, attr,  getattr(self, attr).copy())
-        
+                setattr(instance, attr,  getattr(self, attr))
+
         return instance
 
     def gen_name(self):
@@ -294,7 +295,7 @@ class TriccStatic(BaseModel):
     value: Union[str, float, int, bool]
     def __init__(self,value):
         super().__init__(value = value)
-        
+
     def get_datatype(self):
         if str(type(self.value)) == 'bool':
             return 'boolean'
@@ -316,10 +317,10 @@ class TriccStatic(BaseModel):
         return hash_value
     def get_name(self):
         return self.value
-    
+
     def __str__(self):
         return str(self.value)
-    
+
     def __repr__(self):
         return self.__class__.__name__+":"+str(type(self.value))+':' +str(self.value)
 
@@ -338,14 +339,14 @@ class TriccReference(TriccStatic):
         return OrderedSet([self])
 
 
-class TriccOperator(StrEnum):    
+class TriccOperator(StrEnum):
     AND = 'and' # and between left and rights
-    ADD_OR =  'and_or' # left and one of the righs 
+    ADD_OR =  'and_or' # left and one of the righs
     #ADD_STRING: 'add_string'
     OR = 'or' # or between left and rights
     NATIVE = 'native' #default left is native expression
-    ISTRUE = 'istrue' # left is right 
-    ISNOTTRUE = 'isnottrue' 
+    ISTRUE = 'istrue' # left is right
+    ISNOTTRUE = 'isnottrue'
     ISFALSE = 'isfalse' # left is false
     ISNOTFALSE = 'isnotfalse' # left is false
     SELECTED = 'selected' # right must be la select and one or several options
@@ -367,7 +368,7 @@ class TriccOperator(StrEnum):
     CASE = 'case' # ref (equal value, res), (equal value,res)
     IFS = 'ifs' #(cond, res), (cond,res)
     IF = 'if' # cond val_true, val_false
-    
+
     # CDSS Specific
     HAS_QUALIFIER = 'has_qualifier'
     ZSCORE = 'zscore' # left table_name, right Y, gender give Z
@@ -444,7 +445,7 @@ OPERATION_LIST = {
     '=': TriccOperator.EQUAL,
     '>': TriccOperator.MORE,
     '<': TriccOperator.LESS
-}  
+}
 
 class TriccOperation(BaseModel):
     tricc_type: TriccNodeType = TriccNodeType.operation
@@ -455,24 +456,24 @@ class TriccOperation(BaseModel):
             List[Union[TriccStatic, TriccNodeBaseModel, TriccOperation, TriccReference, Expression]]
         ]
     ] = []
-    
+
     def __str__(self):
         str_ref = map(str, self.reference)
         return f"{self.operator}({', '.join(map(str, str_ref))})"
-    
+
     def __hash__(self):
         return hash(self.__repr__())
 
     def __repr__(self):
         str_ref = map(repr, self.reference)
         return f"TriccOperation:{self.operator}({', '.join(map(str, str_ref))})"
-    
+
     def __eq__(self, other):
         return self.__str__() == str(other)
-    
+
     def __init__(self, operator, reference=[]):
         super().__init__(operator=operator, reference=reference)
-        
+
     def get_datatype(self):
         if self.operator in RETURNS_BOOLEAN:
             return 'boolean'
@@ -493,8 +494,8 @@ class TriccOperation(BaseModel):
             if len(rtype)>1:
                 return 'mixed'
             else:
-                return rtype.pop()     
-  
+                return rtype.pop()
+
     def get_reference_datatype(self, references):
         rtype = set()
         for r in references:
@@ -504,12 +505,12 @@ class TriccOperation(BaseModel):
                 return str(type(r.value))
             else:
                 return str(type(r))
-            
+
             if len(rtype)>1:
                 return 'mixed'
             else:
-                return rtype.pop()         
-        
+                return rtype.pop()
+
     def get_references(self):
         predecessor = OrderedSet()
         if isinstance(self.reference, list):
@@ -518,7 +519,7 @@ class TriccOperation(BaseModel):
         else:
             raise NotImplementedError("cannot find predecessor of a str")
         return predecessor
-    
+
     def _process_reference(self, reference, predecessor):
         if isinstance(reference, list):
             for e in reference:
@@ -535,7 +536,7 @@ class TriccOperation(BaseModel):
     def replace_node(self, old_node ,new_node):
         if isinstance(self.reference, list):
             for key in [i for i, x in enumerate(self.reference)]:
-                self.reference[key] = self._replace_reference(self.reference[key], new_node, old_node) 
+                self.reference[key] = self._replace_reference(self.reference[key], new_node, old_node)
         elif self.reference is not None:
             raise NotImplementedError(f"cannot manage {self.reference.__class__}")
 
@@ -551,23 +552,23 @@ class TriccOperation(BaseModel):
             if hasattr(reference, 'select') and hasattr(new_node, 'select') and issubclass(reference.select.__class__, TriccNodeBaseModel ) :
                 self.replace_node(reference.select ,new_node.select)
         return reference
-    
+
     def __copy__(self, keep_node=False):
         # Create a new instance
         if keep_node:
             reference = [e for e in self.reference]
         else:
             reference = [e.copy() if isinstance(e, (TriccReference, TriccOperation)) else (TriccReference(e.name) if hasattr(e, 'name') else e) for e in self.reference]
-        
-        
+
+
         new_instance = type(self)(
-            self.operator, 
+            self.operator,
             reference
         )
         # Copy attributes (shallow copy for mutable attributes)
-        
+
         return new_instance
-    
+
     def copy(self, keep_node=False):
         return self.__copy__(keep_node)
 
@@ -582,14 +583,14 @@ def clean_and_list(argv):
             argv.remove(a)
         elif a == TriccStatic(False) :
             return [TriccStatic(False)]
-        
+
     internal = list(set(argv))
     for a in internal:
         for b in internal[internal.index(a)+1:]:
             if not_clean(b) == a:
                 return [TriccStatic(False)]
     return sorted(list(set(argv)), key=str)
-            
+
 def not_clean(a):
     new_operator = None
     if a is None or isinstance(a, str) and a == '':
@@ -620,13 +621,13 @@ def not_clean(a):
         new_operator = TriccOperator.LESS
     elif isinstance(a, TriccOperation) and a.operator == TriccOperator.NOT:
         return a.reference[0]
-    
+
     if new_operator:
         return TriccOperation(
             new_operator,
             a.reference
         )
-    
+
     elif not isinstance(a, TriccOperation) and issubclass(a.__class__, object):
         return TriccOperation(
                 operator=TriccOperator.NOTEXISTS,
@@ -637,9 +638,9 @@ def not_clean(a):
             TriccOperator.NOT,
             [a]
         )
-        
-    
-      
+
+
+
 # function that generate remove unsure condition
 # @param list_or
 # @param and elm use upstream
@@ -659,7 +660,7 @@ def clean_or_list(list_or, elm_and=None):
             # if there is x and not(X) in an OR list them the list is always true
         elif elm_and is not None and  (not_clean(a) == elm_and or a == elm_and ):
             list_or.remove(a)
-    internal = list(list_or)    
+    internal = list(list_or)
     for a in internal:
         for b in internal[internal.index(a)+1:]:
             if not_clean(b) == a:
@@ -680,8 +681,8 @@ def and_join(argv):
             TriccOperator.AND,
             argv
         )
-        
-        
+
+
 def string_join(left: Union[str, TriccOperation], right: Union[str, TriccOperation]) -> TriccOperation:
     """
     Concatenates two arguments (strings or TriccOperation) into a TriccOperation with CONCATENATE operator.
@@ -739,16 +740,16 @@ def or_join(list_or, elm_and=None):
     cleaned_list  = clean_or_list(set(list_or), elm_and)
     if len(cleaned_list) == 1:
         return cleaned_list[0]
-    elif len(cleaned_list)>1: 
+    elif len(cleaned_list)>1:
         return TriccOperation(
             TriccOperator.OR,
             cleaned_list
         )
     else:
         logger.error("empty or list")
-    
-    
-    
+
+
+
 # function that make a 2 part NAND
 # @param left part
 # @param right part
