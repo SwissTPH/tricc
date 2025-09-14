@@ -122,10 +122,11 @@ TYPE_MAP = {
     },
     TriccNodeType.calculate: {
         "objects": ["UserObject", "object"],
-        "attributes": ["save", "reference", "trigger"],
+        "attributes": ["save", "reference", "trigger", "remote_reference"],
         "mandatory_attributes": [ "name", 'label'],
         "model": TriccNodeCalculate
     },
+    # TODO: Make either reference or remote_reference mandatory
     TriccNodeType.rhombus: {
         "objects": ["UserObject", "object"],
         "attributes": ["save", "expression", "remote_reference" , "label",'priority', "trigger"],

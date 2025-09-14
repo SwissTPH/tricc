@@ -31,6 +31,7 @@ class TriccNodeDisplayCalculateBase(TriccNodeCalculateBase):
 
 class TriccNodeCalculate(TriccNodeDisplayCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.calculate
+    remote_reference: Optional[Union[Expression, TriccOperation, TriccReference]] = None
 
 
 class TriccNodeAdd(TriccNodeDisplayCalculateBase):
