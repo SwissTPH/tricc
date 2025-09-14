@@ -107,6 +107,7 @@ class TriccNodeRhombus(TriccNodeCalculateBase,TriccRhombusMixIn):
     tricc_type: TriccNodeType = TriccNodeType.rhombus
     path: Optional[TriccNodeBaseModel] = None
     reference: Union[List[TriccNodeBaseModel], Expression, TriccOperation, TriccReference, List[TriccReference]]
+    remote_reference: Optional[Union[Expression, TriccOperation, TriccReference]] = None
 
     def make_instance(self, instance_nb, activity, **kwargs):
         instance = super(TriccNodeRhombus, self).make_instance(instance_nb, activity, **kwargs)

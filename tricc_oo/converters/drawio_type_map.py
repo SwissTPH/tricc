@@ -128,7 +128,7 @@ TYPE_MAP = {
     },
     TriccNodeType.rhombus: {
         "objects": ["UserObject", "object"],
-        "attributes": ["save", "expression", 'label','priority', "trigger"],
+        "attributes": ["save", "expression", "remote_reference" , "label",'priority', "trigger"],
         "mandatory_attributes": ["reference"],
         "model": TriccNodeRhombus
     },
