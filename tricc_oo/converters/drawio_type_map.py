@@ -90,7 +90,7 @@ TYPE_MAP = {
             "required",
             "relevance",
             "priority", "trigger", "default"
-            
+
         ],
         "mandatory_attributes": ["label", "name"],
         "model": TriccNodeInteger
@@ -122,13 +122,14 @@ TYPE_MAP = {
     },
     TriccNodeType.calculate: {
         "objects": ["UserObject", "object"],
-        "attributes": ["save", "reference", "trigger"],
+        "attributes": ["save", "reference", "trigger", "remote_reference"],
         "mandatory_attributes": [ "name", 'label'],
         "model": TriccNodeCalculate
     },
+    # TODO: Make either reference or remote_reference mandatory
     TriccNodeType.rhombus: {
         "objects": ["UserObject", "object"],
-        "attributes": ["save", "expression", 'label','priority', "trigger"],
+        "attributes": ["save", "expression", "remote_reference" , "label",'priority', "trigger"],
         "mandatory_attributes": ["reference"],
         "model": TriccNodeRhombus
     },
@@ -207,7 +208,7 @@ TYPE_MAP = {
     },
     TriccNodeType.proposed_diagnosis: {
         "objects": ["UserObject", "object"],
-        "attributes": ["save", "reference", "severity", "priority", "trigger"],
+        "attributes": ["save","remote_reference", "reference", "severity", "priority", "trigger"],
         "mandatory_attributes": [ "name", 'label'],
         "model": TriccNodeProposedDiagnosis
     },

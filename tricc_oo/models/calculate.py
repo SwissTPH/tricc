@@ -1,7 +1,4 @@
 
-import logging
-import random
-import string
 from enum import Enum, auto
 from typing import Dict, ForwardRef, List, Optional, Union
 
@@ -9,12 +6,7 @@ from pydantic import BaseModel, constr
 from strenum import StrEnum
 from .base import *
 from .tricc import *
-from tricc_oo.converters.utils import generate_id, get_rand_name
-
-
-    
-
-
+from tricc_oo.converters.utils import get_rand_name
 
 class TriccNodeDisplayCalculateBase(TriccNodeCalculateBase):
     save: Optional[str] = None  # contribute to another calculate
@@ -36,9 +28,10 @@ class TriccNodeDisplayCalculateBase(TriccNodeCalculateBase):
 
     def __repr__(self):
         return self.get_name()
-    
+
 class TriccNodeCalculate(TriccNodeDisplayCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.calculate
+    remote_reference: Optional[Union[Expression, TriccOperation, TriccReference]] = None
 
 
 class TriccNodeAdd(TriccNodeDisplayCalculateBase):
@@ -54,23 +47,24 @@ class TriccNodeCount(TriccNodeDisplayCalculateBase):
 class TriccNodeProposedDiagnosis(TriccNodeDisplayCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.proposed_diagnosis
     severity: str = None
-    
-    
+    remote_reference: Optional[Union[Expression, TriccOperation, TriccReference]] = None
+
+
 class TriccNodeFakeCalculateBase(TriccNodeCalculateBase):
     ...
 
 class TriccNodeInput(TriccNodeFakeCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.input
-    
+
 class TriccNodeDisplayBridge(TriccNodeDisplayCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.bridge
-        
+
 
 class TriccNodeBridge(TriccNodeFakeCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.bridge
-        
+
 class TriccRhombusMixIn():
-    
+
     def make_mixin_instance(self, instance, instance_nb, activity, **kwargs):
         # shallow copy
         reference = []
@@ -108,13 +102,14 @@ class TriccRhombusMixIn():
         return instance
 
 
-    
+
 
 class TriccNodeRhombus(TriccNodeCalculateBase,TriccRhombusMixIn):
     tricc_type: TriccNodeType = TriccNodeType.rhombus
     path: Optional[TriccNodeBaseModel] = None
     reference: Union[List[TriccNodeBaseModel], Expression, TriccOperation, TriccReference, List[TriccReference]]
-    
+    remote_reference: Optional[Union[Expression, TriccOperation, TriccReference]] = None
+
     def make_instance(self, instance_nb, activity, **kwargs):
         instance = super(TriccNodeRhombus, self).make_instance(instance_nb, activity, **kwargs)
         instance = self.make_mixin_instance(instance, instance_nb, activity, **kwargs)
@@ -124,10 +119,6 @@ class TriccNodeRhombus(TriccNodeCalculateBase,TriccRhombusMixIn):
     def __init__(self, **data):
         data['name'] = get_rand_name(data.get('id', None))
         super().__init__(**data)
-
-
-
-
 
 class TriccNodeDiagnosis(TriccNodeDisplayCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.diagnosis
@@ -160,7 +151,7 @@ class TriccNodeWait(TriccNodeFakeCalculateBase, TriccRhombusMixIn):
     tricc_type: TriccNodeType = TriccNodeType.wait
     path: Optional[TriccNodeBaseModel] = None
     reference: Union[List[TriccNodeBaseModel], Expression, TriccOperation]
-    
+
     def make_instance(self, instance_nb, activity, **kwargs):
         instance = super(TriccNodeWait, self).make_instance(instance_nb, activity, **kwargs)
         instance = self.make_mixin_instance(instance, instance_nb, activity, **kwargs)
@@ -185,11 +176,9 @@ class TriccNodeEnd(TriccNodeDisplayCalculateBase):
     priority: int = 1000
     def __init__(self, **data):
         if data.get('name', None) is None:
-            data['name'] = 'tricc_end_' + data.get('process', '') 
+            data['name'] = 'tricc_end_' + data.get('process', '')
         super().__init__(**data)
         # FOR END
-        
-        
 
     def set_name(self):
         if self.name is None:
@@ -212,8 +201,5 @@ def get_node_from_list(in_nodes, node_id):
 # qualculate that saves quantity, or we may merge integer/decimals
 class TriccNodeQuantity(TriccNodeDisplayCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.quantity
-
-
-
 
 TriccNodeCalculate.update_forward_refs()
