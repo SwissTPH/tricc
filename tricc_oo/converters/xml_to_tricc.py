@@ -425,20 +425,25 @@ def set_additional_attributes(attribute_names, elm, node):
             setattr(node, attributename, attribute)
 
 
-
-
 def get_context_type(node):
     context_type = getattr(node, 'context_type', None)
     if context_type:
         return context_type
-    if isinstance(node, TriccNodeSelectOption):
-        return 'Value'
-    elif isinstance(node, TriccNodeCalculate):
-        return 'Calculation'
+    if isinstance(node, TriccNodeSelectMultiple):
+        return "Question"
+    elif isinstance(node, TriccNodeSelectOption):
+        if isinstance(node.select, TriccNodeSelectMultiple):
+            return 'Symptom-Finding'
+        else:
+            return 'Value'
     elif isinstance(node, TriccNodeNote):
-        return 'Message'
-    elif isinstance(node, (TriccNodeDecimal, TriccNodeInteger, TriccNodeText, TriccNodeDate, TriccNodeSelectOne, TriccNodeSelectMultiple, TriccNodeSelectYesNo, TriccNodeSelectNotAvailable, TriccNodeInput)):
-        return 'Observation'
+        return 'InteractSet'
+    elif isinstance(node, (TriccNodeDecimal, TriccNodeInteger, TriccNodeText, TriccNodeDate, TriccNodeSelectOne, TriccNodeSelectYesNo, TriccNodeSelectNotAvailable, TriccNodeInput)):
+        return 'Symptom-Finding'
+    elif isinstance(node, (TriccNodeProposedDiagnosis,TriccNodeDiagnosis)):
+        return 'Diagnosis'
+    elif issubclass(node.__class__, TriccNodeCalculateBase):
+        return 'Calculation'
     else:
         return 'Misc'
 
