@@ -85,9 +85,9 @@ def create_activity(diagram, media_path, project):
             activity.edges = edges
         nodes = get_nodes(diagram, activity)
         for n in nodes.values():
-            
+
             if (
-                issubclass(n.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase)) 
+                issubclass(n.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase))
                 and not isinstance(n, (TriccRhombusMixIn, TriccNodeRhombus, TriccNodeDisplayBridge))
                 and not n.name.startswith('label_')
             ):
@@ -110,7 +110,7 @@ def create_activity(diagram, media_path, project):
         # link back the activity
         activity.root.activity = activity
         manage_dangling_calculate(activity)
-        
+
         if activity is not None:
             if activity.root is not None:
                 project.pages[activity.id] = activity
@@ -134,17 +134,17 @@ def create_activity(diagram, media_path, project):
             project.images += images
         for node in list(filter(lambda p_node: isinstance(p_node, TriccNodeSelectNotAvailable),list(activity.nodes.values()))):
             prev_node = None
-            prev_edges = list(filter(lambda p_e: p_e.target == node.id,list(activity.edges))) 
+            prev_edges = list(filter(lambda p_e: p_e.target == node.id,list(activity.edges)))
             if len(prev_edges):
                 prev_node = [n for n in activity.nodes.values() if n.id in [p_e.source for p_e in prev_edges]]
                 if prev_node:
                     node.parent = prev_node[0]
-            if not  node.parent :    
+            if not  node.parent :
                 logger.critical(f"unable to find the parent of the NotApplicable node {node.get_name()}")
                 exit(1)
 
 
-  
+
     else:
         return None, None
         logger.warning("root not found for page {0}".format(name))
@@ -252,10 +252,10 @@ def process_edges(diagram, media_path, activity, nodes):
             n for n in list(activity.nodes.values())
             if (
                 issubclass(
-                    n.__class__, 
+                    n.__class__,
                     (
-                        TriccNodeInputModel, 
-                        TriccNodeText, 
+                        TriccNodeInputModel,
+                        TriccNodeText,
                         TriccNodeNote,
                     )
                 ) and (
@@ -283,7 +283,7 @@ def process_edges(diagram, media_path, activity, nodes):
             else:
                 logger.critical(f"cannot guess end for {activity.get_name()}")
                 exit(1)
-    
+
     return images
 
 def get_id(elm_id, activity_id):
@@ -296,7 +296,7 @@ def _get_name(name, id, act_id):
     ):
         return name + get_id(id, act_id)
     return name
-   
+
 
 def get_nodes(diagram, activity):
     nodes = {activity.root.id: activity.root}
@@ -336,7 +336,7 @@ def get_nodes(diagram, activity):
                 )
                 new_nodes[calc.id] = calc
                 for goto_next_node in next_nodes_id:
-                    remove_prev_next(node, goto_next_node, activity) 
+                    remove_prev_next(node, goto_next_node, activity)
         elif isinstance(node, TriccNodeActivityEnd):
             if not activity_end_node:
                 activity_end_node = node
@@ -345,12 +345,12 @@ def get_nodes(diagram, activity):
                 node_to_remove.append(node.id)
         # add activity relevance to calculate
         elif (
-            issubclass(node.__class__, TriccNodeDisplayCalculateBase) 
+            issubclass(node.__class__, TriccNodeDisplayCalculateBase)
             and not getattr(node, 'relevance', None)
             and node.activity.applicability
         ):
             node.applicability = node.activity.applicability
-            
+
 
     nodes.update(new_nodes)
 
@@ -481,7 +481,6 @@ def get_select_options(diagram, select_node, nodes):
 
     ##TBR START
 
-
 def get_max_version(dict):
     max_version = None
     for id, sim_node in dict.items():
@@ -503,7 +502,7 @@ def get_max_named_version(calculates, name):
 def inject_bridge_path(node, nodes):
     calc_name = "p" + node.id
     calc_id = generate_id(calc_name)
-    
+
     data = {
         "id": calc_id,
         "group": node.group,
@@ -522,7 +521,7 @@ def inject_bridge_path(node, nodes):
             )
         )
     ]
-    if ( len(prev_nodes)>1 and 
+    if ( len(prev_nodes)>1 and
         sum(
             [
                 (
@@ -600,21 +599,21 @@ def enrich_node(diagram, media_path, edge, node, activity, help_before=False):
                     return None, None
             else:
                 logger.warning(f"edge from an unsuported node {edge.source_external_id}")
-                
+
             return None, None
 
 
 get_style_dict = lambda style: dict(item.split('=', 1) for item in style.split(';') if '=' in item)
 
 
-def severity_from_color(color):  
+def severity_from_color(color):
     if color == '#fff2cc':
         return 'moderate'
     elif color == '#f8cecc':
         return 'severe'
     else:
         return 'light'
-    
+
 
 
 def add_tricc_base_node(
@@ -623,7 +622,7 @@ def add_tricc_base_node(
     for elm in list:
         external_id = elm.attrib.get("id")
         id = get_id( external_id,  diagram.attrib.get("id"))
-        parent = elm.attrib.get("parent")    
+        parent = elm.attrib.get("parent")
         node = type(
             external_id=external_id,
             id=id,
@@ -650,9 +649,9 @@ def add_tricc_base_node(
             styles = get_style_dict(mxcell.attrib.get('style',''))
             if 'fillColor' in styles and styles['fillColor'] != 'none':
                 node.severity = severity_from_color(styles['fillColor'])
-            
-    
-                
+
+
+
         set_additional_attributes(attributes, elm, node)
         load_expressions(node)
         nodes[id] = node
@@ -675,11 +674,11 @@ def load_expressions(node):
             node.expression_reference = parse_expression(node.label, node.reference)
         else:
             node.expression_reference = parse_expression('', node.reference)
-            
+
         node.reference = node.expression_reference.get_references()
-    
-        
-        
+
+
+
 
 def parse_expression(label=None, expression=None):
     if expression:
@@ -716,7 +715,7 @@ def parse_expression(label=None, expression=None):
                                 operation,
                             ]
                         )
-                    
+
             else:
                 pass
 
@@ -725,12 +724,12 @@ def parse_expression(label=None, expression=None):
                 expression.replace('${', '"').replace('}', '"'),
                 label
             )
-        
+
     if operation is None:
         logger.warning(f"unable to parse: {expression} ")
         return expression
     return operation
-        
+
 
 def set_mandatory_attribute(elm, mandatory_attributes, diagram=None):
     param = {}
@@ -744,7 +743,7 @@ def set_mandatory_attribute(elm, mandatory_attributes, diagram=None):
             name = elm.attrib.get("name")
             id = elm.attrib.get("id")
             attribute_value = TRICC_LIST_NAME.format(clean_str(_get_name(name, id, diagram_id), replace_dots= True))
-        else:   
+        else:
             attribute_value = elm.attrib.get(attributes)
         if attribute_value is None:
             if elm.attrib.get("label") is not None:
@@ -753,7 +752,7 @@ def set_mandatory_attribute(elm, mandatory_attributes, diagram=None):
                 display_name = elm.attrib.get("name")
             else:
                 display_name = elm.attrib.get("id")
-                 
+
             if attributes == "source":
                 if elm.attrib.get("target") is not None:
                     logger.critical(
@@ -764,7 +763,7 @@ def set_mandatory_attribute(elm, mandatory_attributes, diagram=None):
                     logger.critical(
                         "the attibute target is {}".format(elm.attrib.get("source"))
                     )
-            
+
             logger.critical(
                 "the attibute {} is mandatory but not found in {} within group {}".format(
                     attributes, display_name, diagram.attrib.get('name') if diagram is not None else ""
@@ -959,7 +958,7 @@ def process_condition_edge(edge, nodes):
 
 
 
-        
+
 
 def process_exclusive_edge(edge, nodes):
     error = None
