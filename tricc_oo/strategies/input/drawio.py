@@ -122,8 +122,6 @@ class DrawioStrategy(BaseInputStrategy):
 
     def linking_nodes(self, node, page, pages, processed_nodes=OrderedSet(), path=[]):
         # get the edges that have that node as source
-
-
         node_edge = list(
             filter(lambda x: (
                 ( x.source and x.source == node.id) or 

@@ -22,6 +22,7 @@ FUNCTION_MAP = {
     'Izscore': TriccOperator.IZSCORE,
     'Zscore': TriccOperator.ZSCORE,
     'Round': TriccOperator.ROUND,
+    'Integer': TriccOperator.CAST_INTEGER,
     'DrugDosage':  TriccOperator.DRUG_DOSAGE,
     'HasQualifier': TriccOperator.HAS_QUALIFIER,
     'DateTimeToDecimal' : TriccOperator.DATETIME_TO_DECIMAL

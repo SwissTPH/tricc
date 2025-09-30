@@ -93,12 +93,12 @@ def create_activity(diagram, media_path, project):
             ):
                 system = n.name.split('.')[0] if '.' in n.name else 'tricc'
                 if isinstance(n, TriccNodeSelectOption) and isinstance(n.select, TriccNodeSelectNotAvailable):
-                    add_concept(project.code_systems, system, n.select.name, n.label, {"datatype": 'Boolean'})
+                    add_concept(project.code_systems, system, n.select.name, n.label, {"datatype": 'Boolean', "contextType": get_context_type(n)})
                 elif not isinstance(n, TriccNodeSelectNotAvailable):
-                    add_concept(project.code_systems, system, n.name, n.label, {"datatype": get_data_type(n.tricc_type)})
+                    add_concept(project.code_systems, system, n.name, n.label, {"datatype": get_data_type(n.tricc_type), "contextType": get_context_type(n)})
                 if getattr(n,'save', None):
                     system = n.save.split('.')[0] if '.' in n.save else 'tricc'
-                    add_concept(project.code_systems, system, n.save, n.label, {"datatype": get_data_type(n.tricc_type)})
+                    add_concept(project.code_systems, system, n.save, n.label, {"datatype": get_data_type(n.tricc_type), "contextType": get_context_type(n)})
             
         groups = get_groups(diagram, nodes, activity)
         if groups and len(groups) > 0:
@@ -427,6 +427,21 @@ def set_additional_attributes(attribute_names, elm, node):
 
 
 
+def get_context_type(node):
+    context_type = getattr(node, 'context_type', None)
+    if context_type:
+        return context_type
+    if isinstance(node, TriccNodeSelectOption):
+        return 'Value'
+    elif isinstance(node, TriccNodeCalculate):
+        return 'Calculation'
+    elif isinstance(node, TriccNodeNote):
+        return 'Message'
+    elif isinstance(node, (TriccNodeDecimal, TriccNodeInteger, TriccNodeText, TriccNodeDate, TriccNodeSelectOne, TriccNodeSelectMultiple, TriccNodeSelectYesNo, TriccNodeSelectNotAvailable, TriccNodeInput)):
+        return 'Observation'
+    else:
+        return 'Misc'
+
 def get_select_options(diagram, select_node, nodes):
     options = {}
     i = 0
@@ -442,9 +457,9 @@ def get_select_options(diagram, select_node, nodes):
             )
         else:
             options_name_list.append(name)
-        
+
         external_id = elm.attrib.get("id")
-        id = get_id(external_id, diagram.attrib.get('id'))  
+        id = get_id(external_id, diagram.attrib.get('id'))
         option = TriccNodeSelectOption(
             id=id,
             label=elm.attrib.get("label"),
@@ -454,7 +469,7 @@ def get_select_options(diagram, select_node, nodes):
             activity=select_node.activity,
             group=select_node.group,
             )
-        set_additional_attributes(["save", "relevance"], elm, option)
+        set_additional_attributes(["save", "relevance", "context_type"], elm, option)
         load_expressions(option)
         options[i] = option
         nodes[id] = option

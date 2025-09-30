@@ -1,7 +1,13 @@
 {
   "version": "0.2.0",
   "configurations": [
-
+    {
+      "name": "Python Debugger: Current File",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal"
+    },
     {
       "name": "Global",
       "type": "python",
@@ -9,46 +15,69 @@
       "program": "tests/build.py",
       "args": [
         "-i",
-        "/home/delcpa/Development/global-almanach/L2/yi,/home/delcpa/Development/global-almanach/L2/common",
+        "/mnt/data/Development/global-almanach/L2/child,/mnt/data/Development/global-almanach/L2/common",
         "-l",
         "d",
         "-o",
-        "/home/delcpa/Development/global-almanach/output",
+        "/mnt/data/Development/global-almanach/output",
         "-t",
         "-O",
         "XLSFormCHTHFStrategy",
         "-D",
-        "/home/delcpa/Development/global-almanach/output"
+        "/mnt/data/Development/global-almanach/output"
       ],
       "console": "integratedTerminal",
       "justMyCode": true,
-      "env":{
+      "env": {
         "PYTHONPATH": "${workspaceFolder}${pathSeparator}${env:PYTHONPATH}"
-
       }
-    },    {
+    },
+    {
       "name": "Main",
       "type": "python",
       "request": "launch",
       "program": "tests/build.py",
       "args": [
         "-i",
-        "/home/delcpa/Development/cht-chad/forms/app/adult_v31.drawio",
+        "/mnt/data/Development/cht-chad/forms/app/adult_v31.drawio",
         "-l",
         "d",
         "-o",
-        "/home/delcpa/Development/tricc-mage/output",
+        "/mnt/data/Development/tricc-mage/output",
         "-t",
         "-O",
         "XLSFormCHTStrategy",
         "-D",
-        "/home/delcpa/Development/tricc-mage/output"
+        "/mnt/data/Development/tricc-mage/output"
       ],
       "console": "integratedTerminal",
       "justMyCode": true,
-      "env":{
+      "env": {
         "PYTHONPATH": "${workspaceFolder}${pathSeparator}${env:PYTHONPATH}"
-
+      }
+    },
+    {
+      "name": "Combacal",
+      "type": "python",
+      "request": "launch",
+      "program": "tests/build.py",
+      "args": [
+        "-i",
+        "/mnt/data/Development/tricc_oo/tests/data/test.drawio",
+        "-l",
+        "d",
+        "-o",
+        "/mnt/data/Development/tricc_oo/tests/",
+        "-t",
+        "-O",
+        "XLSFormCHTStrategy",
+        "-D",
+        "/Users/delcpa/Downloads/"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}${pathSeparator}${env:PYTHONPATH}"
       }
     },
     {
@@ -110,5 +139,4 @@
     }
   ]
 }
-
-//"args":["-i","/home/delcpa/Development/cht-chad/forms/app/adult_v29.drawio", "-o", "/home/delcpa/Development/cht-chad/forms/app", "-t"],
+//"args":["-i","/mnt/data/Development/cht-chad/forms/app/adult_v29.drawio", "-o", "/mnt/data/Development/cht-chad/forms/app", "-t"],
