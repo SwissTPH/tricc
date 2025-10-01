@@ -33,6 +33,7 @@ from tricc_oo.models.tricc import (
     TriccNodeMainStart,
     TriccNodeActivity,
     TriccGroup,
+    TriccNodeSelect,
     TriccNodeGoTo,
     TriccNodeSelectMultiple,
     TriccNodeInputModel,
@@ -64,7 +65,7 @@ import hashlib
 from tricc_oo.visitors.tricc import (
     get_select_yes_no_options, get_select_not_available_options,
     set_prev_next_node,  inject_node_before,
-    merge_node, remove_prev_next, get_activity_wait,
+    merge_node, remove_prev_next, get_activity_wait, get_count_terms_details
 )
 from tricc_oo.converters.datadictionnary import add_concept
 
@@ -269,6 +270,7 @@ def process_edges(diagram, media_path, activity, nodes):
         # create calculate based on edges label
         elif edge.value is not None:
             label = edge.value.strip()
+            label_html_free = html2text.html2text(label)
             processed = False
             calc = None
             if label.lower() in TRICC_FOLLOW_LABEL:
@@ -284,11 +286,11 @@ def process_edges(diagram, media_path, activity, nodes):
             elif label.lower() in TRICC_NO_LABEL:
                 calc = process_exclusive_edge(edge, nodes)
             elif any(
-                reserved in html2text.html2text(label.lower())
+                reserved in label_html_free
                 for reserved in ([str(o) for o in list(TriccOperator)] + list(OPERATION_LIST.keys()) + ["$this"])
             ):
                 # manage comment
-                calc = process_condition_edge(edge, nodes)
+                calc = process_condition_edge(edge, label_html_free, nodes)
             else:
                 logger.warning(f"unsupported edge label {label} in {diagram.attrib.get('name', diagram.attrib['id'])}")
                 processed = True
@@ -979,15 +981,20 @@ def process_factor_edge(edge, nodes):
     return None
 
 
-def process_condition_edge(edge, nodes):
-    label = edge.value.strip()
-    nodes[edge.source]
-    node_ref = f'"{nodes[edge.source].name}"'
+def process_condition_edge(edge, label, nodes):
+    source = nodes[edge.source]
+    node_ref = f'"{source.name}"'
     if "$this" in label:
         operation = parse_expression("", expression=label.replace("$this", node_ref))
     else:
         operation = parse_expression(label, expression=node_ref)
+
     if operation and isinstance(operation, TriccOperation):
+        # special management for simple operation
+        if issubclass(source.__class__, TriccNodeSelect) and "$this" not in label:
+            operation.replace_node(
+                TriccReference(source.name),
+                get_count_terms_details(source, None, False))
         # insert rhombus
         return TriccNodeRhombus(
             id=edge.id,

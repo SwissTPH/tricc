@@ -16,8 +16,8 @@ from tricc_oo.models.calculate import (
     TriccNodeProposedDiagnosis,
     TriccNodeDiagnosis,
     TriccNodeInput,
-
 )
+
 from tricc_oo.models.tricc import (
     TriccNodeMainStart,
     TriccNodeLinkIn,

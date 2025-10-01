@@ -381,6 +381,9 @@ class XLSFormStrategy(BaseOutPutStrategy):
                 f"This type of opreation '{operation.operator}' is not supported in this strategy"
             )
 
+    def tricc_operation_count(self, ref_expressions):
+        return f"count-selected({self.clean_coalesce(ref_expressions[0])})"
+
     def tricc_operation_multiplied(self, ref_expressions):
         return "*".join(ref_expressions)
 

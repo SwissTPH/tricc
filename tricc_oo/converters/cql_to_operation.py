@@ -36,6 +36,7 @@ FUNCTION_MAP = {
     "DrugDosage": TriccOperator.DRUG_DOSAGE,
     "HasQualifier": TriccOperator.HAS_QUALIFIER,
     "DateTimeToDecimal": TriccOperator.DATETIME_TO_DECIMAL,
+    "Count": TriccOperator.COUNT,
 }
 # TODO
 # Min

@@ -2217,7 +2217,7 @@ def get_count_terms_details(prev_node, processed_nodes, get_overall_exp, negate=
             return TriccOperation(
                 TriccOperator.MINUS,
                 [
-                    TriccOperation(TriccOperator.NATIVE, ["count-selected", prev_node]),
+                    TriccOperation(TriccOperator.COUNT, [prev_node]),
                     TriccOperation(TriccOperator.CAST_NUMBER, [operation_none]),
                 ],
             )
