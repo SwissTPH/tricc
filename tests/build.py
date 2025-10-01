@@ -1,3 +1,9 @@
+from tricc_oo.strategies.output.spice import SpiceStrategy
+from tricc_oo.strategies.output.xlsform_cht_hf import XLSFormCHTHFStrategy
+from tricc_oo.strategies.output.xlsform_cht import XLSFormCHTStrategy
+from tricc_oo.strategies.output.xlsform_cdss import XLSFormCDSSStrategy
+from tricc_oo.strategies.output.xls_form import XLSFormStrategy
+from tricc_oo.strategies.input.drawio import DrawioStrategy
 import getopt
 import gettext
 import logging
@@ -23,15 +29,9 @@ langs = SingletonLangClass()
 # langs.add_trad('fr', fr)
 # langs.add_trad('en', en)
 
-from tricc_oo.strategies.input.drawio import DrawioStrategy
 
 # from tricc_oo.serializers.medalcreator import execute
 
-from tricc_oo.strategies.output.xls_form import XLSFormStrategy
-from tricc_oo.strategies.output.xlsform_cdss import XLSFormCDSSStrategy
-from tricc_oo.strategies.output.xlsform_cht import XLSFormCHTStrategy
-from tricc_oo.strategies.output.xlsform_cht_hf import XLSFormCHTHFStrategy
-from tricc_oo.strategies.output.spice import SpiceStrategy
 
 def setup_logger(
     logger_name,
@@ -94,9 +94,7 @@ LEVELS = {
 
 
 def print_help():
-    print(
-        "-i / --input draw.io filepath (MANDATORY) or directory containing drawio files"
-    )
+    print("-i / --input draw.io filepath (MANDATORY) or directory containing drawio files")
     print("-o / --output xls file ")
     print("-d form_id ")
     print("-s L4 system/strategy (odk, cht, cc)")
@@ -116,9 +114,7 @@ if __name__ == "__main__":
     input_strategy = "DrawioStrategy"
     output_strategy = "XLSFormStrategy"
     try:
-        opts, args = getopt.getopt(
-            sys.argv[1:], "hti:o:s:I:O:l:d:D:", ["input=", "output=", "help", "trads"]
-        )
+        opts, args = getopt.getopt(sys.argv[1:], "hti:o:s:I:O:l:d:D:", ["input=", "output=", "help", "trads"])
     except getopt.GetoptError:
         print_help()
         sys.exit(1)
@@ -145,7 +141,7 @@ if __name__ == "__main__":
     if in_filepath is None:
         print_help()
         sys.exit(2)
-    
+
     if not download_dir:
         download_dir = out_path
     debug_path = os.fspath(out_path + "/debug.log")
@@ -165,7 +161,7 @@ if __name__ == "__main__":
         setup_logger("default", debug_file_path, logging.INFO)
     file_content = []
     files = []
-    in_filepath_list = in_filepath.split(',')
+    in_filepath_list = in_filepath.split(",")
     for in_filepath in in_filepath_list:
         pre, ext = os.path.splitext(in_filepath)
 
@@ -173,18 +169,13 @@ if __name__ == "__main__":
             # if output file path not specified, just chagne the extension
             out_path = os.path.dirname(pre)
 
-
         if os.path.isdir(in_filepath):
-            files = [
-                os.path.join(in_filepath, f)
-                for f in os.listdir(in_filepath) 
-                if f.endswith(".drawio")
-            ]
+            files = [os.path.join(in_filepath, f) for f in os.listdir(in_filepath) if f.endswith(".drawio")]
         elif os.path.isfile(in_filepath) and in_filepath.endswith(".drawio"):
             files = [in_filepath]
-            
+
         for f in files:
-            with open(f, 'r') as s:
+            with open(f, "r") as s:
                 content = s.read()
                 # present issue with some drawio file that miss the XML header
 
@@ -192,7 +183,6 @@ if __name__ == "__main__":
     if not file_content:
         logger.critical(f"{in_filepath} is neither a drawio file nor a directory containing drawio files")
         exit(1)
-
 
     strategy = globals()[input_strategy](files)
     logger.info(f"build the graph from strategy {input_strategy}")

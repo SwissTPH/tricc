@@ -1,24 +1,30 @@
 from __future__ import annotations
 
-import logging
-import random
-import string
-from enum import Enum, auto
-from typing import Dict, ForwardRef, List, Optional, Union
+from typing import Dict, List, Optional, Union, Set
 from fhir.resources.codesystem import CodeSystem
 from fhir.resources.valueset import ValueSet
-from pydantic import BaseModel, constr
-from strenum import StrEnum
-from .base import *
-from tricc_oo.converters.utils import generate_id
+from pydantic import BaseModel
+from tricc_oo.converters.utils import get_rand_name
+from tricc_oo.models.base import (
+    TriccNodeBaseModel, Expression, TriccOperation,
+    TriccStatic, TriccReference, TriccNodeType, TriccGroup, triccName,
+    TriccEdge, b64, triccId
+)
+
+import logging
+
+
+logger = logging.getLogger(__name__)
+
 
 class TriccNodeCalculateBase(TriccNodeBaseModel):
-    #input: Dict[TriccOperation, TriccNodeBaseModel] = {}
-    reference: Union[List[Union[TriccNodeBaseModel,TriccStatic]], Expression, TriccStatic] = None
+    # input: Dict[TriccOperation, TriccNodeBaseModel] = {}
+    reference: Union[List[Union[TriccNodeBaseModel, TriccStatic]], Expression, TriccStatic] = None
     expression_reference: Union[str, TriccOperation] = None
     last: bool = None
-    datatype: str = 'boolean'
+    datatype: str = "boolean"
     priority: Union[float, int, None] = None
+
     # to use the enum value of the TriccNodeType
     class Config:
         use_enum_values = True  # <--
@@ -26,11 +32,18 @@ class TriccNodeCalculateBase(TriccNodeBaseModel):
     def make_instance(self, instance_nb, activity, **kwargs):
         # shallow copy
         instance = super().make_instance(instance_nb, activity=activity)
-        #input = {}
-        #instance.input = input
-        expression = self.expression.copy() if self.expression is not None else None
+        # input = {}
+        # instance.input = input
+        self.expression.copy() if self.expression is not None else None
         if self.reference:
-            instance.reference = [e.copy() if isinstance(e, (TriccReference, TriccOperation)) else (TriccReference(e.name) if hasattr(e, 'name') else e) for e in self.reference]
+            instance.reference = [
+                (
+                    e.copy()
+                    if isinstance(e, (TriccReference, TriccOperation))
+                    else (TriccReference(e.name) if hasattr(e, "name") else e)
+                )
+                for e in self.reference
+            ]
         else:
             instance.reference = None
         if instance.base_instance != self:
@@ -38,14 +51,13 @@ class TriccNodeCalculateBase(TriccNodeBaseModel):
         return instance
 
     def __init__(self, **data):
-        if 'name' not in data:
-            data['name'] = get_rand_name(data.get('id', None))
+        if "name" not in data:
+            data["name"] = get_rand_name(data.get("id", None))
         super().__init__(**data)
-        
-        
+
     def append(self, elm):
         self.reference.append(elm)
-    
+
     def get_references(self):
         if isinstance(self.reference, set):
             return self.reference
@@ -55,10 +67,11 @@ class TriccNodeCalculateBase(TriccNodeBaseModel):
             return self.expression_reference.get_references()
         elif isinstance(self.reference, TriccOperation):
             return self.reference.get_references()
-        
+
         elif self.reference:
             return self.reference
             logger.critical("Cannot get reference from a sting")
+
     def __str__(self):
         return self.get_name()
 
@@ -75,29 +88,29 @@ class TriccNodeActivity(TriccNodeBaseModel):
     nodes: Dict[str, TriccNodeBaseModel] = {}
     # groups
     groups: Dict[str, TriccGroup] = {}
-    # save the instance on the base activity     
+    # save the instance on the base activity
     instances: Dict[int, TriccNodeBaseModel] = {}
     relevance: Optional[Union[Expression, TriccOperation]] = None
-    #caclulate that are not part of the any skip logic:
+    # caclulate that are not part of the any skip logic:
     # - inputs
     # - dangling calculate
     # - case definition
     calculates: List[TriccNodeCalculateBase] = []
     applicability: Optional[Union[Expression, TriccOperation]] = None
 
-    # redefine 
+    # redefine
     def make_instance(self, instance_nb=None, **kwargs):
         from tricc_oo.models.calculate import (
             TriccNodeDisplayBridge,
             TriccNodeBridge,
- 
         )
+
         # shallow copy
         if instance_nb in self.instances:
             return self.instances[instance_nb]
         else:
             instance = super().make_instance(instance_nb, activity=None)
-            base_instance = (self.base_instance or self)
+            base_instance = self.base_instance or self
             instance.base_instance = base_instance
             # instance.base_instance = self
             # we duplicate all the related nodes (not the calculate, duplication is manage in calculate version code)
@@ -119,15 +132,36 @@ class TriccNodeActivity(TriccNodeBaseModel):
                 instance.edges.append(edge.make_instance(instance_nb, activity=instance))
             instance.update_nodes(self.root)
             # we walk throught the nodes and replace them when ready
-            for node in list(filter(lambda p_node: isinstance(p_node, (TriccNodeDisplayBridge,TriccNodeBridge)),list(self.nodes.values()) )):
+            for node in list(
+                filter(
+                    lambda p_node: isinstance(p_node, (TriccNodeDisplayBridge, TriccNodeBridge)),
+                    list(self.nodes.values()),
+                )
+            ):
                 instance.update_nodes(node)
-            for node in list(filter(lambda p_node: p_node != self.root and not isinstance(p_node, (TriccNodeDisplayBridge,TriccNodeBridge)),list(self.nodes.values()) )):
+            for node in list(
+                filter(
+                    lambda p_node: p_node != self.root
+                    and not isinstance(p_node, (TriccNodeDisplayBridge, TriccNodeBridge)),
+                    list(self.nodes.values()),
+                )
+            ):
                 instance_node = instance.update_nodes(node)
                 if node in self.calculates and instance_node:
                     instance.calculates.append(instance_node)
-            # update parents        
-            for node in list(filter(lambda p_node: getattr(p_node, 'parent', None) is not None, list(instance.nodes.values()))):
-                new_parent = list(filter(lambda p_node: p_node.base_instance == node.parent,list(instance.nodes.values())))
+            # update parents
+            for node in list(
+                filter(
+                    lambda p_node: getattr(p_node, "parent", None) is not None,
+                    list(instance.nodes.values()),
+                )
+            ):
+                new_parent = list(
+                    filter(
+                        lambda p_node: p_node.base_instance == node.parent,
+                        list(instance.nodes.values()),
+                    )
+                )
                 if new_parent:
                     node.parent = new_parent[0]
                 else:
@@ -148,7 +182,7 @@ class TriccNodeActivity(TriccNodeBaseModel):
                 instance_group.group == self
 
     def update_groups(self, group):
-        # create new group 
+        # create new group
         instance_group = group.make_instance(self.instance, activity=self)
         # update the group in all activity
         for node in list(self.nodes.values()):
@@ -158,18 +192,20 @@ class TriccNodeActivity(TriccNodeBaseModel):
 
     def update_nodes(self, node_origin):
         from tricc_oo.models.calculate import (
-            TriccNodeEnd,
             TriccNodeActivityStart,
-            TriccNodeMainStart,
             TriccNodeActivityEnd,
-            TriccRhombusMixIn
+            TriccRhombusMixIn,
         )
+
         updated_edges = 0
         node_instance = None
         if not isinstance(node_origin, TriccNodeSelectOption):
             # do not perpetuate the instance number in the underlying activities
             if isinstance(node_origin, TriccNodeActivity):
-                node_instance = node_origin.make_instance(node_origin.instance if node_origin.instance<100 else 0 , activity=self)
+                node_instance = node_origin.make_instance(
+                    node_origin.instance if node_origin.instance < 100 else 0,
+                    activity=self,
+                )
             else:
                 node_instance = node_origin.make_instance(self.instance, activity=self)
             self.nodes[node_instance.id] = node_instance
@@ -185,13 +221,16 @@ class TriccNodeActivity(TriccNodeBaseModel):
                     for n in node_instance.activity.nodes.values():
                         if n.base_instance.id == old_path.id:
                             node_instance.path = n
-                    # test next_nodes to check that the instance has already prev/next 
+                    # test next_nodes to check that the instance has already prev/next
                     if node_instance.path is None and node_instance.next_nodes:
                         logger.critical("new path not found")
                 elif len(node_instance.prev_nodes) == 1:
-                    node.path = list(node_instance.prev_nodes)[0]
-                elif not (len(node_instance.reference)== 1  and issubclass(node_instance.reference[0].__class__, TriccNodeInputModel)):
-                    error.warning("Rhombus without a path")
+                    node_origin.path = list(node_instance.prev_nodes)[0]
+                elif not (
+                    len(node_instance.reference) == 1
+                    and issubclass(node_instance.reference[0].__class__, TriccNodeInputModel)
+                ):
+                    logger.warning("Rhombus without a path")
                     exit(1)
             # generate options
             elif issubclass(node_instance.__class__, TriccNodeSelect):
@@ -199,19 +238,27 @@ class TriccNodeActivity(TriccNodeBaseModel):
                     updated_edges += self.update_edges(node_origin.options[key], option_instance)
             updated_edges += self.update_edges(node_origin, node_instance)
             if updated_edges == 0:
-                node_edge = list(filter(lambda x: (x.source == node_instance.id or x.source == node_instance) , node_instance.activity.edges))
-                node_edge_origin = list(filter(lambda x: (x.source == node_origin.id or x.source == node_origin) , node_origin.activity.edges))
+                node_edge = list(
+                    filter(
+                        lambda x: (x.source == node_instance.id or x.source == node_instance),
+                        node_instance.activity.edges,
+                    )
+                )
                 if len(node_edge) == 0 and not issubclass(node_origin.__class__, TriccNodeCalculateBase):
-                    logger.warning("no edge was updated for node {}::{}::{}::{}".format(node_instance.activity.get_name(),
-                                                                                  node_instance.__class__,
-                                                                                  node_instance.get_name(),
-                                                                                  node_instance.instance))
+                    logger.warning(
+                        "no edge was updated for node {}::{}::{}::{}".format(
+                            node_instance.activity.get_name(),
+                            node_instance.__class__,
+                            node_instance.get_name(),
+                            node_instance.instance,
+                        )
+                    )
         return node_instance
 
     def update_edges(self, node_origin, node_instance):
         updates = 0
-        
-        for edge in self.edges: 
+
+        for edge in self.edges:
             if edge.source == node_origin.id or edge.source == node_origin:
                 edge.source = node_instance.id
                 updates += 1
@@ -225,9 +272,14 @@ class TriccNodeActivity(TriccNodeBaseModel):
             TriccNodeEnd,
             TriccNodeActivityEnd,
         )
-        return  list(filter(lambda x:  isinstance(x, (TriccNodeActivityEnd)) or (isinstance(x, (TriccNodeEnd)) and isinstance(self.root, TriccNodeMainStart )), self.nodes.values()))
 
-
+        return list(
+            filter(
+                lambda x: isinstance(x, (TriccNodeActivityEnd))
+                or (isinstance(x, (TriccNodeEnd)) and isinstance(self.root, TriccNodeMainStart)),
+                self.nodes.values(),
+            )
+        )
 
 
 class TriccNodeDisplayModel(TriccNodeBaseModel):
@@ -246,18 +298,19 @@ class TriccNodeDisplayModel(TriccNodeBaseModel):
 
 class TriccNodeNote(TriccNodeDisplayModel):
     tricc_type: TriccNodeType = TriccNodeType.note
-    datatype: str = 'string'
+    datatype: str = "string"
+
 
 class TriccNodeInputModel(TriccNodeDisplayModel):
-    required: Optional[Union[Expression, TriccOperation, TriccStatic]] = '1'
-    constraint_message: Optional[Union[str, Dict[str,str]]] = None
+    required: Optional[Union[Expression, TriccOperation, TriccStatic]] = "1"
+    constraint_message: Optional[Union[str, Dict[str, str]]] = None
     constraint: Optional[Expression] = None
-    save: Optional[str] = None # contribute to another calculate
+    save: Optional[str] = None  # contribute to another calculate
 
 
 class TriccNodeDate(TriccNodeInputModel):
     tricc_type: TriccNodeType = TriccNodeType.date
-    datatype: str = 'date'
+    datatype: str = "date"
 
 
 class TriccNodeMainStart(TriccNodeBaseModel):
@@ -265,25 +318,25 @@ class TriccNodeMainStart(TriccNodeBaseModel):
     form_id: Optional[str] = None
     process: Optional[str] = None
     relevance: Optional[Union[Expression, TriccOperation]] = None
-    datatype: str = 'boolean'
+    datatype: str = "boolean"
 
 
 class TriccNodeLinkIn(TriccNodeBaseModel):
     tricc_type: TriccNodeType = TriccNodeType.link_in
-    datatype: str = 'n/a'
+    datatype: str = "n/a"
 
 
 class TriccNodeLinkOut(TriccNodeBaseModel):
     tricc_type: TriccNodeType = TriccNodeType.link_out
     reference: Optional[Union[TriccNodeLinkIn, triccId]] = None
     # no need to copy
-    datatype: str = 'n/a'
+    datatype: str = "n/a"
 
 
 class TriccNodeGoTo(TriccNodeBaseModel):
     tricc_type: TriccNodeType = TriccNodeType.goto
     link: Union[TriccNodeActivity, triccId]
-    datatype: str = 'n/a'
+    datatype: str = "n/a"
     instance: int = 1
 
     # no need ot copy
@@ -297,16 +350,16 @@ class TriccNodeGoTo(TriccNodeBaseModel):
 
 class TriccNodeSelectOption(TriccNodeDisplayModel):
     tricc_type: TriccNodeType = TriccNodeType.select_option
-    label: Union[str, Dict[str,str]]
+    label: Union[str, Dict[str, str]]
     save: Optional[str] = None
     select: TriccNodeInputModel
     list_name: str
+
     def get_datatype(self):
         if self.name.isnumeric():
-            return 'number'
+            return "number"
         else:
-            return 'string'
-
+            return "string"
 
     def make_instance(self, instance_nb, activity, select, **kwargs):
         # shallow copy
@@ -324,15 +377,16 @@ class TriccNodeSelect(TriccNodeInputModel):
     filter: Optional[str] = None
     options: Dict[int, TriccNodeSelectOption] = {}
     list_name: str
+
     def get_datatype(self):
         rtype = set()
-        for k,o in self.options.items():
+        for k, o in self.options.items():
             rtype.add(o.get_datatype())
-        if len(rtype)>1:
-            return 'mixed'
+        if len(rtype) > 1:
+            return "mixed"
         else:
             return rtype.pop()
-            
+
     def make_instance(self, instance_nb, activity, **kwargs):
         # shallow copy, no copy of filter and list_name
         instance = super().make_instance(instance_nb, activity=activity)
@@ -349,13 +403,15 @@ class TriccNodeSelectOne(TriccNodeSelect):
 class TriccNodeSelectYesNo(TriccNodeSelectOne):
     pass
 
+
 class TriccNodeAcceptDiagnostic(TriccNodeSelectOne):
     severity: Optional[str] = None
     priority: Union[float, int, None] = None
 
 
 class TriccParentMixIn(BaseModel):
-    parent: Optional[TriccNodeBaseModel]  = None
+    parent: Optional[TriccNodeBaseModel] = None
+
 
 #    options: List[TriccNodeSelectOption] = [TriccNodeSelectOption(label='Yes', name='yes'),
 #                 TriccNodeSelectOption(label='No', name='no')]
@@ -370,13 +426,12 @@ class TriccNodeSelectMultiple(TriccNodeSelect):
 class TriccNodeNumber(TriccNodeInputModel):
     min: Optional[float] = None
     max: Optional[float] = None
-    datatype : str = 'number'
+    datatype: str = "number"
     # no need to copy min max in make isntance
 
 
 class TriccNodeDecimal(TriccNodeNumber):
     tricc_type: TriccNodeType = TriccNodeType.decimal
-
 
 
 class TriccNodeInteger(TriccNodeNumber):
@@ -385,41 +440,42 @@ class TriccNodeInteger(TriccNodeNumber):
 
 class TriccNodeText(TriccNodeInputModel):
     tricc_type: TriccNodeType = TriccNodeType.text
-    datatype : str = 'string'
+    datatype: str = "string"
 
 
 class TriccNodeMoreInfo(TriccNodeInputModel, TriccParentMixIn):
     tricc_type: TriccNodeType = TriccNodeType.help
-    datatype : str = 'n/a'
+    datatype: str = "n/a"
 
-    
-    
+
 class TriccProject(BaseModel):
     title: str = "My project"
     description: str = ""
     lang_code: str = "en"
     # abstract graph / Scheduling
-    #abs_graph: MultiDiGraph = MultiDiGraph()
-    #abs_graph_process_start: Dict = {}
+    # abs_graph: MultiDiGraph = MultiDiGraph()
+    # abs_graph_process_start: Dict = {}
     # implementation graph
-    #impl_graph: MultiDiGraph = MultiDiGraph()
-    #impl_graph_process_start: Dict = {}
+    # impl_graph: MultiDiGraph = MultiDiGraph()
+    # impl_graph_process_start: Dict = {}
     # authored graph
-    #graph: MultiDiGraph = MultiDiGraph()
-    #graph_process_start: Dict = {}
+    # graph: MultiDiGraph = MultiDiGraph()
+    # graph_process_start: Dict = {}
     # list of context:
-    pages: Dict[str, TriccNodeActivity]= {}
+    pages: Dict[str, TriccNodeActivity] = {}
     start_pages: Dict[str, TriccNodeActivity] = {}
-    images: List[Dict[str,str]] = []
-    contexts : Set[triccName] = set()
+    images: List[Dict[str, str]] = []
+    contexts: Set[triccName] = set()
+
     # TODO manage trad properly
     def get_keyword_trad(keyword):
         return keyword
+
     # dict of code_system_id: codesystem
     code_systems: Dict[str, CodeSystem] = {}
     # dict of valueset_id: valueset
     value_sets: Dict[str, ValueSet] = {}
-    
-    #class Config:
-        # Allow arbitrary types for validation
+
+    # class Config:
+    # Allow arbitrary types for validation
     #    arbitrary_types_allowed = True

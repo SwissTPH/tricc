@@ -1,14 +1,55 @@
+import html2text
+import logging
 import base64
 import os
 import re
-from curses.ascii import isalnum, isalpha, isdigit
 
-from numpy import isnan
 
-from tricc_oo.converters.utils import clean_name, remove_html
+from tricc_oo.converters.utils import remove_html, clean_str
 from tricc_oo.converters.cql_to_operation import transform_cql_to_operation
-from tricc_oo.models.tricc import *
-from tricc_oo.models.base import TriccNodeType, OPERATION_LIST
+from tricc_oo.converters.utils import generate_id, get_rand_name
+from tricc_oo.models.base import (
+    TriccOperator, TriccOperation,
+    TriccStatic, TriccReference, TriccNodeType, TriccEdge, OPERATION_LIST
+)
+from tricc_oo.models.calculate import (
+    TriccNodeDisplayBridge,
+    TriccNodeBridge,
+    TriccNodeActivityEnd,
+    TriccNodeActivityStart,
+    TriccNodeEnd,
+    TriccNodeCalculate,
+    TriccNodeRhombus,
+    TriccNodeDisplayCalculateBase,
+    TriccNodeExclusive,
+    TriccNodeProposedDiagnosis,
+    TriccNodeDiagnosis,
+    TriccRhombusMixIn,
+    TriccNodeInput,
+
+)
+from tricc_oo.models.tricc import (
+    TriccNodeCalculateBase,
+    TriccNodeMainStart,
+    TriccNodeActivity,
+    TriccGroup,
+    TriccNodeGoTo,
+    TriccNodeSelectMultiple,
+    TriccNodeInputModel,
+    TriccNodeSelectNotAvailable,
+    TriccNodeSelectOption,
+    TriccNodeDisplayModel,
+    TriccNodeMoreInfo,
+    TriccNodeText,
+    TriccNodeDecimal,
+    TriccNodeInteger,
+    TriccNodeDate,
+    TriccNodeSelectOne,
+    TriccNodeSelectYesNo,
+    TriccNodeNote,
+)
+
+
 from tricc_oo.models.ocl import get_data_type
 from tricc_oo.converters.drawio_type_map import TYPE_MAP
 from tricc_oo.parsers.xml import (
@@ -20,7 +61,11 @@ from tricc_oo.parsers.xml import (
     get_tricc_type_list,
 )
 import hashlib
-from tricc_oo.visitors.tricc import *
+from tricc_oo.visitors.tricc import (
+    get_select_yes_no_options, get_select_not_available_options,
+    set_prev_next_node,  inject_node_before,
+    merge_node, remove_prev_next, get_activity_wait,
+)
 from tricc_oo.converters.datadictionnary import add_concept
 
 TRICC_YES_LABEL = ["yes", "oui"]
@@ -28,15 +73,9 @@ TRICC_NO_LABEL = ["no", "non"]
 TRICC_FOLLOW_LABEL = ["follow", "suivre", "continue"]
 NO_LABEL = "NO_LABEL"
 TRICC_LIST_NAME = "list_{0}"
-import logging
-DISPLAY_ATTRIBUTES = [
-    'label',
-    'hint',
-    'help'
-]
-logger = logging.getLogger("default")
-import html2text
 
+DISPLAY_ATTRIBUTES = ["label", "hint", "help"]
+logger = logging.getLogger("default")
 
 
 def get_all_nodes(diagram, activity, nodes):
@@ -51,15 +90,16 @@ def get_all_nodes(diagram, activity, nodes):
                 activity,
                 attributes=TYPE_MAP[tricc_type]["attributes"],
                 mandatory_attributes=TYPE_MAP[tricc_type]["mandatory_attributes"],
-                has_options=TYPE_MAP[tricc_type].get('has_options', None)
+                has_options=TYPE_MAP[tricc_type].get("has_options", None),
             )
 
     return nodes
 
+
 def create_activity(diagram, media_path, project):
 
     external_id = diagram.attrib.get("id")
-    id = get_id( external_id,  diagram.attrib.get("id"))
+    id = get_id(external_id, diagram.attrib.get("id"))
     root = create_root_node(diagram)
     name = diagram.attrib.get("name")
     form_id = diagram.attrib.get("name", None)
@@ -73,7 +113,7 @@ def create_activity(diagram, media_path, project):
             form_id=form_id,
         )
         if root.relevance is not None:
-            activity.applicability=root.relevance
+            activity.applicability = root.relevance
         # activity definition is never instanciated
         if isinstance(root, TriccNodeActivityStart):
             activity.instance = 0
@@ -89,17 +129,41 @@ def create_activity(diagram, media_path, project):
             if (
                 issubclass(n.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase))
                 and not isinstance(n, (TriccRhombusMixIn, TriccNodeRhombus, TriccNodeDisplayBridge))
-                and not n.name.startswith('label_')
+                and not n.name.startswith("label_")
             ):
-                system = n.name.split('.')[0] if '.' in n.name else 'tricc'
+                system = n.name.split(".")[0] if "." in n.name else "tricc"
                 if isinstance(n, TriccNodeSelectOption) and isinstance(n.select, TriccNodeSelectNotAvailable):
-                    add_concept(project.code_systems, system, n.select.name, n.label, {"datatype": 'Boolean', "contextType": get_context_type(n)})
+                    add_concept(
+                        project.code_systems,
+                        system,
+                        n.select.name,
+                        n.label,
+                        {"datatype": "Boolean", "contextType": get_context_type(n)},
+                    )
                 elif not isinstance(n, TriccNodeSelectNotAvailable):
-                    add_concept(project.code_systems, system, n.name, n.label, {"datatype": get_data_type(n.tricc_type), "contextType": get_context_type(n)})
-                if getattr(n,'save', None):
-                    system = n.save.split('.')[0] if '.' in n.save else 'tricc'
-                    add_concept(project.code_systems, system, n.save, n.label, {"datatype": get_data_type(n.tricc_type), "contextType": get_context_type(n)})
-            
+                    add_concept(
+                        project.code_systems,
+                        system,
+                        n.name,
+                        n.label,
+                        {
+                            "datatype": get_data_type(n.tricc_type),
+                            "contextType": get_context_type(n),
+                        },
+                    )
+                if getattr(n, "save", None):
+                    system = n.save.split(".")[0] if "." in n.save else "tricc"
+                    add_concept(
+                        project.code_systems,
+                        system,
+                        n.save,
+                        n.label,
+                        {
+                            "datatype": get_data_type(n.tricc_type),
+                            "contextType": get_context_type(n),
+                        },
+                    )
+
         groups = get_groups(diagram, nodes, activity)
         if groups and len(groups) > 0:
             activity.groups = groups
@@ -119,7 +183,7 @@ def create_activity(diagram, media_path, project):
                         activity.root.process == "main" or activity.root.process is None
                     ):
                         project.start_pages["main"] = activity
-                        activity.root.process = 'main'
+                        activity.root.process = "main"
                     elif activity.root.process is not None:
                         if activity.root.process not in project.start_pages:
                             project.start_pages[activity.root.process] = []
@@ -127,23 +191,26 @@ def create_activity(diagram, media_path, project):
                     else:
                         logger.warning(
                             "Page {0} has a start node but there is already a start node in page  {1}".format(
-                                activity.label, start_page.label
+                                activity.label, project.start_pages[activity.root.process][0]
                             )
                         )
         if images:
             project.images += images
-        for node in list(filter(lambda p_node: isinstance(p_node, TriccNodeSelectNotAvailable),list(activity.nodes.values()))):
+        for node in list(
+            filter(
+                lambda p_node: isinstance(p_node, TriccNodeSelectNotAvailable),
+                list(activity.nodes.values()),
+            )
+        ):
             prev_node = None
-            prev_edges = list(filter(lambda p_e: p_e.target == node.id,list(activity.edges)))
+            prev_edges = list(filter(lambda p_e: p_e.target == node.id, list(activity.edges)))
             if len(prev_edges):
                 prev_node = [n for n in activity.nodes.values() if n.id in [p_e.source for p_e in prev_edges]]
                 if prev_node:
                     node.parent = prev_node[0]
-            if not  node.parent :
+            if not node.parent:
                 logger.critical(f"unable to find the parent of the NotApplicable node {node.get_name()}")
                 exit(1)
-
-
 
     else:
         return None, None
@@ -158,10 +225,7 @@ def manage_dangling_calculate(activity):
             for n in list(
                 filter(
                     lambda x: (x.target == node.id or x.target == node)
-                    and (
-                        x.source in activity.nodes
-                        or x.source in activity.nodes.values()
-                    ),
+                    and (x.source in activity.nodes or x.source in activity.nodes.values()),
                     activity.edges,
                 )
             )
@@ -188,7 +252,9 @@ def process_edges(diagram, media_path, activity, nodes):
             if image is not None:
                 images.append({"file_path": enriched, "image_content": image})
 
-        elif isinstance(nodes[edge.target], (TriccNodeActivityEnd)) or (isinstance(nodes[edge.target], (TriccNodeEnd)) and isinstance(activity.root, TriccNodeMainStart )):
+        elif isinstance(nodes[edge.target], (TriccNodeActivityEnd)) or (
+            isinstance(nodes[edge.target], (TriccNodeEnd)) and isinstance(activity.root, TriccNodeMainStart)
+        ):
             end_found = True
         if (
             edge.target in nodes
@@ -197,9 +263,7 @@ def process_edges(diagram, media_path, activity, nodes):
         ):
             edge.target = nodes[edge.target].path.id
         # modify edge for selectyesNo
-        if edge.source in nodes and isinstance(
-            nodes[edge.source], TriccNodeSelectYesNo
-        ):
+        if edge.source in nodes and isinstance(nodes[edge.source], TriccNodeSelectYesNo):
             process_yesno_edge(edge, nodes)
 
         # create calculate based on edges label
@@ -207,9 +271,7 @@ def process_edges(diagram, media_path, activity, nodes):
             label = edge.value.strip()
             processed = False
             calc = None
-            if (
-                 label.lower() in TRICC_FOLLOW_LABEL
-            ):
+            if label.lower() in TRICC_FOLLOW_LABEL:
                 if isinstance(nodes[edge.source], TriccNodeRhombus):
                     edge.source = nodes[edge.source].path.id
                     edge.source_external_id = None
@@ -221,7 +283,10 @@ def process_edges(diagram, media_path, activity, nodes):
                 calc = process_factor_edge(edge, nodes)
             elif label.lower() in TRICC_NO_LABEL:
                 calc = process_exclusive_edge(edge, nodes)
-            elif  any(reserved in html2text.html2text(label.lower()) for reserved in ([str(o) for o in list(TriccOperator)] + list(OPERATION_LIST.keys()) + ['$this'])):
+            elif any(
+                reserved in html2text.html2text(label.lower())
+                for reserved in ([str(o) for o in list(TriccOperator)] + list(OPERATION_LIST.keys()) + ["$this"])
+            ):
                 # manage comment
                 calc = process_condition_edge(edge, nodes)
             else:
@@ -242,14 +307,13 @@ def process_edges(diagram, media_path, activity, nodes):
                         "not management found",
                     )
                 )
-        elif edge.source in  nodes and isinstance(nodes[edge.source], TriccNodeRhombus):
-            logger.critical(
-                "rhombus {} node with labelless edges".format(nodes[edge.source].get_name())
-            )
+        elif edge.source in nodes and isinstance(nodes[edge.source], TriccNodeRhombus):
+            logger.critical("rhombus {} node with labelless edges".format(nodes[edge.source].get_name()))
     if not end_found:
         fake_end = TriccNodeActivityEnd(id=generate_id(f"e{activity.name}"), activity=activity, group=activity)
         last_nodes = [
-            n for n in list(activity.nodes.values())
+            n
+            for n in list(activity.nodes.values())
             if (
                 issubclass(
                     n.__class__,
@@ -257,10 +321,9 @@ def process_edges(diagram, media_path, activity, nodes):
                         TriccNodeInputModel,
                         TriccNodeText,
                         TriccNodeNote,
-                    )
-                ) and (
-                    not any([n.id == e.source for e in activity.edges])
+                    ),
                 )
+                and (not any([n.id == e.source for e in activity.edges]))
             )
         ]
         if last_nodes:
@@ -271,10 +334,7 @@ def process_edges(diagram, media_path, activity, nodes):
         else:
             logger.warning(f"Activity {activity.label} have no end, calculated might be included in the end definition")
             last_nodes = [
-                n for n in list(activity.nodes.values())
-                if (
-                        not any([n.id == e.source for e in activity.edges])
-                )
+                n for n in list(activity.nodes.values()) if (not any([n.id == e.source for e in activity.edges]))
             ]
             if last_nodes:
                 for n in last_nodes:
@@ -286,14 +346,13 @@ def process_edges(diagram, media_path, activity, nodes):
 
     return images
 
+
 def get_id(elm_id, activity_id):
-   return  str(elm_id) if len(elm_id)>8 else str(activity_id) + str(elm_id)
+    return str(elm_id) if len(elm_id) > 8 else str(activity_id) + str(elm_id)
+
 
 def _get_name(name, id, act_id):
-    if (
-        name is not None
-        and (name.endswith(("_", ".")))
-    ):
+    if name is not None and (name.endswith(("_", "."))):
         return name + get_id(id, act_id)
     return name
 
@@ -304,12 +363,9 @@ def get_nodes(diagram, activity):
     new_nodes = {}
     node_to_remove = []
     activity_end_node = None
-    end_node = None
     for node in nodes.values():
         # clean name
-        if (
-            hasattr(node, "name")
-        ):
+        if hasattr(node, "name"):
             node.name = _get_name(node.name, node.id, activity.id)
         if issubclass(node.__class__, TriccRhombusMixIn) and node.path is None:
             # generate rhombuse path
@@ -331,9 +387,7 @@ def get_nodes(diagram, activity):
             next_nodes_id = [e.target for e in activity.edges if e.source == node.id]
             if len(next_nodes_id) > 0:
 
-                calc = get_activity_wait(
-                    path, [node], next_nodes_id, node, edge_only=True
-                )
+                calc = get_activity_wait(path, [node], next_nodes_id, node, edge_only=True)
                 new_nodes[calc.id] = calc
                 for goto_next_node in next_nodes_id:
                     remove_prev_next(node, goto_next_node, activity)
@@ -346,11 +400,10 @@ def get_nodes(diagram, activity):
         # add activity relevance to calculate
         elif (
             issubclass(node.__class__, TriccNodeDisplayCalculateBase)
-            and not getattr(node, 'relevance', None)
+            and not getattr(node, "relevance", None)
             and node.activity.applicability
         ):
             node.applicability = node.activity.applicability
-
 
     nodes.update(new_nodes)
 
@@ -371,7 +424,7 @@ def create_root_node(diagram):
         elm = get_tricc_type(diagram, "UserObject", TriccNodeType.start)
     if elm is not None:
         external_id = elm.attrib.get("id")
-        id = get_id( external_id,  diagram.attrib.get("id"))
+        id = get_id(external_id, diagram.attrib.get("id"))
         node = TriccNodeMainStart(
             id=id,
             external_id=external_id,
@@ -380,7 +433,7 @@ def create_root_node(diagram):
             label=elm.attrib.get("label"),
             form_id=elm.attrib.get("form_id"),
             relevance=elm.attrib.get("relevance"),
-            process=elm.attrib.get('process', 'main'),
+            process=elm.attrib.get("process", "registration"),
         )
     else:
         elm = get_tricc_type(diagram, "object", TriccNodeType.activity_start)
@@ -388,19 +441,15 @@ def create_root_node(diagram):
             elm = get_tricc_type(diagram, "UserObject", TriccNodeType.activity_start)
         if elm is not None:
             external_id = elm.attrib.get("id")
-            id = get_id( external_id,  diagram.attrib.get("id"))
+            id = get_id(external_id, diagram.attrib.get("id"))
             node = TriccNodeActivityStart(
                 id=id,
                 external_id=external_id,
-                #parent=elm.attrib.get("parent"),
+                # parent=elm.attrib.get("parent"),
                 name="ma" + id,
                 label=diagram.attrib.get("name"),
                 relevance=elm.attrib.get("relevance"),
-                instance=int(
-                    elm.attrib.get("instance")
-                    if elm.attrib.get("instance") is not None
-                    else 1
-                ),
+                instance=int(elm.attrib.get("instance") if elm.attrib.get("instance") is not None else 1),
             )
     load_expressions(node)
     return node
@@ -426,26 +475,39 @@ def set_additional_attributes(attribute_names, elm, node):
 
 
 def get_context_type(node):
-    context_type = getattr(node, 'context_type', None)
+    context_type = getattr(node, "context_type", None)
     if context_type:
         return context_type
     if isinstance(node, TriccNodeSelectMultiple):
         return "Question"
     elif isinstance(node, TriccNodeSelectOption):
         if isinstance(node.select, TriccNodeSelectMultiple):
-            return 'Symptom-Finding'
+            return "Symptom-Finding"
         else:
-            return 'Value'
+            return "Value"
     elif isinstance(node, TriccNodeNote):
-        return 'InteractSet'
-    elif isinstance(node, (TriccNodeDecimal, TriccNodeInteger, TriccNodeText, TriccNodeDate, TriccNodeSelectOne, TriccNodeSelectYesNo, TriccNodeSelectNotAvailable, TriccNodeInput)):
-        return 'Symptom-Finding'
-    elif isinstance(node, (TriccNodeProposedDiagnosis,TriccNodeDiagnosis)):
-        return 'Diagnosis'
+        return "InteractSet"
+    elif isinstance(
+        node,
+        (
+            TriccNodeDecimal,
+            TriccNodeInteger,
+            TriccNodeText,
+            TriccNodeDate,
+            TriccNodeSelectOne,
+            TriccNodeSelectYesNo,
+            TriccNodeSelectNotAvailable,
+            TriccNodeInput,
+        ),
+    ):
+        return "Symptom-Finding"
+    elif isinstance(node, (TriccNodeProposedDiagnosis, TriccNodeDiagnosis)):
+        return "Diagnosis"
     elif issubclass(node.__class__, TriccNodeCalculateBase):
-        return 'Calculation'
+        return "Calculation"
     else:
-        return 'Misc'
+        return "Misc"
+
 
 def get_select_options(diagram, select_node, nodes):
     options = {}
@@ -455,16 +517,12 @@ def get_select_options(diagram, select_node, nodes):
     for elm in list:
         name = elm.attrib.get("name")
         if name in options_name_list and not name.endswith("_"):
-            logger.critical(
-                "Select question {0} have twice the option name {1}".format(
-                    select_node.get_name(), name
-                )
-            )
+            logger.critical("Select question {0} have twice the option name {1}".format(select_node.get_name(), name))
         else:
             options_name_list.append(name)
 
         external_id = elm.attrib.get("id")
-        id = get_id(external_id, diagram.attrib.get('id'))
+        id = get_id(external_id, diagram.attrib.get("id"))
         option = TriccNodeSelectOption(
             id=id,
             label=elm.attrib.get("label"),
@@ -473,7 +531,7 @@ def get_select_options(diagram, select_node, nodes):
             list_name=select_node.list_name,
             activity=select_node.activity,
             group=select_node.group,
-            )
+        )
         set_additional_attributes(["save", "relevance", "context_type"], elm, option)
         load_expressions(option)
         options[i] = option
@@ -484,7 +542,8 @@ def get_select_options(diagram, select_node, nodes):
     else:
         return options
 
-    ##TBR START
+    # TBR START
+
 
 def get_max_version(dict):
     max_version = None
@@ -503,7 +562,6 @@ def get_max_named_version(calculates, name):
     return max
 
 
-
 def inject_bridge_path(node, nodes):
     calc_name = "p" + node.id
     calc_id = generate_id(calc_name)
@@ -520,22 +578,16 @@ def inject_bridge_path(node, nodes):
         nodes[n.source]
         for n in list(
             filter(
-                lambda x: (x.target == node.id or x.target == node)
-                and x.source in nodes,
+                lambda x: (x.target == node.id or x.target == node) and x.source in nodes,
                 node.activity.edges,
             )
         )
     ]
-    if ( len(prev_nodes)>1 and
-        sum(
+    if (
+        len(prev_nodes) > 1
+        and sum(
             [
-                (
-                    0
-                    if issubclass(
-                        n.__class__, (TriccNodeDisplayCalculateBase, TriccNodeRhombus)
-                    )
-                    else 1
-                )
+                (0 if issubclass(n.__class__, (TriccNodeDisplayCalculateBase, TriccNodeRhombus)) else 1)
                 for n in prev_nodes
             ]
         )
@@ -564,7 +616,7 @@ def enrich_node(diagram, media_path, edge, node, activity, help_before=False):
         # get node and process type
         type, message = get_message(diagram, edge.source_external_id)
         if type is not None:
-            if type == 'help':
+            if type == "help":
                 help = TriccNodeMoreInfo(
                     id=generate_id(),
                     name=f"{node.name}.more_info",
@@ -572,7 +624,7 @@ def enrich_node(diagram, media_path, edge, node, activity, help_before=False):
                     parent=node,
                     required=None,
                 )
-                #node.help = message
+                # node.help = message
                 if help_before:
                     inject_node_before(help, node, activity)
                 else:
@@ -608,30 +660,37 @@ def enrich_node(diagram, media_path, edge, node, activity, help_before=False):
             return None, None
 
 
-get_style_dict = lambda style: dict(item.split('=', 1) for item in style.split(';') if '=' in item)
+def get_style_dict(style):
+    return dict(item.split("=", 1) for item in style.split(";") if "=" in item)
 
 
 def severity_from_color(color):
-    if color == '#fff2cc':
-        return 'moderate'
-    elif color == '#f8cecc':
-        return 'severe'
+    if color == "#fff2cc":
+        return "moderate"
+    elif color == "#f8cecc":
+        return "severe"
     else:
-        return 'light'
-
+        return "light"
 
 
 def add_tricc_base_node(
-    diagram, nodes, type, list, group, attributes=[], mandatory_attributes=[], has_options=None
+    diagram,
+    nodes,
+    type,
+    list,
+    group,
+    attributes=[],
+    mandatory_attributes=[],
+    has_options=None,
 ):
     for elm in list:
         external_id = elm.attrib.get("id")
-        id = get_id( external_id,  diagram.attrib.get("id"))
-        parent = elm.attrib.get("parent")
+        id = get_id(external_id, diagram.attrib.get("id"))
+        elm.attrib.get("parent")
         node = type(
             external_id=external_id,
             id=id,
-            #parent=parent,
+            # parent=parent,
             group=group,
             activity=group,
             **set_mandatory_attribute(elm, mandatory_attributes, diagram),
@@ -649,13 +708,11 @@ def add_tricc_base_node(
             node.options = get_select_yes_no_options(node, group)
             nodes[node.options[0].id] = node.options[0]
             nodes[node.options[1].id] = node.options[1]
-        elif type == TriccNodeProposedDiagnosis and getattr(node, 'severity', '') == None:
+        elif type == TriccNodeProposedDiagnosis and getattr(node, "severity", "") is None:
             mxcell = get_mxcell(diagram, external_id)
-            styles = get_style_dict(mxcell.attrib.get('style',''))
-            if 'fillColor' in styles and styles['fillColor'] != 'none':
-                node.severity = severity_from_color(styles['fillColor'])
-
-
+            styles = get_style_dict(mxcell.attrib.get("style", ""))
+            if "fillColor" in styles and styles["fillColor"] != "none":
+                node.severity = severity_from_color(styles["fillColor"])
 
         set_additional_attributes(attributes, elm, node)
         load_expressions(node)
@@ -663,72 +720,67 @@ def add_tricc_base_node(
 
 
 def load_expressions(node):
-    if getattr(node, 'constraint', None):
-        node.constraint = parse_expression('', node.constraint)
-    if getattr(node, 'expression', None):
-        node.expression = parse_expression('', node.expression)
-    if getattr(node, 'relevance', None):
-        node.relevance = parse_expression('', node.relevance)
-    if getattr(node, 'trigger', None):
-        node.trigger = parse_expression('', node.trigger)
-    if getattr(node, 'default', None):
-        node.default = parse_expression('', node.default)
-    if getattr(node, 'reference', None):
+    if getattr(node, "constraint", None):
+        node.constraint = parse_expression("", node.constraint)
+    if getattr(node, "expression", None):
+        node.expression = parse_expression("", node.expression)
+    if getattr(node, "relevance", None):
+        node.relevance = parse_expression("", node.relevance)
+    if getattr(node, "trigger", None):
+        node.trigger = parse_expression("", node.trigger)
+    if getattr(node, "default", None):
+        node.default = parse_expression("", node.default)
+    if getattr(node, "reference", None):
         if isinstance(node, TriccNodeRhombus):
             node.label = remove_html(node.label)
             node.expression_reference = parse_expression(node.label, node.reference)
         else:
-            node.expression_reference = parse_expression('', node.reference)
+            node.expression_reference = parse_expression("", node.reference)
 
         node.reference = node.expression_reference.get_references()
 
 
-
-
 def parse_expression(label=None, expression=None):
     if expression:
-        ref_pattern = r'(\$\{[^\}]+\})'
-            # only if simple ref
+        ref_pattern = r"(\$\{[^\}]+\})"
+        # only if simple ref
         if not re.search(ref_pattern, expression):
             operation = transform_cql_to_operation(expression, label)
             if isinstance(operation, TriccReference):
                 if label:
-                    if label[0] == '[' and label[-1] == ']':
+                    if label[0] == "[" and label[-1] == "]":
                         operation = TriccOperation(
                             operator=TriccOperator.SELECTED,
                             reference=[
                                 operation,
-                                TriccReference(operation.value + label)
-                            ]
+                                TriccReference(operation.value + label),
+                            ],
                         )
                     else:
                         for operator in OPERATION_LIST:
                             if operator in label:
-                                if operator == '==':
-                                    operator = '='
+                                if operator == "==":
+                                    operator = "="
                                 terms = label.split(operator)
                                 operation = transform_cql_to_operation(
                                     f"{expression} {operator} {terms[1].replace('?', '').strip()}",
-                                    label
+                                    label,
                                 )
                                 break
                 # implied is true
                 if isinstance(operation, TriccReference):
-                     operation = TriccOperation(
-                            operator=TriccOperator.ISTRUE,
-                            reference=[
-                                operation,
-                            ]
-                        )
+                    operation = TriccOperation(
+                        operator=TriccOperator.ISTRUE,
+                        reference=[
+                            operation,
+                        ],
+                    )
 
             else:
                 pass
 
         else:
-            operation = transform_cql_to_operation(
-                expression.replace('${', '"').replace('}', '"'),
-                label
-            )
+            operation = transform_cql_to_operation(expression.replace("${", '"').replace("}", '"'), label)
 
     if operation is None:
         logger.warning(f"unable to parse: {expression} ")
@@ -738,16 +790,16 @@ def parse_expression(label=None, expression=None):
 
 def set_mandatory_attribute(elm, mandatory_attributes, diagram=None):
     param = {}
-    diagram_id = diagram.attrib.get('id')
+    diagram_id = diagram.attrib.get("id")
     for attributes in mandatory_attributes:
-        if attributes == 'name':
+        if attributes == "name":
             name = elm.attrib.get("name")
             id = elm.attrib.get("id")
             attribute_value = _get_name(name, id, diagram_id)
-        elif attributes == 'list_name':
+        elif attributes == "list_name":
             name = elm.attrib.get("name")
             id = elm.attrib.get("id")
-            attribute_value = TRICC_LIST_NAME.format(clean_str(_get_name(name, id, diagram_id), replace_dots= True))
+            attribute_value = TRICC_LIST_NAME.format(clean_str(_get_name(name, id, diagram_id), replace_dots=True))
         else:
             attribute_value = elm.attrib.get(attributes)
         if attribute_value is None:
@@ -760,18 +812,16 @@ def set_mandatory_attribute(elm, mandatory_attributes, diagram=None):
 
             if attributes == "source":
                 if elm.attrib.get("target") is not None:
-                    logger.critical(
-                        "the attibute target is {}".format(elm.attrib.get("target"))
-                    )
+                    logger.critical("the attibute target is {}".format(elm.attrib.get("target")))
             elif attributes == "target":
                 if elm.attrib.get("source") is not None:
-                    logger.critical(
-                        "the attibute target is {}".format(elm.attrib.get("source"))
-                    )
+                    logger.critical("the attibute target is {}".format(elm.attrib.get("source")))
 
             logger.critical(
                 "the attibute {} is mandatory but not found in {} within group {}".format(
-                    attributes, display_name, diagram.attrib.get('name') if diagram is not None else ""
+                    attributes,
+                    display_name,
+                    diagram.attrib.get("name") if diagram is not None else "",
                 )
             )
             exit(1)
@@ -811,12 +861,10 @@ def add_group(elm, diagram, nodes, groups, parent_group, activity):
             id=id,
             external_id=external_id,
             group=parent_group,
-            activity=activity
+            activity=activity,
         )
         # get elememt witn parent = id and tricc_type defiend
-        list_child = get_tricc_type_list(
-            diagram, ["object", "UserObject"], tricc_type=None, parent_id=id
-        )
+        list_child = get_tricc_type_list(diagram, ["object", "UserObject"], tricc_type=None, parent_id=id)
         add_group_to_child(group, diagram, list_child, nodes, groups, parent_group)
         if group is not None:
             groups[group.id] = group
@@ -832,12 +880,10 @@ def add_group_to_child(group, diagram, list_child, nodes, groups, parent_group):
                 tricc_type=None,
                 parent_id=child_elm.attrib.get("id"),
             )
-            add_group_to_child(
-                group, diagram, list_sub_child, nodes, groups, parent_group
-            )
+            add_group_to_child(group, diagram, list_sub_child, nodes, groups, parent_group)
         elif child_elm.attrib.get("tricc_type") == TriccNodeType.page:
             child_group_id = child_elm.attrib.get("id")
-            if not child_group_id in groups:
+            if child_group_id not in groups:
                 child_group = add_group(child_elm, diagram, nodes, groups, group)
             else:
                 child_group = groups[child_group_id]
@@ -862,16 +908,14 @@ def add_image_from_style(style, path):
     image_attrib = None
     if style is not None and "image=data:image/" in style:
         image_attrib = style.split("image=data:image/")
-    if image_attrib is not None and len(image_attrib)== 2:
+    if image_attrib is not None and len(image_attrib) == 2:
         image_parts = image_attrib[1].split(",")
         if len(image_parts) == 2:
             payload = image_parts[1][:-1]
-            image_name = hashlib.md5(payload.encode('utf-8')).hexdigest()
+            image_name = hashlib.md5(payload.encode("utf-8")).hexdigest()
             path = os.path.join(path, "images")
             file_name = os.path.join(path, image_name + "." + image_parts[0])
-            if not (
-                os.path.isdir(path)
-            ):  # check if it exists, because if it does, error will be raised
+            if not (os.path.isdir(path)):  # check if it exists, because if it does, error will be raised
                 # (later change to make folder complaint to CHT)
                 os.makedirs(path, exist_ok=True)
             with open(file_name, "wb") as fh:
@@ -879,13 +923,6 @@ def add_image_from_style(style, path):
                 image_path = os.path.basename(file_name)
                 return image_path, payload
     return None, None
-
-
-def get_contained_main_node(diagram, id):
-    list = get_mxcell_parent_list(diagram, id, media_nodes)
-    if isinstance(list, List) and len(list) > 0:
-        # use only the first one
-        return list[0]
 
 
 def get_message(diagram, id):
@@ -908,14 +945,12 @@ def get_edges(diagram):
         id = get_id(external_id, diagram.attrib.get("id"))
         edge = TriccEdge(
             id=id,
-            **set_mandatory_attribute(
-                elm, ["source", "parent", "target"], diagram
-            ),
+            **set_mandatory_attribute(elm, ["source", "parent", "target"], diagram),
         )
         edge.source_external_id = edge.source
         edge.target_external_id = edge.target
-        edge.source = get_id(edge.source,  diagram.attrib.get("id"))
-        edge.target = get_id(edge.target,  diagram.attrib.get("id"))
+        edge.source = get_id(edge.source, diagram.attrib.get("id"))
+        edge.target = get_id(edge.target, diagram.attrib.get("id"))
         set_additional_attributes(["value"], elm, edge)
         if edge.value is not None:
             edge.value = remove_html(edge.value)
@@ -923,7 +958,7 @@ def get_edges(diagram):
     return edges
 
 
-## Process edges
+# Process edges
 
 
 def process_factor_edge(edge, nodes):
@@ -932,7 +967,10 @@ def process_factor_edge(edge, nodes):
         source = nodes[edge.source]
         return TriccNodeCalculate(
             id=edge.id,
-            expression_reference=TriccOperation(TriccOperator.MULTIPLIED, [TriccReference(nodes[edge.source].name),TriccStatic(float(factor))]),
+            expression_reference=TriccOperation(
+                TriccOperator.MULTIPLIED,
+                [TriccReference(nodes[edge.source].name), TriccStatic(float(factor))],
+            ),
             reference=[TriccReference(source.name)],
             activity=source.activity,
             group=source.group,
@@ -943,10 +981,10 @@ def process_factor_edge(edge, nodes):
 
 def process_condition_edge(edge, nodes):
     label = edge.value.strip()
-    node = nodes[edge.source]
+    nodes[edge.source]
     node_ref = f'"{nodes[edge.source].name}"'
-    if '$this' in label:
-        operation = parse_expression('', expression=label.replace('$this', node_ref ))
+    if "$this" in label:
+        operation = parse_expression("", expression=label.replace("$this", node_ref))
     else:
         operation = parse_expression(label, expression=node_ref)
     if operation and isinstance(operation, TriccOperation):
@@ -958,11 +996,8 @@ def process_condition_edge(edge, nodes):
             path=nodes[edge.source],
             activity=nodes[edge.source].activity,
             group=nodes[edge.source].group,
-            label=label
+            label=label,
         )
-
-
-
 
 
 def process_exclusive_edge(edge, nodes):
@@ -995,9 +1030,7 @@ def process_exclusive_edge(edge, nodes):
 
 def process_yesno_edge(edge, nodes):
     if not edge.value:
-        logger.critical(
-            "yesNo {} node with labelless edges".format(nodes[edge.source].get_name())
-        )
+        logger.critical("yesNo {} node with labelless edges".format(nodes[edge.source].get_name()))
         exit(1)
     label = edge.value.strip().lower()
     yes_option = None
@@ -1016,8 +1049,4 @@ def process_yesno_edge(edge, nodes):
         edge.source = no_option.id
         edge.source_external_id = None
     else:
-        logger.warning(
-            "edge {0} is coming from select {1}".format(
-                edge.id, nodes[edge.source].get_name()
-            )
-        )
+        logger.warning("edge {0} is coming from select {1}".format(edge.id, nodes[edge.source].get_name()))

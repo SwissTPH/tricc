@@ -1,10 +1,8 @@
-from operator import attrgetter
-import re
-
-from tricc_oo.converters.utils import clean_str,clean_name
-from tricc_oo.models import *
-from tricc_oo.visitors.tricc import clean_or_list, negate_term
-
+import logging
+from tricc_oo.converters.utils import clean_name
+from tricc_oo.models.tricc import TriccNodeSelectOption
+from tricc_oo.models.calculate import TriccNodeInput
+from tricc_oo.models.base import TriccNodeBaseModel
 # from babel import _
 
 # TRICC_SELECT_MULTIPLE_CALC_EXPRESSION = "count-selected(${{{0}}}) - number(selected(${{{0}}},'opt_none'))"
@@ -18,10 +16,9 @@ from tricc_oo.visitors.tricc import clean_or_list, negate_term
 TRICC_NEGATE = "not({})"
 # TRICC_NUMBER = "number({})"
 # TRICC_AND_EXPRESSION = '{0} and {1}'
-VERSION_SEPARATOR = '_Vv_'
+VERSION_SEPARATOR = "_Vv_"
 INSTANCE_SEPARATOR = "_Ii_"
 
-import logging
 
 logger = logging.getLogger("default")
 
@@ -34,25 +31,18 @@ def get_export_name(node, replace_dots=True):
     if node.export_name is None:
         node.gen_name()
         if isinstance(node, TriccNodeSelectOption):
-                node.export_name = node.name
-        elif node.last == False:
-            node.export_name = clean_name(node.name + VERSION_SEPARATOR + str(node.version), replace_dots=replace_dots)
-        # elif node.activity.instance>1:
-        #     if node.version:
-        #         node.export_name = clean_name(node.name + VERSION_SEPARATOR + str(node.version), replace_dots=replace_dots)
-        #     else:
-        #         node.export_name =  clean_name(node.name +  INSTANCE_SEPARATOR + str(node.activity.instance), replace_dots=replace_dots)
-            
+            node.export_name = node.name
+        elif node.last is False:
+            node.export_name = clean_name(
+                node.name + VERSION_SEPARATOR + str(node.version),
+                replace_dots=replace_dots,
+            )
         elif isinstance(node, TriccNodeInput):
-            node.export_name = clean_name('load.' +node.name, replace_dots=replace_dots)
+            node.export_name = clean_name("load." + node.name, replace_dots=replace_dots)
         else:
             node.export_name = clean_name(node.name, replace_dots=replace_dots)
-            
+
     return node.export_name
-
-
-
-
 
 
 def get_list_names(list):

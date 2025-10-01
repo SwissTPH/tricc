@@ -2,7 +2,6 @@ import datetime
 import logging
 import os
 import shutil
-import re
 import pandas as pd
 
 from tricc_oo.models.lang import SingletonLangClass
@@ -24,24 +23,21 @@ logger = logging.getLogger("default")
 
 class XLSFormCHTStrategy(XLSFormCDSSStrategy):
     def process_export(self, start_pages, **kwargs):
-        diags = []
         self.activity_export(start_pages[self.processes[0]], **kwargs)
         # self.add_tab_breaks_choice()
-        cht_header = pd.DataFrame(columns=SURVEY_MAP.keys())
         cht_input_df = self.get_cht_input(start_pages, **kwargs)
-        self.df_survey = self.df_survey[
-            ~self.df_survey["name"].isin(cht_input_df["name"])
-        ]
+        self.df_survey = self.df_survey[~self.df_survey["name"].isin(cht_input_df["name"])]
         self.df_survey.reset_index(drop=True, inplace=True)
 
-        self.df_survey = pd.concat(
-            [cht_input_df, self.df_survey, self.get_cht_summary()], ignore_index=True
-        )
+        self.df_survey = pd.concat([cht_input_df, self.df_survey, self.get_cht_summary()], ignore_index=True)
 
     def get_cht_input(self, start_pages, **kwargs):
         empty = langs.get_trads("", force_dict=True)
         df_input = pd.DataFrame(columns=SURVEY_MAP.keys())
-        # [ #type, '',#name ''#label, '',#hint '',#help '',#default '',#'appearance',  '',#'constraint',  '',#'constraint_message' '',#'relevance' '',#'disabled' '',#'required' '',#'required message' '',#'read only' '',#'expression' '',#'repeat_count' ''#'image' ],
+        # [ #type, '',#name ''#label, '',#hint '',#help '',#default '',#'appearance',
+        # '',#'constraint',  '',#'constraint_message' '',#'relevance' '',#'disabled'
+        # '',#'required' '',#'required message' '',#'read only' '',#'expression' '',#
+        # 'repeat_count' ''#'image' ],
         df_input.loc[len(df_input)] = [
             "begin_group",
             "inputs",
@@ -235,7 +231,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
         inputs = self.export_inputs(start_pages[self.processes[0]], **kwargs)
         for input in inputs:
             df_input.loc[len(df_input)] = get_input_line(input)
-        self.get_contact_inputs(df_input)        
+        self.get_contact_inputs(df_input)
         df_input.loc[len(df_input)] = [
             "hidden",
             "external_id",
@@ -301,8 +297,6 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             "",
             "",
         ]
-        
-
 
         df_input.loc[len(df_input)] = [
             "end_group",
@@ -325,7 +319,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             "",
             "",
         ]
-        
+
         df_input.loc[len(df_input)] = [
             "hidden",
             "data_load",
@@ -355,18 +349,18 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             *list(empty.values()),  # hint
             *list(empty.values()),  # help
             "",  # default
-            "",  #'appearance', clean_name
-            "",  #'constraint',
-            *list(empty.values()),  #'constraint_message'
-            "",  #'relevance'
-            "",  #'disabled'
-            "",  #'required'
-            *list(empty.values()),  #'required message'
-            "",  #'read only'
-            "../inputs/user/contact_id",  #'expression'
+            "",  # 'appearance', clean_name
+            "",  # 'constraint',
+            *list(empty.values()),  # 'constraint_message'
+            "",  # 'relevance'
+            "",  # 'disabled'
+            "",  # 'required'
+            *list(empty.values()),  # 'required message'
+            "",  # 'read only'
+            "../inputs/user/contact_id",  # 'expression'
             "",
-            "",  #'repeat_count'
-            "",  #'image'
+            "",  # 'repeat_count'
+            "",  # 'image'
             "",  # choice filter
         ]
         df_input.loc[len(df_input)] = [
@@ -376,18 +370,18 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             *list(empty.values()),  # hint
             *list(empty.values()),  # help
             "",  # default
-            "",  #'appearance', clean_name
-            "",  #'constraint',
-            *list(empty.values()),  #'constraint_message'
-            "",  #'relevance'
-            "",  #'disabled'
-            "",  #'required'
-            *list(empty.values()),  #'required message'
-            "",  #'read only'
-            "../inputs/user/facility_id",  #'expression'
+            "",  # 'appearance', clean_name
+            "",  # 'constraint',
+            *list(empty.values()),  # 'constraint_message'
+            "",  # 'relevance'
+            "",  # 'disabled'
+            "",  # 'required'
+            *list(empty.values()),  # 'required message'
+            "",  # 'read only'
+            "../inputs/user/facility_id",  # 'expression'
             "",
-            "",  #'repeat_count'
-            "",  #'image'
+            "",  # 'repeat_count'
+            "",  # 'image'
             "",  # choice filter
         ]
         df_input.loc[len(df_input)] = [
@@ -397,18 +391,18 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             *list(empty.values()),  # hint
             *list(empty.values()),  # help
             "",  # default
-            "",  #'appearance', clean_name
-            "",  #'constraint',
-            *list(empty.values()),  #'constraint_message'
-            "",  #'relevance'
-            "",  #'disabled'
-            "",  #'required'
-            *list(empty.values()),  #'required message'
-            "",  #'read only'
-            "../inputs/user/name",  #'expression'
+            "",  # 'appearance', clean_name
+            "",  # 'constraint',
+            *list(empty.values()),  # 'constraint_message'
+            "",  # 'relevance'
+            "",  # 'disabled'
+            "",  # 'required'
+            *list(empty.values()),  # 'required message'
+            "",  # 'read only'
+            "../inputs/user/name",  # 'expression'
             "",
-            "",  #'repeat_count'
-            "",  #'image'
+            "",  # 'repeat_count'
+            "",  # 'image'
             "",  # choice filter
         ]
         df_input.loc[len(df_input)] = [
@@ -418,18 +412,18 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             *list(empty.values()),  # hint
             *list(empty.values()),  # help
             "",  # default
-            "",  #'appearance', clean_name
-            "",  #'constraint',
-            *list(empty.values()),  #'constraint_message'
-            "",  #'relevance'
-            "",  #'disabled'
-            "",  #'required'
-            *list(empty.values()),  #'required message'
-            "",  #'read only'
-            "../inputs/contact/_id",  #'expression'
+            "",  # 'appearance', clean_name
+            "",  # 'constraint',
+            *list(empty.values()),  # 'constraint_message'
+            "",  # 'relevance'
+            "",  # 'disabled'
+            "",  # 'required'
+            *list(empty.values()),  # 'required message'
+            "",  # 'read only'
+            "../inputs/contact/_id",  # 'expression'
             "",
-            "",  #'repeat_count'
-            "",  #'image'
+            "",  # 'repeat_count'
+            "",  # 'image'
             "",  # choice filter
         ]
 
@@ -440,18 +434,18 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             *list(empty.values()),  # hint
             *list(empty.values()),  # help
             "",  # default
-            "",  #'appearance', clean_name
-            "",  #'constraint',
-            *list(empty.values()),  #'constraint_message'
-            "",  #'relevance'
-            "",  #'disabled'
-            "",  #'required'
-            *list(empty.values()),  #'required message'
-            "",  #'read only'
-            "../inputs/source_id",  #'expression'
+            "",  # 'appearance', clean_name
+            "",  # 'constraint',
+            *list(empty.values()),  # 'constraint_message'
+            "",  # 'relevance'
+            "",  # 'disabled'
+            "",  # 'required'
+            *list(empty.values()),  # 'required message'
+            "",  # 'read only'
+            "../inputs/source_id",  # 'expression'
             "",
-            "",  #'repeat_count'
-            "",  #'image'
+            "",  # 'repeat_count'
+            "",  # 'image'
             "",  # choice filter
         ]
         df_input.loc[len(df_input)] = [
@@ -461,21 +455,20 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             *list(empty.values()),  # hint
             *list(empty.values()),  # help
             "",  # default
-            "",  #'appearance', clean_name
-            "",  #'constraint',
-            *list(empty.values()),  #'constraint_message'
-            "",  #'relevance'
-            "",  #'disabled'
-            "",  #'required'
-            *list(empty.values()),  #'required message'
-            "",  #'read only'
-            "../inputs/user/facility_id",  #'expression'
+            "",  # 'appearance', clean_name
+            "",  # 'constraint',
+            *list(empty.values()),  # 'constraint_message'
+            "",  # 'relevance'
+            "",  # 'disabled'
+            "",  # 'required'
+            *list(empty.values()),  # 'required message'
+            "",  # 'read only'
+            "../inputs/user/facility_id",  # 'expression'
             "",
-            "",  #'repeat_count'
-            "",  #'image'
+            "",  # 'repeat_count'
+            "",  # 'image'
             "",  # choice filter
         ]
-        
 
         for input in inputs:
             df_input.loc[len(df_input)] = get_input_calc_line(input)
@@ -484,7 +477,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
 
     def get_contact_inputs(self, df_input):
         empty = langs.get_trads("", force_dict=True)
-        if not len(df_input[df_input['name'] == 'sex']):
+        if not len(df_input[df_input["name"] == "sex"]):
             df_input.loc[len(df_input)] = [
                 "hidden",
                 "sex",
@@ -506,7 +499,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
                 "",
                 "",
             ]
-        if not len(df_input[df_input['name'] == 'date_of_birth']):
+        if not len(df_input[df_input["name"] == "date_of_birth"]):
             df_input.loc[len(df_input)] = [
                 "hidden",
                 "date_of_birth",
@@ -530,7 +523,6 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             ]
 
             return df_input
-
 
     def get_contact_inputs_calculate(self, df_input):
         empty = langs.get_trads("", force_dict=True)
@@ -581,12 +573,6 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
 
     def get_cht_summary(self):
         df_summary = pd.DataFrame(columns=SURVEY_MAP.keys())
-        # [ #type, '',#name ''#label, '',#hint '',#help '',#default '',#'appearance',  '',#'constraint',  '',#'constraint_message' '',#'relevance' '',#'disabled' '',#'required' '',#'required message' '',#'read only' '',#'expression' '',#'repeat_count' ''#'image' ],
-        # df_summary.loc[len(df_summary)] = [ 'begin group', 'group_summary' , 'Summary',                                  '', '', '',  'field-list summary',  '', '', '', '', '', '', '', '', '', '' ]
-        # df_summary.loc[len(df_summary)] = [ 'note',        'r_patient_info', '**${patient_name}** ID: ${patient_id}',  '', '', '',  '',                    '', '', '', '', '', '', '', '', '', '' ]
-        # df_summary.loc[len(df_summary)] = [ 'note',        'r_followup', 'Follow Up <i class=“fa fa-flag”></i>', '', '', '',  '',  '', '','', '', '', '', '', '', '', '' ]
-        # df_summary.loc[len(df_summary)] = [ 'note',        'r_followup_note' ,'FOLLOWUP instruction', '', '', '',  '',  '', '', '','', '', '', '', '', '', '' ]
-        # df_summary.loc[len(df_summary)] = [ 'end group', '' ,'', '', '', '',  '',  '', '', '', '', '', '', '', '','', '' ]
         return df_summary
 
     def get_last_prev_index(self, df, e, depth=0):
@@ -601,7 +587,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
                     latest = index[-1]
         if latest is None and depth > 5:
             for p in e.prev_nodes:
-                index = get_last_prev_index(df, e, depth + 1)
+                index = self.get_last_prev_index(df, e, depth + 1)
                 if not latest and index and index > latest:
                     latest = index
         return latest
@@ -635,9 +621,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
         df_settings = pd.DataFrame(settings, index=indx)
         df_settings.head()
         if len(self.df_survey[self.df_survey["name"] == "version"]):
-            self.df_survey.loc[self.df_survey["name"] == "version", "label"] = (
-                f"v{version}"
-            )
+            self.df_survey.loc[self.df_survey["name"] == "version", "label"] = f"v{version}"
         # create a Pandas Excel writer using XlsxWriter as the engine
         writer = pd.ExcelWriter(newpath, engine="xlsxwriter")
         self.df_survey.to_excel(writer, sheet_name="survey", index=False)
@@ -649,8 +633,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
         for p in self.project.pages.values():
             p_ends = list(
                 filter(
-                    lambda x: issubclass(x.__class__, TriccNodeEnd)
-                    and getattr(x, "process", "") == "pause",
+                    lambda x: issubclass(x.__class__, TriccNodeEnd) and getattr(x, "process", "") == "pause",
                     p.nodes.values(),
                 )
             )
@@ -668,9 +651,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
                         )
                     )
                 else:
-                    logger.critical(
-                        f"impossible to get last index before pause: {e.get_name()}"
-                    )
+                    logger.critical(f"impossible to get last index before pause: {e.get_name()}")
             forms = [form_id]
             for i, e in ends_prev:
                 new_form_id = f"{form_id}_{clean_name(e.name)}"
@@ -685,9 +666,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
                 }
                 df_settings = pd.DataFrame(settings, index=indx)
                 df_settings.head()
-                task_df, hidden_names = make_breakpoints(
-                    self.df_survey, i, e.name, replace_dots=True
-                )
+                task_df, hidden_names = make_breakpoints(self.df_survey, i, e.name, replace_dots=True)
                 # deactivate the end node
                 task_df.loc[task_df["name"] == get_export_name(e), "calculation"] = 0
                 # print fileds
@@ -716,9 +695,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
 
         media_path_tmp = os.path.join(self.output_path, "media-tmp")
         if os.path.isdir(media_path_tmp):
-            if os.path.isdir(
-                media_path
-            ):  # check if it exists, because if it does, error will be raised
+            if os.path.isdir(media_path):  # check if it exists, because if it does, error will be raised
                 shutil.rmtree(media_path)
                 # (later change to make folder complaint to CHT)
             os.mkdir(media_path)
@@ -731,16 +708,31 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
     def tricc_operation_zscore(self, ref_expressions):
         y, ll, m, s = self.get_zscore_params(ref_expressions)
         #  return ((Math.pow((y / m), l) - 1) / (s * l));
-        return f"cht:extension-lib('{ref_expressions[0][1:-1]}.js',{self.clean_coalesce(ref_expressions[1])} ,{self.clean_coalesce(ref_expressions[2])} ,{self.clean_coalesce(ref_expressions[3])})"
+        return f"""cht:extension-lib('{
+            ref_expressions[0][1:-1]
+            }.js',{
+            self.clean_coalesce(ref_expressions[1])
+            } ,{
+            self.clean_coalesce(ref_expressions[2])
+            } ,{
+            self.clean_coalesce(ref_expressions[3])
+            })"""
 
     def tricc_operation_izscore(self, ref_expressions):
         z, ll, m, s = self.get_zscore_params(ref_expressions)
         #  return  (m * (z*s*l-1)^(1/l));
-        return f"cht:extension-lib('{ref_expressions[0][1:-1]}.js',{self.clean_coalesce(ref_expressions[1])} ,{self.clean_coalesce(ref_expressions[2])} ,{self.clean_coalesce(ref_expressions[3])}, true)"
+        return f"""cht:extension-lib('{
+            ref_expressions[0][1:-1]
+            }.js',{
+            self.clean_coalesce(ref_expressions[1])
+            } ,{
+            self.clean_coalesce(ref_expressions[2])
+            } ,{
+            self.clean_coalesce(ref_expressions[3])
+            }, true)"""
 
     def tricc_operation_drug_dosage(self, ref_expressions):
         # drug name
         # age
         # weight
         return f"cht:extension-lib('drugs.js',{','.join(map(self.clean_coalesce, ref_expressions))})"
-

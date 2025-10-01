@@ -1,38 +1,67 @@
-from strenum import StrEnum
-from tricc_oo.models.base import *
-from tricc_oo.models.calculate import *
+from tricc_oo.models.base import (
+    TriccNodeType
+)
 
+from tricc_oo.models.calculate import (
+    TriccNodeBridge,
+    TriccNodeActivityEnd,
+    TriccNodeActivityStart,
+    TriccNodeEnd,
+    TriccNodeAdd,
+    TriccNodeCount,
+    TriccNodeWait,
+    TriccNodeCalculate,
+    TriccNodeRhombus,
+    TriccNodeExclusive,
+    TriccNodeProposedDiagnosis,
+    TriccNodeDiagnosis,
+    TriccNodeInput,
 
+)
+from tricc_oo.models.tricc import (
+    TriccNodeMainStart,
+    TriccNodeLinkIn,
+    TriccNodeGoTo,
+    TriccNodeSelectMultiple,
+    TriccNodeSelectNotAvailable,
+    TriccNodeText,
+    TriccNodeDecimal,
+    TriccNodeInteger,
+    TriccNodeDate,
+    TriccNodeSelectOne,
+    TriccNodeSelectYesNo,
+    TriccNodeNote,
+)
 TYPE_MAP = {
     TriccNodeType.start: {
         "objects": ["UserObject", "object"],
-        "attributes": ['process', 'parent', 'form_id','relevance',"priority"],
+        "attributes": ["process", "parent", "form_id", "relevance", "priority"],
         "mandatory_attributes": ["label"],
-        "model": TriccNodeMainStart
+        "model": TriccNodeMainStart,
     },
     TriccNodeType.activity_start: {
         "objects": ["UserObject", "object"],
-        "attributes": ['parent', 'parent', 'instance', 'relevance',"priority"],
+        "attributes": ["parent", "parent", "instance", "relevance", "priority"],
         "mandatory_attributes": ["label", "name"],
-        "model": TriccNodeActivityStart
+        "model": TriccNodeActivityStart,
     },
     TriccNodeType.note: {
         "objects": ["UserObject", "object"],
-        "attributes": ['relevance',"priority", "context_type"],
+        "attributes": ["relevance", "priority", "context_type"],
         "mandatory_attributes": ["label", "name"],
-        "model": TriccNodeNote
+        "model": TriccNodeNote,
     },
     TriccNodeType.hint: {
         "objects": ["UserObject", "object"],
         "attributes": [],
         "mandatory_attributes": ["label"],
-        "model": None
+        "model": None,
     },
     TriccNodeType.help: {
         "objects": ["UserObject", "object"],
         "attributes": [],
         "mandatory_attributes": ["label"],
-        "model": None
+        "model": None,
     },
     TriccNodeType.select_one: {
         "has_options": True,
@@ -44,10 +73,13 @@ TYPE_MAP = {
             "constraint",
             "constraint_message",
             "relevance",
-            "priority", "trigger", "default", "context_type"
+            "priority",
+            "trigger",
+            "default",
+            "context_type",
         ],
         "mandatory_attributes": ["label", "name", "list_name"],
-        "model": TriccNodeSelectOne
+        "model": TriccNodeSelectOne,
     },
     TriccNodeType.select_multiple: {
         "has_options": True,
@@ -59,10 +91,13 @@ TYPE_MAP = {
             "constraint",
             "constraint_message",
             "relevance",
-            "priority", "trigger", "default", "context_type"
+            "priority",
+            "trigger",
+            "default",
+            "context_type",
         ],
         "mandatory_attributes": ["label", "name", "list_name"],
-        "model": TriccNodeSelectMultiple
+        "model": TriccNodeSelectMultiple,
     },
     TriccNodeType.decimal: {
         "objects": ["UserObject", "object"],
@@ -74,10 +109,13 @@ TYPE_MAP = {
             "constraint_message",
             "required",
             "relevance",
-            "priority", "trigger", "default", "context_type"
+            "priority",
+            "trigger",
+            "default",
+            "context_type",
         ],
         "mandatory_attributes": ["label", "name"],
-        "model": TriccNodeDecimal
+        "model": TriccNodeDecimal,
     },
     TriccNodeType.integer: {
         "objects": ["UserObject", "object"],
@@ -89,67 +127,99 @@ TYPE_MAP = {
             "constraint_message",
             "required",
             "relevance",
-            "priority", "trigger", "default", "context_type"
-            
+            "priority",
+            "trigger",
+            "default",
+            "context_type",
         ],
         "mandatory_attributes": ["label", "name"],
-        "model": TriccNodeInteger
+        "model": TriccNodeInteger,
     },
-
     TriccNodeType.text: {
         "objects": ["UserObject", "object"],
-        "attributes": ["save", "relevance","priority", "trigger", "default", "constraint", "constraint_message", "context_type"],
-        "mandatory_attributes": ["label", 'name'],
-        "model": TriccNodeText
+        "attributes": [
+            "save",
+            "relevance",
+            "priority",
+            "trigger",
+            "default",
+            "constraint",
+            "constraint_message",
+            "context_type",
+        ],
+        "mandatory_attributes": ["label", "name"],
+        "model": TriccNodeText,
     },
     TriccNodeType.date: {
         "objects": ["UserObject", "object"],
-        "attributes": ["save", "relevance","priority", "trigger", "default", "constraint", "constraint_message", "context_type"],
+        "attributes": [
+            "save",
+            "relevance",
+            "priority",
+            "trigger",
+            "default",
+            "constraint",
+            "constraint_message",
+            "context_type",
+        ],
         "mandatory_attributes": ["label", "name"],
-        "model": TriccNodeDate
+        "model": TriccNodeDate,
     },
     TriccNodeType.add: {
         "objects": ["UserObject", "object"],
         "attributes": ["save", "expression", "trigger"],
-        "mandatory_attributes": ['label', "name"],
-        "model": TriccNodeAdd
+        "mandatory_attributes": ["label", "name"],
+        "model": TriccNodeAdd,
     },
     TriccNodeType.count: {
         "objects": ["UserObject", "object"],
         "attributes": ["save", "expression", "trigger"],
-        "mandatory_attributes": ['label', "name"],
-        "model": TriccNodeCount
+        "mandatory_attributes": ["label", "name"],
+        "model": TriccNodeCount,
     },
     TriccNodeType.calculate: {
         "objects": ["UserObject", "object"],
-        "attributes": ["save", "reference", "trigger", "context_type", "remote_reference"],
-        "mandatory_attributes": [ "name", 'label'],
-        "model": TriccNodeCalculate
+        "attributes": [
+            "save",
+            "reference",
+            "trigger",
+            "context_type",
+            "remote_reference",
+        ],
+        "mandatory_attributes": ["name", "label"],
+        "model": TriccNodeCalculate,
     },
     # TODO: Make either reference or remote_reference mandatory
     TriccNodeType.rhombus: {
         "objects": ["UserObject", "object"],
-        "attributes": ["save", "expression", "remote_reference" , "label",'priority', "trigger"],
+        "attributes": [
+            "save",
+            "expression",
+            "remote_reference",
+            "label",
+            "priority",
+            "trigger",
+        ],
         "mandatory_attributes": ["reference"],
-        "model": TriccNodeRhombus
+        "model": TriccNodeRhombus,
     },
     TriccNodeType.wait: {
         "objects": ["UserObject", "object"],
         "attributes": ["save", "expression", "trigger"],
-        "mandatory_attributes": ["reference", "name", 'label'],
-        "model": TriccNodeWait
+        "mandatory_attributes": ["reference", "name", "label"],
+        "model": TriccNodeWait,
     },
     TriccNodeType.exclusive: {
         "objects": ["UserObject", "object"],
         "attributes": [],
         "mandatory_attributes": [],
-        "model": TriccNodeExclusive
+        "model": TriccNodeExclusive,
     },
     TriccNodeType.not_available: {
         "objects": ["UserObject", "object"],
         "attributes": ["context_type"],
         "mandatory_attributes": ["label", "name", "list_name"],
-        "model": TriccNodeSelectNotAvailable
+        "model": TriccNodeSelectNotAvailable,
     },
     TriccNodeType.select_yesno: {
         "objects": ["UserObject", "object"],
@@ -159,66 +229,77 @@ TYPE_MAP = {
             "filter",
             "constraint",
             "constraint_message",
-            "relevance","priority", "trigger", "default", "context_type"
+            "relevance",
+            "priority",
+            "trigger",
+            "default",
+            "context_type",
         ],
         "mandatory_attributes": ["label", "name", "list_name"],
-        "model": TriccNodeSelectYesNo
+        "model": TriccNodeSelectYesNo,
     },
     TriccNodeType.link_out: {
         "objects": ["UserObject", "object"],
         "attributes": [],
         "mandatory_attributes": ["reference", "label", "name"],
-        "model": TriccNodeNote
+        "model": TriccNodeNote,
     },
     TriccNodeType.link_in: {
         "objects": ["UserObject", "object"],
         "attributes": [],
         "mandatory_attributes": ["label", "name"],
-        "model": TriccNodeLinkIn
+        "model": TriccNodeLinkIn,
     },
     TriccNodeType.goto: {
         "objects": ["UserObject", "object"],
-        "attributes": ["instance","priority"],
+        "attributes": ["instance", "priority"],
         "mandatory_attributes": ["link", "label", "name"],
-        "model": TriccNodeGoTo
+        "model": TriccNodeGoTo,
     },
     TriccNodeType.end: {
         "objects": ["UserObject", "object"],
-        "attributes": ['process', 'name', 'label', 'hint'],
-        "mandatory_attributes": ['label'],
-        "model": TriccNodeEnd
+        "attributes": ["process", "name", "label", "hint"],
+        "mandatory_attributes": ["label"],
+        "model": TriccNodeEnd,
     },
     TriccNodeType.activity_end: {
         "objects": ["UserObject", "object"],
         "attributes": [],
         "mandatory_attributes": [],
-        "model": TriccNodeActivityEnd
+        "model": TriccNodeActivityEnd,
     },
     TriccNodeType.bridge: {
         "objects": ["UserObject", "object"],
-        "attributes": ["label","priority"],
+        "attributes": ["label", "priority"],
         "mandatory_attributes": [],
-        "model": TriccNodeBridge
+        "model": TriccNodeBridge,
     },
     TriccNodeType.diagnosis: {
         "objects": ["UserObject", "object"],
         "attributes": ["save", "reference", "priority"],
-        "mandatory_attributes": [ "name", 'label'],
-        "model": TriccNodeDiagnosis
+        "mandatory_attributes": ["name", "label"],
+        "model": TriccNodeDiagnosis,
     },
     TriccNodeType.proposed_diagnosis: {
         "objects": ["UserObject", "object"],
-        "attributes": ["save","remote_reference", "reference", "severity", "priority", "trigger"],
-        "mandatory_attributes": [ "name", 'label'],
-        "model": TriccNodeProposedDiagnosis
+        "attributes": [
+            "save",
+            "remote_reference",
+            "reference",
+            "severity",
+            "priority",
+            "trigger",
+        ],
+        "mandatory_attributes": ["name", "label"],
+        "model": TriccNodeProposedDiagnosis,
     },
     TriccNodeType.input: {
         "objects": ["UserObject", "object"],
-        "attributes": ["save", "reference","datatype", "context_type"],
-        "mandatory_attributes": [ "name", 'label'],
-        "model": TriccNodeInput
+        "attributes": ["save", "reference", "datatype", "context_type"],
+        "mandatory_attributes": ["name", "label"],
+        "model": TriccNodeInput,
     },
-        # TriccNodeType.number: {
+    # TriccNodeType.number: {
     #     "objects": ["UserObject", "object"],
     #     "attributes": ["constraint", "save", "constraint_message", "required"],
     #     "mandatory_attributes": [],

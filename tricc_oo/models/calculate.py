@@ -1,12 +1,19 @@
+from typing import List, Optional, Union
+import logging
+from tricc_oo.models.base import (
+    TriccBaseModel, TriccOperation, TriccStatic, TriccReference, Expression, TriccNodeType
+)
 
-from enum import Enum, auto
-from typing import Dict, ForwardRef, List, Optional, Union
+from tricc_oo.models.tricc import (
+    TriccNodeCalculateBase, TriccNodeBaseModel,
+)
 
-from pydantic import BaseModel, constr
-from strenum import StrEnum
-from .base import *
-from .tricc import *
 from tricc_oo.converters.utils import get_rand_name
+
+logger = logging.getLogger(__name__)
+
+ACTIVITY_END_NODE_FORMAT = "aend_{}"
+
 
 class TriccNodeDisplayCalculateBase(TriccNodeCalculateBase):
     save: Optional[str] = None  # contribute to another calculate
@@ -14,20 +21,23 @@ class TriccNodeDisplayCalculateBase(TriccNodeCalculateBase):
     help: Optional[str] = None  # for diagnostic display
     trigger: Optional[Union[Expression, TriccOperation, TriccReference]] = None
     applicability: Optional[Union[Expression, TriccOperation, TriccReference]] = None
+
     # no need to copy save
     def to_fake(self):
         data = vars(self)
-        del data['hint']
-        del data['help']
-        del data['save']
+        del data["hint"]
+        del data["help"]
+        del data["save"]
         fake = TriccNodeFakeCalculateBase(**data)
-        replace_node(self,fake)
+        self.replace_node(fake)
         return fake
+
     def __str__(self):
         return self.get_name()
 
     def __repr__(self):
         return self.get_name()
+
 
 class TriccNodeCalculate(TriccNodeDisplayCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.calculate
@@ -36,12 +46,12 @@ class TriccNodeCalculate(TriccNodeDisplayCalculateBase):
 
 class TriccNodeAdd(TriccNodeDisplayCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.add
-    datatype: str = 'number'
+    datatype: str = "number"
 
 
 class TriccNodeCount(TriccNodeDisplayCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.count
-    datatype: str = 'number'
+    datatype: str = "number"
 
 
 class TriccNodeProposedDiagnosis(TriccNodeDisplayCalculateBase):
@@ -53,8 +63,10 @@ class TriccNodeProposedDiagnosis(TriccNodeDisplayCalculateBase):
 class TriccNodeFakeCalculateBase(TriccNodeCalculateBase):
     ...
 
+
 class TriccNodeInput(TriccNodeFakeCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.input
+
 
 class TriccNodeDisplayBridge(TriccNodeDisplayCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.bridge
@@ -63,14 +75,18 @@ class TriccNodeDisplayBridge(TriccNodeDisplayCalculateBase):
 class TriccNodeBridge(TriccNodeFakeCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.bridge
 
-class TriccRhombusMixIn():
+
+class TriccRhombusMixIn:
 
     def make_mixin_instance(self, instance, instance_nb, activity, **kwargs):
         # shallow copy
         reference = []
         expression_reference = None
         instance.path = None
-        if isinstance(self.expression_reference, (str, TriccOperation, TriccReference, TriccStatic)):
+        if isinstance(
+            self.expression_reference,
+            (str, TriccOperation, TriccReference, TriccStatic),
+        ):
             expression_reference = self.expression_reference.copy()
             reference = list(expression_reference.get_references())
         if isinstance(self.reference, (str, TriccOperation, TriccReference, TriccStatic)):
@@ -102,12 +118,16 @@ class TriccRhombusMixIn():
         return instance
 
 
-
-
-class TriccNodeRhombus(TriccNodeCalculateBase,TriccRhombusMixIn):
+class TriccNodeRhombus(TriccNodeCalculateBase, TriccRhombusMixIn):
     tricc_type: TriccNodeType = TriccNodeType.rhombus
     path: Optional[TriccNodeBaseModel] = None
-    reference: Union[List[TriccNodeBaseModel], Expression, TriccOperation, TriccReference, List[TriccReference]]
+    reference: Union[
+        List[TriccNodeBaseModel],
+        Expression,
+        TriccOperation,
+        TriccReference,
+        List[TriccReference],
+    ]
     remote_reference: Optional[Union[Expression, TriccOperation, TriccReference]] = None
 
     def make_instance(self, instance_nb, activity, **kwargs):
@@ -115,26 +135,29 @@ class TriccNodeRhombus(TriccNodeCalculateBase,TriccRhombusMixIn):
         instance = self.make_mixin_instance(instance, instance_nb, activity, **kwargs)
         return instance
 
-
     def __init__(self, **data):
-        data['name'] = get_rand_name(data.get('id', None))
+        data["name"] = get_rand_name(data.get("id", None))
         super().__init__(**data)
+
 
 class TriccNodeDiagnosis(TriccNodeDisplayCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.diagnosis
     severity: str = None
+
     def __init__(self, **data):
-        data['reference'] = f'"final.{data["name"]}" is true'
+        data["reference"] = f'"final.{data["name"]}" is true'
         super().__init__(**data)
 
         # rename rhombus
         self.name = get_rand_name(f"d{data.get('id', None)}")
 
+
 class TriccNodeExclusive(TriccNodeFakeCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.exclusive
 
+
 def get_node_from_id(activity, node, edge_only):
-    node_id = getattr(node,'id',node)
+    node_id = getattr(node, "id", node)
     if not isinstance(node_id, str):
         logger.critical("can set prev_next only with string or node")
         exit(1)
@@ -143,9 +166,10 @@ def get_node_from_id(activity, node, edge_only):
     elif node_id in activity.nodes:
         node = activity.nodes[node_id]
     elif not edge_only:
-        logger.critical(f"cannot find {node_id} in  {activiy.get_name()}")
+        logger.critical(f"cannot find {node_id} in  {activity.get_name()}")
         exit(1)
     return node_id, node
+
 
 class TriccNodeWait(TriccNodeFakeCalculateBase, TriccRhombusMixIn):
     tricc_type: TriccNodeType = TriccNodeType.wait
@@ -174,19 +198,21 @@ class TriccNodeEnd(TriccNodeDisplayCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.end
     process: str = None
     priority: int = 1000
+
     def __init__(self, **data):
-        if data.get('name', None) is None:
-            data['name'] = 'tricc_end_' + data.get('process', '')
+        if data.get("name", None) is None:
+            data["name"] = "tricc_end_" + data.get("process", "")
         super().__init__(**data)
         # FOR END
 
     def set_name(self):
         if self.name is None:
             self.name = self.get_reference()
-        #self.name = END_NODE_FORMAT.format(self.activity.id)
+        # self.name = END_NODE_FORMAT.format(self.activity.id)
 
     def get_reference(self):
-        return 'tricc_end_' + (self.process or '')
+        return "tricc_end_" + (self.process or "")
+
 
 class TriccNodeActivityStart(TriccNodeFakeCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.activity_start
@@ -198,8 +224,10 @@ def get_node_from_list(in_nodes, node_id):
     if len(nodes) > 0:
         return nodes[0]
 
+
 # qualculate that saves quantity, or we may merge integer/decimals
 class TriccNodeQuantity(TriccNodeDisplayCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.quantity
+
 
 TriccNodeCalculate.update_forward_refs()

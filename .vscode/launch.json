@@ -67,10 +67,34 @@
         "-l",
         "d",
         "-o",
-        "/mnt/data/Development/tricc_oo/tests/",
+        "/mnt/data/Development/tricc_oo/tests/output/",
         "-t",
         "-O",
         "XLSFormCHTStrategy",
+        "-D",
+        "/Users/delcpa/Downloads/"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}${pathSeparator}${env:PYTHONPATH}"
+      }
+    },
+    {
+      "name": "ETAT",
+      "type": "python",
+      "request": "launch",
+      "program": "tests/build.py",
+      "args": [
+        "-i",
+        "/mnt/data/Development/tricc_oo/tests/data/etat.drawio",
+        "-l",
+        "d",
+        "-o",
+        "/mnt/data/Development/tricc_oo/tests/output/",
+        "-t",
+        "-O",
+        "XLSFormCDSSStrategy",
         "-D",
         "/Users/delcpa/Downloads/"
       ],

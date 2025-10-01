@@ -7,7 +7,7 @@ type_name = "odk_type"
 
 
 def read_drawio(file_content):
-    if file_content.startswith('<mxfile host'):
+    if file_content.startswith("<mxfile host"):
         file_content = "<?xml version='1.0' encoding='utf-8'?>\n" + file_content
     file_content = bytes(bytearray(file_content, encoding="utf-8"))
     root = etree.fromstring(file_content)
@@ -24,9 +24,7 @@ def read_drawio(file_content):
 
 def get_container_media(diagram, container_id):
     # get the edge
-    return diagram.find(
-        f".//object[@{type_name}='container_hint_media' and @id='{container_id}']"
-    )
+    return diagram.find(f".//object[@{type_name}='container_hint_media' and @id='{container_id}']")
     # get the image node
 
 
@@ -57,15 +55,12 @@ def get_tricc_type_list(diagram, node_type, tricc_type=None, parent_id=None):
             return get_child_through_mxcell(diagram, type_name, node_type, parent_suffix, tricc_type)
 
     else:
-        child = list(
-            diagram.findall(
-                f'.//{node_type}[@{type_name}="{tricc_type}"]{parent_suffix}'
-            )
-        )
+        child = list(diagram.findall(f'.//{node_type}[@{type_name}="{tricc_type}"]{parent_suffix}'))
         if child:
             return child
         else:
             return get_child_through_mxcell(diagram, type_name, node_type, parent_suffix, tricc_type)
+
 
 def get_child_through_mxcell(diagram, type_name, node_type, parent_suffix, tricc_type):
     child = []
@@ -74,18 +69,16 @@ def get_child_through_mxcell(diagram, type_name, node_type, parent_suffix, tricc
     for s in sub:
         obj = s.getparent()
         if (
-            obj.tag == node_type 
+            obj.tag == node_type
             and type_name in obj.attrib
-            and (
-                not tricc_type
-                or tricc_type == obj.attrib.get(type_name, None)
-            )
+            and (not tricc_type or tricc_type == obj.attrib.get(type_name, None))
         ):
             child.append(obj)
     return child
 
-    
+
 # end def
+
 
 def get_mxcell_parent_list(diagram, select_id, tricc_type=None, attrib=None):
     # get the mxcels
@@ -100,9 +93,7 @@ def get_mxcell_parent_list(diagram, select_id, tricc_type=None, attrib=None):
             result += get_mxcell_parent_list(diagram, select_id, type)
         return result
     else:
-        return diagram.findall(
-            f".//mxCell[@parent='{select_id}']/..[@{type_name}='{tricc_type}']"
-        )
+        return diagram.findall(f".//mxCell[@parent='{select_id}']/..[@{type_name}='{tricc_type}']")
 
 
 def get_elm(diagram, id):
@@ -110,8 +101,8 @@ def get_elm(diagram, id):
 
 
 def get_mxcell(diagram, id):
-    elm =  diagram.find(f".//*[@id='{id}']")
-    if elm.tag == 'mxCell':
+    elm = diagram.find(f".//*[@id='{id}']")
+    if elm.tag == "mxCell":
         return elm
     else:
         return diagram.find(f".//*[@id='{id}']/mxCell")
@@ -119,13 +110,9 @@ def get_mxcell(diagram, id):
 
 def get_edges_list(diagram):
     # return list(diagram.findall('.//mxCell[@edge][@source][@target]'))
-    # to ensure source and target one can use this xpath above but better trigger a pydantic error if source/target are missing
-    return list(
-        set(
-            diagram.findall(".//mxCell[@edge][@source]")
-            + diagram.findall(".//mxCell[@edge][@target]")
-        )
-    )
+    # to ensure source and target one can use this xpath above
+    # but better trigger a pydantic error if source/target are missing
+    return list(set(diagram.findall(".//mxCell[@edge][@source]") + diagram.findall(".//mxCell[@edge][@target]")))
 
 
 def get_select_option_image(diagram, select_option_id):
@@ -133,6 +120,4 @@ def get_select_option_image(diagram, select_option_id):
     edge = diagram.find(f".//mxCell[@edge and @target='{select_option_id}']")
     # get the image node
     if edge is not None and edge.attrib.get("source") is not None:
-        return diagram.find(
-            f".//mxCell[@id='{edge.attrib.get('source')}' and not(@{type_name}) and not(@edge)]"
-        )
+        return diagram.find(f".//mxCell[@id='{edge.attrib.get('source')}' and not(@{type_name}) and not(@edge)]")
