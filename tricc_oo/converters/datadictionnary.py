@@ -6,8 +6,12 @@ from fhir.resources.codesystem import (
 
 from fhir.resources.valueset import ValueSet
 import logging
+import uuid
 
 logger = logging.getLogger("default")
+
+# Namespace for deterministic UUIDs
+UUID_NAMESPACE = uuid.UUID('12345678-1234-5678-9abc-def012345678')
 
 
 def lookup_codesystems_code(codesystems, ref):
@@ -83,7 +87,8 @@ def check_and_add_concept(code_system: CodeSystem, code: str, display: str, attr
             new_concept = concept
     if not new_concept:
         # Add the new concept if it does not exist
-        new_concept = CodeSystemConcept.construct(code=code, display=display)
+        concept_id = str(uuid.uuid5(UUID_NAMESPACE, display))
+        new_concept = CodeSystemConcept.construct(code=code, display=display, id=concept_id)
         if not hasattr(code_system, "concept"):
             code_system.concept = []
         code_system.concept.append(new_concept)

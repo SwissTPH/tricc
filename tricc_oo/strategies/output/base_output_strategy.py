@@ -83,6 +83,7 @@ class BaseOutPutStrategy:
     # node function
     @abc.abstractmethod
     def generate_calculate(self, node, **kwargs):
+        # called to generate the calculates on the project
         pass
 
     @abc.abstractmethod
@@ -91,10 +92,14 @@ class BaseOutPutStrategy:
 
     @abc.abstractmethod
     def generate_relevance(self, node, **kwargs):
+        # called to generate the references on the project
+
         pass
 
     @abc.abstractmethod
     def generate_export(self, node, **kwargs):
+        # called to the project export
+
         pass
 
     @abc.abstractmethod
@@ -102,87 +107,116 @@ class BaseOutPutStrategy:
         pass
 
     def tricc_operation_equal(self, ref_expressions):
+        # r[0] = r[1]
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
     def tricc_operation_not_equal(self, ref_expressions):
+        # r[0] != r[1]
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
     def tricc_operation_not(self, ref_expressions):
+        # !r[0]
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
     def tricc_operation_and(self, ref_expressions):
+        # r[0] and r[1] ... and r[n]
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
     def tricc_operation_or(self, ref_expressions):
+        # r[0] or r[1] ... or r[n]
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
     def tricc_operation_or_and(self, ref_expressions):
+        # (r[0] or r[1] ... or r[n-1]) and r[n] 
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
     def tricc_operation_native(self, ref_expressions):
+        # r[0](*r[1:])
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
     def tricc_operation_istrue(self, ref_expressions):
+        # r[0] is true
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
     def tricc_operation_isfalse(self, ref_expressions):
+        # r[0] is false
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
     def tricc_operation_selected(self, ref_expressions):
+        # for choice question (single or multiple) it returns true if the second reference is selected
+        # r[1] in r[0]
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
     def tricc_operation_more_or_equal(self, ref_expressions):
+        # r[0] >= r[1]
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
     def tricc_operation_less_or_equal(self, ref_expressions):
+        # r[0] <= r[1]
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
     def tricc_operation_more(self, ref_expressions):
+        # r[0] > r[1]
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
     def tricc_operation_less(self, ref_expressions):
+        # r[0] < r[1]
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
     def tricc_operation_between(self, ref_expressions):
+        # r[0] between r[1] and r[2]
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
     def tricc_operation_case(self, ref_expressions):
+        # case r[0] when r[1][0] then r[1][1] ...  when r[n-1][0] then r[n-1][1] else (r[n] or None) 
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
     def tricc_operation_if(self, ref_expressions):
+        # if r[0][0] then r[0][1] ... elif r[n-1][0] then r[n-1][1] else (r[n] or None) 
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
     def tricc_operation_contains(self, ref_expressions):
+        # r[0] contains r[1]
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
     def tricc_operation_exists(self, ref_expressions):
+        # r[0] exists
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
     def tricc_operation_has_qualifier(self, ref_expressions):
+        # r[0] is a class and has r[1] qualifier
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
     def tricc_operation_zscore(self, ref_expressions):
+        # FIXME zscore((gender=r[0], Xfy=r[1], xfY=r[2]) 
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
     def tricc_operation_datetime_to_decimal(self, ref_expressions):
+        # cast r[0] in decimal
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
     def tricc_operation_round(self, ref_expressions):
+        #round(r[0], r[1])
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
     def tricc_operation_izscore(self, ref_expressions):
+        # FIXME izscore(gender=r[0], Z=r[1], xfY=r[2]) 
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
     def tricc_operation_age_day(self, ref_expressions):
+        # Patient age in day
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
     def tricc_operation_age_month(self, ref_expressions):
+        # Patient age in Month
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
     def tricc_operation_age_year(self, ref_expressions):
+        # Patient age in Years
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
     def tricc_operation_concatenate(self, ref_expressions):
+        # concatenate(*r)
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
     # Utils

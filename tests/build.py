@@ -3,6 +3,10 @@ from tricc_oo.strategies.output.xlsform_cht_hf import XLSFormCHTHFStrategy
 from tricc_oo.strategies.output.xlsform_cht import XLSFormCHTStrategy
 from tricc_oo.strategies.output.xlsform_cdss import XLSFormCDSSStrategy
 from tricc_oo.strategies.output.xls_form import XLSFormStrategy
+from tricc_oo.strategies.output.openmrs_form import OpenMRSStrategy
+from tricc_oo.strategies.output.fhir_form import FHIRStrategy
+from tricc_oo.strategies.output.html_form import HTMLStrategy
+
 from tricc_oo.strategies.input.drawio import DrawioStrategy
 import getopt
 import gettext
