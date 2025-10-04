@@ -127,7 +127,7 @@ class BaseOutPutStrategy:
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
     def tricc_operation_or_and(self, ref_expressions):
-        # (r[0] or r[1] ... or r[n-1]) and r[n] 
+        # (r[0] or r[1] ... or r[n-1]) and r[n]
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
     def tricc_operation_native(self, ref_expressions):
@@ -168,11 +168,11 @@ class BaseOutPutStrategy:
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
     def tricc_operation_case(self, ref_expressions):
-        # case r[0] when r[1][0] then r[1][1] ...  when r[n-1][0] then r[n-1][1] else (r[n] or None) 
+        # case r[0] when r[1][0] then r[1][1] ...  when r[n-1][0] then r[n-1][1] else (r[n] or None)
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
     def tricc_operation_if(self, ref_expressions):
-        # if r[0][0] then r[0][1] ... elif r[n-1][0] then r[n-1][1] else (r[n] or None) 
+        # if r[0][0] then r[0][1] ... elif r[n-1][0] then r[n-1][1] else (r[n] or None)
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
     def tricc_operation_contains(self, ref_expressions):
@@ -188,7 +188,7 @@ class BaseOutPutStrategy:
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
     def tricc_operation_zscore(self, ref_expressions):
-        # FIXME zscore((gender=r[0], Xfy=r[1], xfY=r[2]) 
+        # FIXME zscore((gender=r[0], Xfy=r[1], xfY=r[2])
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
     def tricc_operation_datetime_to_decimal(self, ref_expressions):
@@ -196,11 +196,11 @@ class BaseOutPutStrategy:
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
     def tricc_operation_round(self, ref_expressions):
-        #round(r[0], r[1])
+        # round(r[0], r[1])
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
     def tricc_operation_izscore(self, ref_expressions):
-        # FIXME izscore(gender=r[0], Z=r[1], xfY=r[2]) 
+        # FIXME izscore(gender=r[0], Z=r[1], xfY=r[2])
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
     def tricc_operation_age_day(self, ref_expressions):

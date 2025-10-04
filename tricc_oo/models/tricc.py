@@ -404,7 +404,7 @@ class TriccNodeSelectYesNo(TriccNodeSelectOne):
     pass
 
 
-class TriccNodeAcceptDiagnostic(TriccNodeSelectOne):
+class TriccNodeAcceptDiagnostic(TriccNodeSelectYesNo):
     severity: Optional[str] = None
     priority: Union[float, int, None] = None
 

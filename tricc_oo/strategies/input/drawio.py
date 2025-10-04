@@ -3,7 +3,7 @@ import os
 
 from tricc_oo.converters.xml_to_tricc import create_activity
 from tricc_oo.visitors.tricc import (
-    process_calculate,
+    load_calculate,
     set_prev_next_node,
     replace_node,
     stashed_node_func,
@@ -47,7 +47,7 @@ class DrawioStrategy(BaseInputStrategy):
         # add save nodes and merge nodes
         stashed_node_func(
             start_page.root,
-            process_calculate,
+            load_calculate,
             used_calculates=used_calculates,
             calculates=calculates,
             recursive=False,

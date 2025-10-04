@@ -1,14 +1,11 @@
-import abc
 import logging
 import os
 import json
-import uuid
-from tricc_oo.visitors.tricc import stashed_node_func
 import datetime
 from tricc_oo.strategies.output.base_output_strategy import BaseOutPutStrategy
 from tricc_oo.models.base import (
-    TriccOperator,
-    TriccOperation, TriccStatic, TriccReference, TriccNodeType
+    TriccOperation,
+    TriccStatic, TriccReference
 )
 from tricc_oo.models.tricc import (
     TriccNodeSelectOption,
@@ -36,8 +33,6 @@ class FHIRStrategy(BaseOutPutStrategy):
         ref_expressions = []
         if not hasattr(operation, "reference"):
             return self.get_tricc_operation_operand(operation)
-
-        operator = getattr(operation, "operator", "")
         for r in operation.reference:
             if isinstance(r, list):
                 r_expr = [
@@ -254,8 +249,6 @@ class FHIRStrategy(BaseOutPutStrategy):
         ref_expressions = []
         if not hasattr(operation, "reference"):
             return self.get_tricc_operation_operand_fhirpath(operation)
-
-        operator = getattr(operation, "operator", "")
         for r in operation.reference:
             if isinstance(r, list):
                 r_expr = [

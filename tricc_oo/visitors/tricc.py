@@ -6,7 +6,7 @@ import base64
 
 from tricc_oo.converters.utils import generate_id
 from tricc_oo.models.base import (
-    TriccBaseModel,
+    TriccBaseModel, TriccNodeType,
     TriccOperator, TriccOperation, TriccStatic, TriccReference, not_clean,
     and_join, or_join, clean_or_list, nand_join, TriccEdge
 )
@@ -218,7 +218,7 @@ def merge_expression(expression, last_version):
     return expression
 
 
-def process_calculate(
+def load_calculate(
     node, processed_nodes, stashed_nodes, calculates, used_calculates, warn=False, process=None, **kwargs
 ):
     # used_calculates dict[name, Dict[id, node]]
@@ -893,7 +893,7 @@ def add_used_calculate(node, prev_node, calculates, used_calculates, processed_n
                 used_calculates[prev_node.name][max_version.id] = max_version
         else:
             logger.debug(
-                "process_calculate_version_requirement: failed for {0} , prev Node {1} ".format(
+                "load_calculate_version_requirement: failed for {0} , prev Node {1} ".format(
                     node.get_name(), prev_node.get_name()
                 )
             )
@@ -2509,12 +2509,13 @@ def get_selected_option_expression(option_node, negate):
     else:
         return get_selected_option_expression_multiple(option_node, negate)
 
+
 def get_selected_option_expression_single(option_node, negate):
 
-    if not negate: 
-        return TriccOperation(TriccOperator.EQUAL , [option_node.select, option_node])
+    if not negate:
+        return TriccOperation(TriccOperator.EQUAL, [option_node.select, option_node])
 
-    
+
 def get_selected_option_expression_multiple(option_node, negate):
 
     selected = TriccOperation(TriccOperator.SELECTED, [option_node.select, option_node])
@@ -2530,3 +2531,100 @@ def get_selected_option_expression_multiple(option_node, negate):
 
     else:
         return selected
+
+
+def generate_calculate(node, processed_nodes, **kwargs):
+    # For calculations, set calculate in questionOptions
+    # Check if node is ready to be processed (similar to XLS form strategy)
+    if not is_ready_to_process(node, processed_nodes, strict=True):
+        return False
+
+    # Process references to ensure dependencies are handled
+    if not process_reference(
+        node, processed_nodes, {}, replace_reference=True, codesystems=kwargs.get("codesystems", None)
+    ):
+        return False
+
+    if node not in processed_nodes:
+        if kwargs.get("warn", True):
+            logger.debug("generation of calculate for node {}".format(node.get_name()))
+        if (
+            hasattr(node, "expression")
+            and (node.expression is None)
+            and issubclass(node.__class__, TriccNodeCalculateBase)
+        ):
+            node.expression = get_node_expressions(
+                node, processed_nodes, process=kwargs.get("process", "main ")
+            )
+            # continue walk
+        if issubclass(
+            node.__class__,
+            (
+                TriccNodeDisplayModel,
+                TriccNodeDisplayCalculateBase,
+                TriccNodeEnd,
+            ),
+        ):
+            set_last_version_false(node, processed_nodes)
+    return True
+
+
+def generate_base(node, processed_nodes, **kwargs):
+    # Generate question for OpenMRS O3 schema
+    # Handle activity nodes by processing their inner content
+    # Check if node is ready to be processed (similar to XLS form strategy)
+    if not is_ready_to_process(node, processed_nodes, strict=False):
+        return False
+
+    # Process references to ensure dependencies are handled
+    if not process_reference(
+        node, processed_nodes, {}, replace_reference=False, codesystems=kwargs.get("codesystems", None)
+    ):
+        return False
+    if node not in processed_nodes:
+        if issubclass(node.__class__, TriccRhombusMixIn) and isinstance(node.reference, str):
+            logger.warning("node {} still using the reference string".format(node.get_name()))
+        if issubclass(node.__class__, TriccNodeInputModel):
+            # we don't overright if define in the diagram
+            if node.constraint is None:
+                if isinstance(node, TriccNodeSelectMultiple):
+                    node.constraint = or_join(
+                        [
+                            TriccOperation(
+                                TriccOperator.EQUAL,
+                                ["$this", TriccStatic("opt_none")],
+                            ),
+                            TriccOperation(
+                                TriccOperator.NOT,
+                                [
+                                    TriccOperation(
+                                        TriccOperator.SELECTED,
+                                        ["$this", TriccStatic("opt_none")],
+                                    )
+                                ],
+                            ),
+                        ]
+                    )  # '.=\'opt_none\' or not(selected(.,\'opt_none\'))'
+                    node.constraint_message = "**None** cannot be selected together with choice."
+                elif node.tricc_type in (
+                    TriccNodeType.integer,
+                    TriccNodeType.decimal,
+                ):
+                    constraints = []
+                    constraints_min = ""
+                    constraints_max = ""
+                    if node.min is not None and node.min != "":
+                        constraints.append(TriccOperation(TriccOperator.MORE_OR_EQUAL, ["$this", node.min]))
+                        constraints_min = "The minimun value is {0}.".format(node.min)
+                    if node.max is not None and node.max != "":
+                        constraints.append(TriccOperation(TriccOperator.LESS_OR_EQUAL, ["$this", node.max]))
+                        constraints_max = "The maximum value is {0}.".format(node.max)
+                    if len(constraints) > 1:
+                        node.constraint = TriccOperation(TriccOperator.AND, constraints)
+                        node.constraint_message = (constraints_min + " " + constraints_max).strip()
+                    elif len(constraints) == 1:
+                        node.constraint = constraints[0]
+                        node.constraint_message = (constraints_min + " " + constraints_max).strip()
+        # continue walk
+        return True
+    return False

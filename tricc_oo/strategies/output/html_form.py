@@ -1,12 +1,10 @@
-import abc
 import logging
 import os
-from tricc_oo.visitors.tricc import stashed_node_func
 import datetime
 from tricc_oo.strategies.output.base_output_strategy import BaseOutPutStrategy
 from tricc_oo.models.base import (
-    TriccOperator,
-    TriccOperation, TriccStatic, TriccReference, TriccNodeType
+    TriccOperation,
+    TriccStatic, TriccReference
 )
 from tricc_oo.models.tricc import (
     TriccNodeSelectOption,
@@ -32,8 +30,6 @@ class HTMLStrategy(BaseOutPutStrategy):
         ref_expressions = []
         if not hasattr(operation, "reference"):
             return self.get_tricc_operation_operand(operation)
-
-        operator = getattr(operation, "operator", "")
         for r in operation.reference:
             if isinstance(r, list):
                 r_expr = [
@@ -88,23 +84,23 @@ class HTMLStrategy(BaseOutPutStrategy):
         if hasattr(node, 'tricc_type'):
             onchange = "onchange='updateForm()'"
             if node.tricc_type == 'text':
-                self.html_content += f"<input type='text' id='{node.get_name()}' name='{node.get_name()}' {onchange} />\n"
+                self.html_content += f"<input type='text' id='{node.get_name()}' name='{node.get_name()}' {onchange} />\n"  # noqa: E501
             elif node.tricc_type == 'integer':
-                self.html_content += f"<input type='number' id='{node.get_name()}' name='{node.get_name()}' {onchange} />\n"
+                self.html_content += f"<input type='number' id='{node.get_name()}' name='{node.get_name()}' {onchange} />\n"  # noqa: E501
             # Add more types as needed
         return True
 
     def generate_relevance(self, node, **kwargs):
         # Generate JS for skip logic (relevance)
         if hasattr(node, 'expression') and node.expression:
-            relevance_js = f"if ({self.convert_expression_to_js(node.expression)}) {{ document.getElementById('{node.get_name()}').style.display = 'block'; }} else {{ document.getElementById('{node.get_name()}').style.display = 'none'; }}"
+            relevance_js = f"if ({self.convert_expression_to_js(node.expression)}) {{ document.getElementById('{node.get_name()}').style.display = 'block'; }} else {{ document.getElementById('{node.get_name()}').style.display = 'none'; }}"  # noqa: E501
             self.js_statements.append(relevance_js)
         return True
 
     def generate_calculate(self, node, **kwargs):
         # Generate JS for calculations
         if hasattr(node, 'expression') and node.expression:
-            calc_js = f"document.getElementById('{node.get_name()}').value = {self.convert_expression_to_js(node.expression)};"
+            calc_js = f"document.getElementById('{node.get_name()}').value = {self.convert_expression_to_js(node.expression)};"  # noqa: E501
             self.js_statements.append(calc_js)
         return True
 

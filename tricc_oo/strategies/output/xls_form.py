@@ -12,19 +12,17 @@ import pandas as pd
 from tricc_oo.converters.utils import clean_name
 from tricc_oo.models.base import (
     TriccOperator,
-    TriccOperation, TriccStatic, TriccReference, TriccNodeType, or_join
+    TriccOperation, TriccStatic, TriccReference
 )
 from tricc_oo.models.ordered_set import OrderedSet
 from tricc_oo.models.calculate import (
     TriccNodeEnd,
     TriccNodeDisplayCalculateBase,
-    TriccRhombusMixIn,
 
 )
 from tricc_oo.models.tricc import (
     TriccNodeCalculateBase,
     TriccNodeBaseModel,
-    TriccNodeSelectMultiple,
     TriccNodeSelectOption,
     TriccNodeInputModel,
     TriccNodeDisplayModel
@@ -42,6 +40,8 @@ from tricc_oo.visitors.tricc import (
     TRICC_TRUE_VALUE,
     TRICC_FALSE_VALUE,
     set_last_version_false,
+    generate_calculate,
+    generate_base,
 )
 from tricc_oo.serializers.xls_form import (
     CHOICE_MAP,
@@ -104,13 +104,13 @@ class XLSFormStrategy(BaseOutPutStrategy):
         return str(expression)
 
     def generate_base(self, node, **kwargs):
-        return self.generate_xls_form_condition(node, **kwargs)
+        return generate_base(node, **kwargs)
 
     def generate_relevance(self, node, **kwargs):
         return self.generate_xls_form_relevance(node, **kwargs)
 
     def generate_calculate(self, node, **kwargs):
-        return self.generate_xls_form_calculate(node, **kwargs)
+        return generate_calculate(node, **kwargs)
 
     def __init__(self, project, output_path):
         super().__init__(project, output_path)
@@ -688,68 +688,9 @@ class XLSFormStrategy(BaseOutPutStrategy):
                 return True
         return False
 
-    # function update the select node in the XLSFORM format
-    # @param left part
-    # @param right part
-    def generate_xls_form_condition(self, node, processed_nodes, stashed_nodes, calculates, **kwargs):
-        if is_ready_to_process(node, processed_nodes, strict=False) and process_reference(
-            node,
-            processed_nodes,
-            calculates,
-            replace_reference=False,
-            codesystems=kwargs.get("codesystems", None),
-        ):
-            if node not in processed_nodes:
-                if issubclass(node.__class__, TriccRhombusMixIn) and isinstance(node.reference, str):
-                    logger.warning("node {} still using the reference string".format(node.get_name()))
-                if issubclass(node.__class__, TriccNodeInputModel):
-                    # we don't overright if define in the diagram
-                    if node.constraint is None:
-                        if isinstance(node, TriccNodeSelectMultiple):
-                            node.constraint = or_join(
-                                [
-                                    TriccOperation(
-                                        TriccOperator.EQUAL,
-                                        ["$this", TriccStatic("opt_none")],
-                                    ),
-                                    TriccOperation(
-                                        TriccOperator.NOT,
-                                        [
-                                            TriccOperation(
-                                                TriccOperator.SELECTED,
-                                                ["$this", TriccStatic("opt_none")],
-                                            )
-                                        ],
-                                    ),
-                                ]
-                            )  # '.=\'opt_none\' or not(selected(.,\'opt_none\'))'
-                            node.constraint_message = "**None** cannot be selected together with choice."
-                        elif node.tricc_type in (
-                            TriccNodeType.integer,
-                            TriccNodeType.decimal,
-                        ):
-                            constraints = []
-                            constraints_min = ""
-                            constraints_max = ""
-                            if node.min is not None and node.min != "":
-                                constraints.append(TriccOperation(TriccOperator.MORE_OR_EQUAL, ["$this", node.min]))
-                                constraints_min = "The minimun value is {0}.".format(node.min)
-                            if node.max is not None and node.max != "":
-                                constraints.append(TriccOperation(TriccOperator.LESS_OR_EQUAL, ["$this", node.max]))
-                                constraints_max = "The maximum value is {0}.".format(node.max)
-                            if len(constraints) > 1:
-                                node.constraint = TriccOperation(TriccOperator.AND, constraints)
-                                node.constraint_message = (constraints_min + " " + constraints_max).strip()
-                            elif len(constraints) == 1:
-                                node.constraint = constraints[0]
-                                node.constraint_message = (constraints_min + " " + constraints_max).strip()
-                # continue walk
-                return True
-        return False
-
-    # function transform an object to XLSFORM value
-    # @param r reference to be translated
     def get_tricc_operation_operand(self, r, coalesce_fallback="''"):
+        # function transform an object to XLSFORM value
+        # @param r reference to be translated
         if isinstance(r, TriccOperation):
             return self.get_tricc_operation_expression(r)
         elif isinstance(r, TriccReference):

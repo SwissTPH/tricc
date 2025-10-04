@@ -1,23 +1,32 @@
-import abc
 import logging
 import os
 import json
 import uuid
-from tricc_oo.visitors.tricc import stashed_node_func, is_ready_to_process, process_reference, get_node_expressions
+from tricc_oo.visitors.tricc import (
+    is_ready_to_process,
+    process_reference,
+    generate_base,
+    generate_calculate,
+    walktrhough_tricc_node_processed_stached,
+    check_stashed_loop,
+)
+from tricc_oo.converters.tricc_to_xls_form import get_export_name
 import datetime
 from tricc_oo.strategies.output.base_output_strategy import BaseOutPutStrategy
 from tricc_oo.models.base import (
-    TriccOperator, not_clean,
-    TriccOperation, TriccStatic, TriccReference, TriccNodeType
+    not_clean, TriccOperation,
+    TriccStatic, TriccReference
 )
 from tricc_oo.models.tricc import (
     TriccNodeSelectOption,
     TriccNodeInputModel,
     TriccNodeBaseModel,
-)
+    TriccNodeDisplayModel,
+    TriccNodeSelectYesNo
+    )
 
 from tricc_oo.models.calculate import TriccNodeDisplayCalculateBase
-from tricc_oo.converters.tricc_to_xls_form import get_export_name
+from tricc_oo.models.ordered_set import OrderedSet
 
 logger = logging.getLogger("default")
 
@@ -32,7 +41,7 @@ class OpenMRSStrategy(BaseOutPutStrategy):
 
     def __init__(self, project, output_path):
         super().__init__(project, output_path)
-        form_id = getattr(self.project.start_pages["main"],'form_id', 'openmrs_form')
+        form_id = getattr(self.project.start_pages["main"], 'form_id', 'openmrs_form')
         self.form_data = {
             "$schema": "http://json.openmrs.org/form.schema.json",
             "name": form_id,
@@ -50,41 +59,45 @@ class OpenMRSStrategy(BaseOutPutStrategy):
             ],
             "referencedForms": [],
             "encounter": form_id,
-            "pages": [
-                {
-                    "label": "Main Page",
-                    "sections": [
-                        {
-                            "label": "Main Section",
-                            "questions": []
-                        }
-                    ]
-                }
-            ]
+            "pages": []
         }
         self.field_counter = 1
         self.questions_temp = []  # Temporary storage for questions with ordering info
         self.processing_order = 0  # Counter to track processing order
+        self.current_segment = None
+        self.current_activity = None
+        self.concept_map = {}
+
+    def get_export_name(self, r):
+        if isinstance(r, TriccNodeSelectOption):
+            return self.get_option_value(r.name)
+        elif isinstance(r, str):
+            return self.get_option_value(r)
+        elif isinstance(r, TriccStatic):
+            if isinstance(r.value, str):
+                return self.get_option_value(r.value)
+            elif isinstance(r.value, bool):
+                return str(r.value).lower()
+            else:
+                return r.value
+        else:
+            return get_export_name(r)  # Assuming r is a node
 
     def generate_id(self, name):
         return str(uuid.uuid5(UUID_NAMESPACE, name))
 
     def get_option_value(self, option_name):
-        """Map option names to OpenMRS concept UUIDs"""
-        if option_name.lower() == 'yes':
-            return "1065AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-        elif option_name.lower() == 'no':
-            return "1066AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-        else:
-            return self.generate_id(option_name)
+        if option_name == 'true':
+            return TriccStatic(True)
+        elif option_name == 'false':
+            return TriccStatic(False)
+        return self.concept_map.get(option_name, option_name)
 
     def get_tricc_operation_expression(self, operation):
         # Similar to HTML, but for JSON, perhaps convert to string expressions
         ref_expressions = []
         if not hasattr(operation, "reference"):
             return self.get_tricc_operation_operand(operation)
-
-        operator = getattr(operation, "operator", "")
         for r in operation.reference:
             if isinstance(r, list):
                 r_expr = [
@@ -101,6 +114,8 @@ class OpenMRSStrategy(BaseOutPutStrategy):
                 r_expr = self.get_tricc_operation_operand(r)
             if isinstance(r_expr, TriccReference):
                 r_expr = self.get_tricc_operation_operand(r_expr)
+            elif isinstance(r_expr, TriccStatic) and isinstance(r_expr.value, bool):
+                r_expr = str(r_expr.value).lower()
             ref_expressions.append(r_expr)
 
         # build lower level
@@ -121,13 +136,10 @@ class OpenMRSStrategy(BaseOutPutStrategy):
             logger.critical("Main process required")
 
         logger.info("generate the relevance based on edges")
-        self.process_relevance(self.project.start_pages, pages=self.project.pages)
+        # self.process_relevance(self.project.start_pages, pages=self.project.pages)
 
         logger.info("generate the calculate based on edges")
         self.process_calculate(self.project.start_pages, pages=self.project.pages)
-
-        logger.info("finalize questions order")
-        self.finalize_questions()
 
         logger.info("generate the export format")
         self.process_export(self.project.start_pages, pages=self.project.pages)
@@ -135,56 +147,64 @@ class OpenMRSStrategy(BaseOutPutStrategy):
         logger.info("print the export")
         self.export(self.project.start_pages, version=version)
 
-    def map_tricc_type_to_rendering(self, tricc_type):
+    def map_tricc_type_to_rendering(self, node):
         mapping = {
             'text': 'text',
             'integer': 'number',
+            'decimal': 'number',
+            'date': 'date',
+            'datetime': 'datetime',
             'select_one': 'select',
-            'select_multiple': 'multiCheckbox'
+            'select_multiple': 'multiCheckbox',
+            'select_yesno': 'toggle',
+            'not_available': 'checkbox',
+            'note': 'text'
         }
-        return mapping.get(tricc_type, 'text')
 
-    def generate_base(self, node, **kwargs):
-        # Generate question for OpenMRS O3 schema
-        # Handle activity nodes by processing their inner content
-        if hasattr(node, 'tricc_type') and node.tricc_type == 'activity':
-            # Process inner nodes of the activity
-            if hasattr(node, 'nodes') and node.nodes:
-                for inner_node in node.nodes.values():
-                    self.generate_base(inner_node, **kwargs)
+        if issubclass(node.__class__, TriccNodeSelectYesNo):
+            return 'toggle'
+        return mapping.get(node.tricc_type, 'text')
+
+    def generate_base(self, node, processed_nodes, **kwargs):
+        if generate_base(node, processed_nodes, **kwargs):
+            if getattr(node, 'name', '') not in ('true', 'false'):
+                self.concept_map[node.name] = self.generate_id(self.get_export_name(node))
             return True
+        return False
 
-        processed_nodes = kwargs.get('processed_nodes', set())
-
-        # Check if node is ready to be processed (similar to XLS form strategy)
-        if not is_ready_to_process(node, processed_nodes, strict=False):
-            return False
-
-        # Process references to ensure dependencies are handled
-        if not process_reference(node, processed_nodes, {}, replace_reference=False, codesystems=kwargs.get("codesystems", None)):
-            return False
-
-        if hasattr(node, 'tricc_type') and node.tricc_type in ['text', 'integer', 'select_one', 'select_multiple']:
+    def generate_question(self, node):
+        if issubclass(node.__class__, TriccNodeDisplayModel) and not isinstance(node, TriccNodeSelectOption):
             question = {
                 "label": getattr(node, 'label', '').replace('\u00a0', ' ').strip(),
-                "type": "obs",
+                "type": "obs" if issubclass(node.__class__, TriccNodeInputModel) else 'control',
                 "questionOptions": {
-                    "rendering": self.map_tricc_type_to_rendering(node.tricc_type),
-                    "concept": "",  # Concept UUID, to be set
+                    "rendering": self.map_tricc_type_to_rendering(node),
                 },
                 "required": str(getattr(node, 'required', False)),
                 "unspecified": False,
-                "id": get_export_name(node),
-                "uuid": self.generate_id(get_export_name(node))
+                "id": self.get_export_name(node),
+                "uuid": self.generate_id(self.get_export_name(node))
             }
+            if node.image:
+                question['questionOptions']["imageUrl"] = node.image
+            if node.hint:
+                question["questionInfo"] = node.hint
             if node.tricc_type in ['select_one', 'select_multiple']:
+                labelTrue = None
+                labelFalse = None
                 # Add answers if options
                 if hasattr(node, 'options'):
                     answers = []
                     for opt in node.options.values():
                         display = getattr(opt, 'label', opt.name)
                         # All options now use UUIDs
-                        concept_val = self.get_option_value(display)
+                        concept_val = self.get_option_value(opt.name)
+                        if concept_val == TriccStatic(False):
+                            concept_val = '1065AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+                            labelFalse = display
+                        if concept_val == TriccStatic(True):
+                            concept_val = '1065AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+                            labelTrue = display
                         answers.append({
                             "label": display,
                             "concept": concept_val,
@@ -193,109 +213,147 @@ class OpenMRSStrategy(BaseOutPutStrategy):
                     question["questionOptions"]["answers"] = answers
                 else:
                     question["questionOptions"]["answers"] = []
-            # Set concept for the question itself if it's a coded question
-            if node.tricc_type in ['select_one', 'select_multiple']:
-                # Use the question's export name as concept
-                question["questionOptions"]["concept"] = self.generate_id(get_export_name(node))
+                # Set concept for the question itself if it's a coded question
+                if getattr(node, 'last', True):
+                    question["questionOptions"]["concept"] = self.generate_id(self.get_export_name(node))
+                if issubclass(node.__class__, TriccNodeSelectYesNo):
+                    question["questionOptions"]["toggleOptions"] = {
+                        "labelTrue": labelTrue,
+                        "labelFalse": labelFalse
+                    }
 
-            # Store question with processing order
-            self.questions_temp.append({
-                'question': question,
-                'processing_order': self.processing_order,
-                'node_id': getattr(node, 'id', '')
-            })
-            self.processing_order += 1
-            self.field_counter += 1
-        return True
+            relevance = None
+            if hasattr(node, 'relevance') and node.relevance:
+                relevance = node.relevance
+            if hasattr(node, 'expression') and node.expression:
+                relevance = node.expression
+            if relevance:
+                relevance_str = self.convert_expression_to_string(not_clean(relevance))
+                if relevance_str and relevance_str != 'false':
+                    question["hide"] = {
+                        "hideWhenExpression": f"{relevance_str}"
+                    }
+            return question
+        elif issubclass(node.__class__, TriccNodeDisplayCalculateBase):
+            expression = getattr(node, 'expression', None)
+            if expression:
+                question = {
+                    "id": self.get_export_name(node),
+                    "label": getattr(node, 'label', '').replace('\u00a0', ' ').strip(),
+                    "isHidden": True,
+                    "questionOptions": {
+                        "calculate": {
+                            "calculateExpression": self.convert_expression_to_string(expression)
+                        }
+                    }
+                }
+                return question
+        return None
 
-    def generate_relevance(self, node, processed_nodes, **kwargs):
-        # Check if node is ready to be processed (similar to XLS form strategy)
+    def generate_calculate(self, node, processed_nodes, **kwargs):
+        return generate_calculate(node, processed_nodes, **kwargs)
+
+    def process_export(self, start_pages, **kwargs):
+        self.activity_export(start_pages["main"], **kwargs)
+
+    def activity_export(self, activity, processed_nodes=None, **kwargs):
+        if processed_nodes is None:
+            processed_nodes = OrderedSet()
+        stashed_nodes = OrderedSet()
+        # The stashed node are all the node that have all their prevnode processed but not from the same group
+        # This logic works only because the prev node are ordered by group/parent ..
+        groups = {}
+        cur_group = activity
+        groups[activity.id] = 0
+        path_len = 0
+        process = ["main"]
+        # keep the versions on the group id, max version
+        self.start_page(cur_group)
+        self.start_section(cur_group)
+        walktrhough_tricc_node_processed_stached(
+            activity.root,
+            self.generate_export,
+            processed_nodes,
+            stashed_nodes,
+            path_len,
+            cur_group=activity.root.group,
+            process=process,
+            recursive=False,
+            **kwargs
+        )
+        # we save the survey data frame
+        # MANAGE STASHED NODES
+        prev_stashed_nodes = stashed_nodes.copy()
+        loop_count = 0
+        len_prev_processed_nodes = 0
+        while len(stashed_nodes) > 0:
+            self.questions_temp = []  # Reset for new section
+            loop_count = check_stashed_loop(
+                stashed_nodes,
+                prev_stashed_nodes,
+                processed_nodes,
+                len_prev_processed_nodes,
+                loop_count,
+            )
+            prev_stashed_nodes = stashed_nodes.copy()
+            len_prev_processed_nodes = len(processed_nodes)
+            if len(stashed_nodes) > 0:
+                s_node = stashed_nodes.pop()
+                # while len(stashed_nodes)>0 and isinstance(s_node,TriccGroup):
+                #    s_node = stashed_nodes.pop()
+                if s_node.group is None:
+                    logger.critical("ERROR group is none for node {}".format(s_node.get_name()))
+                # arrange empty group
+                walktrhough_tricc_node_processed_stached(
+                    s_node,
+                    self.generate_export,
+                    processed_nodes,
+                    stashed_nodes,
+                    path_len,
+                    groups=groups,
+                    cur_group=s_node.group,
+                    recursive=False,
+                    process=process,
+                    **kwargs
+                )
+                # add end group if new node where added OR if the previous end group was removed
+                # if two line then empty group
+                if len(self.questions_temp) > 0:
+                    # Add questions to current section
+                    for q_item in sorted(self.questions_temp, key=lambda x: x['processing_order']):
+                        if self.current_section:
+                            self.current_section["questions"].append(q_item['question'])
+                    cur_group = s_node.group
+
+        return processed_nodes
+
+    def generate_export(self, node, processed_nodes, **kwargs):
         if not is_ready_to_process(node, processed_nodes, strict=False):
             return False
 
         # Process references to ensure dependencies are handled
-        if not process_reference(node, processed_nodes, {}, replace_reference=False, codesystems=kwargs.get("codesystems", None)):
-            return False
-        
-        # For relevance, set hide at question level
-        relevance = None
-        if hasattr(node, 'relevance') and node.relevance:
-            relevance = node.relevance
-        if hasattr(node, 'expression') and node.expression:
-            relevance = node.expression
-        if relevance:
-            question_id = get_export_name(node)
-            for item in self.questions_temp:
-                if item['question']["id"] == question_id:
-                    # hide is the opposite of relevance, so use negate
-                    relevance_str = self.convert_expression_to_string(not_clean(relevance))
-                    if relevance_str and relevance_str != 'false':
-                        item['question']["hide"] = {
-                            "hideWhenExpression": f"{relevance_str}"
-                        }
-                    break
-        return True
-
-    def generate_calculate(self, node, processed_nodes, **kwargs):
-        # For calculations, set calculate in questionOptions
-        # Check if node is ready to be processed (similar to XLS form strategy)
-        if not is_ready_to_process(node, processed_nodes, strict=True):
+        if not process_reference(
+            node, processed_nodes, {}, replace_reference=False, codesystems=kwargs.get("codesystems", None)
+        ):
             return False
 
-        # Process references to ensure dependencies are handled
-        if not process_reference(node, processed_nodes, {}, replace_reference=True, codesystems=kwargs.get("codesystems", None)):
-            return False
-        
-        if issubclass(node.__class__, TriccNodeDisplayCalculateBase):
-            expression = None
-            if hasattr(node, 'expression') and node.expression:
-                expression = node.expression
-            elif hasattr(node, 'expression_reference') and node.expression_reference:
-                expression = node.expression_reference
-            elif node.prev_nodes:
-                expression = get_node_expressions(node, processed_nodes=processed_nodes, process=kwargs.get("process", None))
+        if node not in processed_nodes:
+            if self.current_segment != getattr(node.activity.root, 'process', self.current_segment):
+                self.start_page(node.activity)
+            if self.current_activity != node.group:
+                self.start_section(node.group)
+            question = self.generate_question(node)
+            if question:
+                # Store question with processing order
+                # self.questions_temp.append({
+                #     'question': question,
+                #     'processing_order': self.processing_order,
+                #     'node_id': getattr(node, 'id', '')
+                # })
+                self.processing_order += 1
+                self.field_counter += 1
+                self.form_data['pages'][-1]['sections'][-1]['questions'].append(question)
 
-                
-            
-            if expression:
-                question_id = get_export_name(node)
-                found = False
-                for item in self.questions_temp:
-                    if item['question']["id"] == question_id:
-                        item['question']["questionOptions"]["calculate"] = {
-                            "calculateExpression": self.convert_expression_to_string(expression)
-                        }
-                        found = True
-                        break
-                if not found:
-                    question = {
-                    "id": get_export_name(node),
-                    "label": getattr(node, 'label', '').replace('\u00a0', ' ').strip(),
-                    "isHidden": True,
-                    "questionOptions":{
-                        "calculate":{
-                            "calculateExpression":self.convert_expression_to_string(expression)
-                            }
-                        }
-                    }
-                    self.questions_temp.append({
-                        'question': question,
-                        'processing_order': self.processing_order,
-                        'node_id': getattr(node, 'id', '')
-                    })
-        return True
-
-    def finalize_questions(self):
-        """Sort questions by processing order and add them to the form in correct order"""
-        # Sort by processing_order to maintain the order nodes were processed
-        sorted_questions = sorted(self.questions_temp, key=lambda x: x['processing_order'])
-        # Add sorted questions to the form
-        for item in sorted_questions:
-            self.form_data["pages"][0]["sections"][0]["questions"].append(item['question'])
-        # Clear temporary storage
-        self.questions_temp = []
-
-    def generate_export(self, node, **kwargs):
         # Set form name from the start page label if available
         if hasattr(self.project.start_pages["main"], 'label') and self.project.start_pages["main"].label:
             self.form_data["name"] = self.project.start_pages["main"].label.strip()
@@ -318,7 +376,7 @@ class OpenMRSStrategy(BaseOutPutStrategy):
         if isinstance(r, TriccOperation):
             return self.get_tricc_operation_expression(r)
         elif isinstance(r, TriccReference):
-            return get_export_name(r.value)
+            return self.get_export_name(r.value)
         elif isinstance(r, TriccStatic):
             if isinstance(r.value, bool):
                 return str(r.value).lower()
@@ -326,16 +384,21 @@ class OpenMRSStrategy(BaseOutPutStrategy):
                 return f"'{r.value}'"
             else:
                 return str(r.value)
+        elif isinstance(r, bool):
+            return str(r).lower()
         elif isinstance(r, str):
             return f"{r}"
         elif isinstance(r, (int, float)):
-            return str(r)
+            return str(r).lower()
         elif isinstance(r, TriccNodeSelectOption):
-            return f"'{self.get_option_value(r.name)}'"
+            option = self.get_option_value(r.name)
+            if r.name in ('true', 'false'):
+                return option
+            return f"'{option}'"
         elif issubclass(r.__class__, TriccNodeInputModel):
-            return get_export_name(r)
+            return self.get_export_name(r)
         elif issubclass(r.__class__, TriccNodeBaseModel):
-            return get_export_name(r)
+            return self.get_export_name(r)
         else:
             raise NotImplementedError(f"This type of node {r.__class__} is not supported within an operation")
 
@@ -348,16 +411,16 @@ class OpenMRSStrategy(BaseOutPutStrategy):
 
     # Operation methods similar, but for string expressions
     def tricc_operation_equal(self, ref_expressions):
-        return f"{ref_expressions[0]} == {ref_expressions[1]}"
+        return f"{ref_expressions[0]} === {ref_expressions[1]}"
 
     def tricc_operation_not_equal(self, ref_expressions):
-        return f"{ref_expressions[0]} != {ref_expressions[1]}"
+        return f"{ref_expressions[0]} !== {ref_expressions[1]}"
 
     def tricc_operation_and(self, ref_expressions):
         if len(ref_expressions) == 1:
             return ref_expressions[0]
         if len(ref_expressions) > 1:
-            return " and ".join(ref_expressions)
+            return " && ".join(ref_expressions)
         else:
             return "true"
 
@@ -365,7 +428,7 @@ class OpenMRSStrategy(BaseOutPutStrategy):
         if len(ref_expressions) == 1:
             return ref_expressions[0]
         if len(ref_expressions) > 1:
-            return " or ".join(ref_expressions)
+            return " || ".join(ref_expressions)
         else:
             return "true"
 
@@ -395,10 +458,10 @@ class OpenMRSStrategy(BaseOutPutStrategy):
 
     def tricc_operation_selected(self, ref_expressions):
         # For choice questions, returns true if the second reference (value) is included in the first (field)
-        return f"arrayContains({ref_expressions[0]}, {ref_expressions[1]})"
+        return f"({ref_expressions[0]}.includes({ref_expressions[1]}))"
 
     def tricc_operation_count(self, ref_expressions):
-        return f"{ref_expressions[0]}.length"
+        return f"({ref_expressions[0]}.length)"
 
     def tricc_operation_multiplied(self, ref_expressions):
         return "*".join(ref_expressions)
@@ -420,10 +483,10 @@ class OpenMRSStrategy(BaseOutPutStrategy):
             return f"{ref_expressions[0]}({','.join(ref_expressions[1:])})"
 
     def tricc_operation_istrue(self, ref_expressions):
-        return f"{ref_expressions[0]} == true"
+        return f"{ref_expressions[0]} === true"
 
     def tricc_operation_isfalse(self, ref_expressions):
-        return f"{ref_expressions[0]} == false"
+        return f"{ref_expressions[0]} === false"
 
     def tricc_operation_parenthesis(self, ref_expressions):
         return f"({ref_expressions[0]})"
@@ -435,16 +498,16 @@ class OpenMRSStrategy(BaseOutPutStrategy):
         return f"isEmpty({ref_expressions[0]})"
 
     def tricc_operation_isnotnull(self, ref_expressions):
-        return f"{ref_expressions[0]} != ''"
+        return f"{ref_expressions[0]} !== ''"
 
     def tricc_operation_isnottrue(self, ref_expressions):
-        return f"{ref_expressions[0]} != true"
+        return f"{ref_expressions[0]} !== true"
 
     def tricc_operation_isnotfalse(self, ref_expressions):
-        return f"{ref_expressions[0]} != false"
+        return f"{ref_expressions[0]} !== false"
 
     def tricc_operation_notexist(self, ref_expressions):
-        return f"{ref_expressions[0]} == ''"
+        return f"typeof {ref_expressions[0]} === 'undefined'"
 
     def tricc_operation_case(self, ref_expressions):
         # Simplified, assuming list of conditions
@@ -452,7 +515,7 @@ class OpenMRSStrategy(BaseOutPutStrategy):
         for i in range(0, len(ref_expressions), 2):
             if i + 1 < len(ref_expressions):
                 parts.append(f"if({ref_expressions[i]}, {ref_expressions[i+1]})")
-        return " or ".join(parts)  # Simplified
+        return " || ".join(parts)  # Simplified
 
     def tricc_operation_ifs(self, ref_expressions):
         # Similar to case
@@ -467,14 +530,14 @@ class OpenMRSStrategy(BaseOutPutStrategy):
     def tricc_operation_exists(self, ref_expressions):
         parts = []
         for ref in ref_expressions:
-            parts.append(f"{ref} != ''")
-        return " and ".join(parts)
+            parts.append(f"{ref} !== ''")
+        return " && ".join(parts)
 
     def tricc_operation_cast_number(self, ref_expressions):
-        return f"number({ref_expressions[0]})"
+        return f"Number({ref_expressions[0]})"
 
     def tricc_operation_cast_integer(self, ref_expressions):
-        return f"int({ref_expressions[0]})"
+        return f"Number({ref_expressions[0]})"
 
     def tricc_operation_zscore(self, ref_expressions):
         # Simplified, assuming params
@@ -492,4 +555,63 @@ class OpenMRSStrategy(BaseOutPutStrategy):
     def tricc_operation_concatenate(self, ref_expressions):
         return f"concat({','.join(ref_expressions)})"
 
-    # Add more operations as needed...
+    def clean_sections(self):
+        if (
+            self.form_data['pages']
+            and self.form_data['pages'][-1]
+            and self.form_data['pages'][-1]['sections']
+            and self.form_data['pages'][-1]['sections'][-1]
+        ):
+            if len(self.form_data['pages'][-1]['sections'][-1]['questions']) == 0:
+                self.form_data['pages'][-1]['sections'].pop()
+
+    def clean_pages(self):
+        if self.form_data['pages'] and self.form_data['pages'][-1]:
+            if len(self.form_data['pages'][-1]['sections']) == 0:
+                self.form_data['pages'].pop()
+
+    def start_page(self, activity_node):
+        # Add more operations as needed...
+        """Start a new page for an activity"""
+        self.clean_sections()
+        self.clean_pages()
+        page_label = getattr(activity_node.root, 'process', None)
+        self.current_segment = page_label
+        # Set process from id if not set
+        default_label = f"Page {len(self.form_data['pages']) + 1}"
+
+        if page_label is None:
+            label = getattr(activity_node, 'label', None)
+            if label is None:
+                page_label = default_label
+            else:
+                page_label = label
+        page_label = page_label.replace('\u00a0', ' ').strip()
+        self.form_data["pages"].append({
+            "label": page_label,
+            "sections": []
+        })
+        logger.debug(f"Started page: {page_label}")
+
+    def start_section(self, group_node):
+        """Start a new section for a group"""
+        self.clean_sections()
+        self.current_activity = group_node
+        # Set process from id if not set
+        default_label = f"Section {len(self.form_data['pages'][-1]['sections']) + 1}"
+        if hasattr(group_node, 'root'):
+            section_label = getattr(group_node.root, 'label', None)
+        else:
+            section_label = getattr(group_node, 'label', None)
+        if section_label is None:
+            label = getattr(group_node, 'label', None)
+            if label is None:
+                section_label = default_label
+            else:
+                section_label = label
+        section_label = section_label.replace('\u00a0', ' ').strip()
+        self.form_data['pages'][-1]['sections'].append({
+            "label": section_label,
+            "questions": []
+        })
+        logger.debug(f"Started section: {section_label}")
