@@ -3,18 +3,20 @@ import logging
 import os
 import json
 import uuid
-from tricc_oo.visitors.tricc import stashed_node_func, is_ready_to_process, process_reference
+from tricc_oo.visitors.tricc import stashed_node_func, is_ready_to_process, process_reference, get_node_expressions
 import datetime
 from tricc_oo.strategies.output.base_output_strategy import BaseOutPutStrategy
 from tricc_oo.models.base import (
-    TriccOperator,
+    TriccOperator, not_clean,
     TriccOperation, TriccStatic, TriccReference, TriccNodeType
 )
 from tricc_oo.models.tricc import (
     TriccNodeSelectOption,
     TriccNodeInputModel,
-    TriccNodeBaseModel
+    TriccNodeBaseModel,
 )
+
+from tricc_oo.models.calculate import TriccNodeDisplayCalculateBase
 from tricc_oo.converters.tricc_to_xls_form import get_export_name
 
 logger = logging.getLogger("default")
@@ -159,7 +161,7 @@ class OpenMRSStrategy(BaseOutPutStrategy):
             return False
 
         # Process references to ensure dependencies are handled
-        if not process_reference(node, processed_nodes, {}, replace_reference=False):
+        if not process_reference(node, processed_nodes, {}, replace_reference=False, codesystems=kwargs.get("codesystems", None)):
             return False
 
         if hasattr(node, 'tricc_type') and node.tricc_type in ['text', 'integer', 'select_one', 'select_multiple']:
@@ -172,9 +174,6 @@ class OpenMRSStrategy(BaseOutPutStrategy):
                 },
                 "required": str(getattr(node, 'required', False)),
                 "unspecified": False,
-                "hide": {
-                    "hideWhenExpression": "false"
-                },
                 "id": get_export_name(node),
                 "uuid": self.generate_id(get_export_name(node))
             }
@@ -209,7 +208,15 @@ class OpenMRSStrategy(BaseOutPutStrategy):
             self.field_counter += 1
         return True
 
-    def generate_relevance(self, node, **kwargs):
+    def generate_relevance(self, node, processed_nodes, **kwargs):
+        # Check if node is ready to be processed (similar to XLS form strategy)
+        if not is_ready_to_process(node, processed_nodes, strict=False):
+            return False
+
+        # Process references to ensure dependencies are handled
+        if not process_reference(node, processed_nodes, {}, replace_reference=False, codesystems=kwargs.get("codesystems", None)):
+            return False
+        
         # For relevance, set hide at question level
         relevance = None
         if hasattr(node, 'relevance') and node.relevance:
@@ -218,24 +225,64 @@ class OpenMRSStrategy(BaseOutPutStrategy):
             relevance = node.expression
         if relevance:
             question_id = get_export_name(node)
-            for question in self.form_data["pages"][0]["sections"][0]["questions"]:
-                if question["id"] == question_id:
-                    # hide is the opposite of relevance, so wrap in NOT
-                    relevance_str = self.convert_expression_to_string(relevance)
-                    question["hide"]["hideWhenExpression"] = f"not({relevance_str})"
+            for item in self.questions_temp:
+                if item['question']["id"] == question_id:
+                    # hide is the opposite of relevance, so use negate
+                    relevance_str = self.convert_expression_to_string(not_clean(relevance))
+                    if relevance_str and relevance_str != 'false':
+                        item['question']["hide"] = {
+                            "hideWhenExpression": f"{relevance_str}"
+                        }
                     break
         return True
 
-    def generate_calculate(self, node, **kwargs):
+    def generate_calculate(self, node, processed_nodes, **kwargs):
         # For calculations, set calculate in questionOptions
-        if hasattr(node, 'expression') and node.expression:
-            question_id = get_export_name(node)
-            for question in self.form_data["pages"][0]["sections"][0]["questions"]:
-                if question["id"] == question_id:
-                    question["questionOptions"]["calculate"] = {
-                        "calculateExpression": self.convert_expression_to_string(node.expression)
+        # Check if node is ready to be processed (similar to XLS form strategy)
+        if not is_ready_to_process(node, processed_nodes, strict=True):
+            return False
+
+        # Process references to ensure dependencies are handled
+        if not process_reference(node, processed_nodes, {}, replace_reference=True, codesystems=kwargs.get("codesystems", None)):
+            return False
+        
+        if issubclass(node.__class__, TriccNodeDisplayCalculateBase):
+            expression = None
+            if hasattr(node, 'expression') and node.expression:
+                expression = node.expression
+            elif hasattr(node, 'expression_reference') and node.expression_reference:
+                expression = node.expression_reference
+            elif node.prev_nodes:
+                expression = get_node_expressions(node, processed_nodes=processed_nodes, process=kwargs.get("process", None))
+
+                
+            
+            if expression:
+                question_id = get_export_name(node)
+                found = False
+                for item in self.questions_temp:
+                    if item['question']["id"] == question_id:
+                        item['question']["questionOptions"]["calculate"] = {
+                            "calculateExpression": self.convert_expression_to_string(expression)
+                        }
+                        found = True
+                        break
+                if not found:
+                    question = {
+                    "id": get_export_name(node),
+                    "label": getattr(node, 'label', '').replace('\u00a0', ' ').strip(),
+                    "isHidden": True,
+                    "questionOptions":{
+                        "calculate":{
+                            "calculateExpression":self.convert_expression_to_string(expression)
+                            }
+                        }
                     }
-                    break
+                    self.questions_temp.append({
+                        'question': question,
+                        'processing_order': self.processing_order,
+                        'node_id': getattr(node, 'id', '')
+                    })
         return True
 
     def finalize_questions(self):
@@ -301,7 +348,7 @@ class OpenMRSStrategy(BaseOutPutStrategy):
 
     # Operation methods similar, but for string expressions
     def tricc_operation_equal(self, ref_expressions):
-        return f"{ref_expressions[0]} = {ref_expressions[1]}"
+        return f"{ref_expressions[0]} == {ref_expressions[1]}"
 
     def tricc_operation_not_equal(self, ref_expressions):
         return f"{ref_expressions[0]} != {ref_expressions[1]}"
@@ -323,7 +370,7 @@ class OpenMRSStrategy(BaseOutPutStrategy):
             return "true"
 
     def tricc_operation_not(self, ref_expressions):
-        return f"not({ref_expressions[0]})"
+        return f"!({ref_expressions[0]})"
 
     def tricc_operation_plus(self, ref_expressions):
         return " + ".join(ref_expressions)
@@ -348,10 +395,10 @@ class OpenMRSStrategy(BaseOutPutStrategy):
 
     def tricc_operation_selected(self, ref_expressions):
         # For choice questions, returns true if the second reference (value) is included in the first (field)
-        return f"includes({ref_expressions[0]}, {ref_expressions[1]})"
+        return f"arrayContains({ref_expressions[0]}, {ref_expressions[1]})"
 
     def tricc_operation_count(self, ref_expressions):
-        return f"count-selected({ref_expressions[0]})"
+        return f"{ref_expressions[0]}.length"
 
     def tricc_operation_multiplied(self, ref_expressions):
         return "*".join(ref_expressions)
@@ -385,7 +432,7 @@ class OpenMRSStrategy(BaseOutPutStrategy):
         return f"{ref_expressions[0]} >= {ref_expressions[1]} and {ref_expressions[0]} < {ref_expressions[2]}"
 
     def tricc_operation_isnull(self, ref_expressions):
-        return f"{ref_expressions[0]} == ''"
+        return f"isEmpty({ref_expressions[0]})"
 
     def tricc_operation_isnotnull(self, ref_expressions):
         return f"{ref_expressions[0]} != ''"

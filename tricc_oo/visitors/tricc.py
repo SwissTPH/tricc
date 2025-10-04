@@ -34,6 +34,7 @@ from tricc_oo.models.calculate import (
 from tricc_oo.models.tricc import (
     TriccNodeCalculateBase, TriccNodeActivity, TriccNodeBaseModel, TriccNodeNumber,
     TriccNodeSelectMultiple,
+    TriccNodeSelectOne,
     TriccNodeSelectOption,
     TriccNodeSelectYesNo,
     TriccNodeInputModel,
@@ -2503,15 +2504,27 @@ def get_required_node_expression(node):
 
 # Get a selected option
 def get_selected_option_expression(option_node, negate):
+    if isinstance(option_node.select, TriccNodeSelectOne):
+        return get_selected_option_expression_single(option_node, negate)
+    else:
+        return get_selected_option_expression_multiple(option_node, negate)
 
-    selected = TriccOperation(TriccOperator.SELECTED, [option_node.select, TriccStatic(option_node.name)])
+def get_selected_option_expression_single(option_node, negate):
+
+    if not negate: 
+        return TriccOperation(TriccOperator.EQUAL , [option_node.select, option_node])
+
+    
+def get_selected_option_expression_multiple(option_node, negate):
+
+    selected = TriccOperation(TriccOperator.SELECTED, [option_node.select, option_node])
 
     if negate:
         return TriccOperation(
             operator=TriccOperator.AND,
             resource=[
                 TriccOperation(operator=TriccOperator.NOT, resource=[selected]),
-                TriccOperation(operator=TriccOperator.NATIVE, resource=["count-selected", option_node.select]),
+                TriccOperation(operator=TriccOperator.ISNOTNULL, resource=[option_node.select]),
             ],
         )
 
