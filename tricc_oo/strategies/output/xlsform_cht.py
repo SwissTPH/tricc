@@ -31,6 +31,9 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
 
         self.df_survey = pd.concat([cht_input_df, self.df_survey, self.get_cht_summary()], ignore_index=True)
 
+        self.inject_version()
+
+
     def get_cht_input(self, start_pages, **kwargs):
         empty = langs.get_trads("", force_dict=True)
         df_input = pd.DataFrame(columns=SURVEY_MAP.keys())
@@ -620,8 +623,6 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
         }
         df_settings = pd.DataFrame(settings, index=indx)
         df_settings.head()
-        if len(self.df_survey[self.df_survey["name"] == "version"]):
-            self.df_survey.loc[self.df_survey["name"] == "version", "label"] = f"v{version}"
         # create a Pandas Excel writer using XlsxWriter as the engine
         writer = pd.ExcelWriter(newpath, engine="xlsxwriter")
         self.df_survey.to_excel(writer, sheet_name="survey", index=False)

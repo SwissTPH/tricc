@@ -131,6 +131,31 @@ class XLSFormStrategy(BaseOutPutStrategy):
     def generate_export(self, node, **kwargs):
         return generate_xls_form_export(self, node, **kwargs)
 
+    def inject_version(self):
+        # Add hidden version field using ODK's jr:version()
+        empty = langs.get_trads("", force_dict=True)
+        self.df_survey.loc[len(self.df_survey)] = [
+            "hidden",
+            "version",
+            *list(empty.values()),  # label
+            *list(empty.values()),  # hint
+            *list(empty.values()),  # help
+            "",  # default
+            "hidden",  # appearance
+            "",  # constraint
+            *list(empty.values()),  # constraint_message
+            "",  # relevance
+            "",  # disabled
+            "",  # required
+            *list(empty.values()),  # required_message
+            "",  # read only
+            "jr:version()",  # calculation
+            "",  # trigger
+            "",  # repeat_count
+            "",  # image
+            "",  # choice_filter
+        ]
+
     def export(self, start_pages, version):
         if start_pages["main"].root.form_id is not None:
             form_id = str(start_pages["main"].root.form_id)
@@ -158,10 +183,10 @@ class XLSFormStrategy(BaseOutPutStrategy):
         if not os.path.exists(self.output_path):
             os.makedirs(self.output_path)
 
+        self.inject_version()
+
         # create a Pandas Excel writer using XlsxWriter as the engine
         writer = pd.ExcelWriter(newpath, engine="xlsxwriter")
-        if len(self.df_survey[self.df_survey["name"] == "version"]):
-            self.df_survey.loc[self.df_survey["name"] == "version", "label"] = f"v{version}"
         self.df_survey.to_excel(writer, sheet_name="survey", index=False)
         self.df_choice.to_excel(writer, sheet_name="choices", index=False)
         df_settings.to_excel(writer, sheet_name="settings", index=False)
