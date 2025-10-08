@@ -25,7 +25,7 @@ from tricc_oo.models.tricc import (
     TriccNodeSelectYesNo
     )
 
-from tricc_oo.models.calculate import TriccNodeDisplayCalculateBase
+from tricc_oo.models.calculate import TriccNodeDisplayCalculateBase, TriccNodeDiagnosis
 from tricc_oo.models.ordered_set import OrderedSet
 
 logger = logging.getLogger("default")
@@ -33,6 +33,8 @@ logger = logging.getLogger("default")
 # Namespace for deterministic UUIDs
 UUID_NAMESPACE = uuid.UUID('12345678-1234-5678-9abc-def012345678')
 
+CIEL_YES = "1065AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+CIEL_NO = "1066AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 
 class OpenMRSStrategy(BaseOutPutStrategy):
     processes = ["main"]
@@ -156,13 +158,13 @@ class OpenMRSStrategy(BaseOutPutStrategy):
             'datetime': 'datetime',
             'select_one': 'select',
             'select_multiple': 'multiCheckbox',
-            'select_yesno': 'toggle',
+            'select_yesno': 'select',
             'not_available': 'checkbox',
             'note': 'text'
         }
 
-        if issubclass(node.__class__, TriccNodeSelectYesNo):
-            return 'toggle'
+        # if issubclass(node.__class__, TriccNodeSelectYesNo):
+        #     return 'select'
         return mapping.get(node.tricc_type, 'text')
 
     def generate_base(self, node, processed_nodes, **kwargs):
@@ -179,8 +181,9 @@ class OpenMRSStrategy(BaseOutPutStrategy):
                 "type": "obs" if issubclass(node.__class__, TriccNodeInputModel) else 'control',
                 "questionOptions": {
                     "rendering": self.map_tricc_type_to_rendering(node),
+                    "concept": self.generate_id(self.get_export_name(node))
                 },
-                "required": str(getattr(node, 'required', False)),
+                "required": bool(getattr(node, 'required', False)),
                 "unspecified": False,
                 "id": self.get_export_name(node),
                 "uuid": self.generate_id(self.get_export_name(node))
@@ -200,27 +203,24 @@ class OpenMRSStrategy(BaseOutPutStrategy):
                         # All options now use UUIDs
                         concept_val = self.get_option_value(opt.name)
                         if concept_val == TriccStatic(False):
-                            concept_val = '1065AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+                            concept_val = CIEL_NO
                             labelFalse = display
                         if concept_val == TriccStatic(True):
-                            concept_val = '1065AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+                            concept_val = CIEL_YES
                             labelTrue = display
                         answers.append({
                             "label": display,
                             "concept": concept_val,
-                            "conceptMappings": []
-                        })
+                            })
                     question["questionOptions"]["answers"] = answers
                 else:
                     question["questionOptions"]["answers"] = []
                 # Set concept for the question itself if it's a coded question
-                if getattr(node, 'last', True):
-                    question["questionOptions"]["concept"] = self.generate_id(self.get_export_name(node))
-                if issubclass(node.__class__, TriccNodeSelectYesNo):
-                    question["questionOptions"]["toggleOptions"] = {
-                        "labelTrue": labelTrue,
-                        "labelFalse": labelFalse
-                    }
+                # if issubclass(node.__class__, TriccNodeSelectYesNo):
+                #     question["questionOptions"]["toggleOptions"] = {
+                #         "labelTrue": labelTrue,
+                #         "labelFalse": labelFalse
+                #     }
 
             relevance = None
             if hasattr(node, 'relevance') and node.relevance:
@@ -239,8 +239,11 @@ class OpenMRSStrategy(BaseOutPutStrategy):
             if expression:
                 question = {
                     "id": self.get_export_name(node),
+                    "type": "obs" if isinstance(node, TriccNodeDiagnosis) else "control",
                     "label": getattr(node, 'label', '').replace('\u00a0', ' ').strip(),
-                    "isHidden": True,
+                    "hide":{
+                        "hideWhenExpression": "true"
+                    },
                     "questionOptions": {
                         "calculate": {
                             "calculateExpression": self.convert_expression_to_string(expression)
@@ -341,7 +344,7 @@ class OpenMRSStrategy(BaseOutPutStrategy):
             if self.current_segment != getattr(node.activity.root, 'process', self.current_segment):
                 self.start_page(node.activity)
             if self.current_activity != node.group:
-                self.start_section(node.group)
+                self.start_section(node.activity)
             question = self.generate_question(node)
             if question:
                 # Store question with processing order
@@ -411,9 +414,17 @@ class OpenMRSStrategy(BaseOutPutStrategy):
 
     # Operation methods similar, but for string expressions
     def tricc_operation_equal(self, ref_expressions):
+        if ref_expressions[1] == TriccStatic(True) or ref_expressions[1] == True or ref_expressions[1] == 'true':
+            return f"{self._boolean(ref_expressions, '===', CIEL_YES, 'true')}"
+        elif ref_expressions[1] == TriccStatic(False) or ref_expressions[1] == False or ref_expressions[1] == 'false':
+            return f"{self._boolean(ref_expressions, '===', CIEL_NO, 'false')}"
         return f"{ref_expressions[0]} === {ref_expressions[1]}"
 
     def tricc_operation_not_equal(self, ref_expressions):
+        if ref_expressions[1] == TriccStatic(True) or ref_expressions[1] == True or ref_expressions[1] == 'true':
+            return f"!{self._boolean(ref_expressions, '===', CIEL_YES, 'true')}"
+        elif ref_expressions[1] == TriccStatic(False) or ref_expressions[1] == False or ref_expressions[1] == 'false':
+            return f"!{self._boolean(ref_expressions, '===', CIEL_NO, 'false')}"
         return f"{ref_expressions[0]} !== {ref_expressions[1]}"
 
     def tricc_operation_and(self, ref_expressions):
@@ -483,28 +494,35 @@ class OpenMRSStrategy(BaseOutPutStrategy):
             return f"{ref_expressions[0]}({','.join(ref_expressions[1:])})"
 
     def tricc_operation_istrue(self, ref_expressions):
-        return f"{ref_expressions[0]} === true"
+        #return f"{ref_expressions[0]} === true"
+        return f"{self._boolean(ref_expressions, '===', CIEL_YES, 'true')}"
 
     def tricc_operation_isfalse(self, ref_expressions):
-        return f"{ref_expressions[0]} === false"
+        #return f"{ref_expressions[0]} === false"
+        return f"{self._boolean(ref_expressions, '===', CIEL_NO, 'false')}"
 
     def tricc_operation_parenthesis(self, ref_expressions):
         return f"({ref_expressions[0]})"
 
     def tricc_operation_between(self, ref_expressions):
-        return f"{ref_expressions[0]} >= {ref_expressions[1]} and {ref_expressions[0]} < {ref_expressions[2]}"
+        return f"{ref_expressions[0]} >= {ref_expressions[1]} && {ref_expressions[0]} < {ref_expressions[2]}"
 
     def tricc_operation_isnull(self, ref_expressions):
         return f"isEmpty({ref_expressions[0]})"
 
     def tricc_operation_isnotnull(self, ref_expressions):
-        return f"{ref_expressions[0]} !== ''"
+        return f"!isEmpty{ref_expressions[0]})"
 
     def tricc_operation_isnottrue(self, ref_expressions):
-        return f"{ref_expressions[0]} !== true"
+        #return f"{ref_expressions[0]} !== true"
+        return f"!{self._boolean(ref_expressions, '===', CIEL_YES, 'true')}"
 
     def tricc_operation_isnotfalse(self, ref_expressions):
-        return f"{ref_expressions[0]} !== false"
+        #return f"{ref_expressions[0]} !== false"
+        return f"!{self._boolean(ref_expressions, '===', CIEL_NO, 'false')}"
+
+    def _boolean(self, ref_expressions, operator, answer_uuid, bool_val='false'):
+        return f"({ref_expressions[0]} {operator} {bool_val} || {ref_expressions[0]} {operator} '{answer_uuid}')"
 
     def tricc_operation_notexist(self, ref_expressions):
         return f"typeof {ref_expressions[0]} === 'undefined'"
@@ -530,7 +548,7 @@ class OpenMRSStrategy(BaseOutPutStrategy):
     def tricc_operation_exists(self, ref_expressions):
         parts = []
         for ref in ref_expressions:
-            parts.append(f"{ref} !== ''")
+            parts.append(f"!isEmpty{ref})")
         return " && ".join(parts)
 
     def tricc_operation_cast_number(self, ref_expressions):
@@ -591,6 +609,12 @@ class OpenMRSStrategy(BaseOutPutStrategy):
             "label": page_label,
             "sections": []
         })
+        if activity_node.relevance:
+            relevance_str = self.convert_expression_to_string(not_clean(activity_node.relevance))
+            if relevance_str and relevance_str != 'false':
+                self.form_data["pages"][-1]["hide"] = {
+                    "hideWhenExpression": f"{relevance_str}"
+                }
         logger.debug(f"Started page: {page_label}")
 
     def start_section(self, group_node):
@@ -614,4 +638,10 @@ class OpenMRSStrategy(BaseOutPutStrategy):
             "label": section_label,
             "questions": []
         })
+        if group_node.relevance:
+            relevance_str = self.convert_expression_to_string(not_clean(group_node.relevance))
+            if relevance_str and relevance_str != 'false':
+                self.form_data["pages"][-1]['sections'][-1]["hide"] = {
+                    "hideWhenExpression": f"{relevance_str}"
+                }
         logger.debug(f"Started section: {section_label}")
