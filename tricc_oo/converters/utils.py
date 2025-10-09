@@ -23,7 +23,7 @@ def clean_str(name, replace_dots=False):
 
 def clean_name(name, prefix="", replace_dots=False):
     name = clean_str(name, replace_dots)
-    if name[0].isdigit():
+    if name and name[0].isdigit():
         name = "id_" + name
     elif name[0].isdigit() == "_":
         name = name[1:]

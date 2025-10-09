@@ -1,20 +1,17 @@
-from tricc_oo.strategies.output.spice import SpiceStrategy
-from tricc_oo.strategies.output.xlsform_cht_hf import XLSFormCHTHFStrategy
-from tricc_oo.strategies.output.xlsform_cht import XLSFormCHTStrategy
-from tricc_oo.strategies.output.xlsform_cdss import XLSFormCDSSStrategy
-from tricc_oo.strategies.output.xls_form import XLSFormStrategy
-from tricc_oo.strategies.output.openmrs_form import OpenMRSStrategy
-from tricc_oo.strategies.output.fhir_form import FHIRStrategy
-from tricc_oo.strategies.output.html_form import HTMLStrategy
-
-from tricc_oo.strategies.input.drawio import DrawioStrategy
+from tricc_oo.strategies.output.spice import SpiceStrategy  # noqa: F401
+from tricc_oo.strategies.output.xlsform_cht_hf import XLSFormCHTHFStrategy  # noqa: F401
+from tricc_oo.strategies.output.xlsform_cht import XLSFormCHTStrategy  # noqa: F401
+from tricc_oo.strategies.output.xlsform_cdss import XLSFormCDSSStrategy  # noqa: F401
+from tricc_oo.strategies.output.xls_form import XLSFormStrategy  # noqa: F401
+from tricc_oo.strategies.output.openmrs_form import OpenMRSStrategy  # noqa: F401
+from tricc_oo.strategies.output.fhir_form import FHIRStrategy  # noqa: F401
+from tricc_oo.strategies.output.html_form import HTMLStrategy  # noqa: F401
+from tricc_oo.strategies.input.drawio import DrawioStrategy  # noqa: F401
 import getopt
-import gettext
 import logging
 import os
 import sys
 import gc
-import shutil
 from pathlib import Path
 
 # set up logging to file
@@ -43,15 +40,15 @@ def setup_logger(
     level=logging.INFO,
     formatting="[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s",
 ):
-    l = logging.getLogger(logger_name)
+    logger = logging.getLogger(logger_name)
     formatter = logging.Formatter(formatting)
     file_handler = logging.FileHandler(log_file, mode="w+")
     file_handler.setFormatter(formatter)
     stream_handler = logging.StreamHandler()
     stream_handler.setFormatter(formatter)
 
-    l.setLevel(level)
-    l.addHandler(file_handler)
+    logger.setLevel(level)
+    logger.addHandler(file_handler)
 
 
 class ColorFormatter(logging.Formatter):

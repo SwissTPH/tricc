@@ -25,9 +25,11 @@ from tricc_oo.models.tricc import (
     TriccNodeBaseModel,
     TriccNodeSelectOption,
     TriccNodeInputModel,
-    TriccNodeDisplayModel
+    TriccNodeDisplayModel,
+    TRICC_FALSE_VALUE,
+    TRICC_TRUE_VALUE,
 )
-from tricc_oo.converters.tricc_to_xls_form import get_export_name
+from tricc_oo.converters.tricc_to_xls_form import get_export_name, BOOLEAN_MAP
 
 from tricc_oo.models.lang import SingletonLangClass
 
@@ -37,8 +39,6 @@ from tricc_oo.visitors.tricc import (
     is_ready_to_process,
     process_reference,
     get_node_expressions,
-    TRICC_TRUE_VALUE,
-    TRICC_FALSE_VALUE,
     set_last_version_false,
     generate_calculate,
     generate_base,
@@ -49,7 +49,6 @@ from tricc_oo.serializers.xls_form import (
     end_group,
     generate_xls_form_export,
     start_group,
-    BOOLEAN_MAP,
 )
 from tricc_oo.strategies.output.base_output_strategy import BaseOutPutStrategy
 
@@ -722,23 +721,21 @@ class XLSFormStrategy(BaseOutPutStrategy):
             logger.warning(f"reference `{r.value}` still used in a calculate")
             return f"${{{get_export_name(r.value)}}}"
         elif isinstance(r, TriccStatic):
-            if isinstance(r.value, bool):  # or r.value in ('true', 'false')
-                return BOOLEAN_MAP[str(TRICC_TRUE_VALUE)] if r.value else BOOLEAN_MAP[str(TRICC_FALSE_VALUE)]
-            if r.value == TRICC_TRUE_VALUE:
-                return BOOLEAN_MAP[str(TRICC_TRUE_VALUE)]
-            if r.value == TRICC_FALSE_VALUE:
-                return BOOLEAN_MAP[str(TRICC_FALSE_VALUE)]
-            if isinstance(r.value, str):
-                return f"'{r.value}'"
-            else:
-                return str(r.value)
+            return get_export_name(r)
         elif isinstance(r, str):
-            return f"{r}"
+            if r == TRICC_TRUE_VALUE:
+                return BOOLEAN_MAP[str(TRICC_TRUE_VALUE)]
+            elif r == TRICC_FALSE_VALUE:
+                return BOOLEAN_MAP[str(TRICC_FALSE_VALUE)]
+            elif isinstance(r, str):
+                return f"'{r}'"
+            else:
+                return str(r)
         elif isinstance(r, (int, float)):
             return str(r)
         elif isinstance(r, TriccNodeSelectOption):
-            logger.warning(f"select option {r.get_name()} from {r.select.get_name()} was used as a reference")
-            return f"'{r.name}'"
+            logger.debug(f"select option {r.get_name()} from {r.select.get_name()} was used as a reference")
+            return get_export_name(r)
         elif issubclass(r.__class__, TriccNodeInputModel):
             return f"coalesce(${{{get_export_name(r)}}},{coalesce_fallback})"
         elif issubclass(r.__class__, TriccNodeBaseModel):

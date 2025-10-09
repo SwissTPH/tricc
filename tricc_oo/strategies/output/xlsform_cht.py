@@ -33,7 +33,6 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
 
         self.inject_version()
 
-
     def get_cht_input(self, start_pages, **kwargs):
         empty = langs.get_trads("", force_dict=True)
         df_input = pd.DataFrame(columns=SURVEY_MAP.keys())

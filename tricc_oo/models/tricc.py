@@ -15,6 +15,8 @@ import logging
 
 
 logger = logging.getLogger(__name__)
+TRICC_TRUE_VALUE = "true"
+TRICC_FALSE_VALUE = "false"
 
 
 class TriccNodeCalculateBase(TriccNodeBaseModel):

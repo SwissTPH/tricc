@@ -53,9 +53,9 @@ class TestCql(unittest.TestCase):
 
     def test_case(self):
         case_cql = """
-        case AgeInMonths() 
-        when 0 then 'newborn' 
-        when 1 then 'newborn' 
+        case AgeInMonths()
+        when 0 then 'newborn'
+        when 1 then 'newborn'
         else 'child' end
         """
         case_operation = transform_cql_to_operation(case_cql)
@@ -72,7 +72,7 @@ class TestCql(unittest.TestCase):
 
     def test_ifs(self):
         case_cql = """
-        case 
+        case
         when AgeInMonths() <= 2 then true
         when AgeInYears() > 5 then true
         else false end

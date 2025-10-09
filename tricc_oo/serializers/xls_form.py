@@ -3,7 +3,7 @@ import hashlib
 
 # from bs4 import BeautifulSoup
 from tricc_oo.converters.tricc_to_xls_form import (
-    get_export_name,
+    get_export_name, BOOLEAN_MAP
 )
 from tricc_oo.models.lang import SingletonLangClass
 from tricc_oo.converters.utils import clean_name, remove_html
@@ -13,7 +13,6 @@ from tricc_oo.models.base import (
 )
 from tricc_oo.models.calculate import (
     TriccNodeDisplayCalculateBase,
-
 )
 from tricc_oo.models.tricc import (
     TriccNodeActivity, TriccNodeBaseModel, TriccNodeSelectMultiple, TriccNodeSelectOption,
@@ -29,8 +28,6 @@ from tricc_oo.visitors.tricc import (
     is_ready_to_process,
     process_reference,
     add_calculate,
-    TRICC_TRUE_VALUE,
-    TRICC_FALSE_VALUE,
     get_applicability_expression,
     get_prev_instance_skip_expression,
     get_process_skip_expression,
@@ -40,11 +37,6 @@ logger = logging.getLogger("default")
 
 langs = SingletonLangClass()
 TRICC_CALC_EXPRESSION = "${{{0}}}>0"
-
-BOOLEAN_MAP = {
-    str(TRICC_TRUE_VALUE): 1,
-    str(TRICC_FALSE_VALUE): 0,
-}
 
 
 def start_group(

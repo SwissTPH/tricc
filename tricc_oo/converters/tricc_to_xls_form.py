@@ -1,8 +1,9 @@
 import logging
-from tricc_oo.converters.utils import clean_name
-from tricc_oo.models.tricc import TriccNodeSelectOption
+from tricc_oo.converters.utils import clean_name, clean_str
+from tricc_oo.models.tricc import TriccNodeSelectOption, TRICC_TRUE_VALUE, TRICC_FALSE_VALUE
 from tricc_oo.models.calculate import TriccNodeInput
-from tricc_oo.models.base import TriccNodeBaseModel
+from tricc_oo.models.base import TriccNodeBaseModel, TriccStatic, TriccReference
+
 # from babel import _
 
 # TRICC_SELECT_MULTIPLE_CALC_EXPRESSION = "count-selected(${{{0}}}) - number(selected(${{{0}}},'opt_none'))"
@@ -18,6 +19,10 @@ TRICC_NEGATE = "not({})"
 # TRICC_AND_EXPRESSION = '{0} and {1}'
 VERSION_SEPARATOR = "_Vv_"
 INSTANCE_SEPARATOR = "_Ii_"
+BOOLEAN_MAP = {
+    str(TRICC_TRUE_VALUE): 1,
+    str(TRICC_FALSE_VALUE): 0,
+}
 
 
 logger = logging.getLogger("default")
@@ -26,9 +31,36 @@ logger = logging.getLogger("default")
 
 
 def get_export_name(node, replace_dots=True):
-    if isinstance(node, str):
-        return clean_name(node, replace_dots=replace_dots)
-    if node.export_name is None:
+    if hasattr(node, 'export_name') and node.export_name is not None:
+        return node.export_name
+    elif isinstance(node, bool):
+        return BOOLEAN_MAP[str(TRICC_TRUE_VALUE)] if node else BOOLEAN_MAP[str(TRICC_FALSE_VALUE)]
+    elif isinstance(node, TriccReference):
+        logger.warning(f"Reference {node.value} use in export, bad serialiuation probable")
+        return str(node.value)
+    elif isinstance(node, (str, TriccStatic, TriccNodeSelectOption)):
+        if isinstance(node, TriccNodeSelectOption):
+            value = node.name
+        elif isinstance(node, TriccStatic):
+            value = node.value
+        else:
+            value = node
+        if isinstance(value, bool):  # or r.value in ('true', 'false')
+            export_name = BOOLEAN_MAP[str(TRICC_TRUE_VALUE)] if value else BOOLEAN_MAP[str(TRICC_FALSE_VALUE)]
+        elif value == TRICC_TRUE_VALUE:
+            export_name = BOOLEAN_MAP[str(TRICC_TRUE_VALUE)]
+        elif value == TRICC_FALSE_VALUE:
+            export_name = BOOLEAN_MAP[str(TRICC_FALSE_VALUE)]
+        elif isinstance(value, str):
+            export_name = f"'{clean_str(value, replace_dots=replace_dots)}'"
+        else:
+            export_name = str(value)
+        if hasattr(node, 'export_name'):
+            node.export_name = export_name
+        return export_name
+    elif not hasattr(node, 'export_name'):
+        return node
+    else:
         node.gen_name()
         if isinstance(node, TriccNodeSelectOption):
             node.export_name = node.name
@@ -41,8 +73,7 @@ def get_export_name(node, replace_dots=True):
             node.export_name = clean_name("load." + node.name, replace_dots=replace_dots)
         else:
             node.export_name = clean_name(node.name, replace_dots=replace_dots)
-
-    return node.export_name
+        return node.export_name
 
 
 def get_list_names(list):

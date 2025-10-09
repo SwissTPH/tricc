@@ -44,6 +44,8 @@ from tricc_oo.models.tricc import (
     TriccNodeDisplayModel,
     TriccNodeMainStart,
     TriccNodeAcceptDiagnostic,
+    TRICC_FALSE_VALUE,
+    TRICC_TRUE_VALUE,
 )
 from tricc_oo.visitors.utils import PROCESSES
 from tricc_oo.converters.cql_to_operation import transform_cql_to_operation
@@ -52,9 +54,6 @@ from tricc_oo.converters.tricc_to_xls_form import get_list_names, get_export_nam
 
 logger = logging.getLogger("default")
 ONE_QUESTION_AT_A_TIME = False
-
-TRICC_TRUE_VALUE = "true"
-TRICC_FALSE_VALUE = "false"
 
 
 def merge_node(from_node, to_node):
