@@ -460,7 +460,10 @@ class XLSFormStrategy(BaseOutPutStrategy):
             return "1"
 
     def tricc_operation_native(self, ref_expressions):
+    
         if len(ref_expressions) > 0:
+            if ref_expressions[0].startswith(("'","`",)):
+                ref_expressions[0] = ref_expressions[0][1:-1]
             if ref_expressions[0] == "GetChoiceName":
                 return f"""jr:choice-name({
                     self.clean_coalesce(ref_expressions[1])
