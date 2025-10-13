@@ -56,7 +56,7 @@ def get_export_name(node, replace_dots=True):
         elif isinstance(value, str):
             export_name = f"'{clean_str(value, replace_dots=replace_dots)}'"
         else:
-            export_name = str(value)
+            export_name = value
         if hasattr(node, 'export_name'):
             node.export_name = export_name
         return export_name

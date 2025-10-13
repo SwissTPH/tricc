@@ -399,7 +399,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
         # build lower level
         if hasattr(self, f"tricc_operation_{operation.operator}"):
             callable = getattr(self, f"tricc_operation_{operation.operator}")
-            return callable(ref_expressions)
+            return callable(list(map(str, ref_expressions)))
         else:
             raise NotImplementedError(
                 f"This type of opreation '{operation.operator}' is not supported in this strategy"

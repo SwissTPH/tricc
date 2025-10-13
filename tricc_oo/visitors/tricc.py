@@ -2613,10 +2613,16 @@ def generate_base(node, processed_nodes, **kwargs):
                     constraints_min = ""
                     constraints_max = ""
                     if node.min is not None and node.min != "":
-                        constraints.append(TriccOperation(TriccOperator.MORE_OR_EQUAL, ["$this", node.min]))
+                        node.min = float(node.min)
+                        if int(node.min) == node.min:
+                            node.min = int(node.min)
+                        constraints.append(TriccOperation(TriccOperator.MORE_OR_EQUAL, ["$this", TriccStatic(node.min)]))
                         constraints_min = "The minimun value is {0}.".format(node.min)
                     if node.max is not None and node.max != "":
-                        constraints.append(TriccOperation(TriccOperator.LESS_OR_EQUAL, ["$this", node.max]))
+                        node.max = float(node.max)
+                        if int(node.max) == node.max:
+                            node.max = int(node.max)
+                        constraints.append(TriccOperation(TriccOperator.LESS_OR_EQUAL, ["$this", TriccStatic(node.max)]))
                         constraints_max = "The maximum value is {0}.".format(node.max)
                     if len(constraints) > 1:
                         node.constraint = TriccOperation(TriccOperator.AND, constraints)
