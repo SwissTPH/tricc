@@ -460,9 +460,9 @@ class XLSFormStrategy(BaseOutPutStrategy):
             return "1"
 
     def tricc_operation_native(self, ref_expressions):
-    
+
         if len(ref_expressions) > 0:
-            if ref_expressions[0].startswith(("'","`",)):
+            if ref_expressions[0].startswith(("'", "`",)):
                 ref_expressions[0] = ref_expressions[0][1:-1]
             if ref_expressions[0] == "GetChoiceName":
                 return f"""jr:choice-name({
@@ -723,19 +723,8 @@ class XLSFormStrategy(BaseOutPutStrategy):
         elif isinstance(r, TriccReference):
             logger.warning(f"reference `{r.value}` still used in a calculate")
             return f"${{{get_export_name(r.value)}}}"
-        elif isinstance(r, TriccStatic):
+        elif isinstance(r, (TriccStatic, str, int, float)):
             return get_export_name(r)
-        elif isinstance(r, str):
-            if r == TRICC_TRUE_VALUE:
-                return BOOLEAN_MAP[str(TRICC_TRUE_VALUE)]
-            elif r == TRICC_FALSE_VALUE:
-                return BOOLEAN_MAP[str(TRICC_FALSE_VALUE)]
-            elif isinstance(r, str):
-                return f"'{r}'"
-            else:
-                return str(r)
-        elif isinstance(r, (int, float)):
-            return str(r)
         elif isinstance(r, TriccNodeSelectOption):
             logger.debug(f"select option {r.get_name()} from {r.select.get_name()} was used as a reference")
             return get_export_name(r)
