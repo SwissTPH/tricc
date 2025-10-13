@@ -131,7 +131,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
         return generate_xls_form_export(self, node, **kwargs)
 
     def inject_version(self):
-        # Add hidden version field using ODK's jr:version()
+        # Add hidden version field using ODK's version()
         empty = langs.get_trads("", force_dict=True)
         self.df_survey.loc[len(self.df_survey)] = [
             "hidden",
@@ -148,7 +148,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
             "",  # required
             *list(empty.values()),  # required_message
             "",  # read only
-            "jr:version()",  # calculation
+            "version()",  # calculation
             "",  # trigger
             "",  # repeat_count
             "",  # image
