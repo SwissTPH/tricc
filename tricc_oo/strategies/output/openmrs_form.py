@@ -69,6 +69,9 @@ class OpenMRSStrategy(BaseOutPutStrategy):
         self.current_segment = None
         self.current_activity = None
         self.concept_map = {}
+        self.calculated_fields = []  # Store calculated fields to add to first section of each page
+        self.calculated_fields_added = set()  # Track which pages have had calculated fields added
+        self.inject_version()
 
     def get_export_name(self, r):
         if isinstance(r, TriccNodeSelectOption):
@@ -145,6 +148,9 @@ class OpenMRSStrategy(BaseOutPutStrategy):
 
         logger.info("generate the export format")
         self.process_export(self.project.start_pages, pages=self.project.pages)
+
+        logger.info("create calculation page")
+        self.create_calculation_page()
 
         logger.info("print the export")
         self.export(self.project.start_pages, version=version)
@@ -250,7 +256,9 @@ class OpenMRSStrategy(BaseOutPutStrategy):
                         }
                     }
                 }
-                return question
+                # Collect calculated fields to add to first section of each page
+                self.calculated_fields.append(question)
+                return None  # Don't return the question, it will be added to first section
         return None
 
     def generate_calculate(self, node, processed_nodes, **kwargs):
@@ -439,7 +447,7 @@ class OpenMRSStrategy(BaseOutPutStrategy):
         if len(ref_expressions) == 1:
             return ref_expressions[0]
         if len(ref_expressions) > 1:
-            return " || ".join(ref_expressions)
+            return "(" + " || ".join(ref_expressions) + ")"
         else:
             return "true"
 
@@ -472,7 +480,7 @@ class OpenMRSStrategy(BaseOutPutStrategy):
         return f"({ref_expressions[0]}.includes({ref_expressions[1]}))"
 
     def tricc_operation_count(self, ref_expressions):
-        return f"({ref_expressions[0]}.length)"
+        return f"({ref_expressions[0]}.length || 0)"
 
     def tricc_operation_multiplied(self, ref_expressions):
         return "*".join(ref_expressions)
@@ -638,6 +646,7 @@ class OpenMRSStrategy(BaseOutPutStrategy):
             "label": section_label,
             "questions": []
         })
+
         if group_node.relevance:
             relevance_str = self.convert_expression_to_string(not_clean(group_node.relevance))
             if relevance_str and relevance_str != 'false':
@@ -645,3 +654,38 @@ class OpenMRSStrategy(BaseOutPutStrategy):
                     "hideWhenExpression": f"{relevance_str}"
                 }
         logger.debug(f"Started section: {section_label}")
+
+    def create_calculation_page(self):
+        """Create a dedicated page for all calculated fields"""
+        if self.calculated_fields:
+            self.clean_sections()
+            self.clean_pages()
+            page = {
+                "label": "Calculations",
+                "sections": [
+                    {
+                        "label": "Calculations",
+                        "questions": self.calculated_fields
+                    }
+                ]
+            }
+            self.form_data["pages"].append(page)
+            logger.debug("Created calculation page")
+
+    def inject_version(self):
+        # Add hidden version field using version() function
+        question = {
+            "id": "version",
+            "type": "control",
+            "label": "",
+            "hide": {
+                "hideWhenExpression": "true"
+            },
+            "questionOptions": {
+                "calculate": {
+                    "calculateExpression": "version()"
+                }
+            }
+        }
+        # Collect calculated fields to add to first section of each page
+        self.calculated_fields.append(question)

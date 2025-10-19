@@ -494,6 +494,8 @@ class TriccOperation(BaseModel):
                 return "mixed"
             else:
                 return rtype.pop()
+        else:
+            return self.get_reference_datatype(self.reference)
 
     def get_reference_datatype(self, references):
         rtype = set()

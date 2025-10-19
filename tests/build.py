@@ -6,6 +6,7 @@ from tricc_oo.strategies.output.xls_form import XLSFormStrategy  # noqa: F401
 from tricc_oo.strategies.output.openmrs_form import OpenMRSStrategy  # noqa: F401
 from tricc_oo.strategies.output.fhir_form import FHIRStrategy  # noqa: F401
 from tricc_oo.strategies.output.html_form import HTMLStrategy  # noqa: F401
+from tricc_oo.strategies.output.dhis2_form import DHIS2Strategy  # noqa: F401
 from tricc_oo.strategies.input.drawio import DrawioStrategy  # noqa: F401
 import getopt
 import logging

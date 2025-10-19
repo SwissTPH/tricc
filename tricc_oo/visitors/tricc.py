@@ -1564,7 +1564,12 @@ def set_prev_next_node(source_node, target_node, replaced_node=None, edge_only=F
         set_next_node(source_node, target_node, replaced_node, edge_only)
 
     if activity and not any([(e.source == source_id) and (e.target == target_id) for e in activity.edges]):
-        label = "continue" if issubclass(source_node.__class__, TriccNodeSelect) else None
+        if issubclass(source_node.__class__, TriccNodeSelect):
+            label = "continue"
+        elif isinstance(source_node, TriccNodeRhombus):
+            label = "yes"
+        else:
+            label = None
         activity.edges.append(TriccEdge(id=generate_id(), source=source_id, target=target_id, value=label))
 
 
@@ -1848,6 +1853,16 @@ def get_node_expression(in_node, processed_nodes, get_overall_exp=False, is_prev
             logger.critical(f"Rhombus without expression {node.get_name()}")
     elif is_prev and issubclass(node.__class__, TriccNodeDisplayCalculateBase):
         expression = TriccOperation(TriccOperator.ISTRUE, [node])
+        prev_exp_overall = get_node_expression(
+            node,
+            processed_nodes=processed_nodes,
+            get_overall_exp=False,
+            is_prev=False,
+            process=process,
+            negate=negate
+        )
+        if prev_exp_overall in [TriccStatic(True), TriccStatic(False)]:
+            expression = prev_exp_overall
     elif hasattr(node, "expression_reference") and isinstance(node.expression_reference, TriccOperation):
         # if issubclass(node.__class__, TriccNodeDisplayCalculateBase):
         #     expression = TriccOperation(
@@ -2241,7 +2256,10 @@ def get_count_terms_details(prev_node, processed_nodes, get_overall_exp, negate=
                                     get_node_expression(
                                         prev_node,
                                         processed_nodes=processed_nodes,
-                                        get_overall_exp=True,
+                                        get_overall_exp=not issubclass(
+                                            prev_node.__class__,
+                                            (TriccNodeBridge, TriccNodeDisplayBridge)
+                                        ),
                                         is_prev=True,
                                         process=process,
                                     )
@@ -2279,7 +2297,10 @@ def get_add_terms(node, processed_nodes, get_overall_exp=False, negate=False, pr
                         get_node_expression(
                             prev_node,
                             processed_nodes=processed_nodes,
-                            get_overall_exp=True,
+                            get_overall_exp=not issubclass(
+                                prev_node.__class__,
+                                (TriccNodeBridge, TriccNodeDisplayBridge)
+                            ),
                             is_prev=True,
                             process=process,
                         )
@@ -2352,7 +2373,11 @@ def get_rhombus_terms(node, processed_nodes, get_overall_exp=False, negate=False
                 TriccOperator.CAST_NUMBER,
                 [
                     get_node_expression(
-                        expression, processed_nodes=processed_nodes, get_overall_exp=True, is_prev=True, process=process
+                        expression,
+                        processed_nodes=processed_nodes,
+                        get_overall_exp=not issubclass(expression.__class__, (TriccNodeBridge, TriccNodeDisplayBridge)),
+                        is_prev=True,
+                        process=process
                     )
                 ],
             )
@@ -2420,7 +2445,7 @@ def get_calculation_terms(node, processed_nodes, get_overall_exp=False, negate=F
                 return get_node_expression(
                     node_to_negate,
                     processed_nodes=processed_nodes,
-                    get_overall_exp=True,
+                    get_overall_exp=not issubclass(node_to_negate.__class__, (TriccNodeBridge, TriccNodeDisplayBridge)),
                     is_prev=True,
                     negate=True,
                     process=process,
@@ -2429,7 +2454,7 @@ def get_calculation_terms(node, processed_nodes, get_overall_exp=False, negate=F
                 return get_node_expression(
                     node_to_negate,
                     processed_nodes=processed_nodes,
-                    get_overall_exp=True,
+                    get_overall_exp=not issubclass(node_to_negate.__class__, (TriccNodeBridge, TriccNodeDisplayBridge)),
                     is_prev=True,
                     negate=True,
                     process=process,
@@ -2616,13 +2641,17 @@ def generate_base(node, processed_nodes, **kwargs):
                         node.min = float(node.min)
                         if int(node.min) == node.min:
                             node.min = int(node.min)
-                        constraints.append(TriccOperation(TriccOperator.MORE_OR_EQUAL, ["$this", TriccStatic(node.min)]))
+                        constraints.append(
+                            TriccOperation(TriccOperator.MORE_OR_EQUAL, ["$this", TriccStatic(node.min)])
+                        )
                         constraints_min = "The minimun value is {0}.".format(node.min)
                     if node.max is not None and node.max != "":
                         node.max = float(node.max)
                         if int(node.max) == node.max:
                             node.max = int(node.max)
-                        constraints.append(TriccOperation(TriccOperator.LESS_OR_EQUAL, ["$this", TriccStatic(node.max)]))
+                        constraints.append(
+                            TriccOperation(TriccOperator.LESS_OR_EQUAL, ["$this", TriccStatic(node.max)])
+                        )
                         constraints_max = "The maximum value is {0}.".format(node.max)
                     if len(constraints) > 1:
                         node.constraint = TriccOperation(TriccOperator.AND, constraints)
