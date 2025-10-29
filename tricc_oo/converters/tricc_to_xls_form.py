@@ -53,8 +53,8 @@ def get_export_name(node, replace_dots=True):
             export_name = BOOLEAN_MAP[str(TRICC_FALSE_VALUE)]
         elif value == '$this':
             export_name = '.'
-        elif isinstance(value, str):
-            export_name = f"'{clean_str(value, replace_dots=replace_dots)}'"
+        elif isinstance(value, str) and not isinstance(node, str):
+            export_name = f"'{value}'"
         else:
             export_name = value
         if hasattr(node, 'export_name'):
