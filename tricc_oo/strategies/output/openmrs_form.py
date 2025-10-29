@@ -21,6 +21,7 @@ from tricc_oo.models.tricc import (
     TriccNodeSelectOption,
     TriccNodeInputModel,
     TriccNodeBaseModel,
+    TriccNodeSelect,
     TriccNodeDisplayModel,
 )
 
@@ -166,7 +167,7 @@ class OpenMRSStrategy(BaseOutPutStrategy):
             'select_multiple': 'multiCheckbox',
             'select_yesno': 'select',
             'not_available': 'checkbox',
-            'note': 'text'
+            'note': 'markdown'
         }
 
         # if issubclass(node.__class__, TriccNodeSelectYesNo):
@@ -408,6 +409,8 @@ class OpenMRSStrategy(BaseOutPutStrategy):
             return f"'{option}'"
         elif issubclass(r.__class__, TriccNodeInputModel):
             return self.get_export_name(r)
+        elif issubclass(r.__class__, TriccNodeSelect):
+            return "(" + self.get_export_name(r) + " ?? [])"       
         elif issubclass(r.__class__, TriccNodeBaseModel):
             return self.get_export_name(r)
         else:
@@ -455,7 +458,7 @@ class OpenMRSStrategy(BaseOutPutStrategy):
         return f"!({ref_expressions[0]})"
 
     def tricc_operation_plus(self, ref_expressions):
-        return " + ".join(ref_expressions)
+        return "(" + " + ".join(ref_expressions) +")" 
 
     def tricc_operation_minus(self, ref_expressions):
         if len(ref_expressions) > 1:
@@ -480,7 +483,7 @@ class OpenMRSStrategy(BaseOutPutStrategy):
         return f"({ref_expressions[0]}.includes({ref_expressions[1]}))"
 
     def tricc_operation_count(self, ref_expressions):
-        return f"({ref_expressions[0]}.length || 0)"
+        return f"{ref_expressions[0]}.length"
 
     def tricc_operation_multiplied(self, ref_expressions):
         return "*".join(ref_expressions)
