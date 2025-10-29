@@ -101,16 +101,16 @@ def create_activity(diagram, media_path, project):
 
     external_id = diagram.attrib.get("id")
     id = get_id(external_id, diagram.attrib.get("id"))
-    root = create_root_node(diagram)
-    name = diagram.attrib.get("name")
+    root, name = create_root_node(diagram)
+    label = diagram.attrib.get("name")
     form_id = diagram.attrib.get("name", None)
     if root is not None:
         activity = TriccNodeActivity(
             root=root,
-            name=get_rand_name(f"a{id}"),
+            name=name,  #  start node 'name' is saved in label
             id=id,
             external_id=external_id,
-            label=name,
+            label=label,
             form_id=form_id,
         )
         if root.relevance is not None:
@@ -130,7 +130,7 @@ def create_activity(diagram, media_path, project):
             if (
                 issubclass(n.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase))
                 and not isinstance(n, (TriccRhombusMixIn, TriccNodeRhombus, TriccNodeDisplayBridge))
-                and not n.name.startswith("label_")
+                and not n.name.startswith("label_")  # FIXME
             ):
                 system = n.name.split(".")[0] if "." in n.name else "tricc"
                 if isinstance(n, TriccNodeSelectOption) and isinstance(n.select, TriccNodeSelectNotAvailable):
@@ -444,17 +444,18 @@ def create_root_node(diagram):
         if elm is not None:
             external_id = elm.attrib.get("id")
             id = get_id(external_id, diagram.attrib.get("id"))
+            name = generate_id("start"+external_id)
             node = TriccNodeActivityStart(
                 id=id,
                 external_id=external_id,
                 # parent=elm.attrib.get("parent"),
-                name="ma" + id,
+                name=name,
                 label=diagram.attrib.get("name"),
                 relevance=elm.attrib.get("relevance"),
                 instance=int(elm.attrib.get("instance") if elm.attrib.get("instance") is not None else 1),
             )
     load_expressions(node)
-    return node
+    return node, elm.attrib.get("name", generate_id("act"+external_id))
 
 
 # converter XML item to object
