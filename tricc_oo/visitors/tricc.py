@@ -28,6 +28,7 @@ from tricc_oo.models.calculate import (
     TriccNodeActivityEnd,
     TriccNodeActivityStart,
     TriccNodeEnd,
+    TriccNodeDiagnosis,
     get_node_from_id,
 
 )
@@ -120,27 +121,13 @@ def get_last_version(name, processed_nodes, _list=None):
 # node is the node to calculate
 # processed_nodes are the list of processed nodes
 def get_node_expressions(node, processed_nodes, process=None):
-    get_overall_exp = issubclass(node.__class__, TriccNodeCalculateBase) and not issubclass(
-        node.__class__, (TriccNodeDisplayBridge, TriccNodeBridge)
-    )
+    get_overall_exp = issubclass(node.__class__, (TriccNodeDisplayCalculateBase, TriccNodeProposedDiagnosis, TriccNodeDiagnosis)) and not isinstance(node, (TriccNodeDisplayBridge))
     expression = None
     # in case of recursive call processed_nodes will be None
     if processed_nodes is None or is_ready_to_process(node, processed_nodes=processed_nodes):
         expression = get_node_expression(
             node, processed_nodes=processed_nodes, get_overall_exp=get_overall_exp, process=process
         )
-
-    # if get_overall_exp:
-    #     if expression  and (not isinstance(expression, str) or expression != '')
-    #           and  expression is not TriccStatic(True) :
-    #         num_expression = TriccOperation(
-    #             TriccOperator.CAST_NUMBER,
-    #             [expression]
-    #         )
-    #     elif expression is TriccStatic(True)  or (not expression and get_overall_exp):
-    #         expression = TriccStatic(True)
-    #     else:
-    #         expression = None
     if (
         issubclass(node.__class__, TriccNodeCalculateBase)
         and not isinstance(expression, (TriccStatic, TriccReference, TriccOperation))
@@ -2156,7 +2143,7 @@ def get_prev_node_expression(node, processed_nodes, get_overall_exp=False, exclu
                     processed_nodes=processed_nodes,
                     get_overall_exp=get_overall_exp,
                     is_prev=True,
-                    process=process,
+                    process=get_overall_exp,
                 )
                 if isinstance(node, TriccNodeActivity) or get_overall_exp:
                     add_sub_expression(act_expression_inputs, sub)
@@ -2165,11 +2152,12 @@ def get_prev_node_expression(node, processed_nodes, get_overall_exp=False, exclu
 
         if act_expression_inputs:
             act_sub = or_join(act_expression_inputs)
+            # if there is condition fallback on the calling activity condition
             if act_sub == TriccStatic(True):
                 act_sub = get_node_expression(
                     prev_node.activity,
                     processed_nodes=processed_nodes,
-                    get_overall_exp=True,
+                    get_overall_exp=get_overall_exp,
                     is_prev=True,
                     negate=False,
                     process=process,
@@ -2256,10 +2244,7 @@ def get_count_terms_details(prev_node, processed_nodes, get_overall_exp, negate=
                                     get_node_expression(
                                         prev_node,
                                         processed_nodes=processed_nodes,
-                                        get_overall_exp=not issubclass(
-                                            prev_node.__class__,
-                                            (TriccNodeBridge, TriccNodeDisplayBridge)
-                                        ),
+                                        get_overall_exp=get_overall_exp,
                                         is_prev=True,
                                         process=process,
                                     )
@@ -2276,7 +2261,7 @@ def get_count_terms_details(prev_node, processed_nodes, get_overall_exp, negate=
                 TriccOperator.CAST_NUMBER,
                 [
                     get_node_expression(
-                        prev_node, processed_nodes=processed_nodes, get_overall_exp=True, is_prev=True, process=process
+                        prev_node, processed_nodes=processed_nodes, get_overall_exp=get_overall_exp, is_prev=True, process=process
                     )
                 ],
             )
@@ -2297,10 +2282,7 @@ def get_add_terms(node, processed_nodes, get_overall_exp=False, negate=False, pr
                         get_node_expression(
                             prev_node,
                             processed_nodes=processed_nodes,
-                            get_overall_exp=not issubclass(
-                                prev_node.__class__,
-                                (TriccNodeBridge, TriccNodeDisplayBridge)
-                            ),
+                            get_overall_exp=get_overall_exp,
                             is_prev=True,
                             process=process,
                         )
@@ -2375,7 +2357,7 @@ def get_rhombus_terms(node, processed_nodes, get_overall_exp=False, negate=False
                     get_node_expression(
                         expression,
                         processed_nodes=processed_nodes,
-                        get_overall_exp=not issubclass(expression.__class__, (TriccNodeBridge, TriccNodeDisplayBridge)),
+                        get_overall_exp=get_overall_exp,
                         is_prev=True,
                         process=process
                     )
@@ -2415,7 +2397,7 @@ def get_calculation_terms(node, processed_nodes, get_overall_exp=False, negate=F
         return get_count_terms(node, False, negate, process=process)
     elif isinstance(node, TriccNodeRhombus):
         return get_rhombus_terms(
-            node, processed_nodes=processed_nodes, get_overall_exp=False, negate=negate, process=process
+            node, processed_nodes=processed_nodes, get_overall_exp=get_overall_exp, negate=negate, process=process
         )
     elif isinstance(node, (TriccNodeWait)):
         # just use to force order of question
@@ -2432,7 +2414,6 @@ def get_calculation_terms(node, processed_nodes, get_overall_exp=False, negate=F
         )
     elif isinstance(node, (TriccNodeActivityStart, TriccNodeActivityEnd)):
         # the group have the relevance for the activity, not needed to replicate it
-        # return get_prev_node_expression(node.activity, processed_nodes, get_overall_exp=False, excluded_name=None)
         expression = None
     elif isinstance(node, TriccNodeExclusive):
         if len(node.prev_nodes) == 1:
@@ -2445,7 +2426,7 @@ def get_calculation_terms(node, processed_nodes, get_overall_exp=False, negate=F
                 return get_node_expression(
                     node_to_negate,
                     processed_nodes=processed_nodes,
-                    get_overall_exp=not issubclass(node_to_negate.__class__, (TriccNodeBridge, TriccNodeDisplayBridge)),
+                    get_overall_exp=get_overall_exp,
                     is_prev=True,
                     negate=True,
                     process=process,
@@ -2454,7 +2435,7 @@ def get_calculation_terms(node, processed_nodes, get_overall_exp=False, negate=F
                 return get_node_expression(
                     node_to_negate,
                     processed_nodes=processed_nodes,
-                    get_overall_exp=not issubclass(node_to_negate.__class__, (TriccNodeBridge, TriccNodeDisplayBridge)),
+                    get_overall_exp=get_overall_exp,
                     is_prev=True,
                     negate=True,
                     process=process,
