@@ -1,0 +1,419 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/26.1.1 Chrome/132.0.6834.210 Electron/34.3.3 Safari/537.36" version="26.1.1" pages="2">
+  <diagram id="fmbEcsuDMUmzLLnSy5GR" name="Simplify_flow">
+    <mxGraphModel dx="2117" dy="719" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="rn1P77rKJ-pR34yV5j2a-2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="iqi_lfFpcJCjXUtUYmyd-1" target="iqi_lfFpcJCjXUtUYmyd-3" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object label="Under 5" odk_type="start" form_id="questionaire" name="s_" process="registration" id="iqi_lfFpcJCjXUtUYmyd-1">
+          <mxCell style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;labelBackgroundColor=none;" parent="1" vertex="1">
+            <mxGeometry x="-205" y="840" width="70" height="70" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="rn1P77rKJ-pR34yV5j2a-4" value="No" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="iqi_lfFpcJCjXUtUYmyd-2" target="iqi_lfFpcJCjXUtUYmyd-4" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="rn1P77rKJ-pR34yV5j2a-5" value="Yes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="iqi_lfFpcJCjXUtUYmyd-2" target="iqi_lfFpcJCjXUtUYmyd-5" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <UserObject label="Is there an Active Disease?&lt;div&gt;(warn_symp = &#39;1&#39;)&lt;/div&gt;" name="r_" odk_type="rhombus" reference="&quot;warn_symp&quot; = &#39;1&#39;" id="iqi_lfFpcJCjXUtUYmyd-2">
+          <mxCell style="whiteSpace=wrap;html=1;rounded=0;strokeColor=default;fillColor=none;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];shape=mxgraph.bpmn.task2;rectStyle=rounded;size=10;container=1;expand=0;collapsible=0;taskMarker=businessRule;" parent="1" vertex="1">
+            <mxGeometry x="-50" y="1330" width="100" height="70" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="rn1P77rKJ-pR34yV5j2a-1" value="Yes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="iqi_lfFpcJCjXUtUYmyd-3" target="eDciyxFi0ifedOGynCTN-11" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="rn1P77rKJ-pR34yV5j2a-3" value="No" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="iqi_lfFpcJCjXUtUYmyd-3" target="eDciyxFi0ifedOGynCTN-15" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <UserObject label="Do we have recent Warning Symptoms?" name="r_" odk_type="rhombus" reference="&quot;recent_warn_symp_prev&quot; = &#39;1&#39;" id="iqi_lfFpcJCjXUtUYmyd-3">
+          <mxCell style="whiteSpace=wrap;html=1;rounded=0;strokeColor=default;fillColor=none;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];shape=mxgraph.bpmn.task2;rectStyle=rounded;size=10;container=1;expand=0;collapsible=0;taskMarker=businessRule;" parent="1" vertex="1">
+            <mxGeometry x="-215" y="940" width="100" height="100" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="rn1P77rKJ-pR34yV5j2a-6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="iqi_lfFpcJCjXUtUYmyd-4" target="iqi_lfFpcJCjXUtUYmyd-5" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="-5" y="1630" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <object label="Personal Information" odk_type="goto" name="birth_vaccines" link="data:page/id,OBBu7XcgXyWSd6P5Chhv" id="iqi_lfFpcJCjXUtUYmyd-4">
+          <mxCell style="shape=offPageConnector;whiteSpace=wrap;html=1;rounded=0;fontSize=12;labelBackgroundColor=none;" parent="1" vertex="1">
+            <mxGeometry x="-25" y="1460" width="50" height="50" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="Activity end" name="next_" odk_type="activity_end" id="iqi_lfFpcJCjXUtUYmyd-5">
+          <mxCell style="points=[[0.145,0.145,0],[0.5,0,0],[0.855,0.145,0],[1,0.5,0],[0.855,0.855,0],[0.5,1,0],[0.145,0.855,0],[0,0.5,0]];shape=mxgraph.bpmn.event;html=1;verticalLabelPosition=bottom;labelBackgroundColor=none;verticalAlign=top;align=center;perimeter=ellipsePerimeter;outlineConnect=0;aspect=fixed;outline=end;symbol=terminate2;" parent="1" vertex="1">
+            <mxGeometry x="-190" y="1610" width="50" height="50" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="Calculate:&lt;div&gt;warn_symp&lt;/div&gt;" odk_type="calculate" name="warn_symp" reference="if &quot;warn_symp_now&quot; != &#39;&#39; then&#xa;  &#39;1&#39;&#xa;else&#xa;  &#39;2&#39;" id="rn1P77rKJ-pR34yV5j2a-11">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];shape=mxgraph.bpmn.task2;rectStyle=rounded;size=10;container=1;expand=0;collapsible=0;taskMarker=script;movable=1;resizable=1;rotatable=1;deletable=1;editable=1;locked=0;connectable=1;labelBackgroundColor=none;" parent="1" vertex="1">
+            <mxGeometry x="600" y="1150" width="130" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="Calculate:&lt;div&gt;date_warn_symp&lt;/div&gt;" odk_type="calculate" name="date_warn_symp" reference="if &quot;warn_symp&quot; = &#39;1&#39; then&#xa;  &quot;td&quot;&#xa;else&#xa;  &quot;t_date_warn_symp&quot;" id="rn1P77rKJ-pR34yV5j2a-12">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];shape=mxgraph.bpmn.task2;rectStyle=rounded;size=10;container=1;expand=0;collapsible=0;taskMarker=script;movable=1;resizable=1;rotatable=1;deletable=1;editable=1;locked=0;connectable=1;labelBackgroundColor=none;" parent="1" vertex="1">
+            <mxGeometry x="600" y="1230" width="130" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="t_warn_symp" odk_type="input" name="t_warn_symp" id="rn1P77rKJ-pR34yV5j2a-13">
+          <mxCell style="shape=mxgraph.bpmn.data2;labelPosition=center;verticalLabelPosition=bottom;align=center;verticalAlign=top;size=15;html=1;bpmnTransferType=input;labelBackgroundColor=none;" parent="1" vertex="1">
+            <mxGeometry x="380" y="1140" width="40" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="t_date_warn_symp" odk_type="input" name="t_date_warn_symp" id="rn1P77rKJ-pR34yV5j2a-14">
+          <mxCell style="shape=mxgraph.bpmn.data2;labelPosition=center;verticalLabelPosition=bottom;align=center;verticalAlign=top;size=15;html=1;bpmnTransferType=input;labelBackgroundColor=none;" parent="1" vertex="1">
+            <mxGeometry x="380" y="1230" width="40" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="Calculate:&lt;div&gt;recent_warn_symp&lt;/div&gt;&lt;div&gt;&lt;br&gt;Participant reported warning symptoms within the last 7 days, which might have been resolved in the meantime.&lt;/div&gt;" odk_type="calculate" name="recent_warn_symp" reference="if int(&quot;recent_warn_symp_res&quot;) = 1 then&#xa;  &#39;2&#39;&#xa;else &#xa;  &quot;recent_warn_symp_prev&quot;" id="rn1P77rKJ-pR34yV5j2a-15">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];shape=mxgraph.bpmn.task2;rectStyle=rounded;size=10;container=1;expand=0;collapsible=0;taskMarker=script;movable=1;resizable=1;rotatable=1;deletable=1;editable=1;locked=0;connectable=1;labelBackgroundColor=none;" parent="1" vertex="1">
+            <mxGeometry x="340" y="1450" width="272.5" height="100" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="Calculate:&lt;div&gt;recent_warn_symp_prev&lt;/div&gt;&lt;div&gt;&lt;br&gt;Participant reported warning symptoms within the last 7 days&lt;/div&gt;" odk_type="calculate" name="recent_warn_symp_prev" reference="if &quot;t_warn_symp&quot; = &#39;1&#39; and &quot;t_date_warn_symp&quot; != &#39;&#39; and DateTimeToDecimal(&quot;td&quot;) - DateTimeToDecimal(&quot;t_date_warn_symp&quot;) &lt; 7 then&#xa;  &#39;1&#39;&#xa;else&#xa;  &#39;2&#39;" id="eDciyxFi0ifedOGynCTN-10">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];shape=mxgraph.bpmn.task2;rectStyle=rounded;size=10;container=1;expand=0;collapsible=0;taskMarker=script;movable=1;resizable=1;rotatable=1;deletable=1;editable=1;locked=0;connectable=1;labelBackgroundColor=none;" parent="1" vertex="1">
+            <mxGeometry x="340" y="1570" width="272.5" height="100" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="eDciyxFi0ifedOGynCTN-13" value="Yes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="eDciyxFi0ifedOGynCTN-11" target="iqi_lfFpcJCjXUtUYmyd-2" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eDciyxFi0ifedOGynCTN-14" value="No" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="eDciyxFi0ifedOGynCTN-11" target="iqi_lfFpcJCjXUtUYmyd-5" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <UserObject label="Did the warning symptoms resolve in the meantime?" name="recent_warn_symp_res" odk_type="select_one yesno" id="eDciyxFi0ifedOGynCTN-11">
+          <mxCell style="html=1;whiteSpace=wrap;rounded=0;align=left;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];shape=mxgraph.bpmn.task2;rectStyle=rounded;size=10;container=1;expand=0;collapsible=0;taskMarker=abstract;labelBackgroundColor=none;" parent="1" vertex="1">
+            <mxGeometry x="-250" y="1100" width="170" height="40" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="eDciyxFi0ifedOGynCTN-16" value="continue" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="eDciyxFi0ifedOGynCTN-15" target="iqi_lfFpcJCjXUtUYmyd-2" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <UserObject label="Are there warning symptoms now?" name="warn_symp_now" odk_type="select_one yesno" id="eDciyxFi0ifedOGynCTN-15">
+          <mxCell style="html=1;whiteSpace=wrap;rounded=0;align=left;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];shape=mxgraph.bpmn.task2;rectStyle=rounded;size=10;container=1;expand=0;collapsible=0;taskMarker=abstract;labelBackgroundColor=none;" parent="1" vertex="1">
+            <mxGeometry x="130" y="1345" width="170" height="40" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <object label="Calculate: Today" odk_type="calculate" name="td" reference="today()" id="eDciyxFi0ifedOGynCTN-18">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];shape=mxgraph.bpmn.task2;rectStyle=rounded;size=10;container=1;expand=0;collapsible=0;taskMarker=script;movable=1;resizable=1;rotatable=1;deletable=1;editable=1;locked=0;connectable=1;labelBackgroundColor=none;" parent="1" vertex="1">
+            <mxGeometry x="600" y="1070" width="130" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="eDciyxFi0ifedOGynCTN-20" value="&lt;div&gt;For the note mother_patient_id_n this results in&lt;/div&gt;&lt;div&gt;not(${load_t_mother_patient_id}!=&#39;&#39;) and ((${piqi_lfFpcJCjXUtUYmyd_2}&amp;gt;=1 and coalesce(${u5_bukana_available},0)&amp;gt;=1 and not(${warn_symp}=&#39;1&#39;) and not(${load_t_under_5_number}!=&#39;&#39;)) or (${piqi_lfFpcJCjXUtUYmyd_2}&amp;gt;=1 and not(${warn_symp}=&#39;1&#39;)) or (${piqi_lfFpcJCjXUtUYmyd_2}&amp;gt;=1 and not(${warn_symp}=&#39;1&#39;) and not(${load_t_under_5_number}!=&#39;&#39;)) or selected(${under5_nr_yn}, &#39;1&#39;))&lt;/div&gt;&lt;div&gt;as required.&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;BUT: the personal information sheet is completely unchanged, and everything i changed on the main sheet should be (and is) handled at the gorup level&lt;/div&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" parent="1" vertex="1">
+          <mxGeometry x="-790" y="1730" width="2110" height="100" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram name="Personal Informatiokn" id="OBBu7XcgXyWSd6P5Chhv">
+    <mxGraphModel dx="1290" dy="719" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="Gmsd4vZ7Zv51DgAtORjc-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;labelBackgroundColor=none;" parent="1" source="Gmsd4vZ7Zv51DgAtORjc-2" target="Gmsd4vZ7Zv51DgAtORjc-58" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1359" y="790.25" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="944.5" y="760.25" />
+              <mxPoint x="944.5" y="757.25" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <object label="&lt;div&gt;Under 5 Number&lt;/div&gt;" odk_type="text" name="under_5_number" constraint="regex($this, &#39;^[A-Za-z]\d{4}20\d{2}(0[1-9]|1[0-2])\d{3,4}$&#39;)" constraint_message="The under 5 number does not mach the format described above." id="Gmsd4vZ7Zv51DgAtORjc-2">
+          <mxCell style="shape=mxgraph.bpmn.task2;whiteSpace=wrap;html=1;fixedSize=1;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];rectStyle=rounded;size=10;container=1;expand=0;collapsible=0;taskMarker=user;labelBackgroundColor=none;" parent="1" vertex="1">
+            <mxGeometry x="1549.5" y="730.25" width="110" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="Gmsd4vZ7Zv51DgAtORjc-3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="Gmsd4vZ7Zv51DgAtORjc-31" target="Gmsd4vZ7Zv51DgAtORjc-6" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object label="Medic ID of the Mother/Guardian (only enter the digits including leading 0)" odk_type="text" name="mother_patient_id" constraint="regex($this, &#39;^[0-9]{4,10}$&#39;)" constraint_message="The Patient ID consists of 4 to 10 digits." id="Gmsd4vZ7Zv51DgAtORjc-4">
+          <mxCell style="shape=mxgraph.bpmn.task2;whiteSpace=wrap;html=1;fixedSize=1;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];rectStyle=rounded;size=10;container=1;expand=0;collapsible=0;taskMarker=user;fillColor=none;strokeColor=#9673a6;" parent="1" vertex="1">
+            <mxGeometry x="1392" y="1001.25" width="110" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="Gmsd4vZ7Zv51DgAtORjc-5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="Gmsd4vZ7Zv51DgAtORjc-6" target="Gmsd4vZ7Zv51DgAtORjc-8" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object label="Surname of Mother/Guardian" odk_type="text" name="mother_surname" id="Gmsd4vZ7Zv51DgAtORjc-6">
+          <mxCell style="shape=mxgraph.bpmn.task2;whiteSpace=wrap;html=1;fixedSize=1;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];rectStyle=rounded;size=10;container=1;expand=0;collapsible=0;taskMarker=user;fillColor=none;strokeColor=#9673a6;" parent="1" vertex="1">
+            <mxGeometry x="1387.5" y="1181.25" width="110" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="Gmsd4vZ7Zv51DgAtORjc-7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="Gmsd4vZ7Zv51DgAtORjc-8" target="Gmsd4vZ7Zv51DgAtORjc-15" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1360" y="1286.25" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <UserObject label="Place of Birth" name="place_of_birth" odk_type="select_one" filter="" id="Gmsd4vZ7Zv51DgAtORjc-8">
+          <mxCell style="swimlane;fontStyle=0;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;rounded=1;align=left;movable=1;resizable=1;rotatable=1;deletable=1;editable=1;locked=0;connectable=1;" parent="1" vertex="1">
+            <mxGeometry x="1330" y="1281.25" width="225" height="90" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="Health facility" name="health_facility" odk_type="select_option" id="Gmsd4vZ7Zv51DgAtORjc-9">
+          <mxCell style="text;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;rounded=0;dashed=1;" parent="Gmsd4vZ7Zv51DgAtORjc-8" vertex="1">
+            <mxGeometry y="30" width="225" height="30" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="Home delivery" name="home_delivery" odk_type="select_option" id="Gmsd4vZ7Zv51DgAtORjc-10">
+          <mxCell style="text;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;rounded=0;dashed=1;" parent="Gmsd4vZ7Zv51DgAtORjc-8" vertex="1">
+            <mxGeometry y="60" width="225" height="30" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <object label="U5_number preload" odk_type="input" name="t_under_5_number" id="Gmsd4vZ7Zv51DgAtORjc-11">
+          <mxCell style="shape=mxgraph.bpmn.data2;labelPosition=center;verticalLabelPosition=bottom;align=center;verticalAlign=top;size=15;html=1;bpmnTransferType=input;labelBackgroundColor=none;" parent="1" vertex="1">
+            <mxGeometry x="700" y="561.25" width="40" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="Gmsd4vZ7Zv51DgAtORjc-12" value="continue" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="Gmsd4vZ7Zv51DgAtORjc-35" target="Gmsd4vZ7Zv51DgAtORjc-15" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <UserObject label="Is the U5 number already konwn?" name="r_" odk_type="rhombus" reference="&quot;t_under_5_number&quot; != &#39;&#39;" id="Gmsd4vZ7Zv51DgAtORjc-13">
+          <mxCell style="whiteSpace=wrap;html=1;rounded=0;strokeColor=default;fillColor=none;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];shape=mxgraph.bpmn.task2;rectStyle=rounded;size=10;container=1;expand=0;collapsible=0;taskMarker=businessRule;" parent="1" vertex="1">
+            <mxGeometry x="860" y="580.25" width="100" height="100" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="Gmsd4vZ7Zv51DgAtORjc-14" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="Gmsd4vZ7Zv51DgAtORjc-15" target="Gmsd4vZ7Zv51DgAtORjc-62" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object label="Bridge" odk_type="bridge" id="Gmsd4vZ7Zv51DgAtORjc-15">
+          <mxCell style="shape=mxgraph.bpmn.event;whiteSpace=wrap;html=1;backgroundOutline=1;points=[[0.145,0.145,0],[0.5,0,0],[0.855,0.145,0],[1,0.5,0],[0.855,0.855,0],[0.5,1,0],[0.145,0.855,0],[0,0.5,0]];verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;perimeter=ellipsePerimeter;outlineConnect=0;aspect=fixed;outline=eventInt;symbol=parallelMultiple;fontColor=#000000;" parent="1" vertex="1">
+            <mxGeometry x="896" y="1310.75" width="30" height="31" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="Gmsd4vZ7Zv51DgAtORjc-16" value="continue" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="Gmsd4vZ7Zv51DgAtORjc-18" target="Gmsd4vZ7Zv51DgAtORjc-60" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="907.5" y="501.25" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="Gmsd4vZ7Zv51DgAtORjc-17" value="No" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="Gmsd4vZ7Zv51DgAtORjc-18" target="Gmsd4vZ7Zv51DgAtORjc-20" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <UserObject label="Is the Bukana available?" name="u5_bukana_available" odk_type="select_one yesno" id="Gmsd4vZ7Zv51DgAtORjc-18">
+          <mxCell style="html=1;whiteSpace=wrap;rounded=0;align=left;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];shape=mxgraph.bpmn.task2;rectStyle=rounded;size=10;container=1;expand=0;collapsible=0;taskMarker=abstract;labelBackgroundColor=none;" parent="1" vertex="1">
+            <mxGeometry x="847.5" y="390.25" width="120" height="40" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="Gmsd4vZ7Zv51DgAtORjc-19" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="Gmsd4vZ7Zv51DgAtORjc-20" target="Gmsd4vZ7Zv51DgAtORjc-60" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1209.5" y="487.25" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <object label="&lt;font style=&quot;font-size: 12px&quot;&gt;Please remind the patient to bring the Bukana or vaccination record next time.&lt;/font&gt;" odk_type="note" name="u5_bukana_available_n" id="Gmsd4vZ7Zv51DgAtORjc-20">
+          <mxCell style="rounded=0;whiteSpace=wrap;html=1;align=left;fillColor=none;fontSize=12;strokeColor=default;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];shape=mxgraph.bpmn.task2;rectStyle=rounded;size=10;container=1;expand=0;collapsible=0;taskMarker=send;" parent="1" vertex="1">
+            <mxGeometry x="1039" y="380.25" width="340" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="Gmsd4vZ7Zv51DgAtORjc-21" value="continue" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="Gmsd4vZ7Zv51DgAtORjc-23" target="Gmsd4vZ7Zv51DgAtORjc-58" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1309" y="760.25" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="1274.5" y="750.25" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="Gmsd4vZ7Zv51DgAtORjc-22" value="yes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="Gmsd4vZ7Zv51DgAtORjc-23" target="Gmsd4vZ7Zv51DgAtORjc-29" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <UserObject label="Is the under 5 number available?" name="under5_nr_yn" odk_type="select_one yesno" id="Gmsd4vZ7Zv51DgAtORjc-23">
+          <mxCell style="html=1;whiteSpace=wrap;rounded=0;align=left;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];shape=mxgraph.bpmn.task2;rectStyle=rounded;size=10;container=1;expand=0;collapsible=0;taskMarker=abstract;labelBackgroundColor=none;" parent="1" vertex="1">
+            <mxGeometry x="1214.5" y="610.25" width="120" height="40" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="Gmsd4vZ7Zv51DgAtORjc-24" value="No" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="Gmsd4vZ7Zv51DgAtORjc-13" target="Gmsd4vZ7Zv51DgAtORjc-27" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points" />
+            <mxPoint x="954.5" y="540.25" as="sourcePoint" />
+            <mxPoint x="1284.5" y="535.25" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="Gmsd4vZ7Zv51DgAtORjc-25" value="Yes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="Gmsd4vZ7Zv51DgAtORjc-27" target="Gmsd4vZ7Zv51DgAtORjc-23" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="Gmsd4vZ7Zv51DgAtORjc-26" value="continue" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="Gmsd4vZ7Zv51DgAtORjc-27" target="Gmsd4vZ7Zv51DgAtORjc-58" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1309" y="760.25" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="1069.5" y="740.25" />
+              <mxPoint x="914.5" y="740.25" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <UserObject label="Is the bukana available?" name="r_" odk_type="rhombus" reference="&quot;u5_bukana_available&quot;" id="Gmsd4vZ7Zv51DgAtORjc-27">
+          <mxCell style="whiteSpace=wrap;html=1;rounded=0;strokeColor=default;fillColor=none;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];shape=mxgraph.bpmn.task2;rectStyle=rounded;size=10;container=1;expand=0;collapsible=0;taskMarker=businessRule;" parent="1" vertex="1">
+            <mxGeometry x="1019.75" y="595.25" width="100" height="70" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="Gmsd4vZ7Zv51DgAtORjc-28" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="Gmsd4vZ7Zv51DgAtORjc-29" target="Gmsd4vZ7Zv51DgAtORjc-2" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object label="The under 5 number looks like this for instance:&lt;div&gt;**J1111202507001**&amp;nbsp;&lt;/div&gt;&lt;div&gt;It consists of: The health facility code (i.e. J1111), the year (i.e. 2025), the month (i.e. 07) and the number of the child in that facility in that month (i.e. 001 or 0001 for the first child to be born)&lt;/div&gt;" odk_type="note" name="under5_nr_n" id="Gmsd4vZ7Zv51DgAtORjc-29">
+          <mxCell style="rounded=0;whiteSpace=wrap;html=1;align=left;fillColor=none;fontSize=12;strokeColor=default;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];shape=mxgraph.bpmn.task2;rectStyle=rounded;size=10;container=1;expand=0;collapsible=0;taskMarker=send;" parent="1" vertex="1">
+            <mxGeometry x="1429.5" y="565.25" width="350" height="130" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="Gmsd4vZ7Zv51DgAtORjc-30" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="Gmsd4vZ7Zv51DgAtORjc-4" target="Gmsd4vZ7Zv51DgAtORjc-31" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1075.75" y="1001.25" as="sourcePoint" />
+            <mxPoint x="1075.75" y="1101.25" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <object label="Firstname of Mother/Guardian" odk_type="text" name="mother_firstname" id="Gmsd4vZ7Zv51DgAtORjc-31">
+          <mxCell style="shape=mxgraph.bpmn.task2;whiteSpace=wrap;html=1;fixedSize=1;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];rectStyle=rounded;size=10;container=1;expand=0;collapsible=0;taskMarker=user;fillColor=none;strokeColor=#9673a6;" parent="1" vertex="1">
+            <mxGeometry x="1392" y="1101.25" width="110" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="Mother Medic ID preload" odk_type="input" name="t_mother_patient_id" id="Gmsd4vZ7Zv51DgAtORjc-32">
+          <mxCell style="shape=mxgraph.bpmn.data2;labelPosition=center;verticalLabelPosition=bottom;align=center;verticalAlign=top;size=15;html=1;bpmnTransferType=input;labelBackgroundColor=none;" parent="1" vertex="1">
+            <mxGeometry x="700" y="656.25" width="40" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="Gmsd4vZ7Zv51DgAtORjc-33" value="continue" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="Gmsd4vZ7Zv51DgAtORjc-13" target="Gmsd4vZ7Zv51DgAtORjc-58" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="910.5" y="680.25" as="sourcePoint" />
+            <mxPoint x="907.5" y="1060.25" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="Gmsd4vZ7Zv51DgAtORjc-34" value="No" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="Gmsd4vZ7Zv51DgAtORjc-35" target="Gmsd4vZ7Zv51DgAtORjc-37" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <UserObject label="Is the Mothers Medic ID already known?" name="r_" odk_type="rhombus" reference="&quot;t_mother_patient_id&quot; != &#39;&#39;" id="Gmsd4vZ7Zv51DgAtORjc-35">
+          <mxCell style="whiteSpace=wrap;html=1;rounded=0;strokeColor=default;fillColor=none;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];shape=mxgraph.bpmn.task2;rectStyle=rounded;size=10;container=1;expand=0;collapsible=0;taskMarker=businessRule;" parent="1" vertex="1">
+            <mxGeometry x="865.5" y="981.25" width="100" height="100" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="Gmsd4vZ7Zv51DgAtORjc-36" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="Gmsd4vZ7Zv51DgAtORjc-37" target="Gmsd4vZ7Zv51DgAtORjc-4" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object label="If you have not already done so, close this form and go to the profile of the mother in the CHT app. Copy the medic ID to a piece of paper or take a picture with your phone. Then come back to this form and enter the medic ID below." odk_type="note" name="mother_patient_id_n" id="Gmsd4vZ7Zv51DgAtORjc-37">
+          <mxCell style="rounded=0;whiteSpace=wrap;html=1;align=left;fillColor=none;fontSize=12;strokeColor=default;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];shape=mxgraph.bpmn.task2;rectStyle=rounded;size=10;container=1;expand=0;collapsible=0;taskMarker=send;" parent="1" vertex="1">
+            <mxGeometry x="1010" y="981.25" width="360" height="100" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="Gmsd4vZ7Zv51DgAtORjc-38" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="Gmsd4vZ7Zv51DgAtORjc-61" target="Gmsd4vZ7Zv51DgAtORjc-18" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="782.5" y="410.25" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="Gmsd4vZ7Zv51DgAtORjc-39" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="Gmsd4vZ7Zv51DgAtORjc-40" target="Gmsd4vZ7Zv51DgAtORjc-23" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object label="Na o na le nomoro ea tliliniki ea bana ba lilemo tse ka tlaseho ho hlano e teng?" odk_type="hint-message" id="Gmsd4vZ7Zv51DgAtORjc-40">
+          <mxCell style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;fontColor=default;strokeColor=#666666;align=left;fontSize=12;" parent="1" vertex="1">
+            <mxGeometry x="1164.5" y="550.25" width="220" height="39" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="Gmsd4vZ7Zv51DgAtORjc-41" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="Gmsd4vZ7Zv51DgAtORjc-42" target="Gmsd4vZ7Zv51DgAtORjc-2" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object label="Nomoro ea tliliniki ea bana ba lilemo tse ka tlase ho hlano." odk_type="hint-message" id="Gmsd4vZ7Zv51DgAtORjc-42">
+          <mxCell style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;fontColor=default;strokeColor=#666666;align=left;fontSize=12;" parent="1" vertex="1">
+            <mxGeometry x="1714.5" y="740.75" width="220" height="39" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="Gmsd4vZ7Zv51DgAtORjc-43" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="Gmsd4vZ7Zv51DgAtORjc-44" target="Gmsd4vZ7Zv51DgAtORjc-37" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object label="Ha e ba ha o so etse joalo, koala fomo&amp;nbsp; e be o ea ho CHT, Bula fomo ea mme&amp;nbsp; ka har’a CHT o shebe nomoro ea Medic ea ‘Me’ o e ngole fatse pampiring kapa o e nke foto ka phono ea hao. Bula fomo ea e na hape o ngole nomoro ea Medic." odk_type="hint-message" id="Gmsd4vZ7Zv51DgAtORjc-44">
+          <mxCell style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;fontColor=default;strokeColor=#666666;align=left;fontSize=12;" parent="1" vertex="1">
+            <mxGeometry x="1070" y="1111.75" width="260" height="89.5" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="Gmsd4vZ7Zv51DgAtORjc-45" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="Gmsd4vZ7Zv51DgAtORjc-46" target="Gmsd4vZ7Zv51DgAtORjc-4" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object label="Nomoro ea medic ea ‘me’/ mohlokomeli (kenya linomoro&amp;nbsp; fela le 0 e qalang)" odk_type="hint-message" id="Gmsd4vZ7Zv51DgAtORjc-46">
+          <mxCell style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;fontColor=default;strokeColor=#666666;align=left;fontSize=12;" parent="1" vertex="1">
+            <mxGeometry x="1580" y="1011.75" width="260" height="39" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="Gmsd4vZ7Zv51DgAtORjc-47" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="Gmsd4vZ7Zv51DgAtORjc-48" target="Gmsd4vZ7Zv51DgAtORjc-31" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object label="Lebitso la ‘me’/mohlokomeli" odk_type="hint-message" id="Gmsd4vZ7Zv51DgAtORjc-48">
+          <mxCell style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;fontColor=default;strokeColor=#666666;align=left;fontSize=12;" parent="1" vertex="1">
+            <mxGeometry x="1549.5" y="1111.75" width="220" height="39" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="Gmsd4vZ7Zv51DgAtORjc-49" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="Gmsd4vZ7Zv51DgAtORjc-50" target="Gmsd4vZ7Zv51DgAtORjc-6" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object label="Fane ea ‘me’/Mohlokomeli" odk_type="hint-message" id="Gmsd4vZ7Zv51DgAtORjc-50">
+          <mxCell style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;fontColor=default;strokeColor=#666666;align=left;fontSize=12;" parent="1" vertex="1">
+            <mxGeometry x="1590" y="1191.75" width="220" height="39" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="Gmsd4vZ7Zv51DgAtORjc-51" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="Gmsd4vZ7Zv51DgAtORjc-52" target="Gmsd4vZ7Zv51DgAtORjc-8" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object label="Sebaka sa tlhaho" odk_type="hint-message" id="Gmsd4vZ7Zv51DgAtORjc-52">
+          <mxCell style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;fontColor=default;strokeColor=#666666;align=left;fontSize=12;" parent="1" vertex="1">
+            <mxGeometry x="1630" y="1302.75" width="220" height="39" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="Gmsd4vZ7Zv51DgAtORjc-53" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="Gmsd4vZ7Zv51DgAtORjc-54" target="Gmsd4vZ7Zv51DgAtORjc-20" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object label="Hopotsa ea nkang karolo ho tla le bukana kapa tlaleho e ngoetsoeng ea liente nako e tlang." odk_type="hint-message" id="Gmsd4vZ7Zv51DgAtORjc-54">
+          <mxCell style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;fontColor=default;strokeColor=#666666;align=left;fontSize=12;" parent="1" vertex="1">
+            <mxGeometry x="1430" y="380" width="230" height="59.5" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="Gmsd4vZ7Zv51DgAtORjc-55" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="Gmsd4vZ7Zv51DgAtORjc-56" target="Gmsd4vZ7Zv51DgAtORjc-29" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1610" y="580.25" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <object label="&lt;div&gt;Nomoro e shebahala tjena:&lt;/div&gt;&lt;div&gt;J1111202507001&lt;/div&gt;&lt;div&gt;It consists of: nomoro ea setsi sa bophelo(i.e.J1111),selemo(i.e 2025) le nomoro ea ngoana setsing moo hore na ke oa bokae khoeling eo. (i.e 001 kapa 0001 ho ngoana oa pele ea hlaileng )&lt;/div&gt;" odk_type="hint-message" id="Gmsd4vZ7Zv51DgAtORjc-56">
+          <mxCell style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;fontColor=default;strokeColor=#666666;align=left;fontSize=12;" parent="1" vertex="1">
+            <mxGeometry x="1827" y="575.25" width="355" height="110" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="Gmsd4vZ7Zv51DgAtORjc-57" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="Gmsd4vZ7Zv51DgAtORjc-58" target="Gmsd4vZ7Zv51DgAtORjc-35" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object label="Bridge" odk_type="bridge" id="Gmsd4vZ7Zv51DgAtORjc-58">
+          <mxCell style="shape=mxgraph.bpmn.event;whiteSpace=wrap;html=1;backgroundOutline=1;points=[[0.145,0.145,0],[0.5,0,0],[0.855,0.145,0],[1,0.5,0],[0.855,0.855,0],[0.5,1,0],[0.145,0.855,0],[0,0.5,0]];verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;perimeter=ellipsePerimeter;outlineConnect=0;aspect=fixed;outline=eventInt;symbol=parallelMultiple;fontColor=#000000;" parent="1" vertex="1">
+            <mxGeometry x="895" y="730.25" width="30" height="31" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="Gmsd4vZ7Zv51DgAtORjc-59" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="Gmsd4vZ7Zv51DgAtORjc-60" target="Gmsd4vZ7Zv51DgAtORjc-13" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object label="Bridge" odk_type="bridge" id="Gmsd4vZ7Zv51DgAtORjc-60">
+          <mxCell style="shape=mxgraph.bpmn.event;whiteSpace=wrap;html=1;backgroundOutline=1;points=[[0.145,0.145,0],[0.5,0,0],[0.855,0.145,0],[1,0.5,0],[0.855,0.855,0],[0.5,1,0],[0.145,0.855,0],[0,0.5,0]];verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;perimeter=ellipsePerimeter;outlineConnect=0;aspect=fixed;outline=eventInt;symbol=parallelMultiple;fontColor=#000000;" parent="1" vertex="1">
+            <mxGeometry x="892.5" y="471.25" width="30" height="31" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="&lt;span style=&quot;font-family: helvetica; font-size: 12px; font-style: normal; font-weight: 400; letter-spacing: normal; text-align: center; text-indent: 0px; text-transform: none; word-spacing: 0px; display: inline; float: none;&quot;&gt;Activity start&lt;/span&gt;" name="lki_" odk_type="activity_start" id="Gmsd4vZ7Zv51DgAtORjc-61">
+          <mxCell style="points=[[0.145,0.145,0],[0.5,0,0],[0.855,0.145,0],[1,0.5,0],[0.855,0.855,0],[0.5,1,0],[0.145,0.855,0],[0,0.5,0]];shape=mxgraph.bpmn.event;html=1;verticalLabelPosition=bottom;labelBackgroundColor=none;verticalAlign=top;align=center;perimeter=ellipsePerimeter;outlineConnect=0;aspect=fixed;outline=throwing;symbol=general;fontColor=default;" parent="1" vertex="1">
+            <mxGeometry x="850" y="180" width="60" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="Activity end" name="next_" odk_type="activity_end" id="Gmsd4vZ7Zv51DgAtORjc-62">
+          <mxCell style="points=[[0.145,0.145,0],[0.5,0,0],[0.855,0.145,0],[1,0.5,0],[0.855,0.855,0],[0.5,1,0],[0.145,0.855,0],[0,0.5,0]];shape=mxgraph.bpmn.event;html=1;verticalLabelPosition=bottom;labelBackgroundColor=none;verticalAlign=top;align=center;perimeter=ellipsePerimeter;outlineConnect=0;aspect=fixed;outline=end;symbol=terminate2;" parent="1" vertex="1">
+            <mxGeometry x="886" y="1480" width="50" height="50" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="Gmsd4vZ7Zv51DgAtORjc-63" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="Gmsd4vZ7Zv51DgAtORjc-64" target="Gmsd4vZ7Zv51DgAtORjc-18" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object label="Na bukana e teng?" odk_type="hint-message" id="Gmsd4vZ7Zv51DgAtORjc-64">
+          <mxCell style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;fontColor=default;strokeColor=#666666;align=left;fontSize=12;" parent="1" vertex="1">
+            <mxGeometry x="580" y="390.25" width="220" height="39" as="geometry" />
+          </mxCell>
+        </object>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

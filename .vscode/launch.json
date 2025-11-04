@@ -63,7 +63,7 @@
       "program": "tests/build.py",
       "args": [
         "-i",
-        "/mnt/data/Development/tricc_oo/tests/data/test.drawio",
+        "/mnt/data/Development/tricc_oo/tests/data/combacal.drawio",
         "-l",
         "d",
         "-o",
@@ -81,7 +81,77 @@
       }
     },
     {
-      "name": "ETAT",
+      "name": "ETAT OPENMRS",
+      "type": "python",
+      "request": "launch",
+      "program": "tests/build.py",
+      "args": [
+        "-i",
+        "/mnt/data/Development/tricc_oo/tests/data/etat.drawio",
+        "-l",
+        "d",
+        "-o",
+        "/mnt/data/Development/tricc_oo/tests/output/",
+        "-t",
+        "-O",
+        "OpenMRSStrategy",
+        "-D",
+        "/Users/delcpa/Downloads/"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}${pathSeparator}${env:PYTHONPATH}"5
+      }
+    },    {
+      "name": "ETAT DHIS2",
+      "type": "python",
+      "request": "launch",
+      "program": "tests/build.py",
+      "args": [
+        "-i",
+        "/mnt/data/Development/tricc_oo/tests/data/etat.drawio",
+        "-l",
+        "d",
+        "-o",
+        "/mnt/data/Development/tricc_oo/tests/output/",
+        "-t",
+        "-O",
+        "DHIS2Strategy",
+        "-D",
+        "/Users/delcpa/Downloads/"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}${pathSeparator}${env:PYTHONPATH}"
+      }
+    },   {
+      "name": "ETAT FHIR",
+      "type": "python",
+      "request": "launch",
+      "program": "tests/build.py",
+      "args": [
+        "-i",
+        "/mnt/data/Development/tricc_oo/tests/data/etat.drawio",
+        "-l",
+        "d",
+        "-o",
+        "/mnt/data/Development/tricc_oo/tests/output/",
+        "-t",
+        "-O",
+        "FHIRStrategy",
+        "-D",
+        "/Users/delcpa/Downloads/"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}${pathSeparator}${env:PYTHONPATH}"
+      }
+    },
+    {
+      "name": "ETAT ODK",
       "type": "python",
       "request": "launch",
       "program": "tests/build.py",

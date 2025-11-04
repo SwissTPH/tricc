@@ -1,0 +1,192 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/26.1.1 Chrome/132.0.6834.210 Electron/34.3.3 Safari/537.36" version="26.1.1" pages="2">
+  <diagram name="Page-1" id="xLtfuh_nWbX3ofOFRV1s">
+    <mxGraphModel dx="1290" dy="719" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="aB79TC2IiCX67K0zMH7Y-2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="cVjjgBlzz0tecl0hnNG0-53" target="cVjjgBlzz0tecl0hnNG0-64" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object label="Main Start" odk_type="start" form_id="Triage_Alg" name="s_" id="cVjjgBlzz0tecl0hnNG0-53">
+          <mxCell style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fontColor=default;" parent="1" vertex="1">
+            <mxGeometry x="210" y="250" width="70" height="70" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="aB79TC2IiCX67K0zMH7Y-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="cVjjgBlzz0tecl0hnNG0-64" target="MocptzA2DGFnPYzxlNRT-1" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object label="a/b" odk_type="goto" name="lko_" link="data:page/id,AYINelPHror37v-gV56b" id="cVjjgBlzz0tecl0hnNG0-64">
+          <mxCell style="shape=offPageConnector;whiteSpace=wrap;html=1;rounded=0;fontSize=12;strokeColor=default;fillColor=none;fontColor=default;" parent="1" vertex="1">
+            <mxGeometry x="414" y="270" width="50" height="50" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="end" name="end_" odk_type="end" hint="" id="MocptzA2DGFnPYzxlNRT-1">
+          <mxCell style="points=[[0.145,0.145,0],[0.5,0,0],[0.855,0.145,0],[1,0.5,0],[0.855,0.855,0],[0.5,1,0],[0.145,0.855,0],[0,0.5,0]];shape=mxgraph.bpmn.event;html=1;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;align=center;perimeter=ellipsePerimeter;outlineConnect=0;aspect=fixed;outline=end;symbol=terminate2;strokeColor=default;" parent="1" vertex="1">
+            <mxGeometry x="400" y="450" width="50" height="50" as="geometry" />
+          </mxCell>
+        </object>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="AYINelPHror37v-gV56b" name="A AND B">
+    <mxGraphModel dx="1290" dy="719" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="WhmR5lBpts5AyKrwe5l7-6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="emkg1WKCkQp-XbOPO64b-1" target="WhmR5lBpts5AyKrwe5l7-1" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object label="&lt;span style=&quot;color: rgb(0 , 0 , 0) ; font-family: &amp;quot;helvetica&amp;quot; ; font-size: 12px ; font-style: normal ; font-weight: 400 ; letter-spacing: normal ; text-align: center ; text-indent: 0px ; text-transform: none ; word-spacing: 0px ; background-color: rgb(255 , 255 , 255) ; display: inline ; float: none&quot;&gt;Activity start&lt;/span&gt;" name="a_b_step" odk_type="activity_start" id="emkg1WKCkQp-XbOPO64b-1">
+          <mxCell style="points=[[0.145,0.145,0],[0.5,0,0],[0.855,0.145,0],[1,0.5,0],[0.855,0.855,0],[0.5,1,0],[0.145,0.855,0],[0,0.5,0]];shape=mxgraph.bpmn.event;html=1;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;align=center;perimeter=ellipsePerimeter;outlineConnect=0;aspect=fixed;outline=throwing;symbol=general;" parent="1" vertex="1">
+            <mxGeometry x="13" y="160" width="60" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="Activity end" name="next_" odk_type="activity_end" id="emkg1WKCkQp-XbOPO64b-2">
+          <mxCell style="points=[[0.145,0.145,0],[0.5,0,0],[0.855,0.145,0],[1,0.5,0],[0.855,0.855,0],[0.5,1,0],[0.145,0.855,0],[0,0.5,0]];shape=mxgraph.bpmn.event;html=1;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;align=center;perimeter=ellipsePerimeter;outlineConnect=0;aspect=fixed;outline=end;symbol=terminate2;strokeColor=default;" parent="1" vertex="1">
+            <mxGeometry x="750" y="590" width="50" height="50" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="QzP7vSFyadD4jHfsWdiy-1" value="&amp;gt;0" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="jmjsKcAgqat1JtKRkfiv-1" target="a0MZiDxfhY08Y0cCu43E-1" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="NBMiA9EtcCHO311uYoVd-9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="jmjsKcAgqat1JtKRkfiv-1" target="emkg1WKCkQp-XbOPO64b-2" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="500" y="615" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <UserObject label="any of the following present?" name="select_" odk_type="select_multiple" filter="" id="jmjsKcAgqat1JtKRkfiv-1">
+          <mxCell style="swimlane;fontStyle=0;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;fontColor=#000000;rounded=0;fillColor=none;align=left;strokeColor=#F19C99;" parent="1" vertex="1">
+            <mxGeometry x="380" y="260" width="282" height="240" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="Oxygen Sats &lt; 89%" name="opt_1" odk_type="select_option" id="jmjsKcAgqat1JtKRkfiv-2">
+          <mxCell style="text;strokeColor=default;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;fontColor=#000000;rounded=0;dashed=1;" parent="jmjsKcAgqat1JtKRkfiv-1" vertex="1">
+            <mxGeometry y="30" width="282" height="30" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="Respiratory rate &lt;8 or &gt;31" name="opt_2" odk_type="select_option" id="jmjsKcAgqat1JtKRkfiv-3">
+          <mxCell style="text;strokeColor=default;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;fontColor=#000000;rounded=0;dashed=1;" parent="jmjsKcAgqat1JtKRkfiv-1" vertex="1">
+            <mxGeometry y="60" width="282" height="30" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="Severe respiratory dysfunction or exhaustion" name="opt_3" odk_type="select_option" id="jmjsKcAgqat1JtKRkfiv-4">
+          <mxCell style="text;strokeColor=default;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;fontColor=#000000;rounded=0;dashed=1;" parent="jmjsKcAgqat1JtKRkfiv-1" vertex="1">
+            <mxGeometry y="90" width="282" height="30" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="Inability to speak in complete sentences" name="opt_4" odk_type="select_option" id="jmjsKcAgqat1JtKRkfiv-5">
+          <mxCell style="text;strokeColor=default;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;dashed=1;" parent="jmjsKcAgqat1JtKRkfiv-1" vertex="1">
+            <mxGeometry y="120" width="282" height="30" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="Stridor" name="opt_5" odk_type="select_option" id="jmjsKcAgqat1JtKRkfiv-6">
+          <mxCell style="text;strokeColor=default;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;dashed=1;" parent="jmjsKcAgqat1JtKRkfiv-1" vertex="1">
+            <mxGeometry y="150" width="282" height="30" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="Reduced level of consciousness due to low oxygen" name="opt_6" odk_type="select_option" id="jmjsKcAgqat1JtKRkfiv-7">
+          <mxCell style="text;strokeColor=default;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;dashed=1;" parent="jmjsKcAgqat1JtKRkfiv-1" vertex="1">
+            <mxGeometry y="180" width="282" height="30" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="None of the above" name="opt_none" odk_type="select_option" id="jmjsKcAgqat1JtKRkfiv-8">
+          <mxCell style="text;strokeColor=default;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;dashed=1;" parent="jmjsKcAgqat1JtKRkfiv-1" vertex="1">
+            <mxGeometry y="210" width="282" height="30" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <object label="&lt;span style=&quot;font-size: 12pt; line-height: 107%; font-family: Arial, sans-serif;&quot;&gt;triage RED&lt;/span&gt;" odk_type="proposed_diagnosis" name="triage_RED" severity="severe" id="a0MZiDxfhY08Y0cCu43E-1">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" parent="1" vertex="1">
+            <mxGeometry x="690" y="520" width="120" height="40" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="a0MZiDxfhY08Y0cCu43E-5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="NBMiA9EtcCHO311uYoVd-2" target="emkg1WKCkQp-XbOPO64b-2" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="190" y="570" as="sourcePoint" />
+            <Array as="points">
+              <mxPoint x="632" y="615" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="WhmR5lBpts5AyKrwe5l7-7" value="yES" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="WhmR5lBpts5AyKrwe5l7-1" target="WhmR5lBpts5AyKrwe5l7-2" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <UserObject label="&lt;span style=&quot;font-size: 12pt; line-height: 107%; font-family: Arial, sans-serif;&quot;&gt;Is Airway compromised?&amp;nbsp;&lt;/span&gt;" name="ask_" odk_type="select_one yesno" id="WhmR5lBpts5AyKrwe5l7-1">
+          <mxCell style="html=1;whiteSpace=wrap;fillColor=none;rounded=0;strokeColor=default;align=left;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];shape=mxgraph.bpmn.task2;rectStyle=rounded;size=10;container=1;expand=0;collapsible=0;taskMarker=abstract;" parent="1" vertex="1">
+            <mxGeometry x="180" y="170" width="120" height="40" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <object label="&lt;span style=&quot;font-size: 12pt; line-height: 107%; font-family: Arial, sans-serif;&quot;&gt;triage RED&lt;/span&gt;" odk_type="proposed_diagnosis" name="triage_RED" severity="severe" id="WhmR5lBpts5AyKrwe5l7-2">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" parent="1" vertex="1">
+            <mxGeometry x="430" y="170" width="120" height="40" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="WhmR5lBpts5AyKrwe5l7-3" value="Yes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;fillColor=#F8CECC;" parent="1" source="WhmR5lBpts5AyKrwe5l7-4" target="jmjsKcAgqat1JtKRkfiv-1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="292" y="410" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <UserObject label="&lt;span style=&quot;font-size: 12pt; line-height: 107%; font-family: Arial, sans-serif;&quot;&gt;Is breathing abnormal?&amp;nbsp;&amp;nbsp;&lt;/span&gt;" name="ask_" odk_type="select_one yesno" id="WhmR5lBpts5AyKrwe5l7-4">
+          <mxCell style="html=1;whiteSpace=wrap;fillColor=none;rounded=0;strokeColor=default;align=left;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];shape=mxgraph.bpmn.task2;rectStyle=rounded;size=10;container=1;expand=0;collapsible=0;taskMarker=abstract;" parent="1" vertex="1">
+            <mxGeometry x="180" y="360" width="120" height="40" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="WhmR5lBpts5AyKrwe5l7-5" value="No" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;" parent="1" source="WhmR5lBpts5AyKrwe5l7-1" target="WhmR5lBpts5AyKrwe5l7-4" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="NBMiA9EtcCHO311uYoVd-1" value="No" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;fillColor=#F8CECC;" parent="1" source="WhmR5lBpts5AyKrwe5l7-4" target="NBMiA9EtcCHO311uYoVd-2" edge="1">
+          <mxGeometry x="-0.022" relative="1" as="geometry">
+            <mxPoint x="230" y="730" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="200" y="730" />
+              <mxPoint x="401" y="730" />
+              <mxPoint x="401" y="770" />
+            </Array>
+            <mxPoint as="offset" />
+            <mxPoint x="230" y="480" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <UserObject label="any of the following present?" name="select_" odk_type="select_multiple" filter="" id="NBMiA9EtcCHO311uYoVd-2">
+          <mxCell style="swimlane;fontStyle=0;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;fontColor=#000000;rounded=0;fillColor=none;align=left;strokeColor=#F19C99;" parent="1" vertex="1">
+            <mxGeometry x="400" y="690" width="282" height="120" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="Oxygen sats 90-92%" name="opt_1" odk_type="select_option" id="NBMiA9EtcCHO311uYoVd-3">
+          <mxCell style="text;strokeColor=default;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;fontColor=#000000;rounded=0;dashed=1;" parent="NBMiA9EtcCHO311uYoVd-2" vertex="1">
+            <mxGeometry y="30" width="282" height="30" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="Respiratory rate &gt;9 or 21-30" name="opt_2" odk_type="select_option" id="NBMiA9EtcCHO311uYoVd-4">
+          <mxCell style="text;strokeColor=default;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;fontColor=#000000;rounded=0;dashed=1;" parent="NBMiA9EtcCHO311uYoVd-2" vertex="1">
+            <mxGeometry y="60" width="282" height="30" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="None of the above" name="opt_none" odk_type="select_option" id="NBMiA9EtcCHO311uYoVd-5">
+          <mxCell style="text;strokeColor=default;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;dashed=1;" parent="NBMiA9EtcCHO311uYoVd-2" vertex="1">
+            <mxGeometry y="90" width="282" height="30" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <object label="&lt;span style=&quot;font-size: 12pt; line-height: 107%; font-family: Arial, sans-serif;&quot;&gt;TRIAGE YELLOW&lt;/span&gt;" odk_type="proposed_diagnosis" name="TRIAGE_YELLOW" severity="moderate" id="NBMiA9EtcCHO311uYoVd-6">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+            <mxGeometry x="640" y="960" width="120" height="40" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="NBMiA9EtcCHO311uYoVd-7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="NBMiA9EtcCHO311uYoVd-3" target="NBMiA9EtcCHO311uYoVd-6" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="NBMiA9EtcCHO311uYoVd-8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="NBMiA9EtcCHO311uYoVd-4" target="NBMiA9EtcCHO311uYoVd-6" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object label="notes" odk_type="text" name="t_" constraint="regex($this, &#39;^[A-Za-z]\d{4}20\d{2}(0[1-9]|1[0-2])\d{3,4}$&#39;)" id="dNcOhr7AaJdLc9kptqI6-2">
+          <mxCell style="shape=mxgraph.bpmn.task2;whiteSpace=wrap;html=1;fixedSize=1;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];rectStyle=rounded;size=10;container=1;expand=0;collapsible=0;taskMarker=user;fillColor=none;strokeColor=#9673a6;" vertex="1" parent="1">
+            <mxGeometry x="180" y="900" width="110" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="dNcOhr7AaJdLc9kptqI6-3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="NBMiA9EtcCHO311uYoVd-5" target="dNcOhr7AaJdLc9kptqI6-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

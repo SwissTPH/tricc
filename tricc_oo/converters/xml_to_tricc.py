@@ -455,7 +455,7 @@ def create_root_node(diagram):
                 instance=int(elm.attrib.get("instance") if elm.attrib.get("instance") is not None else 1),
             )
     load_expressions(node)
-    return node, elm.attrib.get("name", generate_id("act"+external_id))
+    return node, _get_name(elm.attrib.get("name", "act_"), external_id, diagram.attrib.get("id"))
 
 
 # converter XML item to object
