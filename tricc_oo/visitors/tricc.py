@@ -173,16 +173,22 @@ def get_version_inheritance(node, last_version, processed_nodes):
                     node.relevance = expression
     else:
         node.last = False
+        
+                    # Create a calculate node that coalesces the previous saved value with the current node value
+        calc_id = generate_id(f"save_{node.save}")
         calc = TriccNodeCalculate(
-            id=generate_id(f"save{node.id}"),
-            name=node.name,
+            id=calc_id,
+            name=node.save,
             path_len=node.path_len + 1,
-            # version=get_next_version(node.name, processed_nodes, node.version+2),
-            expression=merge_expression(node, last_version),
-            label=f"merge{node.id}",
-            last=True,
+            expression_reference=TriccOperation(
+                TriccOperator.COALESCE,
+                [TriccReference(node.save), last_version],
+            ),
+            reference=[TriccReference(n.name)],
             activity=node.activity,
             group=node.group,
+            label=f"Save calculation for {n.label}",
+            last=True,
         )
         node.activity.nodes[calc.id] = calc
         node.activity.calculates.append(calc)

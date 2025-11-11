@@ -399,7 +399,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
         # build lower level
         if hasattr(self, f"tricc_operation_{operation.operator}"):
             callable = getattr(self, f"tricc_operation_{operation.operator}")
-            return callable(list(map(str, ref_expressions)))
+            return callable(ref_expressions)
         else:
             raise NotImplementedError(
                 f"This type of opreation '{operation.operator}' is not supported in this strategy"
@@ -409,7 +409,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
         return f"count-selected({self.clean_coalesce(ref_expressions[0])})"
 
     def tricc_operation_multiplied(self, ref_expressions):
-        return "*".join(ref_expressions)
+        return "*".join(map(str,ref_expressions))
 
     def tricc_operation_divided(self, ref_expressions):
         return f"{ref_expressions[0]} div {ref_expressions[1]}"
@@ -430,7 +430,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
             return f"-{ref_expressions[0]}"
 
     def tricc_operation_plus(self, ref_expressions):
-        return " + ".join(ref_expressions)
+        return " + ".join(map(str,ref_expressions))
 
     def tricc_operation_not(self, ref_expressions):
         return f"not({ref_expressions[0]})"
@@ -474,7 +474,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
                 return "0"
                 # return f"jr:choice-name({','.join(ref_expressions[1:])})"
             else:
-                return f"{ref_expressions[0]}({','.join(ref_expressions[1:])})"
+                return f"{ref_expressions[0]}({','.join(map(str,ref_expressions[1:]))})"
 
     def tricc_operation_istrue(self, ref_expressions):
         if str(BOOLEAN_MAP[str(TRICC_TRUE_VALUE)]).isnumeric():
@@ -548,15 +548,15 @@ class XLSFormStrategy(BaseOutPutStrategy):
         ifs = 0
         parts = []
         else_found = False
-        if not isinstance(ref_expressions[0], list):
+        if isinstance(ref_expressions[0], list):
             return self.tricc_operation_ifs(ref_expressions)
-        for i in range(int(len(ref_expressions))):
+        for i in range(int(len(ref_expressions[1:]))):
             if isinstance(ref_expressions[i], list):
-                parts.append(f"if({ref_expressions[i][0]},{ref_expressions[i][1]}")
+                parts.append(f"if({ref_expressions[0]}={ref_expressions[i+1][0]},{ref_expressions[i+1][1]}")
                 ifs += 1
             else:
                 else_found = True
-                parts.append(ref_expressions[i])
+                parts.append(ref_expressions[i+1])
         # join the if
         exp = ",".join(map(str, parts))
         # in case there is no default put ''
@@ -571,15 +571,16 @@ class XLSFormStrategy(BaseOutPutStrategy):
         ifs = 0
         parts = []
         else_found = False
-        for i in range(int(len(ref_expressions[1:]))):
-            if isinstance(ref_expressions[i + 1], list):
-                parts.append(f"if({ref_expressions[0]}={ref_expressions[i+1][0]},{ref_expressions[i+1][1]}")
+        for i in range(int(len(ref_expressions))):
+            if isinstance(ref_expressions[i], list):
+                parts.append(f"if({ref_expressions[i][0]},{ref_expressions[i][1]}")
                 ifs += 1
             else:
                 else_found = True
-                parts.append(ref_expressions[i + 1])
+                parts.append(ref_expressions[i])
+                break
         # join the if
-        exp = ",".join(parts)
+        exp = ",".join(map(str, parts))
         # in case there is no default put ''
         if not else_found:
             exp += ",''"
@@ -736,4 +737,4 @@ class XLSFormStrategy(BaseOutPutStrategy):
             raise NotImplementedError(f"This type of node {r.__class__} is not supported within an operation")
 
     def tricc_operation_concatenate(self, ref_expressions):
-        return f"concat({','.join(ref_expressions)})"
+        return f"concat({','.join(map(str, ref_expressions))})"
