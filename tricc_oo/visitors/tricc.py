@@ -1933,7 +1933,6 @@ def get_prev_instance_skip_expression(node, processed_nodes, process, expression
                 ),
             )
         if expression and expression_inputs:
-            add_sub_expression(expression_inputs, expression)
             expression = nand_join(expression, or_join(expression_inputs))
         elif expression_inputs:
             expression = negate_term(or_join(expression_inputs))
