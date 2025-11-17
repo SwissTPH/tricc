@@ -415,7 +415,7 @@ def get_more_info_select(strategy, node):
         if column == "type":
             values.append("select_one more_info")
         elif column == "label":
-            values.append("NO_LABEL")
+            values.append(strategy.get_empty_label())
         elif column == "name":
             values.append(get_export_name(node) + "_optin")
         elif column == "hint":

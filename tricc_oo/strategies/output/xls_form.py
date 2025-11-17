@@ -589,6 +589,9 @@ class XLSFormStrategy(BaseOutPutStrategy):
             exp += ")"
         return exp
 
+    def get_empty_label(self):
+        return "."
+
     def tricc_operation_if(self, ref_expressions):
         return f"if({ref_expressions[0]},{ref_expressions[1]},{ref_expressions[2]})"
 
