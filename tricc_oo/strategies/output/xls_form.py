@@ -596,7 +596,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
         return f"if({ref_expressions[0]},{ref_expressions[1]},{ref_expressions[2]})"
 
     def tricc_operation_contains(self, ref_expressions):
-        return f"contains('{self.clean_coalesce(ref_expressions[0])}', '{self.clean_coalesce(ref_expressions[1])}')"
+        return f"contains({self.clean_coalesce(ref_expressions[0])}, {self.clean_coalesce(ref_expressions[1])})"
 
     def tricc_operation_exists(self, ref_expressions):
         parts = []
