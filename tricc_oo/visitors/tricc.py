@@ -542,6 +542,32 @@ def generate_calculates(node, calculates, used_calculates, processed_nodes, proc
             for calc in list_calc:
                 node.activity.nodes[calc.id] = calc
                 add_calculate(calculates, calc)
+
+    # Add CONTAINS calculations for each option in select multiple (except opt_none)
+    if isinstance(node, TriccNodeSelectMultiple):
+        for option in node.options.values():
+            if not option.name.startswith("opt_"):
+                calc_id = generate_id(f"contains_{node.id}_{option.name}")
+                expression = TriccOperation(TriccOperator.CONTAINS, [node, TriccStatic(option.name)])
+                calc_node = TriccNodeCalculate(
+                    name=option.name,
+                    id=calc_id,
+                    group=node.group,
+                    activity=node.activity,
+                    label=f"contains: {node.get_name()} contains '{option.name}'",
+                    path_len=node.path_len + 1,
+                    last=True,
+                    expression=expression,
+                )
+                node.activity.calculates.append(calc_node)
+                last_version = set_last_version_false(calc_node, processed_nodes)
+                if last_version:
+                    calc_node.expression = merge_expression(calc_node.expression, last_version)
+                processed_nodes.add(calc_node)
+                list_calc.append(calc_node)
+                node.activity.nodes[calc_node.id] = calc_node
+                add_calculate(calculates, calc_node)
+
     return list_calc
 
 
