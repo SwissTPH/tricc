@@ -11,7 +11,7 @@ from tricc_oo.models.ordered_set import OrderedSet
 
 logger = logging.getLogger("default")
 
-Expression = Annotated[str, StringConstraints(pattern=r"^[^\\/\:]+$")]
+Expression = Annotated[str, StringConstraints(pattern=r".+")]
 
 triccId = Annotated[str, StringConstraints(pattern=r"^[^\\/\: ]+$")]
 
