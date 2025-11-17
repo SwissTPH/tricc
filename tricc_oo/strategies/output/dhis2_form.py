@@ -25,6 +25,8 @@ from tricc_oo.models.tricc import (
     TriccNodeDisplayModel,
     TriccNodeCalculateBase,
     TriccNodeActivity,
+    TriccNodeSelect,
+    TriccNodeSelectYesNo,
 )
 from tricc_oo.models.calculate import TriccNodeDisplayCalculateBase
 from tricc_oo.models.ordered_set import OrderedSet
@@ -66,18 +68,22 @@ class DHIS2Strategy(BaseOutPutStrategy):
 
     def get_export_name(self, r):
         if isinstance(r, TriccNodeSelectOption):
-            return self.get_option_value(r.name)
+            ret = self.get_option_value(r.name)
         elif isinstance(r, str):
-            return self.get_option_value(r)
+            ret = self.get_option_value(r)
         elif isinstance(r, TriccStatic):
             if isinstance(r.value, str):
-                return self.get_option_value(r.value)
+                ret = self.get_option_value(r.value)
             elif isinstance(r.value, bool):
-                return str(r.value).lower()
+                ret = str(r.value).lower()
             else:
-                return r.value
+                ret = r.value
         else:
-            return get_export_name(r)
+            ret = get_export_name(r)
+        if isinstance(ret, str):
+            return ret[:50]
+        else:
+            return ret
 
     def generate_id(self, name):
         """Generate DHIS2-compliant UID: 1 letter + 10 alphanumeric characters"""
@@ -139,7 +145,15 @@ class DHIS2Strategy(BaseOutPutStrategy):
             raise NotImplementedError(
                 f"This type of operation '{operation.operator}' is not supported in this strategy"
             )
-
+    def get_display(self, node):
+        if hasattr(node, 'label') and node.label:
+            ret =  node.label
+        elif hasattr(node, 'name') and node.name:
+            ret = node.name
+        else:
+            ret = str(node.id)
+        return  ret.replace('\u00a0', ' ').strip()
+    
     def execute(self):
         version = datetime.datetime.now().strftime("%Y%m%d%H%M")
         logger.info(f"build version: {version}")
@@ -223,11 +237,13 @@ class DHIS2Strategy(BaseOutPutStrategy):
                     self.program_rule_actions.append(program_rule_action)
 
                     # Create program rule referencing the action
+                    condition = self.simplify_expression(f"!({relevance_str})")  # Negate for hide when true
+                    condition = self.simplify_expression(condition)
                     self.program_rules.append({
                         "id": rule_id,
-                        "name": f"Hide {node.get_name()} when condition met",
-                        "description": f"Hide {node.get_name()} based on relevance",
-                        "condition": f"!({relevance_str})",  # Negate for hide when true
+                        "name": f"Hide `{self.get_export_name(node)}` when condition met",
+                        "description": f"Hide `{self.get_display(node)}` based on relevance",
+                        "condition": condition,
                         "programRuleActions": [{"id": action_id}]
                     })
         return True
@@ -257,11 +273,15 @@ class DHIS2Strategy(BaseOutPutStrategy):
                 "id": de_id,
                 "name": self.get_export_name(node),
                 "shortName": node.name[:50],
-                "displayFormName": getattr(node, 'label', node.name).replace('\u00a0', ' ').strip(),
+                "displayFormName":self.get_display(node),
+                "formName": self.get_display(node),
                 "valueType": value_type,
                 "domainType": "TRACKER",
                 "aggregationType": "NONE"
             }
+            
+            if issubclass(node.__class__, TriccNodeSelect) and not isinstance(node, TriccNodeSelectYesNo):
+                data_element["optionSetValue"] = True
 
             # Only create optionSet for non-boolean select questions
             if node.tricc_type in ['select_one', 'select_multiple'] and not is_boolean_question:
@@ -273,7 +293,7 @@ class DHIS2Strategy(BaseOutPutStrategy):
                     # Create the actual optionSet definition
                     option_set = {
                         "id": option_set_id,
-                        "name": f"{node.name} Options",
+                        "name": f"{self.get_export_name(node)} Options",
                         "shortName": f"{node.name}_opts"[:50],
                         "valueType": "TEXT",
                         "options": []
@@ -288,10 +308,10 @@ class DHIS2Strategy(BaseOutPutStrategy):
                                 option_name = option_name.replace('\u00a0', ' ').strip()
                             elif isinstance(option_name, TriccStatic):
                                 option_name = str(option_name.value)
-                            # Create separate option entity
+                            # Create separate option entityif
                             option_def = {
                                 "id": option_id,
-                                "name": option_name,
+                                "name": self.get_display(option),
                                 "shortName": option.name[:50],
                                 "code": str(self.get_export_name(option))
                             }
@@ -303,6 +323,20 @@ class DHIS2Strategy(BaseOutPutStrategy):
                     self.option_sets[option_set_id] = option_set
 
             self.data_elements[node.name] = data_element
+
+            # Create program rule variable for this data element
+            var_id = self.generate_id(f"var_{node.name}")
+            var_name = self.get_export_name(node)
+            program_rule_variable = {
+                "id": var_id,
+                "name": var_name,
+                "programRuleVariableSourceType": "DATAELEMENT_CURRENT_EVENT",
+                "dataElement": {"id": de_id},
+                "program": {"id": self.program_metadata["id"]}
+            }
+            self.program_rule_variables.append(program_rule_variable)
+            self.concept_map[node.name] = var_name  # Store variable name for #{var_name} references
+
             return data_element
         return None
 
@@ -325,9 +359,10 @@ class DHIS2Strategy(BaseOutPutStrategy):
                         mock_node = MockNode(operation_datatype)
                         data_type = self.map_tricc_type_to_dhis2_value_type(mock_node)
 
+                var_name = self.get_export_name(node)
                 program_rule_variable = {
                     "id": var_id,
-                    "name": self.get_export_name(node.name)[:50],
+                    "name": var_name,
                     "programRuleVariableSourceType": "CALCULATED_VALUE",
                     "calculatedValueScript": expression_str,
                     "dataType": data_type,
@@ -336,7 +371,7 @@ class DHIS2Strategy(BaseOutPutStrategy):
                 }
                 self.program_rule_variables.append(program_rule_variable)
                 # Add to concept map for potential referencing
-                self.concept_map[node.name] = var_id
+                self.concept_map[node.name] = var_name  # Store variable name
             return True
         return False
 
@@ -674,7 +709,7 @@ class DHIS2Strategy(BaseOutPutStrategy):
         if isinstance(r, TriccOperation):
             return self.get_tricc_operation_expression(r)
         elif isinstance(r, TriccReference):
-            # Use DHIS2 ID from concept_map instead of name
+            # Use variable name from concept_map
             node_id = self.concept_map.get(r.value.name, self.get_export_name(r.value))
             return f"#{{{node_id}}}"
         elif isinstance(r, TriccStatic):
@@ -696,25 +731,39 @@ class DHIS2Strategy(BaseOutPutStrategy):
                 return option
             return f"'{option}'"
         elif issubclass(r.__class__, TriccNodeDisplayCalculateBase):
-            # Use DHIS2 ID from concept_map instead of name
-            node_id = self.concept_map.get(r.name, self.get_export_name(r))
-            return f"#{node_id}"
+            # Use variable name from concept_map
+            node_id = self.get_export_name(r)
+            return f"#{{{node_id}}}"
+        elif issubclass(r.__class__, TriccNodeCalculateBase):
+            # Use variable name from concept_map
+            node_id =  self.get_export_name(r)
+            return f"#{{{node_id}}}"
         elif issubclass(r.__class__, TriccNodeInputModel):
-            # Use DHIS2 ID from concept_map instead of name
-            node_id = self.concept_map.get(r.name, self.get_export_name(r))
+            # Use variable name from concept_map
+            node_id =  self.get_export_name(r)
             return f"#{{{node_id}}}"
         elif issubclass(r.__class__, TriccNodeBaseModel):
-            # Use DHIS2 ID from concept_map instead of name
-            node_id = self.concept_map.get(r.name, self.get_export_name(r))
+            # Use variable name from concept_map
+            node_id =  self.get_export_name(r)
             return f"#{{{node_id}}}"
         else:
             raise NotImplementedError(f"This type of node {r.__class__.__name__} is not supported within an operation")
 
+    def simplify_expression(self, expr):
+        while expr.startswith('!(!(') and expr.endswith('))'):
+            expr = expr[4:-2]
+        return expr
+
     def convert_expression_to_string(self, expression):
         if isinstance(expression, TriccOperation):
-            return self.get_tricc_operation_expression(expression)
+            expr = self.get_tricc_operation_expression(expression)
         else:
-            return self.get_tricc_operation_operand(expression)
+            expr = self.get_tricc_operation_operand(expression)
+
+        # Simplify double negations
+        expr = self.simplify_expression(expr)
+
+        return expr
 
     # Operation methods for DHIS2 expressions
     def tricc_operation_equal(self, ref_expressions):
@@ -765,7 +814,7 @@ class DHIS2Strategy(BaseOutPutStrategy):
 
     def tricc_operation_selected(self, ref_expressions):
         # For DHIS2, check if value is selected in multi-select
-        return f"d2:hasValue({ref_expressions[0]}) && d2:contains({ref_expressions[0]}, {ref_expressions[1]})"
+        return f"d2:countIfValue({ref_expressions[0]}, {ref_expressions[1]})>0"
 
     def tricc_operation_count(self, ref_expressions):
         return f"d2:count({ref_expressions[0]})"
