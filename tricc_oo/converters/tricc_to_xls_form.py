@@ -43,6 +43,8 @@ def get_export_name(node, replace_dots=True):
             value = node.name
         elif isinstance(node, TriccStatic):
             value = node.value
+            if isinstance(value, TriccNodeSelectOption):
+                value = value.name
         else:
             value = node
         if isinstance(value, bool):  # or r.value in ('true', 'false')

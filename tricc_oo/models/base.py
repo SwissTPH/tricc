@@ -274,7 +274,7 @@ class TriccNodeBaseModel(TriccBaseModel):
 
 
 class TriccStatic(BaseModel):
-    value: Union[str, float, int, bool]
+    value: Union[str, float, int, bool, TriccNodeBaseModel]
 
     def __init__(self, value):
         super().__init__(value=value)

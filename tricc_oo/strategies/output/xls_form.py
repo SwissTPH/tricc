@@ -495,7 +495,12 @@ class XLSFormStrategy(BaseOutPutStrategy):
         parts = []
         for s in ref_expressions[1:]:
             # for option with numeric value
-            cleaned_s = s if isinstance(s, str) else "'" + str(s) + "'"
+            if isinstance(s, str):
+                cleaned_s = s
+            elif isinstance(s, TriccNodeSelectOption):
+                cleaned_s = s.name
+            else:
+                cleaned_s = "'" + str(s) + "'"
             parts.append(f"selected({self.clean_coalesce(ref_expressions[0])}, {cleaned_s})")
         if len(parts) == 1:
             return parts[0]
@@ -724,11 +729,12 @@ class XLSFormStrategy(BaseOutPutStrategy):
         # @param r reference to be translated
         if isinstance(r, TriccOperation):
             return self.get_tricc_operation_expression(r)
+        elif isinstance(r, (TriccStatic, str, int, float)):
+            return get_export_name(r)
         elif isinstance(r, TriccReference):
             logger.warning(f"reference `{r.value}` still used in a calculate")
             return f"${{{get_export_name(r.value)}}}"
-        elif isinstance(r, (TriccStatic, str, int, float)):
-            return get_export_name(r)
+
         elif isinstance(r, TriccNodeSelectOption):
             logger.debug(f"select option {r.get_name()} from {r.select.get_name()} was used as a reference")
             return get_export_name(r)

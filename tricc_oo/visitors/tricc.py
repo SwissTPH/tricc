@@ -1737,6 +1737,7 @@ PARENT_GROUP_PRIORITY = 6000
 ACTIVE_ACTIVITY_PRIORITY = 5000
 NON_START_ACTIVITY_PRIORITY = 4000
 ACTIVE_ACTIVITY_LOWER_PRIORITY = 3000
+FLOW_CALCULATE_NODE_PRIORITY = 8000
 RHOMBUS_PRIORITY = 1000
 DEFAULT_PRIORITY = 2000
 
@@ -1763,6 +1764,9 @@ def reorder_node_list(node_list, group, processed_nodes):
         # Check for non main activities
         elif activity and isinstance(activity.root, TriccNodeActivityStart):
             priority += NON_START_ACTIVITY_PRIORITY
+        # Check for display calculate and end nodes with prev_nodes
+        elif (issubclass(node.__class__, TriccNodeDisplayCalculateBase) or isinstance(node, TriccNodeEnd)) and not isinstance(node, TriccNodeActivityEnd) and hasattr(node, 'prev_nodes') and len(node.prev_nodes) > 0:
+            priority += FLOW_CALCULATE_NODE_PRIORITY
         # Check for active activities (lower priority)
         elif activity and activity in active_activities:
             priority += ACTIVE_ACTIVITY_LOWER_PRIORITY
@@ -2024,7 +2028,7 @@ def get_accept_diagnostic_node(code, display, severity, priority, activity):
     return node
 
 
-def get_diagnostic_node(code, display, severity, priority, activity):
+def get_diagnostic_node(code, display, severity, priority, activity, option):
     node = TriccNodeCalculate(
         id=generate_id("final." + code),
         name="final." + code,
@@ -2035,7 +2039,7 @@ def get_diagnostic_node(code, display, severity, priority, activity):
         expression_reference=or_join(
             [
                 TriccOperation(TriccOperator.ISTRUE, [TriccReference("pre_final." + code)]),
-                TriccOperation(TriccOperator.SELECTED, [TriccReference("tricc.manual.diag"), TriccStatic(code)]),
+                TriccOperation(TriccOperator.SELECTED, [TriccReference("tricc.manual.diag"), TriccStatic(option)]),
             ]
         ),
     )
@@ -2094,9 +2098,18 @@ def create_determine_diagnosis_activity(diags):
         group=activity,
         required=TriccStatic(False),
     )
+    options = []
     for proposed in diags:
+        option =  TriccNodeSelectOption(
+            id=generate_id(proposed.name),
+            name=proposed.name,
+            label=proposed.label,
+            list_name=f.list_name,
+            relevance=proposed.activity.applicability,
+            select=f,
+        )
         d = get_accept_diagnostic_node(proposed.name, proposed.label, proposed.severity, proposed.priority, activity)
-        c = get_diagnostic_node(proposed.name, proposed.label, proposed.severity, proposed.priority, activity)
+        c = get_diagnostic_node(proposed.name, proposed.label, proposed.severity, proposed.priority, activity, option)
         diags_conf.append(d)
         r = TriccNodeRhombus(
             path=start,
@@ -2121,17 +2134,7 @@ def create_determine_diagnosis_activity(diags):
         activity.nodes[wait2.id] = wait2
     # fallback
 
-    options = [
-        TriccNodeSelectOption(
-            id=generate_id(d.name),
-            name=d.name,
-            label=d.label,
-            list_name=f.list_name,
-            relevance=d.activity.applicability,
-            select=f,
-        )
-        for d in diags
-    ]
+    
     f.options = dict(zip(range(0, len(options)), options))
     activity.nodes[f.id] = f
     set_prev_next_node(f, end, edge_only=False)
@@ -2239,10 +2242,22 @@ def get_count_terms(node, processed_nodes, get_overall_exp, negate=False, proces
         return TriccOperation(TriccOperator.PLUS, [TriccOperation(TriccOperator.CAST_NUMBER, [term]) for term in terms])
 
 
+def get_none_option(node):
+    if hasattr(node, "options"):
+        for opt in node.options.values():
+            if opt.name == "opt_none":
+                return opt
+    return None
+
+
 def get_count_terms_details(prev_node, processed_nodes, get_overall_exp, negate=False, process=None):
-    operation_none = TriccOperation(TriccOperator.SELECTED, [prev_node, TriccStatic("opt_none")])
+    opt_none = get_none_option(prev_node)
+    if opt_none:
+        operation_none = TriccOperation(TriccOperator.SELECTED, [prev_node, TriccStatic(opt_none)])
+    else:
+        operation_none = TriccOperation(TriccOperator.SELECTED, [prev_node, TriccStatic("opt_none")])
     if isinstance(prev_node, TriccNodeSelectYesNo):
-        return TriccOperation(TriccOperator.SELECTED, [prev_node, TriccStatic(prev_node.options[0].name)])
+        return TriccOperation(TriccOperator.SELECTED, [prev_node, TriccStatic(prev_node.options[0])])
     elif issubclass(prev_node.__class__, TriccNodeSelect):
         if negate:
             return
@@ -2554,7 +2569,7 @@ def get_selected_option_expression_single(option_node, negate):
 
 def get_selected_option_expression_multiple(option_node, negate):
 
-    selected = TriccOperation(TriccOperator.SELECTED, [option_node.select, option_node])
+    selected = TriccOperation(TriccOperator.SELECTED, [option_node.select, TriccStatic(option_node)])
 
     if negate:
         return TriccOperation(
@@ -2624,24 +2639,26 @@ def generate_base(node, processed_nodes, **kwargs):
             # we don't overright if define in the diagram
             if node.constraint is None:
                 if isinstance(node, TriccNodeSelectMultiple):
-                    node.constraint = or_join(
-                        [
-                            TriccOperation(
-                                TriccOperator.EQUAL,
-                                ["$this", TriccStatic("opt_none")],
-                            ),
-                            TriccOperation(
-                                TriccOperator.NOT,
-                                [
-                                    TriccOperation(
-                                        TriccOperator.SELECTED,
-                                        ["$this", TriccStatic("opt_none")],
-                                    )
-                                ],
-                            ),
-                        ]
-                    )  # '.=\'opt_none\' or not(selected(.,\'opt_none\'))'
-                    node.constraint_message = "**None** cannot be selected together with choice."
+                    none_opt = get_none_option(node)
+                    if none_opt:
+                        node.constraint = or_join(
+                            [
+                                TriccOperation(
+                                    TriccOperator.EQUAL,
+                                    ["$this", TriccStatic(none_opt)],
+                                ),
+                                TriccOperation(
+                                    TriccOperator.NOT,
+                                    [
+                                        TriccOperation(
+                                            TriccOperator.SELECTED,
+                                            ["$this", TriccStatic(none_opt)],
+                                        )
+                                    ],
+                                ),
+                            ]
+                        )  # '.=\'opt_none\' or not(selected(.,\'opt_none\'))'
+                        node.constraint_message = "**None** cannot be selected together with choice."
                 elif node.tricc_type in (
                     TriccNodeType.integer,
                     TriccNodeType.decimal,
