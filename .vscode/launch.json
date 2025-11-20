@@ -1,5 +1,83 @@
 {
   "version": "0.2.0",
+  "inputs": [
+    {
+      "id": "testSelection",
+      "description": "Select which test to run",
+      "default": "tests.test_build",
+      "type": "pickString",
+      "options": [
+        {
+          "label": "All Build Tests",
+          "value": "tests.test_build"
+        },
+        {
+          "label": "Basic Build Test",
+          "value": "tests.test_build.TestBuildScript.test_basic_build_with_demo_file"
+        },
+        {
+          "label": "Directory Input Test",
+          "value": "tests.test_build.TestBuildScript.test_build_with_directory_input"
+        },
+        {
+          "label": "XLSForm Strategy Test",
+          "value": "tests.test_build.TestBuildScript.test_build_with_xlsform_strategy"
+        },
+        {
+          "label": "HTML Strategy Test",
+          "value": "tests.test_build.TestBuildScript.test_build_with_html_strategy"
+        },
+        {
+          "label": "FHIR Strategy Test",
+          "value": "tests.test_build.TestBuildScript.test_build_with_fhir_strategy"
+        },
+        {
+          "label": "DHIS2 Strategy Test",
+          "value": "tests.test_build.TestBuildScript.test_build_with_dhis2_strategy"
+        },
+        {
+          "label": "OpenMRS Strategy Test",
+          "value": "tests.test_build.TestBuildScript.test_build_with_openmrs_strategy"
+        },
+        {
+          "label": "CHT Strategy Test",
+          "value": "tests.test_build.TestBuildScript.test_build_with_cht_strategy"
+        },
+        {
+          "label": "CHT HF Strategy Test",
+          "value": "tests.test_build.TestBuildScript.test_build_with_cht_hf_strategy"
+        },
+        {
+          "label": "CDSS Strategy Test",
+          "value": "tests.test_build.TestBuildScript.test_build_with_cdss_strategy"
+        },
+        {
+          "label": "Spice Strategy Test",
+          "value": "tests.test_build.TestBuildScript.test_build_with_spice_strategy"
+        },
+        {
+          "label": "Debug Level Test",
+          "value": "tests.test_build.TestBuildScript.test_build_with_debug_level"
+        },
+        {
+          "label": "Translation Test",
+          "value": "tests.test_build.TestBuildScript.test_build_with_trad_option"
+        },
+        {
+          "label": "Form ID Test",
+          "value": "tests.test_build.TestBuildScript.test_build_with_form_id"
+        },
+        {
+          "label": "Missing Input Test",
+          "value": "tests.test_build.TestBuildScript.test_build_missing_input"
+        },
+        {
+          "label": "Invalid Input Test",
+          "value": "tests.test_build.TestBuildScript.test_build_invalid_input_file"
+        }
+      ]
+    }
+  ],
   "configurations": [
     {
       "name": "Python Debugger: Current File",
@@ -33,7 +111,7 @@
       }
     },
     {
-      "name": "Main",
+      "name": "Adult ODK",
       "type": "python",
       "request": "launch",
       "program": "tests/build.py",
@@ -46,7 +124,31 @@
         "/mnt/data/Development/tricc-mage/output",
         "-t",
         "-O",
-        "XLSFormCHTStrategy",
+        "XLSFormCDSSStrategy",
+        "-D",
+        "/mnt/data/Development/tricc-mage/output"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}${pathSeparator}${env:PYTHONPATH}"
+      }
+    },
+    {
+      "name": "Adult CHT",
+      "type": "python",
+      "request": "launch",
+      "program": "tests/build.py",
+      "args": [
+        "-i",
+        "/mnt/data/Development/cht-chad/forms/app/adult_v31.drawio",
+        "-l",
+        "d",
+        "-o",
+        "/mnt/data/Development/tricc-mage/output",
+        "-t",
+        "-O",
+        "XLSFormCHTtrategy",
         "-D",
         "/mnt/data/Development/tricc-mage/output"
       ],
@@ -230,6 +332,237 @@
       ],
       "console": "integratedTerminal",
       "justMyCode": false
+    },
+    {
+      "name": "Run Build Tests",
+      "type": "python",
+      "request": "launch",
+      "module": "unittest",
+      "args": [
+        "${input:testSelection}",
+        "-v"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}${pathSeparator}${env:PYTHONPATH}"
+      }
+    },
+    {
+      "name": "Matrix: Demo + XLSForm",
+      "type": "python",
+      "request": "launch",
+      "program": "tests/build.py",
+      "args": [
+        "-i",
+        "./tests/data/demo.drawio",
+        "-l",
+        "i",
+        "-o",
+        "./tests/output/matrix/demo_xlsform",
+        "-O",
+        "XLSFormStrategy"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "Matrix: Demo + XLSFormCHT",
+      "type": "python",
+      "request": "launch",
+      "program": "tests/build.py",
+      "args": [
+        "-i",
+        "./tests/data/demo.drawio",
+        "-l",
+        "i",
+        "-o",
+        "./tests/output/matrix/demo_cht",
+        "-O",
+        "XLSFormCHTStrategy"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "Matrix: Demo + XLSFormCDSS",
+      "type": "python",
+      "request": "launch",
+      "program": "tests/build.py",
+      "args": [
+        "-i",
+        "./tests/data/demo.drawio",
+        "-l",
+        "i",
+        "-o",
+        "./tests/output/matrix/demo_cdss",
+        "-O",
+        "XLSFormCDSSStrategy"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "Matrix: Demo + HTML",
+      "type": "python",
+      "request": "launch",
+      "program": "tests/build.py",
+      "args": [
+        "-i",
+        "./tests/data/demo.drawio",
+        "-l",
+        "i",
+        "-o",
+        "./tests/output/matrix/demo_html",
+        "-O",
+        "HTMLStrategy"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "Matrix: Demo + FHIR",
+      "type": "python",
+      "request": "launch",
+      "program": "tests/build.py",
+      "args": [
+        "-i",
+        "./tests/data/demo.drawio",
+        "-l",
+        "i",
+        "-o",
+        "./tests/output/matrix/demo_fhir",
+        "-O",
+        "FHIRStrategy"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "Matrix: Demo + DHIS2",
+      "type": "python",
+      "request": "launch",
+      "program": "tests/build.py",
+      "args": [
+        "-i",
+        "./tests/data/demo.drawio",
+        "-l",
+        "i",
+        "-o",
+        "./tests/output/matrix/demo_dhis2",
+        "-O",
+        "DHIS2Strategy"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "Matrix: Demo + OpenMRS",
+      "type": "python",
+      "request": "launch",
+      "program": "tests/build.py",
+      "args": [
+        "-i",
+        "./tests/data/demo.drawio",
+        "-l",
+        "i",
+        "-o",
+        "./tests/output/matrix/demo_openmrs",
+        "-O",
+        "OpenMRSStrategy"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "Matrix: Combacal + XLSForm",
+      "type": "python",
+      "request": "launch",
+      "program": "tests/build.py",
+      "args": [
+        "-i",
+        "./tests/data/combacal.drawio",
+        "-l",
+        "i",
+        "-o",
+        "./tests/output/matrix/combacal_xlsform",
+        "-O",
+        "XLSFormStrategy"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "Matrix: Combacal + XLSFormCHT",
+      "type": "python",
+      "request": "launch",
+      "program": "tests/build.py",
+      "args": [
+        "-i",
+        "./tests/data/combacal.drawio",
+        "-l",
+        "i",
+        "-o",
+        "./tests/output/matrix/combacal_cht",
+        "-O",
+        "XLSFormCHTStrategy"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "Matrix: Etat + XLSForm",
+      "type": "python",
+      "request": "launch",
+      "program": "tests/build.py",
+      "args": [
+        "-i",
+        "./tests/data/etat.drawio",
+        "-l",
+        "i",
+        "-o",
+        "./tests/output/matrix/etat_xlsform",
+        "-O",
+        "XLSFormStrategy"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "Matrix: Etat + XLSFormCDSS",
+      "type": "python",
+      "request": "launch",
+      "program": "tests/build.py",
+      "args": [
+        "-i",
+        "./tests/data/etat.drawio",
+        "-l",
+        "i",
+        "-o",
+        "./tests/output/matrix/etat_cdss",
+        "-O",
+        "XLSFormCDSSStrategy"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "Matrix: All Files + XLSForm",
+      "type": "python",
+      "request": "launch",
+      "program": "tests/build.py",
+      "args": [
+        "-i",
+        "./tests/data/",
+        "-l",
+        "i",
+        "-o",
+        "./tests/output/matrix/all_xlsform",
+        "-O",
+        "XLSFormStrategy"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": true
     }
   ]
 }
