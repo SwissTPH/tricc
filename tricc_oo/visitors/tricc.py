@@ -121,7 +121,10 @@ def get_last_version(name, processed_nodes, _list=None):
 # node is the node to calculate
 # processed_nodes are the list of processed nodes
 def get_node_expressions(node, processed_nodes, process=None):
-    get_overall_exp = issubclass(node.__class__, (TriccNodeDisplayCalculateBase, TriccNodeProposedDiagnosis, TriccNodeDiagnosis)) and not isinstance(node, (TriccNodeDisplayBridge))
+    get_overall_exp = issubclass(
+        node.__class__,
+        (TriccNodeDisplayCalculateBase, TriccNodeProposedDiagnosis, TriccNodeDiagnosis)
+    ) and not isinstance(node, (TriccNodeDisplayBridge))
     expression = None
     # in case of recursive call processed_nodes will be None
     if processed_nodes is None or is_ready_to_process(node, processed_nodes=processed_nodes):
@@ -173,8 +176,8 @@ def get_version_inheritance(node, last_version, processed_nodes):
                     node.relevance = expression
     else:
         node.last = False
-        
-                    # Create a calculate node that coalesces the previous saved value with the current node value
+
+        # Create a calculate node that coalesces the previous saved value with the current node value
         calc_id = generate_id(f"save_{node.save}")
         calc = TriccNodeCalculate(
             id=calc_id,
@@ -184,10 +187,10 @@ def get_version_inheritance(node, last_version, processed_nodes):
                 TriccOperator.COALESCE,
                 [TriccReference(node.save), last_version],
             ),
-            reference=[TriccReference(n.name)],
+            reference=[TriccReference(node.name)],
             activity=node.activity,
             group=node.group,
-            label=f"Save calculation for {n.label}",
+            label=f"Save calculation for {node.label}",
             last=True,
         )
         node.activity.nodes[calc.id] = calc
@@ -1737,7 +1740,7 @@ PARENT_GROUP_PRIORITY = 6000
 ACTIVE_ACTIVITY_PRIORITY = 5000
 NON_START_ACTIVITY_PRIORITY = 4000
 ACTIVE_ACTIVITY_LOWER_PRIORITY = 3000
-FLOW_CALCULATE_NODE_PRIORITY = 8000
+FLOW_CALCULATE_NODE_PRIORITY = 6500
 RHOMBUS_PRIORITY = 1000
 DEFAULT_PRIORITY = 2000
 
@@ -1765,7 +1768,10 @@ def reorder_node_list(node_list, group, processed_nodes):
         elif activity and isinstance(activity.root, TriccNodeActivityStart):
             priority += NON_START_ACTIVITY_PRIORITY
         # Check for display calculate and end nodes with prev_nodes
-        elif (issubclass(node.__class__, TriccNodeDisplayCalculateBase) or isinstance(node, TriccNodeEnd)) and not isinstance(node, TriccNodeActivityEnd) and hasattr(node, 'prev_nodes') and len(node.prev_nodes) > 0:
+        elif (
+            issubclass(node.__class__, TriccNodeDisplayCalculateBase) or
+            isinstance(node, TriccNodeEnd)
+        ) and not isinstance(node, TriccNodeActivityEnd) and hasattr(node, 'prev_nodes') and len(node.prev_nodes) > 0:
             priority += FLOW_CALCULATE_NODE_PRIORITY
         # Check for active activities (lower priority)
         elif activity and activity in active_activities:
@@ -2100,7 +2106,7 @@ def create_determine_diagnosis_activity(diags):
     )
     options = []
     for proposed in diags:
-        option =  TriccNodeSelectOption(
+        option = TriccNodeSelectOption(
             id=generate_id(proposed.name),
             name=proposed.name,
             label=proposed.label,
@@ -2108,6 +2114,7 @@ def create_determine_diagnosis_activity(diags):
             relevance=proposed.activity.applicability,
             select=f,
         )
+        options.append(option)
         d = get_accept_diagnostic_node(proposed.name, proposed.label, proposed.severity, proposed.priority, activity)
         c = get_diagnostic_node(proposed.name, proposed.label, proposed.severity, proposed.priority, activity, option)
         diags_conf.append(d)
@@ -2134,7 +2141,6 @@ def create_determine_diagnosis_activity(diags):
         activity.nodes[wait2.id] = wait2
     # fallback
 
-    
     f.options = dict(zip(range(0, len(options)), options))
     activity.nodes[f.id] = f
     set_prev_next_node(f, end, edge_only=False)
@@ -2307,7 +2313,11 @@ def get_count_terms_details(prev_node, processed_nodes, get_overall_exp, negate=
                 TriccOperator.CAST_NUMBER,
                 [
                     get_node_expression(
-                        prev_node, processed_nodes=processed_nodes, get_overall_exp=get_overall_exp, is_prev=True, process=process
+                        prev_node,
+                        processed_nodes=processed_nodes,
+                        get_overall_exp=get_overall_exp,
+                        is_prev=True,
+                        process=process
                     )
                 ],
             )

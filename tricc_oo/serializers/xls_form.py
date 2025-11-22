@@ -16,7 +16,7 @@ from tricc_oo.models.calculate import (
     TriccNodeCalculate
 )
 from tricc_oo.models.tricc import (
-    TriccNodeActivity, TriccNodeBaseModel, TriccNodeSelectMultiple, TriccNodeSelectOption,
+    TriccNodeBaseModel, TriccNodeSelectMultiple, TriccNodeSelectOption,
     TriccNodeSelectOne,
     TriccNodeSelect,
     TriccNodeMoreInfo,
@@ -39,7 +39,9 @@ logger = logging.getLogger("default")
 langs = SingletonLangClass()
 TRICC_CALC_EXPRESSION = "${{{0}}}>0"
 
-def get_export_group_name(in_node):return f"gcalc_{get_export_name(in_node)}"
+
+def get_export_group_name(in_node): return f"gcalc_{get_export_name(in_node)}"
+
 
 def start_group(
     strategy,
@@ -60,13 +62,12 @@ def start_group(
 
     else:
         groups[name] = 0
-    is_activity = isinstance(cur_group, TriccNodeActivity)
     relevance = relevance and cur_group.relevance is not None and cur_group.relevance != ""
     past_instances = len(getattr(cur_group.base_instance, "instances", []))
-    group_calc_required = relevance is not None and (len(str(relevance)) > 100 or past_instances>1)
+    group_calc_required = relevance is not None and (len(str(relevance)) > 100 or past_instances > 1)
     calc = None
     if group_calc_required and getattr(cur_group.relevance, 'operator', None) != TriccOperator.ISTRUE:
-        
+
         calc = TriccNodeCalculate(
             id=generate_id(get_export_group_name(name)),
             group=cur_group,
@@ -77,23 +78,22 @@ def start_group(
         if calc not in cur_group.calculates:
             cur_group.calculates.append(calc)
             processed_nodes.add(calc)
-            
+
         cur_group.relevance = TriccOperation(
                 TriccOperator.ISTRUE,
                 [calc]
             )
-    
+
     relevance_expression = cur_group.relevance
     relevance_expression = get_applicability_expression(cur_group, processed_nodes, process, relevance_expression)
     relevance_expression = get_prev_instance_skip_expression(cur_group, processed_nodes, process, relevance_expression)
     relevance_expression = get_process_skip_expression(cur_group, processed_nodes, process, relevance_expression)
 
-
     if not relevance:
         relevance_expression_str = ""
     elif isinstance(relevance_expression, (TriccOperation, TriccStatic)):
         relevance_expression_str = strategy.get_tricc_operation_expression(relevance_expression)
-    
+
     # group
     values = []
     for column in SURVEY_MAP:
@@ -114,7 +114,7 @@ def start_group(
     df_survey.loc[len(df_survey)] = values
 
     # calc
-    if calc and len(df_calculate[df_calculate["name"] ==  get_export_group_name(name)]) == 0:
+    if calc and len(df_calculate[df_calculate["name"] == get_export_group_name(name)]) == 0:
         calc_values = []
         for column in SURVEY_MAP:
             if column == "type":

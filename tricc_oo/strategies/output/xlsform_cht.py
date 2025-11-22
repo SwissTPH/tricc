@@ -2,6 +2,7 @@ import datetime
 import logging
 import os
 import shutil
+import subprocess
 import pandas as pd
 
 from tricc_oo.models.lang import SingletonLangClass
@@ -616,6 +617,9 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
         newpath = os.path.join(self.output_path, newfilename)
         media_path = os.path.join(self.output_path, form_id + "-media")
 
+        # Track all generated XLS files for validation
+        generated_files = [newpath]
+
         settings = {
             "form_title": title,
             "form_id": form_id,
@@ -660,6 +664,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
                 new_form_id = f"{form_id}_{clean_name(e.name)}"
                 newfilename = f"{new_form_id}.xlsx"
                 newpath = os.path.join(self.output_path, newfilename)
+                generated_files.append(newpath)  # Track additional XLS files
                 settings = {
                     "form_title": title,
                     "form_id": f"{new_form_id}",
@@ -707,6 +712,105 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             for file_name in file_names:
                 shutil.move(os.path.join(media_path_tmp, file_name), media_path)
             shutil.rmtree(media_path_tmp)
+
+        return generated_files
+
+    def execute(self):
+        """Override execute to handle multiple output files from CHT strategy."""
+        version = datetime.datetime.now().strftime("%Y%m%d%H%M")
+        logger.info(f"build version: {version}")
+        if "main" in self.project.start_pages:
+            self.process_base(self.project.start_pages, pages=self.project.pages, version=version)
+        else:
+            logger.critical("Main process required")
+
+        logger.info("generate the relevance based on edges")
+
+        # create relevance Expression
+
+        # create calculate Expression
+        self.process_calculate(self.project.start_pages, pages=self.project.pages)
+        logger.info("generate the export format")
+        # create calculate Expression
+        self.process_export(self.project.start_pages, pages=self.project.pages)
+
+        logger.info("print the export")
+
+        # Export returns list of generated files for CHT strategy
+        generated_files = self.export(self.project.start_pages, version=version)
+
+        logger.info("validate the output")
+        self.validate(generated_files)
+
+    def validate(self, generated_files=None):
+        """Validate the generated XLS form(s) using xls2xform-medic."""
+        if generated_files is None:
+            # Fallback for single file validation
+            if self.project.start_pages["main"].root.form_id is not None:
+                form_id = str(self.project.start_pages["main"].root.form_id)
+                generated_files = [os.path.join(self.output_path, form_id + ".xlsx")]
+            else:
+                logger.error("Form ID not found for validation")
+                return False
+
+        # Ensure xls2xform-medic is available
+        medic_tool = self._ensure_xls2xform_medic()
+        if not medic_tool:
+            logger.error("xls2xform-medic tool not available, skipping CHT validation")
+            return False
+
+        all_valid = True
+        for xls_file in generated_files:
+            if not os.path.exists(xls_file):
+                logger.error(f"XLS file not found: {xls_file}")
+                all_valid = False
+                continue
+
+            try:
+                # Run xls2xform-medic validation
+                result = subprocess.run(
+                    [medic_tool, xls_file],
+                    capture_output=True,
+                    text=True,
+                    cwd=self.output_path
+                )
+
+                if result.returncode == 0:
+                    logger.info(f"CHT XLSForm validation successful: {os.path.basename(xls_file)}")
+                else:
+                    logger.error(f"CHT XLSForm validation failed for {os.path.basename(xls_file)}: {result.stderr}")
+                    all_valid = False
+
+            except Exception as e:
+                logger.error(f"CHT XLSForm validation error for {os.path.basename(xls_file)}: {str(e)}")
+                all_valid = False
+
+        return all_valid
+
+    def _ensure_xls2xform_medic(self):
+        """Ensure xls2xform-medic tool is available."""
+        # Check if it's in PATH
+        medic_tool = shutil.which("xls2xform-medic")
+        if medic_tool:
+            return medic_tool
+
+        # Check if we need to download it
+        medic_path = os.path.join(os.path.dirname(__file__), "xls2xform-medic")
+        if os.path.exists(medic_path):
+            return medic_path
+
+        # Try to download from the provided URL
+        try:
+            import urllib.request
+            medic_url = "https://github.com/medic/pyxform/releases/download/v4.0.0-medic/xls2xform-medic"
+            logger.info(f"Downloading xls2xform-medic from {medic_url}")
+            urllib.request.urlretrieve(medic_url, medic_path)
+            # Make executable
+            os.chmod(medic_path, 0o755)
+            return medic_path
+        except Exception as e:
+            logger.error(f"Failed to download xls2xform-medic: {str(e)}")
+            return None
 
     def tricc_operation_zscore(self, ref_expressions):
         y, ll, m, s = self.get_zscore_params(ref_expressions)

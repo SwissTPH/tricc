@@ -7,7 +7,7 @@ import re
 
 from tricc_oo.converters.utils import remove_html, clean_str
 from tricc_oo.converters.cql_to_operation import transform_cql_to_operation
-from tricc_oo.converters.utils import generate_id, get_rand_name
+from tricc_oo.converters.utils import generate_id
 from tricc_oo.models.base import (
     TriccOperator, TriccOperation,
     TriccStatic, TriccReference, TriccNodeType, TriccEdge, OPERATION_LIST
@@ -107,7 +107,7 @@ def create_activity(diagram, media_path, project):
     if root is not None:
         activity = TriccNodeActivity(
             root=root,
-            name=name,  #  start node 'name' is saved in label
+            name=name,  # start node 'name' is saved in label
             id=id,
             external_id=external_id,
             label=label,

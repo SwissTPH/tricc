@@ -8,6 +8,7 @@ import logging
 import os
 import re
 import pandas as pd
+from pyxform import create_survey_from_xls
 
 from tricc_oo.converters.utils import clean_name
 from tricc_oo.models.base import (
@@ -409,7 +410,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
         return f"count-selected({self.clean_coalesce(ref_expressions[0])})"
 
     def tricc_operation_multiplied(self, ref_expressions):
-        return "*".join(map(str,ref_expressions))
+        return "*".join(map(str, ref_expressions))
 
     def tricc_operation_divided(self, ref_expressions):
         return f"{ref_expressions[0]} div {ref_expressions[1]}"
@@ -430,7 +431,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
             return f"-{ref_expressions[0]}"
 
     def tricc_operation_plus(self, ref_expressions):
-        return " + ".join(map(str,ref_expressions))
+        return " + ".join(map(str, ref_expressions))
 
     def tricc_operation_not(self, ref_expressions):
         return f"not({ref_expressions[0]})"
@@ -474,7 +475,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
                 return "0"
                 # return f"jr:choice-name({','.join(ref_expressions[1:])})"
             else:
-                return f"{ref_expressions[0]}({','.join(map(str,ref_expressions[1:]))})"
+                return f"{ref_expressions[0]}({','.join(map(str, ref_expressions[1:]))})"
 
     def tricc_operation_istrue(self, ref_expressions):
         if str(BOOLEAN_MAP[str(TRICC_TRUE_VALUE)]).isnumeric():
@@ -747,3 +748,33 @@ class XLSFormStrategy(BaseOutPutStrategy):
 
     def tricc_operation_concatenate(self, ref_expressions):
         return f"concat({','.join(map(str, ref_expressions))})"
+
+    def validate(self):
+        """Validate the generated XLS form using pyxform."""
+        try:
+            # Determine the XLS file path
+            if self.project.start_pages["main"].root.form_id is not None:
+                form_id = str(self.project.start_pages["main"].root.form_id)
+                xls_path = os.path.join(self.output_path, form_id + ".xlsx")
+
+                if not os.path.exists(xls_path):
+                    logger.error(f"XLS file not found: {xls_path}")
+                    return False
+
+                # Validate using pyxform
+                survey = create_survey_from_xls(xls_path)
+                xml_output = survey.to_xml()
+
+                # Check if XML was generated successfully
+                if xml_output and len(xml_output.strip()) > 0:
+                    logger.info("XLSForm validation successful")
+                    return True
+                else:
+                    logger.error("XLSForm validation failed: Empty XML output")
+                    return False
+            else:
+                logger.error("Form ID not found for validation")
+                return False
+        except Exception as e:
+            logger.error(f"XLSForm validation failed: {str(e)}")
+            return False

@@ -410,7 +410,7 @@ class OpenMRSStrategy(BaseOutPutStrategy):
         elif issubclass(r.__class__, TriccNodeInputModel):
             return self.get_export_name(r)
         elif issubclass(r.__class__, TriccNodeSelect):
-            return "(" + self.get_export_name(r) + " ?? [])"       
+            return "(" + self.get_export_name(r) + " ?? [])"
         elif issubclass(r.__class__, TriccNodeBaseModel):
             return self.get_export_name(r)
         else:
@@ -458,7 +458,7 @@ class OpenMRSStrategy(BaseOutPutStrategy):
         return f"!({ref_expressions[0]})"
 
     def tricc_operation_plus(self, ref_expressions):
-        return "(" + " + ".join(ref_expressions) +")" 
+        return "(" + " + ".join(ref_expressions) + ")"
 
     def tricc_operation_minus(self, ref_expressions):
         if len(ref_expressions) > 1:

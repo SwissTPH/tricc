@@ -43,6 +43,9 @@ class BaseOutPutStrategy:
 
         self.export(self.project.start_pages, version=version)
 
+        logger.info("validate the output")
+        self.validate()
+
     # walking function
     def process_base(self, start_pages, **kwargs):
         # for each node, check if condition is required issubclass(TriccNodeDisplayModel)
@@ -104,6 +107,10 @@ class BaseOutPutStrategy:
 
     @abc.abstractmethod
     def export(self, **kwargs):
+        pass
+
+    @abc.abstractmethod
+    def validate(self):
         pass
 
     def tricc_operation_equal(self, ref_expressions):

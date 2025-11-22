@@ -1,5 +1,5 @@
 import logging
-from tricc_oo.converters.utils import clean_name, clean_str
+from tricc_oo.converters.utils import clean_name
 from tricc_oo.models.tricc import TriccNodeSelectOption, TRICC_TRUE_VALUE, TRICC_FALSE_VALUE, TriccNodeActivity
 from tricc_oo.models.calculate import TriccNodeInput
 from tricc_oo.models.base import TriccNodeBaseModel, TriccStatic, TriccReference
@@ -66,14 +66,13 @@ def get_export_name(node, replace_dots=True):
         return node
     else:
         node.gen_name()
-        if isinstance(node, TriccNodeActivity) and getattr(node, 'instance', 1)>1:
+        if isinstance(node, TriccNodeActivity) and getattr(node, 'instance', 1) > 1:
             node.export_name = clean_name(
                 node.name + INSTANCE_SEPARATOR + str(node.instance),
                 replace_dots=replace_dots,
             )
         elif isinstance(node, TriccNodeSelectOption):
             node.export_name = node.name
-            
         elif node.last is False:
             node.export_name = clean_name(
                 node.name + VERSION_SEPARATOR + str(node.version),

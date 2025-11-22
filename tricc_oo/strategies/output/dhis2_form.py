@@ -145,15 +145,16 @@ class DHIS2Strategy(BaseOutPutStrategy):
             raise NotImplementedError(
                 f"This type of operation '{operation.operator}' is not supported in this strategy"
             )
+
     def get_display(self, node):
         if hasattr(node, 'label') and node.label:
-            ret =  node.label
+            ret = node.label
         elif hasattr(node, 'name') and node.name:
             ret = node.name
         else:
             ret = str(node.id)
-        return  ret.replace('\u00a0', ' ').strip()
-    
+        return ret.replace('\u00a0', ' ').strip()
+
     def execute(self):
         version = datetime.datetime.now().strftime("%Y%m%d%H%M")
         logger.info(f"build version: {version}")
@@ -273,13 +274,12 @@ class DHIS2Strategy(BaseOutPutStrategy):
                 "id": de_id,
                 "name": self.get_export_name(node),
                 "shortName": node.name[:50],
-                "displayFormName":self.get_display(node),
+                "displayFormName": self.get_display(node),
                 "formName": self.get_display(node),
                 "valueType": value_type,
                 "domainType": "TRACKER",
                 "aggregationType": "NONE"
             }
-            
             if issubclass(node.__class__, TriccNodeSelect) and not isinstance(node, TriccNodeSelectYesNo):
                 data_element["optionSetValue"] = True
 
@@ -736,15 +736,15 @@ class DHIS2Strategy(BaseOutPutStrategy):
             return f"#{{{node_id}}}"
         elif issubclass(r.__class__, TriccNodeCalculateBase):
             # Use variable name from concept_map
-            node_id =  self.get_export_name(r)
+            node_id = self.get_export_name(r)
             return f"#{{{node_id}}}"
         elif issubclass(r.__class__, TriccNodeInputModel):
             # Use variable name from concept_map
-            node_id =  self.get_export_name(r)
+            node_id = self.get_export_name(r)
             return f"#{{{node_id}}}"
         elif issubclass(r.__class__, TriccNodeBaseModel):
             # Use variable name from concept_map
-            node_id =  self.get_export_name(r)
+            node_id = self.get_export_name(r)
             return f"#{{{node_id}}}"
         else:
             raise NotImplementedError(f"This type of node {r.__class__.__name__} is not supported within an operation")
