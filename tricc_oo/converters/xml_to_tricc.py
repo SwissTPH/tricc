@@ -625,6 +625,8 @@ def enrich_node(diagram, media_path, edge, node, activity, help_before=False):
                     name=f"{node.name}.more_info",
                     label=message,
                     parent=node,
+                    group=node.group,
+                    activity=node.activity,
                     required=None,
                 )
                 # node.help = message
