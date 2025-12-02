@@ -1758,6 +1758,11 @@ def reorder_node_list(node_list, group, processed_nodes):
         # Check for same group
         if group is not None and node_group and node_group.id == group.id:
             priority += SAME_GROUP_PRIORITY
+        elif (
+            issubclass(node.__class__, TriccNodeDisplayCalculateBase) or
+            isinstance(node, TriccNodeEnd)
+        ) and not isinstance(node, TriccNodeActivityEnd) and hasattr(node, 'prev_nodes') and len(node.prev_nodes) > 0:
+            priority += FLOW_CALCULATE_NODE_PRIORITY
         # Check for parent group
         elif hasattr(group, "group") and group.group and node_group and node_group.id == group.group.id:
             priority += PARENT_GROUP_PRIORITY
@@ -1767,12 +1772,6 @@ def reorder_node_list(node_list, group, processed_nodes):
         # Check for non main activities
         elif activity and isinstance(activity.root, TriccNodeActivityStart):
             priority += NON_START_ACTIVITY_PRIORITY
-        # Check for display calculate and end nodes with prev_nodes
-        elif (
-            issubclass(node.__class__, TriccNodeDisplayCalculateBase) or
-            isinstance(node, TriccNodeEnd)
-        ) and not isinstance(node, TriccNodeActivityEnd) and hasattr(node, 'prev_nodes') and len(node.prev_nodes) > 0:
-            priority += FLOW_CALCULATE_NODE_PRIORITY
         # Check for active activities (lower priority)
         elif activity and activity in active_activities:
             priority += ACTIVE_ACTIVITY_LOWER_PRIORITY

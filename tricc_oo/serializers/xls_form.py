@@ -64,19 +64,30 @@ def start_group(
         groups[name] = 0
     relevance = relevance and cur_group.relevance is not None and cur_group.relevance != ""
     past_instances = len(getattr(cur_group.base_instance, "instances", []))
-    group_calc_required = relevance is not None and (len(str(relevance)) > 100 or past_instances > 1)
+    group_calc_required = False and relevance is not None and (len(str(relevance)) > 100 or past_instances > 1)
     calc = None
     if group_calc_required and getattr(cur_group.relevance, 'operator', None) != TriccOperator.ISTRUE:
 
         calc = TriccNodeCalculate(
             id=generate_id(get_export_group_name(name)),
-            group=cur_group,
+            group=cur_group.group,
             activity=cur_group.activity,
             name=get_export_group_name(name),
-            expression=cur_group.relevance
+            expression=cur_group.relevance.copy()
         )
-        if calc not in cur_group.calculates:
-            cur_group.calculates.append(calc)
+
+        if calc not in cur_group.activity.calculates:
+            process_reference(
+                calc,
+                processed_nodes,
+                calculates=kwargs.get('calculates', None),
+                used_calculates=kwargs.get('used_calculates', None),
+                replace_reference=True,
+                warn=False,
+                codesystems=kwargs.get('codesystems', None)
+            )
+            cur_group.activity.calculates.append(calc)
+            cur_group.activity.nodes[calc.id] = calc
             processed_nodes.add(calc)
 
         cur_group.relevance = TriccOperation(
@@ -123,7 +134,7 @@ def start_group(
                 value = get_export_name(calc)
                 calc_values.append(value)
             elif column == "calculation":
-                calc_values.append(f"number({strategy.get_tricc_operation_expression(calc.expression)}")
+                calc_values.append(f"number({strategy.get_tricc_operation_expression(calc.expression)})")
             elif column == "relevance":
                 calc_values.append("")
             else:

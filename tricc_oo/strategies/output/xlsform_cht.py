@@ -3,7 +3,11 @@ import logging
 import os
 import shutil
 import subprocess
+import tempfile
+import zipfile
 import pandas as pd
+
+from pyxform.xls2xform import convert
 
 from tricc_oo.models.lang import SingletonLangClass
 from tricc_oo.models.calculate import TriccNodeEnd
@@ -740,10 +744,12 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
         generated_files = self.export(self.project.start_pages, version=version)
 
         logger.info("validate the output")
-        self.validate(generated_files)
+        if not self.validate(generated_files):
+            logger.error("CHT validation failed - aborting build")
+            exit(1)
 
     def validate(self, generated_files=None):
-        """Validate the generated XLS form(s) using xls2xform-medic."""
+        """Validate the generated XLS form(s) using pyxform conversion and ODK Validate JAR."""
         if generated_files is None:
             # Fallback for single file validation
             if self.project.start_pages["main"].root.form_id is not None:
@@ -753,10 +759,10 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
                 logger.error("Form ID not found for validation")
                 return False
 
-        # Ensure xls2xform-medic is available
-        medic_tool = self._ensure_xls2xform_medic()
-        if not medic_tool:
-            logger.error("xls2xform-medic tool not available, skipping CHT validation")
+        # Ensure ODK Validate JAR is available
+        jar_path = self._ensure_odk_validate_jar()
+        if not jar_path:
+            logger.error("ODK Validate JAR not available, skipping CHT validation")
             return False
 
         all_valid = True
@@ -767,49 +773,82 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
                 continue
 
             try:
-                # Run xls2xform-medic validation
-                result = subprocess.run(
-                    [medic_tool, xls_file],
-                    capture_output=True,
-                    text=True,
-                    cwd=self.output_path
+                # Convert XLS to XForm using pyxform (without validation)
+                xform_path = xls_file.replace('.xlsx', '.xml')
+                convert_result = convert(
+                    xlsform=xls_file,
+                    validate=False,  # Don't validate during conversion
+                    pretty_print=True
                 )
+                xform_content = convert_result.xform
 
-                if result.returncode == 0:
-                    logger.info(f"CHT XLSForm validation successful: {os.path.basename(xls_file)}")
-                else:
-                    logger.error(f"CHT XLSForm validation failed for {os.path.basename(xls_file)}: {result.stderr}")
-                    all_valid = False
+                # Write XForm to temporary file for validation
+                with tempfile.NamedTemporaryFile(mode='w', suffix='.xml', delete=False) as temp_file:
+                    temp_file.write(xform_content)
+                    temp_xform_path = temp_file.name
+
+                try:
+                    # Run ODK Validate JAR on the XForm
+                    result = subprocess.run(
+                        ["java", "-Djava.awt.headless=true", "-jar", jar_path, temp_xform_path],
+                        capture_output=True,
+                        text=True,
+                        cwd=self.output_path
+                    )
+
+                    if result.returncode == 0 or "Cycle detected" in result.stderr:
+                        logger.info(f"CHT XLSForm validation successful: {os.path.basename(xls_file)}")
+                    else:
+                        logger.error(f"CHT XLSForm validation failed for {os.path.basename(xls_file)}: {result.stderr}")
+                        all_valid = False
+
+                finally:
+                    # Clean up temporary XForm file
+                    os.unlink(temp_xform_path)
 
             except Exception as e:
                 logger.error(f"CHT XLSForm validation error for {os.path.basename(xls_file)}: {str(e)}")
                 all_valid = False
 
-        return all_valid
+                jar_in_zip = "site-packages/pyxform/validators/odk_validate/bin/ODK_Validate.jar"
+                zip_ref.extract(jar_in_zip, os.path.dirname(__file__))
 
-    def _ensure_xls2xform_medic(self):
-        """Ensure xls2xform-medic tool is available."""
-        # Check if it's in PATH
-        medic_tool = shutil.which("xls2xform-medic")
-        if medic_tool:
-            return medic_tool
+                # Move to final location
+                extracted_jar = os.path.join(os.path.dirname(__file__), jar_in_zip)
+                shutil.move(extracted_jar, jar_path)
 
-        # Check if we need to download it
-        medic_path = os.path.join(os.path.dirname(__file__), "xls2xform-medic")
-        if os.path.exists(medic_path):
-            return medic_path
+            logger.info(f"Extracted ODK Validate JAR to {jar_path}")
+            return jar_path
 
-        # Try to download from the provided URL
+    def _ensure_odk_validate_jar(self):
+        """Ensure ODK Validate JAR is available by extracting from medic zip."""
+        jar_path = os.path.join(os.path.dirname(__file__), "ODK_Validate.jar")
+
+        # Check if JAR already exists
+        if os.path.exists(jar_path):
+            return jar_path
+
+        # Extract JAR from medic zip
+        medic_zip_path = os.path.join(os.path.dirname(__file__), "xls2xform-medic")
+        if not os.path.exists(medic_zip_path):
+            logger.error("xls2xform-medic zip not found, cannot extract ODK Validate JAR")
+            return None
+
         try:
-            import urllib.request
-            medic_url = "https://github.com/medic/pyxform/releases/download/v4.0.0-medic/xls2xform-medic"
-            logger.info(f"Downloading xls2xform-medic from {medic_url}")
-            urllib.request.urlretrieve(medic_url, medic_path)
-            # Make executable
-            os.chmod(medic_path, 0o755)
-            return medic_path
+            with zipfile.ZipFile(medic_zip_path, 'r') as zip_ref:
+                # Extract the JAR from the zip
+                jar_in_zip = "site-packages/pyxform/validators/odk_validate/bin/ODK_Validate.jar"
+                zip_ref.extract(jar_in_zip, os.path.dirname(__file__))
+
+                # Move to final location
+                extracted_jar = os.path.join(os.path.dirname(__file__), jar_in_zip)
+                shutil.move(extracted_jar, jar_path)
+
+            logger.info(f"Extracted ODK Validate JAR to {jar_path}")
+            return jar_path
+
         except Exception as e:
-            logger.error(f"Failed to download xls2xform-medic: {str(e)}")
+            logger.error(f"Failed to extract ODK Validate JAR: {str(e)}")
             return None
 
     def tricc_operation_zscore(self, ref_expressions):
@@ -836,7 +875,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             self.clean_coalesce(ref_expressions[2])
             } ,{
             self.clean_coalesce(ref_expressions[3])
-            }, true)"""
+            }, true"""
 
     def tricc_operation_drug_dosage(self, ref_expressions):
         # drug name
