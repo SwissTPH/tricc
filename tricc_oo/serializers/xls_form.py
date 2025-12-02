@@ -64,7 +64,7 @@ def start_group(
         groups[name] = 0
     relevance = relevance and cur_group.relevance is not None and cur_group.relevance != ""
     past_instances = len(getattr(cur_group.base_instance, "instances", []))
-    group_calc_required = False and relevance is not None and (len(str(relevance)) > 100 or past_instances > 1)
+    group_calc_required = relevance is not None and (len(str(relevance)) > 100 or past_instances > 1)
     calc = None
     if group_calc_required and getattr(cur_group.relevance, 'operator', None) != TriccOperator.ISTRUE:
 
