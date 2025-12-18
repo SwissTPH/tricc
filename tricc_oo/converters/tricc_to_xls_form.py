@@ -36,7 +36,7 @@ def get_export_name(node, replace_dots=True):
     elif isinstance(node, bool):
         return BOOLEAN_MAP[str(TRICC_TRUE_VALUE)] if node else BOOLEAN_MAP[str(TRICC_FALSE_VALUE)]
     elif isinstance(node, TriccReference):
-        logger.warning(f"Reference {node.value} use in export, bad serialiuation probable")
+        logger.warning(f"Reference {node.value} use in export, bad serialization probable")
         return str(node.value)
     elif isinstance(node, (str, TriccStatic, TriccNodeSelectOption)):
         if isinstance(node, TriccNodeSelectOption):

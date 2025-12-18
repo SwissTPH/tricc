@@ -821,34 +821,22 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             return jar_path
 
     def _ensure_odk_validate_jar(self):
-        """Ensure ODK Validate JAR is available by extracting from medic zip."""
+        """Ensure ODK Validate JAR is available by downloading from GitHub releases."""
         jar_path = os.path.join(os.path.dirname(__file__), "ODK_Validate.jar")
 
         # Check if JAR already exists
         if os.path.exists(jar_path):
             return jar_path
 
-        # Extract JAR from medic zip
-        medic_zip_path = os.path.join(os.path.dirname(__file__), "xls2xform-medic")
-        if not os.path.exists(medic_zip_path):
-            logger.error("xls2xform-medic zip not found, cannot extract ODK Validate JAR")
-            return None
-
+        # Download JAR from GitHub releases
+        jar_url = "https://github.com/getodk/validate/releases/download/v1.19.2/validate.jar"
         try:
-            with zipfile.ZipFile(medic_zip_path, 'r') as zip_ref:
-                # Extract the JAR from the zip
-                jar_in_zip = "site-packages/pyxform/validators/odk_validate/bin/ODK_Validate.jar"
-                zip_ref.extract(jar_in_zip, os.path.dirname(__file__))
-
-                # Move to final location
-                extracted_jar = os.path.join(os.path.dirname(__file__), jar_in_zip)
-                shutil.move(extracted_jar, jar_path)
-
-            logger.info(f"Extracted ODK Validate JAR to {jar_path}")
+            import urllib.request
+            urllib.request.urlretrieve(jar_url, jar_path)
+            logger.info(f"Downloaded ODK Validate JAR to {jar_path}")
             return jar_path
-
         except Exception as e:
-            logger.error(f"Failed to extract ODK Validate JAR: {str(e)}")
+            logger.error(f"Failed to download ODK Validate JAR: {str(e)}")
             return None
 
     def tricc_operation_zscore(self, ref_expressions):
