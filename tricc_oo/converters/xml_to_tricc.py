@@ -128,7 +128,7 @@ def create_activity(diagram, media_path, project):
         for n in nodes.values():
 
             if (
-                issubclass(n.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase))
+                issubclass(n.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase, TriccNodeInput))
                 and not isinstance(n, (TriccRhombusMixIn, TriccNodeRhombus, TriccNodeDisplayBridge))
                 and not n.name.startswith("label_")  # FIXME
             ):
@@ -139,7 +139,7 @@ def create_activity(diagram, media_path, project):
                         system,
                         n.select.name,
                         n.label,
-                        {"datatype": "Boolean", "contextType": get_context_type(n)},
+                        {"dataType": "Boolean", "conceptType": get_concept_type(n)},
                     )
                 elif not isinstance(n, TriccNodeSelectNotAvailable):
                     add_concept(
@@ -148,8 +148,20 @@ def create_activity(diagram, media_path, project):
                         n.name,
                         n.label,
                         {
-                            "datatype": get_data_type(n.tricc_type),
-                            "contextType": get_context_type(n),
+                            "dataType": get_data_type(n.tricc_type),
+                            "conceptType": get_concept_type(n),
+                        },
+                    )
+                elif not issubclass(n.__class__, TriccNodeCalculate):
+                    system = n.name.split(".")[0] if "." in n.name else "calculate"
+                    add_concept(
+                        project.code_systems,
+                        system,
+                        n.name,
+                        n.label,
+                        {
+                            "dataType": get_data_type(n.tricc_type),
+                            "conceptType": get_concept_type(n),
                         },
                     )
                 if getattr(n, "save", None):
@@ -160,8 +172,8 @@ def create_activity(diagram, media_path, project):
                         n.save,
                         n.label,
                         {
-                            "datatype": get_data_type(n.tricc_type),
-                            "contextType": get_context_type(n),
+                            "dataType": get_data_type(n.tricc_type),
+                            "conceptType": get_concept_type(n),
                         },
                     )
 
@@ -175,7 +187,7 @@ def create_activity(diagram, media_path, project):
         # link back the activity
         activity.root.activity = activity
         manage_dangling_calculate(activity)
-
+        # assign the process
         if activity is not None:
             if activity.root is not None:
                 project.pages[activity.id] = activity
@@ -197,6 +209,7 @@ def create_activity(diagram, media_path, project):
                         )
         if images:
             project.images += images
+        # Assign parent to NotAvailable
         for node in list(
             filter(
                 lambda p_node: isinstance(p_node, TriccNodeSelectNotAvailable),
@@ -477,10 +490,10 @@ def set_additional_attributes(attribute_names, elm, node):
             setattr(node, attributename, attribute)
 
 
-def get_context_type(node):
-    context_type = getattr(node, "context_type", None)
-    if context_type:
-        return context_type
+def get_concept_type(node):
+    concept_type = getattr(node, "concept_type", None)
+    if concept_type:
+        return concept_type
     if isinstance(node, TriccNodeSelectMultiple):
         return "Question"
     elif isinstance(node, TriccNodeSelectOption):
@@ -535,7 +548,7 @@ def get_select_options(diagram, select_node, nodes):
             activity=select_node.activity,
             group=select_node.group,
         )
-        set_additional_attributes(["save", "relevance", "context_type"], elm, option)
+        set_additional_attributes(["save", "relevance", "concept_type"], elm, option)
         load_expressions(option)
         options[i] = option
         nodes[id] = option
@@ -802,9 +815,11 @@ def set_mandatory_attribute(elm, mandatory_attributes, diagram=None):
             id = elm.attrib.get("id")
             attribute_value = _get_name(name, id, diagram_id)
         elif attributes == "list_name":
-            name = elm.attrib.get("name")
-            id = elm.attrib.get("id")
-            attribute_value = TRICC_LIST_NAME.format(clean_str(_get_name(name, id, diagram_id), replace_dots=True))
+            attribute_value = elm.attrib.get("list_name", None)
+            if not attribute_value:
+                name = elm.attrib.get("name")
+                id = elm.attrib.get("id")
+                attribute_value = TRICC_LIST_NAME.format(clean_str(_get_name(name, id, diagram_id), replace_dots=True))
         else:
             attribute_value = elm.attrib.get(attributes)
         if attribute_value is None:

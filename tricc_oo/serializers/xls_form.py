@@ -32,6 +32,7 @@ from tricc_oo.visitors.tricc import (
     get_applicability_expression,
     get_prev_instance_skip_expression,
     get_process_skip_expression,
+    process_operation_reference,
 )
 
 logger = logging.getLogger("default")
@@ -73,7 +74,7 @@ def start_group(
             group=cur_group.group,
             activity=cur_group.activity,
             name=get_export_group_name(name),
-            expression=cur_group.relevance.copy()
+            expression=cur_group.relevance
         )
 
         if calc not in cur_group.activity.calculates:
@@ -103,7 +104,18 @@ def start_group(
     if not relevance:
         relevance_expression_str = ""
     elif isinstance(relevance_expression, (TriccOperation, TriccStatic)):
-        relevance_expression_str = strategy.get_tricc_operation_expression(relevance_expression)
+        relevance_expression = process_operation_reference(
+            relevance_expression,
+            cur_group,
+            processed_nodes=processed_nodes,
+            calculates=kwargs.get('calculates', None),
+            used_calculates=kwargs.get('used_calculates', None),
+            replace_reference=True,
+            warn=False,
+            codesystems=kwargs.get('codesystems', None),
+        ) or relevance_expression
+        if relevance_expression:
+            relevance_expression_str = strategy.get_tricc_operation_expression(relevance_expression)
 
     # group
     values = []

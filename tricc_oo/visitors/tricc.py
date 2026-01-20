@@ -185,9 +185,9 @@ def get_version_inheritance(node, last_version, processed_nodes):
             path_len=node.path_len + 1,
             expression_reference=TriccOperation(
                 TriccOperator.COALESCE,
-                [TriccReference(node.save), last_version],
+                [node, last_version],
             ),
-            reference=[TriccReference(node.name)],
+            reference=[node, last_version],
             activity=node.activity,
             group=node.group,
             label=f"Save calculation for {node.label}",
@@ -805,7 +805,7 @@ def process_operation_reference(
     operation,
     node,
     processed_nodes,
-    calculates,
+    calculates=None,
     used_calculates=None,
     replace_reference=False,
     warn=False,
@@ -1740,16 +1740,17 @@ PARENT_GROUP_PRIORITY = 6000
 ACTIVE_ACTIVITY_PRIORITY = 5000
 NON_START_ACTIVITY_PRIORITY = 4000
 ACTIVE_ACTIVITY_LOWER_PRIORITY = 3000
-FLOW_CALCULATE_NODE_PRIORITY = 6500
-RHOMBUS_PRIORITY = 1000
-DEFAULT_PRIORITY = 2000
+FLOW_CALCULATE_NODE_PRIORITY_TOP_UP = 50
+RHOMBUS_PRIORITY_TO_UP = 50
 
-
+    
 def reorder_node_list(node_list, group, processed_nodes):
     # Cache active activities for O(1) lookup
     active_activities = {n.activity for n in processed_nodes}
-
+    MAP_PRIORITIES = {}
     def get_priority(node):
+        if node.id in MAP_PRIORITIES:
+            return MAP_PRIORITIES[node.id]
         # Cache attributes to avoid repeated getattr calls
         priority = int(getattr(node, "priority", 0) or 0)
         node_group = getattr(node, "group", None)
@@ -1757,12 +1758,7 @@ def reorder_node_list(node_list, group, processed_nodes):
 
         # Check for same group
         if group is not None and node_group and node_group.id == group.id:
-            priority += SAME_GROUP_PRIORITY
-        elif (
-            issubclass(node.__class__, TriccNodeDisplayCalculateBase) or
-            isinstance(node, TriccNodeEnd)
-        ) and not isinstance(node, TriccNodeActivityEnd) and hasattr(node, 'prev_nodes') and len(node.prev_nodes) > 0:
-            priority += FLOW_CALCULATE_NODE_PRIORITY
+            priority += SAME_GROUP_PRIORITY 
         # Check for parent group
         elif hasattr(group, "group") and group.group and node_group and node_group.id == group.group.id:
             priority += PARENT_GROUP_PRIORITY
@@ -1776,11 +1772,21 @@ def reorder_node_list(node_list, group, processed_nodes):
         elif activity and activity in active_activities:
             priority += ACTIVE_ACTIVITY_LOWER_PRIORITY
         # Check for rhombus nodes
-        elif issubclass(node.__class__, TriccRhombusMixIn):
-            priority += RHOMBUS_PRIORITY
-        else:
-            priority += DEFAULT_PRIORITY
+        
 
+        if (
+            issubclass(node.__class__, TriccNodeDisplayCalculateBase) or
+            isinstance(node, TriccNodeEnd)
+        ) and not isinstance(node, TriccNodeActivityEnd) and hasattr(node, 'prev_nodes') and len(node.prev_nodes) > 0:
+            priority += FLOW_CALCULATE_NODE_PRIORITY_TOP_UP
+        elif issubclass(node.__class__, TriccRhombusMixIn):
+            priority += RHOMBUS_PRIORITY_TO_UP
+
+        if node.prev_nodes:
+            priority = max(priority, *[get_priority(p) for p in node.prev_nodes])
+        
+        MAP_PRIORITIES[node.id] = priority
+        
         return priority
 
     # Sort in place, highest priority first
@@ -2258,7 +2264,12 @@ def get_none_option(node):
 def get_count_terms_details(prev_node, processed_nodes, get_overall_exp, negate=False, process=None):
     opt_none = get_none_option(prev_node)
     if opt_none:
-        operation_none = TriccOperation(TriccOperator.SELECTED, [prev_node, TriccStatic(opt_none)])
+        if isinstance(opt_none, str):
+            operation_none = TriccOperation(TriccOperator.SELECTED, [prev_node, TriccStatic(opt_none)])
+        elif issubclass(opt_none.__class__, TriccBaseModel):
+            operation_none = TriccOperation(TriccOperator.SELECTED, [prev_node, opt_none])
+        else:
+            logger.critical(f"unexpected none option value {opt_none}")
     else:
         operation_none = TriccOperation(TriccOperator.SELECTED, [prev_node, TriccStatic("opt_none")])
     if isinstance(prev_node, TriccNodeSelectYesNo):

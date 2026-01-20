@@ -103,7 +103,7 @@ def check_and_add_concept(code_system: CodeSystem, code: str, display: str, attr
                 # TODO support other type of Codesystem Concept Property Value
                 existing_attributes
                 if p.valueString != v:
-                    logger.warning(f"conflicting value for property {k}: {p.valueString} != {v}")
+                    logger.warning(f"conflicting value for concept `{concept.code}` property ` {k}`: {p.valueString} != {v}")
         if not existing_attributes:
             new_concept.property.append(CodeSystemConceptProperty(code=k, valueString=v))
 

@@ -829,7 +829,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             return jar_path
 
         # Download JAR from GitHub releases
-        jar_url = "https://github.com/getodk/validate/releases/download/v1.19.2/validate.jar"
+        jar_url = "https://github.com/getodk/validate/releases/download/v1.20.0/ODK-Validate-v1.20.0.jar"
         try:
             import urllib.request
             urllib.request.urlretrieve(jar_url, jar_path)

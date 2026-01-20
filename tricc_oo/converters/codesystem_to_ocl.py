@@ -31,16 +31,16 @@ def extract_properties_metadata(fhir_cs: CodeSystem) -> Dict[str, Dict]:
 
             property_types[prop.code] = {
                 "name": prop.code,
-                "datatype": ocl_type,
+                "dataType": ocl_type,
                 "description": prop.description if hasattr(prop, "description") else "",
             }
     return property_types
 
 
 def get_fhir_concept_datatype(concept):
-    datatype = extract_concept_properties(concept, ["datatype"])
+    datatype = extract_concept_properties(concept, ["dataType"])
     if datatype:
-        return datatype["datatype"]
+        return datatype["dataType"]
     else:
         return OclConstants.DATA_TYPE_NONE
 
@@ -84,7 +84,7 @@ def get_attributes_from_concept_properties(concept, property_types: Dict) -> Lis
                 "type": "Attribute",
                 "attribute_type": code,
                 "value": value,
-                "value_type": property_types[code]["datatype"],
+                "value_type": property_types[code]["dataType"],
             }
         )
     return attributes
