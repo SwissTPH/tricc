@@ -1735,13 +1735,13 @@ def replace_next_node(prev_node, next_node, old_node):
 
 
 # Priority constants
-SAME_GROUP_PRIORITY = 7000
-PARENT_GROUP_PRIORITY = 6000
-ACTIVE_ACTIVITY_PRIORITY = 5000
-NON_START_ACTIVITY_PRIORITY = 4000
-ACTIVE_ACTIVITY_LOWER_PRIORITY = 3000
-FLOW_CALCULATE_NODE_PRIORITY_TOP_UP = 50
-RHOMBUS_PRIORITY_TO_UP = 50
+SAME_GROUP_PRIORITY = 70
+PARENT_GROUP_PRIORITY = 60
+ACTIVE_ACTIVITY_PRIORITY = 50
+NON_START_ACTIVITY_PRIORITY = 40
+ACTIVE_ACTIVITY_LOWER_PRIORITY = 30
+FLOW_CALCULATE_NODE_PRIORITY_TOP_UP = 3
+RHOMBUS_PRIORITY_TO_UP = 3
 
     
 def reorder_node_list(node_list, group, processed_nodes):
@@ -1751,8 +1751,11 @@ def reorder_node_list(node_list, group, processed_nodes):
     def get_priority(node):
         if node.id in MAP_PRIORITIES:
             return MAP_PRIORITIES[node.id]
+        if isinstance(node, (TriccNodeActivityStart, TriccNodeMainStart)):
+            return get_priority(node.activity)
+
         # Cache attributes to avoid repeated getattr calls
-        priority = int(getattr(node, "priority", 0) or 0)
+        priority = int(getattr(node, "priority", 0) or 0) 
         node_group = getattr(node, "group", None)
         activity = getattr(node, "activity", None)
 
@@ -1982,7 +1985,7 @@ def get_prev_instance_skip_expression(node, processed_nodes, process, expression
 
 # end def
 def get_process_skip_expression(node, processed_nodes, process, expression=None):
-    list_ends = OrderedSet(filter(lambda x: issubclass(x.__class__, TriccNodeEnd), processed_nodes))
+    list_ends = [x for x in processed_nodes if isinstance(x, TriccNodeEnd)]
     if list_ends:
         end_expressions = []
         f_end_expression = get_end_expression(list_ends)
@@ -1991,8 +1994,11 @@ def get_process_skip_expression(node, processed_nodes, process, expression=None)
         b_end_expression = get_end_expression(list_ends, "pause")
         if b_end_expression:
             end_expressions.append(b_end_expression)
-        if process[0] in PROCESSES:
-            for p in PROCESSES[PROCESSES.index(process[0]) + 1:]:
+        process_index = None
+        if process and process[0] in PROCESSES:
+            process_index = PROCESSES.index(process[0])
+        if process_index is not None:
+            for p in PROCESSES[process_index + 1:]:
                 p_end_expression = get_end_expression(list_ends, p)
                 if p_end_expression:
                     end_expressions.append(p_end_expression)
