@@ -640,6 +640,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
         df_settings.to_excel(writer, sheet_name="settings", index=False)
         writer.close()
         # pause
+        logger.info("generating the task and after pause questionnaires")
         ends = []
         for p in self.project.pages.values():
             p_ends = list(

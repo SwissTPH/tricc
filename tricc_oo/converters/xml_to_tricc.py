@@ -636,23 +636,23 @@ def enrich_node(diagram, media_path, edge, node, activity, help_before=False):
         # get node and process type
         type, message = get_message(diagram, edge.source_external_id)
         if type is not None:
-            if type == "help":
-                help = TriccNodeMoreInfo(
-                    id=generate_id(),
-                    name=f"{node.name}.more_info",
-                    label=message,
-                    parent=node,
-                    group=node.group,
-                    activity=node.activity,
-                    required=None,
-                )
-                # node.help = message
-                if help_before:
-                    inject_node_before(help, node, activity)
-                else:
-                    set_prev_next_node(node, help, edge_only=True, activity=activity)
-                    activity.nodes[help.id] = help
-                return help, None
+            # if type == "help":
+            #     help = TriccNodeMoreInfo(
+            #         id=generate_id(),
+            #         name=f"{node.name}.more_info",
+            #         label=message,
+            #         parent=node,
+            #         group=node.group,
+            #         activity=node.activity,
+            #         required=None,
+            #     )
+            #     # node.help = message
+            #     if help_before:
+            #         inject_node_before(help, node, activity)
+            #     else:
+            #         set_prev_next_node(node, help, edge_only=True, activity=activity)
+            #         activity.nodes[help.id] = help
+            #     return help, None
 
             if type in (TriccNodeType.start, TriccNodeType.activity_start):
                 return True

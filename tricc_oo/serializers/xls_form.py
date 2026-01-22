@@ -432,7 +432,7 @@ def get_attr_if_exists(strategy, node, column, map_array):
         return ""
 
 
-def get_more_info_select(strategy, node):
+def get_more_info_select(strategy, base_name, relevance):
     values = []
     for column in SURVEY_MAP:
         if column == "type":
@@ -440,28 +440,30 @@ def get_more_info_select(strategy, node):
         elif column == "label":
             values.append(strategy.get_empty_label())
         elif column == "name":
-            values.append(get_export_name(node) + "_optin")
-        elif column == "hint":
-            print(get_xfrom_trad(strategy, node, column, SURVEY_MAP, clean_html=True))
-            values.append(get_xfrom_trad(strategy, node, column, SURVEY_MAP, clean_html=True))
+            values.append(base_name + "_optin")
         elif column == "relevance":
-            values.append(get_xfrom_trad(strategy, node.parent, column, SURVEY_MAP))
+            values.append(relevance)
         else:
             values.append(get_xfrom_trad(strategy, None, column, SURVEY_MAP))
     return values
 
 
-def get_more_info_message(strategy, node):
+def get_more_info_message(strategy, base_name, message):
     values = []
     for column in SURVEY_MAP:
         if column == "type":
             values.append("note")
+        elif column == "name":
+            values.append(base_name)
         elif column == "relevance":
-            values.append(f"${{{get_export_name(node)}_optin}} = 1")
-        elif column.startswith("hint"):
-            values.append(langs.get_trads("", trad=None))
+            values.append(f"${{{base_name}_optin}} = 1")
+        elif column.startswith("label"):
+            arr = column.split("::")
+            column = arr[0]
+            trad = arr[1] if len(arr) == 2 else None
+            values.append(langs.get_trads(message, trad=trad))
         else:
-            values.append(get_xfrom_trad(strategy, node, column, SURVEY_MAP, clean_html=True))
+            values.append(get_xfrom_trad(strategy, None, column, SURVEY_MAP, clean_html=True))
     return values
 
 
@@ -482,6 +484,13 @@ def get_more_info_choice(strategy):
     return values
 
 
+def inject_more_info(strategy, base_name, relevance, message, df_survey, df_choice):
+    df_survey.loc[len(df_survey)] = get_more_info_select(strategy, base_name, relevance)
+    df_survey.loc[len(df_survey)] = get_more_info_message(strategy, base_name, message)
+    if len(df_choice[(df_choice["list_name"] == "more_info")]) == 0:
+        df_choice.loc[len(df_choice)] = get_more_info_choice(strategy)
+
+
 def generate_xls_form_export(
     strategy,
     node,
@@ -492,6 +501,7 @@ def generate_xls_form_export(
     df_calculate,
     cur_group,
     calculates,
+    help_before=False,
     **kwargs,
 ):
     # check that all prev nodes were processed
@@ -503,6 +513,15 @@ def generate_xls_form_export(
         codesystems=kwargs.get("codesystems", None),
     ):
         if node not in processed_nodes:
+            if help_before and getattr(node, 'help', None):
+                base_name=f"{get_export_name(node)}_more_info"
+                inject_more_info(
+                    strategy,
+                    base_name,
+                    get_xfrom_trad(strategy, node, "relevance", SURVEY_MAP),
+                    node.help,
+                    df_survey,
+                    df_choice)
             add_calculate(calculates, node)
             if node.group != cur_group and not isinstance(node, TriccNodeSelectOption):
                 return False
@@ -530,10 +549,14 @@ def generate_xls_form_export(
                     ):
                         df_choice.loc[len(df_choice)] = values
                 elif isinstance(node, TriccNodeMoreInfo):
-                    df_survey.loc[len(df_survey)] = get_more_info_select(strategy, node)
-                    df_survey.loc[len(df_survey)] = get_more_info_message(strategy, node)
-                    if len(df_choice[(df_choice["list_name"] == "more_info")]) == 0:
-                        df_choice.loc[len(df_choice)] = get_more_info_choice(strategy)
+                    inject_more_info(
+                        strategy,
+                        get_export_name(node),
+                        get_xfrom_trad(strategy, node.parent, "relevance", SURVEY_MAP),
+                        node.label,
+                        df_survey,
+                        df_choice
+                    )
                 elif node.tricc_type in ODK_TRICC_TYPE_MAP and ODK_TRICC_TYPE_MAP[node.tricc_type] is not None:
                     if ODK_TRICC_TYPE_MAP[node.tricc_type] == "calculate":
                         values = []
@@ -560,6 +583,16 @@ def generate_xls_form_export(
                         logger.warning("node {} have an unmapped type {}".format(node.get_name(), node.tricc_type))
                 else:
                     logger.warning("node {} have an unsupported type {}".format(node.get_name(), node.tricc_type))
+            if not help_before and getattr(node, 'help', None):
+                base_name=f"{get_export_name(node)}_more_info"
+                inject_more_info(
+                    strategy,
+                    base_name,
+                    get_xfrom_trad(strategy, node, "relevance", SURVEY_MAP),
+                    node.help,
+                    df_survey,
+                    df_choice
+                )
             # continue walk °
             return True
     return False
