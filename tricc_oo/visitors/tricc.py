@@ -405,6 +405,11 @@ def get_bridge_path(prev_nodes, node=None, edge_only=False):
         calc = TriccNodeDisplayBridge(**data)
     else:
         calc = TriccNodeBridge(**data)
+    if node:
+        priority = getattr(node, 'priority', None)
+        if priority:
+            calc.priority = priority
+    
     return calc
 
 
@@ -1753,6 +1758,8 @@ def reorder_node_list(node_list, group, processed_nodes):
             return MAP_PRIORITIES[node.id]
         if isinstance(node, (TriccNodeActivityStart, TriccNodeMainStart)):
             return get_priority(node.activity)
+        if isinstance(node, (TriccNodeSelectOption)):
+            return get_priority(node.select)
 
         # Cache attributes to avoid repeated getattr calls
         priority = int(getattr(node, "priority", 0) or 0) 

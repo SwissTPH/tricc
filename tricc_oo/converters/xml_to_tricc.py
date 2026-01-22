@@ -483,7 +483,7 @@ def set_additional_attributes(attribute_names, elm, node):
             # input expression can add a condition to either relevance (display) or calculate expression
             if attributename == "expression_inputs":
                 attribute = [attribute]
-            elif attributename == "instance":
+            elif attributename in ["priority", "instance"]:
                 attribute = int(attribute)
             else:
                 attribute
@@ -612,7 +612,11 @@ def inject_bridge_path(node, nodes):
         calc = TriccNodeDisplayBridge(**data)
     else:
         calc = TriccNodeBridge(**data)
-
+    if node:
+        priority = getattr(node, 'priority', None)
+        if priority:
+            calc.priority = priority
+            
     for e in node.activity.edges:
         if e.target == node.id:
             if e.source in node.activity.nodes and len(node.activity.nodes[e.source].next_nodes):
