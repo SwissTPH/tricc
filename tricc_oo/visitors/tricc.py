@@ -56,6 +56,9 @@ from tricc_oo.converters.tricc_to_xls_form import get_list_names, get_export_nam
 logger = logging.getLogger("default")
 ONE_QUESTION_AT_A_TIME = False
 
+# Track the last group that was reordered to avoid unnecessary reordering
+_last_reordered_group = None
+
 
 def merge_node(from_node, to_node):
     if from_node.activity != to_node.activity:
@@ -973,6 +976,7 @@ def walktrhough_tricc_node_processed_stached(
     warn=False,
     node_path=[],
     process=None,
+    loop_count=0,
     **kwargs,
 ):
     ended_activity = False
@@ -1138,7 +1142,10 @@ def walktrhough_tricc_node_processed_stached(
                     if nn not in stashed_nodes:
                         stashed_nodes.insert_at_top(nn)
         if not recursive:
-            reorder_node_list(stashed_nodes, node.group, processed_nodes)
+            global _last_reordered_group
+            if _last_reordered_group != node.group:
+                reorder_node_list(stashed_nodes, node.group, processed_nodes)
+                _last_reordered_group = node.group
 
     else:
         if prev_process and process and prev_process != process[0]:
@@ -1285,7 +1292,7 @@ def stashed_node_func(node, callback, recursive=False, **kwargs):
 
 
 # check if the all the prev nodes are processed
-def is_ready_to_process(in_node, processed_nodes, strict=True, local=False):
+def is_ready_to_process(in_node, processed_nodes, strict=True, local=False, loop_count=0):
     if isinstance(in_node, TriccNodeSelectOption):
         node = in_node.select
     elif isinstance(in_node, (TriccNodeActivityStart, TriccNodeMainStart)):
@@ -1296,36 +1303,38 @@ def is_ready_to_process(in_node, processed_nodes, strict=True, local=False):
     if hasattr(node, "prev_nodes"):
         # ensure the  previous node of the select are processed, not the option prev nodes
         for prev_node in node.prev_nodes:
-            if is_prev_processed(prev_node, node, processed_nodes, local) is False:
+            if is_prev_processed(prev_node, node, processed_nodes, local, loop_count) is False:
                 return False
     return True
 
 
-def is_prev_processed(prev_node, node, processed_nodes, local):
+def is_prev_processed(prev_node, node, processed_nodes, local, loop_count=0):
     if hasattr(prev_node, "select"):
-        return is_prev_processed(prev_node.select, node, processed_nodes, local)
+        return is_prev_processed(prev_node.select, node, processed_nodes, local, loop_count)
     if prev_node not in processed_nodes and (not local):
-        if isinstance(prev_node, TriccNodeExclusive):
-            iterator = iter(prev_node.prev_nodes)
-            p_n_node = next(iterator)
+        # Only log detailed failures when we suspect dependency loops (loop_count > 5)
+        if loop_count > 5:
+            if isinstance(prev_node, TriccNodeExclusive):
+                iterator = iter(prev_node.prev_nodes)
+                p_n_node = next(iterator)
+                logger.debug(
+                    "is_ready_to_process:failed:via_excl: {} - {} > {} {}:{}".format(
+                        get_data_for_log(p_n_node), prev_node.get_name(), node.__class__, node.get_name(), node.instance
+                    )
+                )
+
+            else:
+                logger.debug(
+                    "is_ready_to_process:failed: {} -> {} {}:{}".format(
+                        get_data_for_log(prev_node), node.__class__, node.get_name(), node.instance
+                    )
+                )
+
             logger.debug(
-                "is_ready_to_process:failed:via_excl: {} - {} > {} {}:{}".format(
-                    get_data_for_log(p_n_node), prev_node.get_name(), node.__class__, node.get_name(), node.instance
+                "prev node node {}:{} for node {} not in processed".format(
+                    prev_node.__class__, prev_node.get_name(), node.get_name()
                 )
             )
-
-        else:
-            logger.debug(
-                "is_ready_to_process:failed: {} -> {} {}:{}".format(
-                    get_data_for_log(prev_node), node.__class__, node.get_name(), node.instance
-                )
-            )
-
-        logger.debug(
-            "prev node node {}:{} for node {} not in processed".format(
-                prev_node.__class__, prev_node.get_name(), node.get_name()
-            )
-        )
         return False
     return True
 
@@ -1762,7 +1771,8 @@ def reorder_node_list(node_list, group, processed_nodes):
             return get_priority(node.select)
 
         # Cache attributes to avoid repeated getattr calls
-        priority = int(getattr(node, "priority", 0) or 0) 
+        explicit_priority = getattr(node, "priority", None)
+        priority = int(explicit_priority or 0)
         node_group = getattr(node, "group", None)
         activity = getattr(node, "activity", None)
 
@@ -1792,7 +1802,7 @@ def reorder_node_list(node_list, group, processed_nodes):
         elif issubclass(node.__class__, TriccRhombusMixIn):
             priority += RHOMBUS_PRIORITY_TO_UP
 
-        if node.prev_nodes:
+        if node.prev_nodes and not explicit_priority and not isinstance(node, TriccNodeMainStart):
             priority = max(priority, *[get_priority(p) for p in node.prev_nodes])
         
         MAP_PRIORITIES[node.id] = priority
