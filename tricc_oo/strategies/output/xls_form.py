@@ -694,6 +694,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
     # @param left part
     # @param right part
     def generate_xls_form_calculate(self, node, processed_nodes, stashed_nodes, calculates, **kwargs):
+        self.codesystems = kwargs.get("codesystems", {})
         if is_ready_to_process(node, processed_nodes, strict=False) and process_reference(
             node,
             processed_nodes,
@@ -748,6 +749,36 @@ class XLSFormStrategy(BaseOutPutStrategy):
 
     def tricc_operation_concatenate(self, ref_expressions):
         return f"concat({','.join(map(str, ref_expressions))})"
+
+    def tricc_operation_diagnosis_list(self, ref_expressions):
+        from tricc_oo.converters.datadictionnary import lookup_codesystems_code
+        parts = []
+        for expr in ref_expressions:
+            if isinstance(expr, str):
+                # expr is the variable reference like "final.TRIAGE_YELLOW" or "${var}"
+                if expr.startswith("${") and expr.endswith("}"):
+                    var_path = expr[2:-1]
+                else:
+                    var_path = expr
+                # Handle final. prefix
+                code = var_path[6:] if var_path.startswith("final.") else var_path
+                concept = lookup_codesystems_code(self.codesystems, code)
+                if concept:
+                    display = concept.get("display", code)
+                else:
+                    logger.warning(f"Diagnosis code '{code}' not found in codesystems")
+                    display = code
+                if expr.startswith("${"):
+                    condition = f"{expr} = 1"
+                else:
+                    condition = f"${{{expr}}} = 1"
+                # Always include comma after diagnosis name
+                parts.append(f"if({condition}, '{display},', '')")
+            else:
+                logger.warning(f"Unexpected expression type: {type(expr)}, value: {expr}")
+        if parts:
+            return f"concat({','.join(parts)})"
+        return "''"
 
     def validate(self):
         """Validate the generated XLS form using pyxform."""

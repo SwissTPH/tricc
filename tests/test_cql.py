@@ -26,6 +26,15 @@ class TestCql(unittest.TestCase):
         )
         self.assertEqual(str(dg_operation), str(dg_expected))
 
+    def test_diagnosis_list(self):
+        if_cql = 'DiagnosisList("final.TRIAGE_YELLOW", "triage_RED")'
+        dg_operation = transform_cql_to_operation(if_cql)
+        dg_expected = TriccOperation(
+            operator=TriccOperator.DIAGNOSIS_LIST,
+            reference=[TriccReference(value="final.TRIAGE_YELLOW"), TriccReference(value="triage_RED")],
+        )
+        self.assertEqual(str(dg_operation), str(dg_expected))
+
     def test_implied_concat(self):
         if_cql = "'A' & \"B\" & 'C'"
         cc_operation = transform_cql_to_operation(if_cql)

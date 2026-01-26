@@ -37,6 +37,7 @@ FUNCTION_MAP = {
     "HasQualifier": TriccOperator.HAS_QUALIFIER,
     "DateTimeToDecimal": TriccOperator.DATETIME_TO_DECIMAL,
     "Count": TriccOperator.COUNT,
+    "DiagnosisList": TriccOperator.DIAGNOSIS_LIST,
 }
 # TODO
 # Min

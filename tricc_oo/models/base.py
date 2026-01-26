@@ -377,6 +377,7 @@ class TriccOperator(StrEnum):
     PARENTHESIS = "parenthesis"
     CONCATENATE = "concatenate"
     DATETIME_TO_DECIMAL = "datetime_to_decimal"
+    DIAGNOSIS_LIST = "diagnosis_list"
 
 
 RETURNS_BOOLEAN = [
@@ -422,6 +423,8 @@ RETURNS_NUMBER = [
 ]
 
 RETURNS_DATE = [TriccOperator.CAST_DATE]
+
+RETURNS_STRING = [TriccOperator.DIAGNOSIS_LIST]
 
 OPERATION_LIST = {
     ">=": TriccOperator.MORE_OR_EQUAL,
@@ -480,6 +483,8 @@ class TriccOperation(BaseModel):
             return "number"
         elif self.operator in RETURNS_DATE:
             return "date"
+        elif self.operator in RETURNS_STRING:
+            return "string"
         elif self.operator == TriccOperator.CONCATENATE:
             return "string"
         elif self.operator == TriccOperator.PARENTHESIS:
