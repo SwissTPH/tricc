@@ -2194,7 +2194,9 @@ def get_prev_node_expression(node, processed_nodes, get_overall_exp=False, exclu
 
     for act_id in prev_activities:
         act_expression_inputs = []
+        none_input_prev_node = False
         for prev_node in prev_activities[act_id]:
+            none_input_prev_node = none_input_prev_node or not issubclass(prev_node.__class__, TriccNodeInputModel)
             if (
                 excluded_name is None
                 or prev_node != excluded_name
@@ -2230,6 +2232,17 @@ def get_prev_node_expression(node, processed_nodes, get_overall_exp=False, exclu
                     negate=False,
                     process=process,
                 )
+            elif none_input_prev_node:
+                # For non-input nodes, AND the activity relevance with the prev expression
+                activity_relevance = get_node_expression(
+                    prev_node.activity,
+                    processed_nodes=processed_nodes,
+                    get_overall_exp=get_overall_exp,
+                    is_prev=True,
+                    negate=False,
+                    process=process,
+                )
+                act_sub = and_join([activity_relevance, act_sub])
             add_sub_expression(expression_inputs, act_sub)
             # avoid void is there is not conditions to avoid looping too much itme
     # expression_inputs = clean_or_list(
