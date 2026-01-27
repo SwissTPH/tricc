@@ -840,7 +840,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             logger.error(f"Failed to download ODK Validate JAR: {str(e)}")
             return None
 
-    def tricc_operation_zscore(self, ref_expressions):
+    def tricc_operation_zscore(self, ref_expressions, original_references=None):
         y, ll, m, s = self.get_zscore_params(ref_expressions)
         #  return ((Math.pow((y / m), l) - 1) / (s * l));
         return f"""cht:extension-lib('{
@@ -853,7 +853,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             self.clean_coalesce(ref_expressions[3])
             })"""
 
-    def tricc_operation_izscore(self, ref_expressions):
+    def tricc_operation_izscore(self, ref_expressions, original_references=None):
         z, ll, m, s = self.get_zscore_params(ref_expressions)
         #  return  (m * (z*s*l-1)^(1/l));
         return f"""cht:extension-lib('{
@@ -866,7 +866,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             self.clean_coalesce(ref_expressions[3])
             }, true"""
 
-    def tricc_operation_drug_dosage(self, ref_expressions):
+    def tricc_operation_drug_dosage(self, ref_expressions, original_references=None):
         # drug name
         # age
         # weight

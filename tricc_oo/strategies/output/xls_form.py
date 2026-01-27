@@ -374,12 +374,14 @@ class XLSFormStrategy(BaseOutPutStrategy):
 
     def get_tricc_operation_expression(self, operation):
         ref_expressions = []
+        original_references = []
         if not hasattr(operation, "reference"):
             return self.get_tricc_operation_operand(operation)
 
         operator = getattr(operation, "operator", "")
         coalesce_fallback = OPERATOR_COALESCE_FALLBACK[operator] if operator in OPERATOR_COALESCE_FALLBACK else "''"
         for r in operation.reference:
+            original_references.append(r)
             if isinstance(r, list):
                 r_expr = [
                     (
@@ -400,43 +402,43 @@ class XLSFormStrategy(BaseOutPutStrategy):
         # build lower level
         if hasattr(self, f"tricc_operation_{operation.operator}"):
             callable = getattr(self, f"tricc_operation_{operation.operator}")
-            return callable(ref_expressions)
+            return callable(ref_expressions, original_references)
         else:
             raise NotImplementedError(
                 f"This type of opreation '{operation.operator}' is not supported in this strategy"
             )
 
-    def tricc_operation_count(self, ref_expressions):
+    def tricc_operation_count(self, ref_expressions, original_references=None):
         return f"count-selected({self.clean_coalesce(ref_expressions[0])})"
 
-    def tricc_operation_multiplied(self, ref_expressions):
+    def tricc_operation_multiplied(self, ref_expressions, original_references=None):
         return "*".join(map(str, ref_expressions))
 
-    def tricc_operation_divided(self, ref_expressions):
+    def tricc_operation_divided(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]} div {ref_expressions[1]}"
 
-    def tricc_operation_modulo(self, ref_expressions):
+    def tricc_operation_modulo(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]} mod {ref_expressions[1]}"
 
-    def tricc_operation_coalesce(self, ref_expressions):
+    def tricc_operation_coalesce(self, ref_expressions, original_references=None):
         return f"coalesce({','.join(map(self.clean_coalesce, ref_expressions))})"
 
-    def tricc_operation_module(self, ref_expressions):
+    def tricc_operation_module(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]} mod {ref_expressions[1]}"
 
-    def tricc_operation_minus(self, ref_expressions):
+    def tricc_operation_minus(self, ref_expressions, original_references=None):
         if len(ref_expressions) > 1:
             return " - ".join(map(str, ref_expressions))
         elif len(ref_expressions) == 1:
             return f"-{ref_expressions[0]}"
 
-    def tricc_operation_plus(self, ref_expressions):
+    def tricc_operation_plus(self, ref_expressions, original_references=None):
         return " + ".join(map(str, ref_expressions))
 
-    def tricc_operation_not(self, ref_expressions):
+    def tricc_operation_not(self, ref_expressions, original_references=None):
         return f"not({ref_expressions[0]})"
 
-    def tricc_operation_and(self, ref_expressions):
+    def tricc_operation_and(self, ref_expressions, original_references=None):
         if len(ref_expressions) == 1:
             return ref_expressions[0]
         if len(ref_expressions) > 1:
@@ -448,7 +450,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
         else:
             return "1"
 
-    def tricc_operation_or(self, ref_expressions):
+    def tricc_operation_or(self, ref_expressions, original_references=None):
         if len(ref_expressions) == 1:
             return ref_expressions[0]
         if len(ref_expressions) > 1:
@@ -460,7 +462,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
         else:
             return "1"
 
-    def tricc_operation_native(self, ref_expressions):
+    def tricc_operation_native(self, ref_expressions, original_references=None):
 
         if len(ref_expressions) > 0:
             if ref_expressions[0].startswith(("'", "`",)):
@@ -477,22 +479,22 @@ class XLSFormStrategy(BaseOutPutStrategy):
             else:
                 return f"{ref_expressions[0]}({','.join(map(str, ref_expressions[1:]))})"
 
-    def tricc_operation_istrue(self, ref_expressions):
+    def tricc_operation_istrue(self, ref_expressions, original_references=None):
         if str(BOOLEAN_MAP[str(TRICC_TRUE_VALUE)]).isnumeric():
             return f"{ref_expressions[0]}>={BOOLEAN_MAP[str(TRICC_TRUE_VALUE)]}"
         else:
             return f"{ref_expressions[0]}={BOOLEAN_MAP[str(TRICC_TRUE_VALUE)]}"
 
-    def tricc_operation_isfalse(self, ref_expressions):
+    def tricc_operation_isfalse(self, ref_expressions, original_references=None):
         if str(BOOLEAN_MAP[str(TRICC_FALSE_VALUE)]).isnumeric():
             return f"{ref_expressions[0]}={BOOLEAN_MAP[str(TRICC_FALSE_VALUE)]}"
         else:
             return f"{ref_expressions[0]}={BOOLEAN_MAP[str(TRICC_FALSE_VALUE)]}"
 
-    def tricc_operation_parenthesis(self, ref_expressions):
+    def tricc_operation_parenthesis(self, ref_expressions, original_references=None):
         return f"({ref_expressions[0]})"
 
-    def tricc_operation_selected(self, ref_expressions):
+    def tricc_operation_selected(self, ref_expressions, original_references=None):
         parts = []
         for s in ref_expressions[1:]:
             # for option with numeric value
@@ -508,49 +510,49 @@ class XLSFormStrategy(BaseOutPutStrategy):
         else:
             return self.tricc_operation_or(parts)
 
-    def tricc_operation_more_or_equal(self, ref_expressions):
+    def tricc_operation_more_or_equal(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]}>={ref_expressions[1]}"
 
-    def tricc_operation_less_or_equal(self, ref_expressions):
+    def tricc_operation_less_or_equal(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]}<={ref_expressions[1]}"
 
-    def tricc_operation_more(self, ref_expressions):
+    def tricc_operation_more(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]}>{ref_expressions[1]}"
 
-    def tricc_operation_less(self, ref_expressions):
+    def tricc_operation_less(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]}<{ref_expressions[1]}"
 
-    def tricc_operation_between(self, ref_expressions):
+    def tricc_operation_between(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]}>={ref_expressions[1]} and {ref_expressions[0]} < {ref_expressions[2]}"
 
-    def tricc_operation_equal(self, ref_expressions):
+    def tricc_operation_equal(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]}={ref_expressions[1]}"
 
-    def tricc_operation_not_equal(self, ref_expressions):
+    def tricc_operation_not_equal(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]}!={ref_expressions[1]}"
 
-    def tricc_operation_isnull(self, ref_expressions):
+    def tricc_operation_isnull(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]}=''"
 
-    def tricc_operation_isnotnull(self, ref_expressions):
+    def tricc_operation_isnotnull(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]}!=''"
 
-    def tricc_operation_isnottrue(self, ref_expressions):
+    def tricc_operation_isnottrue(self, ref_expressions, original_references=None):
         if str(BOOLEAN_MAP[str(TRICC_TRUE_VALUE)]).isnumeric():
             return f"{ref_expressions[0]}<{BOOLEAN_MAP[str(TRICC_TRUE_VALUE)]}"
         else:
             return f"{ref_expressions[0]}!={BOOLEAN_MAP[str(TRICC_TRUE_VALUE)]}"
 
-    def tricc_operation_isnotfalse(self, ref_expressions):
+    def tricc_operation_isnotfalse(self, ref_expressions, original_references=None):
         if str(BOOLEAN_MAP[str(TRICC_FALSE_VALUE)]).isnumeric():
             return f"{ref_expressions[0]}>{BOOLEAN_MAP[str(TRICC_FALSE_VALUE)]}"
         else:
             return f"{ref_expressions[0]}!={BOOLEAN_MAP[str(TRICC_FALSE_VALUE)]}"
 
-    def tricc_operation_notexist(self, ref_expressions):
+    def tricc_operation_notexist(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]}=''"
 
-    def tricc_operation_case(self, ref_expressions):
+    def tricc_operation_case(self, ref_expressions, original_references=None):
         ifs = 0
         parts = []
         else_found = False
@@ -573,7 +575,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
             exp += ")"
         return exp
 
-    def tricc_operation_ifs(self, ref_expressions):
+    def tricc_operation_ifs(self, ref_expressions, original_references=None):
         ifs = 0
         parts = []
         else_found = False
@@ -598,19 +600,19 @@ class XLSFormStrategy(BaseOutPutStrategy):
     def get_empty_label(self):
         return "."
 
-    def tricc_operation_if(self, ref_expressions):
+    def tricc_operation_if(self, ref_expressions, original_references=None):
         return f"if({ref_expressions[0]},{ref_expressions[1]},{ref_expressions[2]})"
 
-    def tricc_operation_contains(self, ref_expressions):
+    def tricc_operation_contains(self, ref_expressions, original_references=None):
         return f"contains({self.clean_coalesce(ref_expressions[0])}, {self.clean_coalesce(ref_expressions[1])})"
 
-    def tricc_operation_exists(self, ref_expressions):
+    def tricc_operation_exists(self, ref_expressions, original_references=None):
         parts = []
         for ref in ref_expressions:
             parts.append(self.tricc_operation_not_equal([self.tricc_operation_coalesce([ref, "''"]), "''"]))
         return self.tricc_operation_and(parts)
 
-    def tricc_operation_cast_number(self, ref_expressions):
+    def tricc_operation_cast_number(self, ref_expressions, original_references=None):
         if isinstance(
             ref_expressions[0],
             (
@@ -637,7 +639,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
         else:
             return f"number({ref_expressions[0]})"
 
-    def tricc_operation_cast_integer(self, ref_expressions):
+    def tricc_operation_cast_integer(self, ref_expressions, original_references=None):
         if isinstance(
             ref_expressions[0],
             (
@@ -664,18 +666,18 @@ class XLSFormStrategy(BaseOutPutStrategy):
         else:
             return f"int({ref_expressions[0]})"
 
-    def tricc_operation_zscore(self, ref_expressions):
+    def tricc_operation_zscore(self, ref_expressions, original_references=None):
         y, ll, m, s = self.get_zscore_params(ref_expressions)
         #  return ((Math.pow((y / m), l) - 1) / (s * l));
         return f"(pow({y} div ({m}), {ll}) -1) div (({s}) div ({ll}))"
 
-    def tricc_operation_datetime_to_decimal(self, ref_expressions):
+    def tricc_operation_datetime_to_decimal(self, ref_expressions, original_references=None):
         return f"decimal-date-time({ref_expressions[0]})"
 
-    def tricc_operation_round(self, ref_expressions):
+    def tricc_operation_round(self, ref_expressions, original_references=None):
         return f"round({ref_expressions[0]})"
 
-    def tricc_operation_izscore(self, ref_expressions):
+    def tricc_operation_izscore(self, ref_expressions, original_references=None):
         z, ll, m, s = self.get_zscore_params(ref_expressions)
         #  return  (m * (z*s*l-1)^(1/l));
         return f"pow({m} * ({z} * {s} * {ll} -1), 1 div {ll})"
@@ -747,35 +749,36 @@ class XLSFormStrategy(BaseOutPutStrategy):
         else:
             raise NotImplementedError(f"This type of node {r.__class__} is not supported within an operation")
 
-    def tricc_operation_concatenate(self, ref_expressions):
+    def tricc_operation_concatenate(self, ref_expressions, original_references=None):
         return f"concat({','.join(map(str, ref_expressions))})"
 
-    def tricc_operation_diagnosis_list(self, ref_expressions):
+    def tricc_operation_diagnosis_list(self, ref_expressions, original_references=None):
         from tricc_oo.converters.datadictionnary import lookup_codesystems_code
+       
         parts = []
-        for expr in ref_expressions:
-            if isinstance(expr, str):
-                # expr is the variable reference like "final.TRIAGE_YELLOW" or "${var}"
-                if expr.startswith("${") and expr.endswith("}"):
-                    var_path = expr[2:-1]
-                else:
-                    var_path = expr
-                # Handle final. prefix
-                code = var_path[6:] if var_path.startswith("final.") else var_path
-                concept = lookup_codesystems_code(self.codesystems, code)
-                if concept:
-                    display = concept.get("display", code)
-                else:
-                    logger.warning(f"Diagnosis code '{code}' not found in codesystems")
-                    display = code
-                if expr.startswith("${"):
-                    condition = f"{expr} = 1"
-                else:
-                    condition = f"${{{expr}}} = 1"
-                # Always include comma after diagnosis name
-                parts.append(f"if({condition}, '{display},', '')")
+        for i, orig_ref in enumerate(original_references):
+            expr = ref_expressions[i] if ref_expressions and i < len(ref_expressions) else None
+
+            code = None
+            # Use only original references for code lookup
+            if isinstance(orig_ref, TriccReference):
+                code = orig_ref.value
+            elif issubclass(type(orig_ref), TriccNodeBaseModel):
+                code = orig_ref.name
             else:
-                logger.warning(f"Unexpected expression type: {type(expr)}, value: {expr}")
+                logger.critical(f"Unexpected reference type: {type(orig_ref)}, value: {orig_ref}")
+                exit(1)
+
+            concept = lookup_codesystems_code(self.project.code_systems, code)
+            if concept:
+                display = getattr(concept, 'display', code)
+            else:
+                logger.warning(f"Diagnosis code '{code}' not found in codesystems")
+                display = code
+
+            # Always include comma after diagnosis name
+            parts.append(f"if({expr} = 1, '{display},', '')")
+
         if parts:
             return f"concat({','.join(parts)})"
         return "''"
