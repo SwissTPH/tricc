@@ -19,7 +19,7 @@ from tricc_oo.models.ordered_set import OrderedSet
 from tricc_oo.models.calculate import (
     TriccNodeEnd,
     TriccNodeDisplayCalculateBase,
-
+    TriccNodeActivityStart,
 )
 from tricc_oo.models.tricc import (
     TriccNodeCalculateBase,
@@ -28,6 +28,7 @@ from tricc_oo.models.tricc import (
     TriccNodeSelect,
     TriccNodeInputModel,
     TriccNodeDisplayModel,
+    TriccNodeMainStart,
     TRICC_FALSE_VALUE,
     TRICC_TRUE_VALUE,
 )
@@ -50,6 +51,8 @@ from tricc_oo.serializers.xls_form import (
     SURVEY_MAP,
     end_group,
     generate_xls_form_export,
+    get_export_group_name,
+    get_export_group_required,
     start_group,
 )
 from tricc_oo.strategies.output.base_output_strategy import BaseOutPutStrategy
@@ -745,6 +748,13 @@ class XLSFormStrategy(BaseOutPutStrategy):
         elif isinstance(r, TriccNodeSelectOption):
             logger.debug(f"select option {r.get_name()} from {r.select.get_name()} was used as a reference")
             return get_export_name(r)
+        elif isinstance(r, TriccNodeActivityStart):
+            if get_export_group_required(r.activity):
+                return f"${{{get_export_group_name(r.activity)}}}"
+            else:
+                return f"({self.get_tricc_operation_expression(r.relevance)})"
+        elif isinstance(r, TriccNodeMainStart):
+            return "1"
         elif issubclass(r.__class__, (TriccNodeInputModel, TriccNodeSelect)):
             return f"coalesce(${{{get_export_name(r)}}},{coalesce_fallback})"
         elif issubclass(r.__class__, TriccNodeBaseModel):

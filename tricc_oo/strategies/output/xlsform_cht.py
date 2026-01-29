@@ -811,13 +811,6 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
                 logger.error(f"CHT XLSForm validation error for {os.path.basename(xls_file)}: {str(e)}")
                 all_valid = False
 
-                jar_in_zip = "site-packages/pyxform/validators/odk_validate/bin/ODK_Validate.jar"
-                zip_ref.extract(jar_in_zip, os.path.dirname(__file__))
-
-                # Move to final location
-                extracted_jar = os.path.join(os.path.dirname(__file__), jar_in_zip)
-                shutil.move(extracted_jar, jar_path)
-
             logger.info(f"Extracted ODK Validate JAR to {jar_path}")
             return jar_path
 

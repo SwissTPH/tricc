@@ -217,6 +217,7 @@ class TriccNodeBaseModel(TriccBaseModel):
     expression_inputs: List[Expression] = []
     activity: Optional[FwTriccNodeBaseModel] = None
     ref_def: Optional[Union[int, str]] = None  # for medal creator
+    is_sequence_defined: bool = False
 
     class Config:
         use_enum_values = True  # <--

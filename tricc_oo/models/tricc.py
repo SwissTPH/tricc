@@ -301,6 +301,7 @@ class TriccNodeDisplayModel(TriccNodeBaseModel):
 class TriccNodeNote(TriccNodeDisplayModel):
     tricc_type: TriccNodeType = TriccNodeType.note
     datatype: str = "string"
+    is_sequence_defined: bool = True
 
 
 class TriccNodeInputModel(TriccNodeDisplayModel):
@@ -308,6 +309,7 @@ class TriccNodeInputModel(TriccNodeDisplayModel):
     constraint_message: Optional[Union[str, Dict[str, str]]] = None
     constraint: Optional[Expression] = None
     save: Optional[str] = None  # contribute to another calculate
+    is_sequence_defined: bool = True
 
 
 class TriccNodeDate(TriccNodeInputModel):

@@ -43,6 +43,7 @@ TRICC_CALC_EXPRESSION = "${{{0}}}>0"
 
 def get_export_group_name(in_node): return f"gcalc_{get_export_name(in_node)}"
 
+def get_export_group_required(in_node): return in_node.relevance  and in_node.relevance != TriccStatic(True)
 
 def start_group(
     strategy,
@@ -65,9 +66,9 @@ def start_group(
         groups[name] = 0
     relevance = relevance and cur_group.relevance is not None and cur_group.relevance != ""
     past_instances = len(getattr(cur_group.base_instance, "instances", []))
-    group_calc_required = relevance is not None and (len(str(relevance)) > 100 or past_instances > 1)
+    group_calc_required = get_export_group_required(cur_group)
     calc = None
-    if group_calc_required and getattr(cur_group.relevance, 'operator', None) != TriccOperator.ISTRUE:
+    if group_calc_required and len(df_calculate[df_calculate["name"] == get_export_group_name(cur_group)]) == 0:
 
         calc = TriccNodeCalculate(
             id=generate_id(get_export_group_name(name)),
