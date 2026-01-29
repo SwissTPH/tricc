@@ -158,19 +158,25 @@ def set_last_version_false(node, processed_nodes):
     return last_version
 
 
-def get_version_inheritance(node, last_version, processed_nodes):
-    # FIXME this is for XLS form where only calculate are evaluated
-    # for a activity that is not triggered
+def get_version_inheritance(node, all_prev_versions, processed_nodes):
+
+    # Updated to merge ALL previous versions, not just the last one
+    # This ensures inheritance works even when intermediate activities weren't triggered
+    
     if not issubclass(node.__class__, (TriccNodeInputModel)):
         node.last = True
         if issubclass(node.__class__, (TriccNodeDisplayCalculateBase, TriccNodeEnd)) and node.name is not None:
             # logger.debug("set last to false for node {}
             # and add its link it to next one".format(last_used_calc.get_name()))
             if node.prev_nodes:
-                set_prev_next_node(last_version, node)
+                # Set prev_next_node only with the immediate last version
+                for pv in  all_prev_versions:
+                    set_prev_next_node(pv, node)
             else:
                 expression = node.expression or node.expression_reference or getattr(node, "relevance", None)
-                expression = merge_expression(expression, last_version)
+                # Merge with ALL previous versions, not just the last one
+                if all_prev_versions:
+                    expression = merge_all_expressions(expression, all_prev_versions)
                 if node.expression:
                     node.expression = expression
                 elif node.expression_reference:
@@ -180,17 +186,21 @@ def get_version_inheritance(node, last_version, processed_nodes):
     else:
         node.last = False
 
-        # Create a calculate node that coalesces the previous saved value with the current node value
+        # Create a calculate node that coalesces all previous saved values with the current node value
         calc_id = generate_id(f"save_{node.save}")
+        
+        # Build reference list with current node and all previous versions
+        reference_list = [node] + (all_prev_versions if all_prev_versions else [])
+        
         calc = TriccNodeCalculate(
             id=calc_id,
             name=node.save,
             path_len=node.path_len + 1,
             expression_reference=TriccOperation(
                 TriccOperator.COALESCE,
-                [node, last_version],
+                reference_list,
             ),
-            reference=[node, last_version],
+            reference=reference_list,
             activity=node.activity,
             group=node.group,
             label=f"Save calculation for {node.label}",
@@ -201,7 +211,9 @@ def get_version_inheritance(node, last_version, processed_nodes):
         # set_last_version_false(calc, processed_nodes)
         processed_nodes.add(calc)
         if issubclass(node.__class__, TriccNodeInputModel):
-            node.expression = TriccOperation(TriccOperator.COALESCE, ["$this", last_version])
+            # Coalesce with all previous versions
+            coalesce_operands = ["$this"] + (all_prev_versions if all_prev_versions else [])
+            node.expression = TriccOperation(TriccOperator.COALESCE, coalesce_operands)
 
 
 def merge_expression(expression, last_version):
@@ -213,6 +225,30 @@ def merge_expression(expression, last_version):
         expression = TriccOperation(TriccOperator.PLUS, [last_version, expression])
     else:
         expression = TriccOperation(TriccOperator.COALESCE, [last_version, expression])
+    return expression
+
+
+def merge_all_expressions(expression, all_versions):
+    """
+    Merge an expression with ALL previous versions, not just the last one.
+    This ensures inheritance works even when intermediate versions weren't evaluated
+    due to activity relevance conditions.
+    """
+    if not all_versions:
+        return expression
+    
+    datatype = expression.get_datatype() if expression else "unknown"
+    
+    if datatype == "boolean":
+        expression = or_join(all_versions)
+    
+    else:
+        # COALESCE through all previous versions, then the current expression
+        coalesce_operands = list(all_versions)
+        if expression:
+            coalesce_operands.append(expression)
+        expression = TriccOperation(TriccOperator.COALESCE, coalesce_operands)
+    
     return expression
 
 
@@ -239,8 +275,14 @@ def load_calculate(
             # tricc diagnostic have the same name as proposed diag but will be serialised with different names
 
             last_version = set_last_version_false(node, processed_nodes)
+            # Get all previous versions from processed_nodes, not just the last one
+            node_name = node.name if not isinstance(node, TriccNodeEnd) else node.get_reference()
+            all_prev_versions = get_versions(node_name, processed_nodes)
+            # Exclude the current node itself
+            all_prev_versions = [v for v in all_prev_versions if v != node]
+
             if last_version:
-                last_version = get_version_inheritance(node, last_version, processed_nodes)
+                get_version_inheritance(node, all_prev_versions, processed_nodes)
 
             generate_calculates(node, calculates, used_calculates, processed_nodes=processed_nodes, process=process)
 
@@ -2554,15 +2596,6 @@ def get_calculation_terms(node, processed_nodes, get_overall_exp=False, negate=F
 
     if isinstance(node.expression_reference, (TriccOperation, TriccStatic)):
         expression = node.expression_reference
-    elif node.reference is not None and node.expression_reference is not None:
-        expression = get_prev_node_expression(
-            node, processed_nodes=processed_nodes, get_overall_exp=get_overall_exp, process=process
-        )
-        ref_expression = node.expression_reference.format(*[get_export_name(ref) for ref in node.reference])
-        if expression is not None and expression != "":
-            expression = and_join([expression, ref_expression])
-        else:
-            expression = ref_expression
     elif expression is None:
         expression = get_prev_node_expression(
             node, processed_nodes=processed_nodes, get_overall_exp=get_overall_exp, process=process

@@ -25,6 +25,7 @@ from tricc_oo.models.tricc import (
     TriccNodeCalculateBase,
     TriccNodeBaseModel,
     TriccNodeSelectOption,
+    TriccNodeSelect,
     TriccNodeInputModel,
     TriccNodeDisplayModel,
     TRICC_FALSE_VALUE,
@@ -87,6 +88,8 @@ OPERATOR_COALESCE_FALLBACK = {
     TriccOperator.MORE_OR_EQUAL: -2147483648,
     TriccOperator.LESS: 2147483647,
     TriccOperator.LESS_OR_EQUAL: 2147483647,
+    TriccOperator.CONTAINS: "''",
+    TriccOperator.SELECTED: "''",
 }
 
 
@@ -742,7 +745,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
         elif isinstance(r, TriccNodeSelectOption):
             logger.debug(f"select option {r.get_name()} from {r.select.get_name()} was used as a reference")
             return get_export_name(r)
-        elif issubclass(r.__class__, TriccNodeInputModel):
+        elif issubclass(r.__class__, (TriccNodeInputModel, TriccNodeSelect)):
             return f"coalesce(${{{get_export_name(r)}}},{coalesce_fallback})"
         elif issubclass(r.__class__, TriccNodeBaseModel):
             return f"${{{get_export_name(r)}}}"
