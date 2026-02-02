@@ -357,8 +357,7 @@ def generate_choice_filter(strategy, node):
         choice_filter = TriccOperation(TriccOperator.OR, [basic])
         for k, op in relevances.items():
             choice_filter.append(
-                TriccOperation(
-                    TriccOperator.AND,
+                and_join(
                     [
                         TriccOperation(
                             TriccOperator.EQUAL,
@@ -368,7 +367,7 @@ def generate_choice_filter(strategy, node):
                             ],
                         ),
                         op,
-                    ],
+                    ]
                 )
             )
         return strategy.get_tricc_operation_expression(choice_filter)

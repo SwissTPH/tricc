@@ -99,6 +99,7 @@ class TriccNodeActivity(TriccNodeBaseModel):
     # - case definition
     calculates: List[TriccNodeCalculateBase] = []
     applicability: Optional[Union[Expression, TriccOperation]] = None
+    is_sequence_defined: bool = False
 
     # redefine
     def make_instance(self, instance_nb=None, **kwargs):
@@ -294,7 +295,8 @@ class TriccNodeDisplayModel(TriccNodeBaseModel):
     default: Optional[Union[Expression, TriccOperation, TriccReference, TriccStatic]] = None
     trigger: Optional[Union[Expression, TriccOperation, TriccReference]] = None
     priority: Union[float, int, None] = None
-
+    concept_type: str = None
+    datatype: str = None
     # to use the enum value of the TriccNodeType
 
 

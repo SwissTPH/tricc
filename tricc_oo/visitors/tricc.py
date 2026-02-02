@@ -2265,8 +2265,7 @@ def get_prev_node_expression(node, processed_nodes, get_overall_exp=False, exclu
         if act_expression_inputs:
             act_sub = or_join(act_expression_inputs)
             # if there is condition fallback on the calling activity condition
-            if act_sub == TriccStatic(True):
-                act_sub = get_node_expression(
+            act_relevance = get_node_expression(
                     prev_node.activity,
                     processed_nodes=processed_nodes,
                     get_overall_exp=get_overall_exp,
@@ -2274,7 +2273,9 @@ def get_prev_node_expression(node, processed_nodes, get_overall_exp=False, exclu
                     negate=False,
                     process=process,
                 )
-            elif none_sequence_defined_prev_node:
+            if act_sub == TriccStatic(True):
+                act_sub = act_relevance
+            elif act_relevance != TriccStatic(True) and none_sequence_defined_prev_node:
                 # For nodes with is_sequence_defined = False, AND the activity relevance with the prev expression
                 # activity_relevance = get_node_expression(
                 #     prev_node.activity,
@@ -2284,7 +2285,13 @@ def get_prev_node_expression(node, processed_nodes, get_overall_exp=False, exclu
                 #     negate=False,
                 #     process=process,
                 # )
-                act_sub = and_join([ prev_node.activity.root, act_sub])
+                act_sub = and_join([
+                    TriccOperation(
+                        TriccOperator.ISTRUE,
+                        [prev_node.activity.root]
+                    ),
+                    act_sub
+                ])
             add_sub_expression(expression_inputs, act_sub)
             # avoid void is there is not conditions to avoid looping too much itme
     # expression_inputs = clean_or_list(
@@ -2661,13 +2668,10 @@ def get_selected_option_expression_multiple(option_node, negate):
     selected = TriccOperation(TriccOperator.SELECTED, [option_node.select, TriccStatic(option_node)])
 
     if negate:
-        return TriccOperation(
-            operator=TriccOperator.AND,
-            resource=[
+        return and_join([
                 TriccOperation(operator=TriccOperator.NOT, resource=[selected]),
                 TriccOperation(operator=TriccOperator.ISNOTNULL, resource=[option_node.select]),
-            ],
-        )
+            ])
 
     else:
         return selected
@@ -2778,7 +2782,7 @@ def generate_base(node, processed_nodes, **kwargs):
                         )
                         constraints_max = "The maximum value is {0}.".format(node.max)
                     if len(constraints) > 1:
-                        node.constraint = TriccOperation(TriccOperator.AND, constraints)
+                        node.constraint = and_join(constraints)
                         node.constraint_message = (constraints_min + " " + constraints_max).strip()
                     elif len(constraints) == 1:
                         node.constraint = constraints[0]
