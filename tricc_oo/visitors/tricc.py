@@ -176,7 +176,7 @@ def get_version_inheritance(node, all_prev_versions, processed_nodes):
                 expression = node.expression or node.expression_reference or getattr(node, "relevance", None)
                 # Merge with ALL previous versions, not just the last one
                 if all_prev_versions:
-                    expression = merge_all_expressions(expression, all_prev_versions)
+                    expression = merge_expressions(expression, *all_prev_versions)
                 if node.expression:
                     node.expression = expression
                 elif node.expression_reference:
@@ -216,39 +216,15 @@ def get_version_inheritance(node, all_prev_versions, processed_nodes):
             node.expression = TriccOperation(TriccOperator.COALESCE, coalesce_operands)
 
 
-def merge_expression(expression, last_version):
+def merge_expressions(expression, last_version, *argv):
     datatype = expression.get_datatype()
     if datatype == "boolean":
-        expression = or_join([TriccOperation(TriccOperator.ISTRUE, [last_version]), expression])
+        expression = or_join([TriccOperation(TriccOperator.ISTRUE, [last_version, *argv]), expression])
 
     elif datatype == "number":
-        expression = TriccOperation(TriccOperator.PLUS, [last_version, expression])
+        expression = TriccOperation(TriccOperator.PLUS, [last_version, *argv, expression])
     else:
-        expression = TriccOperation(TriccOperator.COALESCE, [last_version, expression])
-    return expression
-
-
-def merge_all_expressions(expression, all_versions):
-    """
-    Merge an expression with ALL previous versions, not just the last one.
-    This ensures inheritance works even when intermediate versions weren't evaluated
-    due to activity relevance conditions.
-    """
-    if not all_versions:
-        return expression
-    
-    datatype = expression.get_datatype() if expression else "unknown"
-    
-    if datatype == "boolean":
-        expression = or_join([expression, *all_versions])
-    
-    else:
-        # COALESCE through all previous versions, then the current expression
-        coalesce_operands = list(all_versions)
-        if expression:
-            coalesce_operands.append(expression)
-        expression = TriccOperation(TriccOperator.COALESCE, coalesce_operands)
-    
+        expression = TriccOperation(TriccOperator.COALESCE, [expression, last_version, *argv])
     return expression
 
 
@@ -582,7 +558,7 @@ def generate_calculates(node, calculates, used_calculates, processed_nodes, proc
             node.activity.calculates.append(calc_node)
             last_version = set_last_version_false(calc_node, processed_nodes)
             if last_version:
-                calc_node.expression = merge_expression(calc_node.expression, last_version)
+                calc_node.expression = merge_expressions(calc_node.expression, last_version)
             processed_nodes.add(calc_node)
             logger.debug(
                 "generate_save_calculate:{}:{} as {}".format(
@@ -615,7 +591,7 @@ def generate_calculates(node, calculates, used_calculates, processed_nodes, proc
                 node.activity.calculates.append(calc_node)
                 last_version = set_last_version_false(calc_node, processed_nodes)
                 if last_version:
-                    calc_node.expression = merge_expression(calc_node.expression, last_version)
+                    calc_node.expression = merge_expressions(calc_node.expression, last_version)
                 processed_nodes.add(calc_node)
                 list_calc.append(calc_node)
                 node.activity.nodes[calc_node.id] = calc_node
