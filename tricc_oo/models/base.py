@@ -603,7 +603,7 @@ def clean_and_list(argv):
     internal = list(set(argv))
     for a in internal:
         for b in internal[internal.index(a) + 1:]:
-            if not_clean(b) == a:
+            if not_clean(a) == b or not_clean(b) == a:
                 return [TriccStatic(False)]
     return sorted(list(set(argv)), key=str)
 
@@ -775,6 +775,386 @@ def nand_join(left, right):
         return left
     else:
         return and_join([left, not_clean(right)])
+
+
+def simplify_with_sympy(operation):
+    """
+    Simplify a TriccOperation using SymPy boolean and algebraic operations.
+
+    This enhanced version maps Tricc operators to actual SymPy operations/symbols
+    instead of treating them as placeholders, enabling sophisticated mixed-domain
+    simplifications.
+
+    Args:
+        operation: TriccOperation to simplify
+
+    Returns:
+        Simplified TriccOperation or original if no simplification possible
+    """
+    # Step 1: Check if operation contains operations that can be simplified
+    if not isinstance(operation, TriccOperation):
+        return operation
+
+    try:
+        import sympy as sp
+        from sympy.logic.boolalg import simplify_logic
+        from sympy import Add, Mul, Pow, Eq, Ne, And, Or, Not, Gt, Ge, Lt, Le
+        from sympy.functions import Abs, sign
+    except ImportError:
+        logger.warning("SymPy not available, skipping algebraic simplification")
+        return operation
+
+    # Step 2: Create comprehensive Tricc-to-SymPy operator mapping
+    tricc_to_sympy_map = {
+        # Boolean operations - treat as symbols to preserve structure
+        TriccOperator.AND: And,
+        TriccOperator.OR: Or,
+        TriccOperator.NOT: Not,
+        TriccOperator.ISTRUE: None,  # Will be treated as symbol
+        TriccOperator.ISFALSE: None,  # Will be treated as symbol
+        TriccOperator.EXISTS: None,  # Will be treated as symbol
+        TriccOperator.NOTEXISTS: None,  # Will be treated as symbol
+        TriccOperator.ISNOTTRUE: None,  # Will be treated as symbol
+        TriccOperator.ISNOTFALSE: None,  # Will be treated as symbol
+
+        # Arithmetic operations
+        TriccOperator.PLUS: Add,
+        TriccOperator.MINUS: lambda *args: Add(args[0], Mul(-1, args[1])) if len(args) == 2 else Mul(-1, args[0]),
+        TriccOperator.MULTIPLIED: Mul,
+        TriccOperator.DIVIDED: lambda x, y: Mul(x, Pow(y, -1)),
+        TriccOperator.MODULO: lambda x, y: x % y,  # Modulo
+
+        # Comparison operations
+        TriccOperator.EQUAL: Eq,
+        TriccOperator.NOTEQUAL: Ne,
+        TriccOperator.MORE: Gt,
+        TriccOperator.LESS: Lt,
+        TriccOperator.MORE_OR_EQUAL: Ge,
+        TriccOperator.LESS_OR_EQUAL: Le,
+
+        # Numeric operations
+        TriccOperator.ROUND: lambda x: sp.round(x),
+        TriccOperator.CAST_NUMBER: lambda x: x,  # Identity for numbers
+        TriccOperator.CAST_INTEGER: lambda x: sp.floor(x),
+
+        # Special operations (placeholders for now)
+        TriccOperator.COALESCE: None,  # Will use placeholder
+        TriccOperator.CONCATENATE: None,  # Will use placeholder
+        TriccOperator.CASE: None,  # Will use placeholder
+        TriccOperator.IFS: None,  # Will use placeholder
+    }
+
+    # Step 3: Create reference mapping with structural keys
+    ref_counter = 0
+    ref_map = {}  # SymPy symbol -> actual reference
+    reverse_map = {}  # structural key -> SymPy symbol
+
+    def get_structural_key(ref):
+        """Generate a canonical key based on structural equality"""
+        if isinstance(ref, TriccOperation):
+            ref_keys = [get_structural_key(r) for r in ref.reference]
+            return f"op_{ref.operator}_{'_'.join(ref_keys)}"
+        elif isinstance(ref, TriccReference):
+            return f"ref_{ref.value}"
+        elif isinstance(ref, TriccStatic):
+            return f"static_{ref.value}"
+        elif hasattr(ref, 'id'):
+            return f"{ref.__class__.__name__}_{ref.id}"
+        else:
+            return str(ref)
+
+    def get_sympy_symbol(ref):
+        """Get or create SymPy symbol for a reference"""
+        nonlocal ref_counter
+        ref_key = get_structural_key(ref)
+        if ref_key in reverse_map:
+            return reverse_map[ref_key]
+
+        # Create unique symbol name
+        if hasattr(ref, 'reference') and isinstance(ref.reference, (list, OrderedSet)):
+            # For operations, create path-based name
+            path_parts = []
+            current = ref
+            depth = 0
+            while hasattr(current, 'reference') and depth < 3:
+                if isinstance(current.reference, (list, OrderedSet)) and len(current.reference) > 0:
+                    path_parts.insert(0, str(len(current.reference)))
+                    current = current.reference[0]
+                    depth += 1
+                else:
+                    break
+            if path_parts:
+                symbol_name = f"r_{'_'.join(path_parts)}"
+            else:
+                symbol_name = f"r_{ref_counter}"
+        else:
+            symbol_name = f"r_{ref_counter}"
+
+        ref_counter += 1
+        symbol = sp.Symbol(symbol_name)
+        ref_map[symbol] = ref
+        reverse_map[ref_key] = symbol
+        return symbol
+
+    def tricc_to_sympy_expr(op):
+        """Convert TriccOperation to SymPy expression"""
+        if isinstance(op, TriccOperation):
+            # Special handling for boolean operations
+            if op.operator == TriccOperator.ISTRUE:
+                # istrue(x) becomes a symbol for the entire operation
+                return get_sympy_symbol(op)
+            elif op.operator == TriccOperator.ISNOTTRUE:
+                # isnottrue(x) becomes not(istrue(x))
+                if len(op.reference) == 1:
+                    istrue_op = TriccOperation(TriccOperator.ISTRUE, op.reference)
+                    istrue_symbol = get_sympy_symbol(istrue_op)
+                    return Not(istrue_symbol)
+                else:
+                    return get_sympy_symbol(op)
+            elif op.operator == TriccOperator.NOT and len(op.reference) == 1:
+                # Handle NOT(boolean_operation) by applying SymPy to inner and wrapping
+                inner = op.reference[0]
+                if isinstance(inner, TriccOperation) and inner.get_datatype() == "boolean":
+                    # Apply SymPy to the inner boolean expression
+                    inner_sympy = tricc_to_sympy_expr(inner)
+                    if inner_sympy != get_sympy_symbol(inner):
+                        # Inner was simplified, wrap with NOT
+                        return Not(inner_sympy)
+                    else:
+                        # Inner wasn't simplified, return as symbol
+                        return get_sympy_symbol(op)
+                else:
+                    # Not a boolean operation, handle normally
+                    sympy_op = tricc_to_sympy_map.get(op.operator)
+                    if sympy_op is None:
+                        return get_sympy_symbol(op)
+
+                    sympy_refs = [tricc_to_sympy_expr(ref) for ref in op.reference]
+                    if callable(sympy_op):
+                        try:
+                            if len(sympy_refs) == 1:
+                                return sympy_op(sympy_refs[0])
+                            elif len(sympy_refs) == 2:
+                                return sympy_op(sympy_refs[0], sympy_refs[1])
+                            else:
+                                result = sympy_refs[0]
+                                for ref in sympy_refs[1:]:
+                                    result = sympy_op(result, ref)
+                                return result
+                        except Exception as e:
+                            logger.debug(f"Failed to apply {sympy_op} to {sympy_refs}: {e}")
+                            return get_sympy_symbol(op)
+                    else:
+                        try:
+                            return sympy_op(*sympy_refs)
+                        except Exception as e:
+                            logger.debug(f"Failed to create {sympy_op} with {sympy_refs}: {e}")
+                            return get_sympy_symbol(op)
+            else:
+                # Normal operation handling
+                sympy_op = tricc_to_sympy_map.get(op.operator)
+
+                if sympy_op is None:
+                    # Use placeholder for unmapped operations
+                    return get_sympy_symbol(op)
+
+                # Convert references to SymPy expressions
+                sympy_refs = [tricc_to_sympy_expr(ref) for ref in op.reference]
+
+                # Apply the SymPy operation
+                if callable(sympy_op):
+                    try:
+                        if len(sympy_refs) == 1:
+                            return sympy_op(sympy_refs[0])
+                        elif len(sympy_refs) == 2:
+                            return sympy_op(sympy_refs[0], sympy_refs[1])
+                        else:
+                            # For operations with multiple args, apply sequentially
+                            result = sympy_refs[0]
+                            for ref in sympy_refs[1:]:
+                                result = sympy_op(result, ref)
+                            return result
+                    except Exception as e:
+                        logger.debug(f"Failed to apply {sympy_op} to {sympy_refs}: {e}")
+                        return get_sympy_symbol(op)
+                else:
+                    # Direct SymPy operation class
+                    try:
+                        return sympy_op(*sympy_refs)
+                    except Exception as e:
+                        logger.debug(f"Failed to create {sympy_op} with {sympy_refs}: {e}")
+                        return get_sympy_symbol(op)
+
+        elif isinstance(op, TriccStatic):
+            if isinstance(op.value, bool):
+                return sp.true if op.value else sp.false
+            elif isinstance(op.value, (int, float)):
+                return sp.S(op.value)
+            else:
+                return get_sympy_symbol(op)
+        else:
+            # References and other objects
+            return get_sympy_symbol(op)
+
+    def sympy_expr_to_tricc(expr):
+        """Convert SymPy expression back to TriccOperation using expression tree"""
+        if isinstance(expr, sp.Symbol):
+            # Direct symbol lookup
+            if expr in ref_map:
+                return ref_map[expr]
+            else:
+                # This shouldn't happen, but handle gracefully
+                return TriccReference(str(expr))
+
+        elif expr is sp.true:
+            return TriccStatic(True)
+        elif expr is sp.false:
+            return TriccStatic(False)
+
+        elif isinstance(expr, (sp.Integer, sp.Float)):
+            return TriccStatic(float(expr))
+
+
+
+        elif isinstance(expr, And):
+            args = [sympy_expr_to_tricc(arg) for arg in expr.args]
+            return and_join(args)
+
+        elif isinstance(expr, Or):
+            args = [sympy_expr_to_tricc(arg) for arg in expr.args]
+            return or_join(args)
+
+        elif isinstance(expr, Not):
+            inner = sympy_expr_to_tricc(expr.args[0])
+            return TriccOperation(TriccOperator.NOT, [inner])
+
+        elif isinstance(expr, Add):
+            if len(expr.args) == 2:
+                left, right = [sympy_expr_to_tricc(arg) for arg in expr.args]
+                # Check if right is negative (indicating subtraction)
+                if isinstance(right, TriccOperation) and right.operator == TriccOperator.MINUS and len(right.reference) == 1:
+                    return TriccOperation(TriccOperator.MINUS, [left, right.reference[0]])
+                else:
+                    return TriccOperation(TriccOperator.PLUS, [left, right])
+            else:
+                # Multiple addition
+                args = [sympy_expr_to_tricc(arg) for arg in expr.args]
+                return TriccOperation(TriccOperator.PLUS, args)
+
+        elif isinstance(expr, Mul):
+            if len(expr.args) == 2:
+                left, right = [sympy_expr_to_tricc(arg) for arg in expr.args]
+                # Check for division (multiplication by reciprocal)
+                if isinstance(right, TriccOperation) and right.operator == TriccOperator.DIVIDED:
+                    if len(right.reference) == 1:
+                        return TriccOperation(TriccOperator.DIVIDED, [left, right.reference[0]])
+                else:
+                    return TriccOperation(TriccOperator.MULTIPLIED, [left, right])
+            else:
+                # Multiple multiplication
+                args = [sympy_expr_to_tricc(arg) for arg in expr.args]
+                return TriccOperation(TriccOperator.MULTIPLIED, args)
+
+        elif isinstance(expr, Pow):
+            # Handle division (x^(-1) = 1/x)
+            if len(expr.args) == 2 and expr.args[1] == -1:
+                numerator = sympy_expr_to_tricc(expr.args[0])
+                denominator = TriccStatic(1)
+                return TriccOperation(TriccOperator.DIVIDED, [numerator, denominator])
+            else:
+                # Other powers - fallback to placeholder
+                return TriccReference(str(expr))
+
+        elif isinstance(expr, (Eq, Ne, Lt, Le, Gt, Ge)):
+            left, right = [sympy_expr_to_tricc(arg) for arg in expr.args]
+            op_map = {
+                Eq: TriccOperator.EQUAL,
+                Ne: TriccOperator.NOTEQUAL,
+                Lt: TriccOperator.LESS,
+                Le: TriccOperator.LESS_OR_EQUAL,
+                Gt: TriccOperator.MORE,
+                Ge: TriccOperator.MORE_OR_EQUAL,
+            }
+            operator = op_map.get(type(expr), TriccOperator.EQUAL)
+            return TriccOperation(operator, [left, right])
+
+        else:
+            # Unknown SymPy expression type - fallback to string representation
+            logger.debug(f"Unknown SymPy expression type: {type(expr)}, falling back to placeholder")
+            return TriccReference(str(expr))
+
+    # Step 4: Apply custom boolean simplifications first
+    if operation.get_datatype() == "boolean":
+        # Apply our custom boolean simplifications
+        custom_simplified = apply_boolean_simplifications(operation)
+        if custom_simplified != operation:
+            logger.debug(f"Custom boolean simplification: {operation} -> {custom_simplified}")
+            return custom_simplified
+
+    # Step 5: Convert to SymPy and simplify
+    try:
+        sympy_expr = tricc_to_sympy_expr(operation)
+        logger.debug(f"Original SymPy expression: {sympy_expr}")
+
+        # Apply appropriate simplification based on expression type
+        if operation.get_datatype() == "boolean":
+            # Use boolean algebra simplification
+            simplified_expr = simplify_logic(sympy_expr)
+        else:
+            # Use general algebraic simplification
+            simplified_expr = sp.simplify(sympy_expr)
+
+        logger.debug(f"Simplified SymPy expression: {simplified_expr}")
+
+        # Step 6: Convert back to TriccOperation if different
+        if simplified_expr != sympy_expr:
+            reconstructed = sympy_expr_to_tricc(simplified_expr)
+            logger.debug(f"SymPy simplified {operation} to {reconstructed}")
+            return reconstructed
+
+    except Exception as e:
+        logger.warning(f"SymPy simplification failed for {operation}: {e}")
+
+    return operation
+
+
+def apply_boolean_simplifications(operation):
+    """Apply custom boolean simplifications that SymPy might miss"""
+    if not isinstance(operation, TriccOperation):
+        return operation
+
+    if operation.operator == TriccOperator.OR:
+        # Apply clean_or_list which includes our pattern recognition
+        cleaned_list = clean_or_list(set(operation.reference))
+        if len(cleaned_list) == 1:
+            return cleaned_list[0]
+        elif len(cleaned_list) != len(operation.reference):
+            return TriccOperation(TriccOperator.OR, cleaned_list)
+
+    elif operation.operator == TriccOperator.AND:
+        # Apply clean_and_list
+        cleaned_list = clean_and_list(operation.reference)
+        if len(cleaned_list) == 1:
+            return cleaned_list[0]
+        elif len(cleaned_list) != len(operation.reference):
+            return TriccOperation(TriccOperator.AND, cleaned_list)
+
+    # Recursively apply to sub-operations
+    simplified_refs = []
+    changed = False
+    for ref in operation.reference:
+        if isinstance(ref, TriccOperation):
+            simplified_ref = apply_boolean_simplifications(ref)
+            if simplified_ref != ref:
+                changed = True
+            simplified_refs.append(simplified_ref)
+        else:
+            simplified_refs.append(ref)
+
+    if changed:
+        return TriccOperation(operation.operator, simplified_refs)
+
+    return operation
 
 
 TriccGroup.update_forward_refs()

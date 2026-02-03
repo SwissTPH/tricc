@@ -158,7 +158,7 @@ if __name__ == "__main__":
     if debug_level is not None:
         setup_logger("default", debug_file_path, LEVELS[debug_level])
     elif "pydevd" in sys.modules:
-        setup_logger("default", debug_file_path, logging.DEBUG)
+        setup_logger("default", debug_file_path, logging.INFO)
     else:
         setup_logger("default", debug_file_path, logging.INFO)
     file_content = []
