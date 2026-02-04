@@ -298,7 +298,7 @@ def load_calculate(
                     )
                 ]
                 last_expression_same_activity = [
-                    TriccOperation(TriccOperator.ISTRUE,l) for l in  all_prev_versions if (
+                    TriccOperation(TriccOperator.ISTRUE,[l]) for l in  all_prev_versions if (
                         node.is_sequence_defined and
                         node.activity == l.activity
                     )
