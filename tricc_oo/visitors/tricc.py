@@ -2023,7 +2023,7 @@ def get_applicability_expression(node, processed_nodes, process, expression=None
 def get_prev_instance_skip_expression(node, processed_nodes, process, expression=None):
     if node.base_instance is not None:
         expression_inputs = []
-        past_instances = [n for n in processed_nodes if getattr(n.base_instance, "id", None) == node.base_instance.id]
+        past_instances = [n for n in processed_nodes if getattr(n.base_instance, "id", None) == node.base_instance.id and node != n]
         for past_instance in past_instances:
             add_sub_expression(
                 expression_inputs,
