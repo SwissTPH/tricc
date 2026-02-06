@@ -144,8 +144,8 @@ class TriccBaseModel(BaseModel):
         return hash_value
 
     def get_name(self):
-        return self.id
-
+        return f"{self.id}::{self.instance}::{self.version}" 
+    
     def __str__(self):
         return self.get_name()
 
@@ -233,7 +233,7 @@ class TriccNodeBaseModel(TriccBaseModel):
         label = getattr(self, "label", None)
 
         if name:
-            result += name
+            result += f"{name}::{self.instance}::{self.version}" 
         if label:
             result += "::" + (next(iter(self.label.values())) if isinstance(self.label, Dict) else self.label)
         if len(result) < 80:
@@ -636,6 +636,10 @@ def not_clean(a):
         new_operator = TriccOperator.MORE
     elif isinstance(a, TriccOperation) and a.operator == TriccOperator.MORE_OR_EQUAL:
         new_operator = TriccOperator.LESS
+    elif isinstance(a, TriccOperation) and a.operator == TriccOperator.EXISTS:
+        new_operator = TriccOperator.NOTEXISTS
+    elif isinstance(a, TriccOperation) and a.operator == TriccOperator.NOTEXISTS:
+        new_operator = TriccOperator.EXISTS
     elif isinstance(a, TriccOperation) and a.operator == TriccOperator.NOT:
         return a.reference[0]
 
@@ -777,19 +781,87 @@ def nand_join(left, right):
         return and_join([left, not_clean(right)])
 
 
+def collect_istrue_references(operation):
+    """Collect all references that appear in istrue operations"""
+    istrue_refs = set()
+
+    def _collect_istrue(op):
+        if isinstance(op, TriccOperation):
+            if op.operator == TriccOperator.ISTRUE and len(op.reference) == 1:
+                ref = op.reference[0]
+                # Use structural key for comparison
+                if isinstance(ref, TriccReference):
+                    istrue_refs.add(f"ref_{ref.value}")
+                elif hasattr(ref, 'id'):
+                    istrue_refs.add(f"{ref.__class__.__name__}_{ref.id}")
+                else:
+                    istrue_refs.add(str(ref))
+            # Recursively collect from sub-operations
+            for ref in op.reference:
+                _collect_istrue(ref)
+
+    _collect_istrue(operation)
+    return istrue_refs
+
+
+def restore_istrue_wrappers(operation, istrue_refs):
+    """Restore istrue wrappers around references that were originally istrue-wrapped"""
+    if not isinstance(operation, TriccOperation):
+        return operation
+
+    def _get_structural_key(ref):
+        """Generate a canonical key based on structural equality"""
+        if isinstance(ref, TriccReference):
+            return f"ref_{ref.value}"
+        elif hasattr(ref, 'id'):
+            return f"{ref.__class__.__name__}_{ref.id}"
+        else:
+            return str(ref)
+
+    def _restore_istrue(op):
+        if isinstance(op, TriccOperation):
+            # If this is already an istrue operation, leave it as-is
+            if op.operator == TriccOperator.ISTRUE:
+                return op
+
+            # Check if this single-reference operation should be wrapped in istrue
+            if len(op.reference) == 1:
+                ref = op.reference[0]
+                ref_key = _get_structural_key(ref)
+                if ref_key in istrue_refs:
+                    # This reference was originally istrue-wrapped, restore it
+                    return TriccOperation(TriccOperator.ISTRUE, [op])
+
+            # Recursively restore in sub-operations
+            restored_refs = []
+            for ref in op.reference:
+                restored_refs.append(_restore_istrue(ref))
+            op.reference = restored_refs
+
+        elif not isinstance(op, TriccOperation):
+            # Check if this bare reference should be wrapped in istrue
+            ref_key = _get_structural_key(op)
+            if ref_key in istrue_refs:
+                return TriccOperation(TriccOperator.ISTRUE, [op])
+
+        return op
+
+    return _restore_istrue(operation)
+
+
 def simplify_with_sympy(operation):
     """
     Simplify a TriccOperation using SymPy boolean and algebraic operations.
 
-    This enhanced version maps Tricc operators to actual SymPy operations/symbols
-    instead of treating them as placeholders, enabling sophisticated mixed-domain
-    simplifications.
+    This enhanced version preserves istrue semantic information by tracking which
+    references were originally wrapped in istrue operations and restoring them
+    after simplification.
 
     Args:
         operation: TriccOperation to simplify
 
     Returns:
-        Simplified TriccOperation or original if no simplification possible
+        Simplified TriccOperation with preserved istrue semantics, or original if no simplification possible
     """
     # Step 1: Check if operation contains operations that can be simplified
     if not isinstance(operation, TriccOperation):
@@ -846,7 +918,7 @@ def simplify_with_sympy(operation):
 
     # Step 3: Create reference mapping with structural keys
     ref_counter = 0
-    ref_map = {}  # SymPy symbol -> actual reference
+    ref_map = {}  # SymPy symbol -> (actual reference, is_boolean_symbol)
     reverse_map = {}  # structural key -> SymPy symbol
 
     def get_structural_key(ref):
@@ -899,17 +971,36 @@ def simplify_with_sympy(operation):
     def tricc_to_sympy_expr(op):
         """Convert TriccOperation to SymPy expression"""
         if isinstance(op, TriccOperation):
-            # Special handling for boolean operations
-            if op.operator == TriccOperator.ISTRUE:
-                # istrue(x) becomes a symbol for the entire operation
-                return get_sympy_symbol(op)
-            elif op.operator == TriccOperator.ISNOTTRUE:
-                # isnottrue(x) becomes not(istrue(x))
+            # Special handling for boolean operations - ensure consistent symbols
+            if op.operator in (TriccOperator.ISTRUE, TriccOperator.ISNOTTRUE, TriccOperator.ISFALSE, TriccOperator.ISNOTFALSE):
+                # For boolean operations on single references, use a consistent base symbol
                 if len(op.reference) == 1:
-                    istrue_op = TriccOperation(TriccOperator.ISTRUE, op.reference)
-                    istrue_symbol = get_sympy_symbol(istrue_op)
-                    return Not(istrue_symbol)
+                    # Create a base symbol key using the reference, not the operation
+                    base_ref = op.reference[0]
+                    base_key = get_structural_key(base_ref)
+
+                    # Create a boolean symbol name based on the base reference
+                    if base_key not in reverse_map:
+                        nonlocal ref_counter
+                        symbol_name = f"bool_{ref_counter}"
+                        ref_counter += 1
+                        base_symbol = sp.Symbol(symbol_name)
+                        ref_map[base_symbol] = base_ref
+                        reverse_map[base_key] = base_symbol
+
+                    base_symbol = reverse_map[base_key]
+
+                    # Apply the boolean operation
+                    if op.operator == TriccOperator.ISTRUE:
+                        return base_symbol
+                    elif op.operator == TriccOperator.ISNOTTRUE:
+                        return Not(base_symbol)
+                    elif op.operator == TriccOperator.ISFALSE:
+                        return Not(base_symbol)  # isfalse(x) = not(istrue(x))
+                    elif op.operator == TriccOperator.ISNOTFALSE:
+                        return base_symbol  # isnotfalse(x) = istrue(x)
                 else:
+                    # Fallback for multi-reference boolean operations
                     return get_sympy_symbol(op)
             elif op.operator == TriccOperator.NOT and len(op.reference) == 1:
                 # Handle NOT(boolean_operation) by applying SymPy to inner and wrapping
@@ -1001,7 +1092,16 @@ def simplify_with_sympy(operation):
         if isinstance(expr, sp.Symbol):
             # Direct symbol lookup
             if expr in ref_map:
-                return ref_map[expr]
+                original_ref = ref_map[expr]
+                # If this symbol represents a reference that was used in a boolean operation,
+                # reconstruct it as istrue(reference)
+                if isinstance(original_ref, TriccReference):
+                    # Check if this reference was used in boolean operations by looking at reverse_map
+                    ref_key = get_structural_key(original_ref)
+                    if ref_key in reverse_map and reverse_map[ref_key] == expr:
+                        # This is a boolean symbol representing a reference
+                        return TriccOperation(TriccOperator.ISTRUE, [original_ref])
+                return original_ref
             else:
                 # This shouldn't happen, but handle gracefully
                 return TriccReference(str(expr))
@@ -1083,15 +1183,18 @@ def simplify_with_sympy(operation):
             logger.debug(f"Unknown SymPy expression type: {type(expr)}, falling back to placeholder")
             return TriccReference(str(expr))
 
-    # Step 4: Apply custom boolean simplifications first
+    # Step 4: Collect istrue metadata before simplification
+    istrue_refs = collect_istrue_references(operation)
+
+    # Step 5: Apply custom boolean simplifications first
     if operation.get_datatype() == "boolean":
         # Apply our custom boolean simplifications
         custom_simplified = apply_boolean_simplifications(operation)
         if custom_simplified != operation:
             logger.debug(f"Custom boolean simplification: {operation} -> {custom_simplified}")
-            return custom_simplified
+            return restore_istrue_wrappers(custom_simplified, istrue_refs)
 
-    # Step 5: Convert to SymPy and simplify
+    # Step 6: Convert to SymPy and simplify
     try:
         sympy_expr = tricc_to_sympy_expr(operation)
         logger.debug(f"Original SymPy expression: {sympy_expr}")
@@ -1105,12 +1208,17 @@ def simplify_with_sympy(operation):
             simplified_expr = sp.simplify(sympy_expr)
 
         logger.debug(f"Simplified SymPy expression: {simplified_expr}")
+        logger.debug(f"SymPy expressions equal: {simplified_expr == sympy_expr}")
 
-        # Step 6: Convert back to TriccOperation if different
+        # Step 7: Convert back to TriccOperation if different
         if simplified_expr != sympy_expr:
             reconstructed = sympy_expr_to_tricc(simplified_expr)
             logger.debug(f"SymPy simplified {operation} to {reconstructed}")
-            return reconstructed
+
+            # Step 8: Restore istrue wrappers
+            result = restore_istrue_wrappers(reconstructed, istrue_refs)
+            logger.debug(f"After restoring istrue wrappers: {result}")
+            return result
 
     except Exception as e:
         logger.warning(f"SymPy simplification failed for {operation}: {e}")

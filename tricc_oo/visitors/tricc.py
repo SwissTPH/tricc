@@ -190,7 +190,7 @@ def get_version_inheritance(node, all_prev_versions, processed_nodes):
         calc_id = generate_id(f"save_{node.save}")
         
         # Build reference list with current node and all previous versions
-        reference_list = [node] + (all_prev_versions if all_prev_versions else [])
+        reference_list = [node] + all_prev_versions if all_prev_versions else []
         
         calc = TriccNodeCalculate(
             id=calc_id,
@@ -219,8 +219,7 @@ def get_version_inheritance(node, all_prev_versions, processed_nodes):
 def merge_expressions(expression, last_version, *argv):
     datatype = expression.get_datatype()
     if datatype == "boolean":
-        expression = or_join([TriccOperation(TriccOperator.ISTRUE, [last_version, *argv]), expression])
-
+        expression = or_join([expression] + [TriccOperation(TriccOperator.ISTRUE, [n]) for n in [last_version, *argv]])
     elif datatype == "number":
         expression = TriccOperation(TriccOperator.PLUS, [last_version, *argv, expression])
     else:
@@ -250,14 +249,14 @@ def load_calculate(
                 logger.debug("Processing relevance for node {0}".format(node.get_name()))
             # tricc diagnostic have the same name as proposed diag but will be serialised with different names
 
-            last_version = set_last_version_false(node, processed_nodes)
+            set_last_version_false(node, processed_nodes)
             # Get all previous versions from processed_nodes, not just the last one
             node_name = node.name if not isinstance(node, TriccNodeEnd) else node.get_reference()
             all_prev_versions = get_versions(node_name, processed_nodes)
             # Exclude the current node itself
             all_prev_versions = [v for v in all_prev_versions if v != node]
 
-            if last_version:
+            if all_prev_versions:
                 get_version_inheritance(node, all_prev_versions, processed_nodes)
 
             generate_calculates(node, calculates, used_calculates, processed_nodes=processed_nodes, process=process)
@@ -289,25 +288,27 @@ def load_calculate(
                     for r in relevance_reference:
                         if issubclass(r.__class__, (TriccNodeDisplayCalculateBase)):
                             add_used_calculate(node, r, calculates, used_calculates, processed_nodes)
-
-            if last_version and hasattr(node, "relevance"):
+            # add skip logic for display node ()
+            if all_prev_versions and hasattr(node, "relevance"):
+                # search for same node in completly differnt activity
                 last_expressions_other_activity = [
-                    and_join([TriccOperation(TriccOperator.ISTRUE,[l]),l.activity.root]) for l in  all_prev_versions if (
+                    not_clean(and_join([has_node_data_operation(l),TriccOperation(TriccOperator.ISTRUE,[l.activity.root])])) for l in  all_prev_versions if (
                         node.is_sequence_defined and
                         node.activity.base_instance != l.activity.base_instance
                     )
                 ]
+                # search for same some in the same activity (might require a warning)
                 last_expression_same_activity = [
-                    TriccOperation(TriccOperator.ISTRUE,[l]) for l in  all_prev_versions if (
+                    has_node_data_operation(l) for l in  all_prev_versions if (
                         node.is_sequence_defined and
                         node.activity == l.activity
                     )
                 ]
+
+                # we don't care about the same some in other activity isntance because this is managed on activity level
                 last_version_relevance = [*last_expressions_other_activity, *last_expression_same_activity]
-                if isinstance(node, TriccNodeInputModel):
-                    version_relevance = TriccOperation(TriccOperator.ISNULL, [last_version])
-                elif last_version_relevance:
-                    version_relevance = not_clean(or_join(last_version_relevance))
+                if last_version_relevance:
+                    version_relevance = or_join(last_version_relevance)
                 else:
                     version_relevance = None
 
@@ -346,6 +347,9 @@ def load_calculate(
     return False
 
 
+def has_node_data_operation(node):
+    return TriccOperation(TriccOperator.ISTRUE if node.get_datatype() == 'boolean' else TriccOperator.ISNOTNULL, [node])
+
 def get_max_named_version(calculates, name):
     max = 0
     if name in calculates:
@@ -367,9 +371,7 @@ def get_count_node(node):
         path_len=node.path_len,
     )
 
-
 # Function that inject a wait after path that will wait for the nodes
-
 
 def get_activity_wait(prev_nodes, nodes_to_wait, next_nodes, replaced_node=None, edge_only=False, activity=None):
 

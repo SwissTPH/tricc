@@ -13,7 +13,8 @@ from pyxform import create_survey_from_xls
 from tricc_oo.converters.utils import clean_name
 from tricc_oo.models.base import (
     TriccOperator,
-    TriccOperation, TriccStatic, TriccReference
+    TriccOperation, TriccStatic, TriccReference,
+    simplify_with_sympy
 )
 from tricc_oo.models.ordered_set import OrderedSet
 from tricc_oo.models.calculate import (
@@ -379,6 +380,9 @@ class XLSFormStrategy(BaseOutPutStrategy):
         return processed_nodes
 
     def get_tricc_operation_expression(self, operation):
+        # Apply SymPy boolean simplification for boolean operations
+        # operation = simplify_with_sympy(operation)
+        
         ref_expressions = []
         original_references = []
         if not hasattr(operation, "reference"):
@@ -697,42 +701,6 @@ class XLSFormStrategy(BaseOutPutStrategy):
         m = f"number(instance({table})/root/item[sex={sex} and x_max>" + x + " and x_min<=" + x + "]/m)"
         s = f"number(instance({table})/root/item[sex={sex} and x_max>" + x + " and x_min<=" + x + "]/s)"
         return yz, ll, m, s
-
-    # function update the calcualte in the XLSFORM format
-    # @param left part
-    # @param right part
-    def generate_xls_form_calculate(self, node, processed_nodes, stashed_nodes, calculates, **kwargs):
-        self.codesystems = kwargs.get("codesystems", {})
-        if is_ready_to_process(node, processed_nodes, strict=False) and process_reference(
-            node,
-            processed_nodes,
-            calculates,
-            replace_reference=False,
-            codesystems=kwargs.get("codesystems", None),
-        ):
-            if node not in processed_nodes:
-                if kwargs.get("warn", True):
-                    logger.debug("generation of calculate for node {}".format(node.get_name()))
-                if (
-                    hasattr(node, "expression")
-                    and (node.expression is None)
-                    and issubclass(node.__class__, TriccNodeCalculateBase)
-                ):
-                    node.expression = get_node_expressions(
-                        node, processed_nodes, process=kwargs.get("process", "main ")
-                    )
-                    # continue walk
-                if issubclass(
-                    node.__class__,
-                    (
-                        TriccNodeDisplayModel,
-                        TriccNodeDisplayCalculateBase,
-                        TriccNodeEnd,
-                    ),
-                ):
-                    set_last_version_false(node, processed_nodes)
-                return True
-        return False
 
     def get_tricc_operation_operand(self, r, coalesce_fallback="''"):
         # function transform an object to XLSFORM value
