@@ -1924,6 +1924,8 @@ def get_node_expression(in_node, processed_nodes, get_overall_exp=False, is_prev
         prev_exp = get_node_expression(
             node.path, processed_nodes=processed_nodes, get_overall_exp=get_overall_exp, is_prev=True, process=process
         )
+        if prev_exp:
+            prev_exp = prev_exp.copy(keep_node=True)
         if prev_exp and expression:
             expression = and_join([prev_exp, expression])
             negate_expression = and_join([prev_exp, negate_expression])

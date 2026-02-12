@@ -26,7 +26,6 @@ from tricc_oo.models.calculate import (
     TriccNodeDiagnosis,
     TriccRhombusMixIn,
     TriccNodeInput,
-
 )
 from tricc_oo.models.tricc import (
     TriccNodeCalculateBase,
@@ -1005,12 +1004,11 @@ def process_factor_edge(edge, nodes):
 
 def process_condition_edge(edge, label, nodes):
     source = nodes[edge.source]
-    node_ref = f'"{source.name}"'
+    node_ref = source
     if "$this" in label:
         operation = parse_expression("", expression=label.replace("$this", node_ref))
     else:
         operation = parse_expression(label, expression=node_ref)
-
     if operation and isinstance(operation, TriccOperation):
         # special management for simple operation
         if issubclass(source.__class__, TriccNodeSelect) and "$this" not in label:
