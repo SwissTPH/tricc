@@ -617,11 +617,11 @@ def not_clean(a):
     elif isinstance(a, TriccStatic) and a == TriccStatic(True):
         return TriccStatic(False)
     elif isinstance(a, TriccOperation) and a.operator == TriccOperator.ISTRUE:
-        new_operator = TriccOperator.ISNOTTRUE
+        new_operator = TriccOperator.ISFALSE
     elif isinstance(a, TriccOperation) and a.operator == TriccOperator.ISNOTTRUE:
         new_operator = TriccOperator.ISTRUE
     elif isinstance(a, TriccOperation) and a.operator == TriccOperator.ISFALSE:
-        new_operator = TriccOperator.ISNOTFALSE
+        new_operator = TriccOperator.ISTRUE
     elif isinstance(a, TriccOperation) and a.operator == TriccOperator.ISNOTFALSE:
         new_operator = TriccOperator.ISFALSE
     elif isinstance(a, TriccOperation) and a.operator == TriccOperator.ISNULL:
@@ -849,6 +849,27 @@ def restore_istrue_wrappers(operation, istrue_refs):
     return _restore_istrue(operation)
 
 
+def contains_istrue_operation(operation):
+    """Check if an operation contains any istrue operations (recursively)"""
+    if not isinstance(operation, TriccOperation):
+        return False
+
+    if operation.operator == TriccOperator.ISTRUE:
+        return True
+
+    # Check recursively in all references
+    for ref in operation.reference:
+        if isinstance(ref, TriccOperation):
+            if contains_istrue_operation(ref):
+                return True
+        elif isinstance(ref, list):
+            for item in ref:
+                if isinstance(item, TriccOperation) and contains_istrue_operation(item):
+                    return True
+
+    return False
+
+
 def simplify_with_sympy(operation):
     """
     Simplify a TriccOperation using SymPy boolean and algebraic operations.
@@ -856,6 +877,9 @@ def simplify_with_sympy(operation):
     This enhanced version preserves istrue semantic information by tracking which
     references were originally wrapped in istrue operations and restoring them
     after simplification.
+
+    For expressions containing istrue operations, simplification is skipped entirely
+    to preserve the original structure.
 
     Args:
         operation: TriccOperation to simplify
@@ -865,6 +889,11 @@ def simplify_with_sympy(operation):
     """
     # Step 1: Check if operation contains operations that can be simplified
     if not isinstance(operation, TriccOperation):
+        return operation
+
+    # Step 2: If operation contains istrue, skip simplification to preserve structure
+    if contains_istrue_operation(operation):
+        logger.debug(f"Skipping SymPy simplification for operation containing istrue: {operation}")
         return operation
 
     try:
@@ -1093,13 +1122,11 @@ def simplify_with_sympy(operation):
             # Direct symbol lookup
             if expr in ref_map:
                 original_ref = ref_map[expr]
-                # If this symbol represents a reference that was used in a boolean operation,
+                # If this symbol represents a reference that was originally wrapped in istrue,
                 # reconstruct it as istrue(reference)
                 if isinstance(original_ref, TriccReference):
-                    # Check if this reference was used in boolean operations by looking at reverse_map
                     ref_key = get_structural_key(original_ref)
-                    if ref_key in reverse_map and reverse_map[ref_key] == expr:
-                        # This is a boolean symbol representing a reference
+                    if ref_key in istrue_refs:  # Check if this reference was originally istrue-wrapped
                         return TriccOperation(TriccOperator.ISTRUE, [original_ref])
                 return original_ref
             else:

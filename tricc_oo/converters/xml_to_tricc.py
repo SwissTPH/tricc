@@ -227,8 +227,8 @@ def create_activity(diagram, media_path, project):
                 exit(1)
 
     else:
-        return None, None
         logger.warning("root not found for page {0}".format(name))
+        return None, None     
 
 
 def manage_dangling_calculate(activity):

@@ -54,3 +54,9 @@ urllib3==2.2.2
 virtualenv==20.26.3
 XlsxWriter==3.2.0
 zipp==3.19.2
+
+# Google API libraries for Drive authentication
+google-api-python-client==2.137.0
+google-auth==2.34.0
+google-auth-oauthlib==1.2.1
+google-auth-httplib2==0.2.0
