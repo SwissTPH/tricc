@@ -484,6 +484,8 @@ def set_additional_attributes(attribute_names, elm, node):
                 attribute = [attribute]
             elif attributename in ["priority", "instance"]:
                 attribute = int(attribute)
+            elif attributename == "relevance":
+                attribute = remove_html(attribute.strip())
             else:
                 attribute
             setattr(node, attributename, attribute)
@@ -765,7 +767,7 @@ def parse_expression(label=None, expression=None):
     if expression:
         ref_pattern = r"(\$\{[^\}]+\})"
         # only if simple ref
-        if not re.search(ref_pattern, expression):
+        if not isinstance(expression, str) or not re.search(ref_pattern, expression):
             operation = transform_cql_to_operation(expression, label)
             if isinstance(operation, TriccReference):
                 if label:
@@ -1004,7 +1006,7 @@ def process_factor_edge(edge, nodes):
 
 def process_condition_edge(edge, label, nodes):
     source = nodes[edge.source]
-    node_ref = source
+    node_ref = f'"{source.name}"'
     if "$this" in label:
         operation = parse_expression("", expression=label.replace("$this", node_ref))
     else:

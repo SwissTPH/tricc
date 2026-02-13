@@ -41,6 +41,20 @@ langs = SingletonLangClass()
 TRICC_CALC_EXPRESSION = "${{{0}}}>0"
 
 
+def extract_help_title(help_message):
+    """
+    Extract title from help message if it starts with [title].
+    Returns (title, stripped_help_message) or (None, help_message)
+    """
+    if help_message and isinstance(help_message, str) and help_message.startswith('['):
+        end = help_message.find(']')
+        if end != -1:
+            title = help_message[1:end]
+            stripped_help = help_message[end+1:].strip()
+            return title, stripped_help
+    return None, help_message
+
+
 def get_export_group_name(in_node): return f"gcalc_{get_export_name(in_node)}"
 
 def get_export_group_required(in_node): return in_node.relevance  and in_node.relevance != TriccStatic(True)
@@ -467,7 +481,9 @@ def get_more_info_message(strategy, base_name, message):
     return values
 
 
-def get_more_info_choice(strategy):
+def get_more_info_choice(strategy, title=None):
+    if title is None:
+        title = "More information"
     values = []
     for column in CHOICE_MAP:
         if column == "list_name":
@@ -478,17 +494,18 @@ def get_more_info_choice(strategy):
             arr = column.split("::")
             column = arr[0]
             trad = arr[1] if len(arr) == 2 else None
-            values.append(langs.get_trads("More information", trad=trad))
+            values.append(langs.get_trads(title, trad=trad))
         else:
             values.append(get_xfrom_trad(strategy, None, column, CHOICE_MAP, True))
     return values
 
 
 def inject_more_info(strategy, base_name, relevance, message, df_survey, df_choice):
+    title, stripped_message = extract_help_title(message)
     df_survey.loc[len(df_survey)] = get_more_info_select(strategy, base_name, relevance)
-    df_survey.loc[len(df_survey)] = get_more_info_message(strategy, base_name, message)
+    df_survey.loc[len(df_survey)] = get_more_info_message(strategy, base_name, stripped_message)
     if len(df_choice[(df_choice["list_name"] == "more_info")]) == 0:
-        df_choice.loc[len(df_choice)] = get_more_info_choice(strategy)
+        df_choice.loc[len(df_choice)] = get_more_info_choice(strategy, title)
 
 
 def generate_xls_form_export(

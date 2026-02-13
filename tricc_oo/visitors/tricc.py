@@ -262,7 +262,7 @@ def load_calculate(
             generate_calculates(node, calculates, used_calculates, processed_nodes=processed_nodes, process=process)
 
             # if has prev, create condition
-            if hasattr(node, "relevance") and (node.relevance is None or isinstance(node.relevance, TriccOperation)):
+            if hasattr(node, "relevance") and (node.relevance is None or not isinstance(node.relevance, TriccOperation)):
                 node.relevance = get_node_expressions(node, processed_nodes=processed_nodes, process=process)
                 # manage not Available
                 if isinstance(node, TriccNodeSelectNotAvailable):

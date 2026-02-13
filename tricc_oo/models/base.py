@@ -307,6 +307,12 @@ class TriccStatic(BaseModel):
     def __str__(self):
         return str(self.value)
 
+    def __copy__(self, **argv):
+        return super().__copy__()
+
+    def copy(self, **argv):
+        return self.__copy__()
+
     def __repr__(self):
         return self.__class__.__name__ + ":" + str(type(self.value)) + ":" + str(self.value)
 
