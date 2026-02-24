@@ -623,11 +623,11 @@ def not_clean(a):
     elif isinstance(a, TriccStatic) and a == TriccStatic(True):
         return TriccStatic(False)
     elif isinstance(a, TriccOperation) and a.operator == TriccOperator.ISTRUE:
-        new_operator = TriccOperator.ISFALSE
+        new_operator = TriccOperator.ISNOTTRUE
     elif isinstance(a, TriccOperation) and a.operator == TriccOperator.ISNOTTRUE:
         new_operator = TriccOperator.ISTRUE
     elif isinstance(a, TriccOperation) and a.operator == TriccOperator.ISFALSE:
-        new_operator = TriccOperator.ISTRUE
+        new_operator = TriccOperator.ISNOTFALSE
     elif isinstance(a, TriccOperation) and a.operator == TriccOperator.ISNOTFALSE:
         new_operator = TriccOperator.ISFALSE
     elif isinstance(a, TriccOperation) and a.operator == TriccOperator.ISNULL:

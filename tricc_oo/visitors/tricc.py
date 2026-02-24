@@ -314,7 +314,7 @@ def load_calculate(
 
                 if version_relevance:
                     if getattr(node, "relevance", None):
-                        node.relevance = and_join([version_relevance, node.relevance])
+                        node.relevance = and_join([not_clean(version_relevance), node.relevance])
 
                     elif hasattr(node, "relevance"):
                         node.relevance = version_relevance
