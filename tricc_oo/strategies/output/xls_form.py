@@ -13,20 +13,23 @@ from pyxform import create_survey_from_xls
 from tricc_oo.converters.utils import clean_name
 from tricc_oo.models.base import (
     TriccOperator,
-    TriccOperation, TriccStatic, TriccReference
+    TriccOperation, TriccStatic, TriccReference,
+    simplify_with_sympy
 )
 from tricc_oo.models.ordered_set import OrderedSet
 from tricc_oo.models.calculate import (
     TriccNodeEnd,
     TriccNodeDisplayCalculateBase,
-
+    TriccNodeActivityStart,
 )
 from tricc_oo.models.tricc import (
     TriccNodeCalculateBase,
     TriccNodeBaseModel,
     TriccNodeSelectOption,
+    TriccNodeSelect,
     TriccNodeInputModel,
     TriccNodeDisplayModel,
+    TriccNodeMainStart,
     TRICC_FALSE_VALUE,
     TRICC_TRUE_VALUE,
 )
@@ -49,6 +52,8 @@ from tricc_oo.serializers.xls_form import (
     SURVEY_MAP,
     end_group,
     generate_xls_form_export,
+    get_export_group_name,
+    get_export_group_required,
     start_group,
 )
 from tricc_oo.strategies.output.base_output_strategy import BaseOutPutStrategy
@@ -87,6 +92,8 @@ OPERATOR_COALESCE_FALLBACK = {
     TriccOperator.MORE_OR_EQUAL: -2147483648,
     TriccOperator.LESS: 2147483647,
     TriccOperator.LESS_OR_EQUAL: 2147483647,
+    TriccOperator.CONTAINS: "''",
+    TriccOperator.SELECTED: "''",
 }
 
 
@@ -373,13 +380,18 @@ class XLSFormStrategy(BaseOutPutStrategy):
         return processed_nodes
 
     def get_tricc_operation_expression(self, operation):
+        # Apply SymPy boolean simplification for boolean operations
+        # operation = simplify_with_sympy(operation)
+        
         ref_expressions = []
+        original_references = []
         if not hasattr(operation, "reference"):
             return self.get_tricc_operation_operand(operation)
 
         operator = getattr(operation, "operator", "")
         coalesce_fallback = OPERATOR_COALESCE_FALLBACK[operator] if operator in OPERATOR_COALESCE_FALLBACK else "''"
         for r in operation.reference:
+            original_references.append(r)
             if isinstance(r, list):
                 r_expr = [
                     (
@@ -400,43 +412,43 @@ class XLSFormStrategy(BaseOutPutStrategy):
         # build lower level
         if hasattr(self, f"tricc_operation_{operation.operator}"):
             callable = getattr(self, f"tricc_operation_{operation.operator}")
-            return callable(ref_expressions)
+            return callable(ref_expressions, original_references)
         else:
             raise NotImplementedError(
                 f"This type of opreation '{operation.operator}' is not supported in this strategy"
             )
 
-    def tricc_operation_count(self, ref_expressions):
+    def tricc_operation_count(self, ref_expressions, original_references=None):
         return f"count-selected({self.clean_coalesce(ref_expressions[0])})"
 
-    def tricc_operation_multiplied(self, ref_expressions):
+    def tricc_operation_multiplied(self, ref_expressions, original_references=None):
         return "*".join(map(str, ref_expressions))
 
-    def tricc_operation_divided(self, ref_expressions):
+    def tricc_operation_divided(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]} div {ref_expressions[1]}"
 
-    def tricc_operation_modulo(self, ref_expressions):
+    def tricc_operation_modulo(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]} mod {ref_expressions[1]}"
 
-    def tricc_operation_coalesce(self, ref_expressions):
+    def tricc_operation_coalesce(self, ref_expressions, original_references=None):
         return f"coalesce({','.join(map(self.clean_coalesce, ref_expressions))})"
 
-    def tricc_operation_module(self, ref_expressions):
+    def tricc_operation_module(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]} mod {ref_expressions[1]}"
 
-    def tricc_operation_minus(self, ref_expressions):
+    def tricc_operation_minus(self, ref_expressions, original_references=None):
         if len(ref_expressions) > 1:
             return " - ".join(map(str, ref_expressions))
         elif len(ref_expressions) == 1:
             return f"-{ref_expressions[0]}"
 
-    def tricc_operation_plus(self, ref_expressions):
+    def tricc_operation_plus(self, ref_expressions, original_references=None):
         return " + ".join(map(str, ref_expressions))
 
-    def tricc_operation_not(self, ref_expressions):
+    def tricc_operation_not(self, ref_expressions, original_references=None):
         return f"not({ref_expressions[0]})"
 
-    def tricc_operation_and(self, ref_expressions):
+    def tricc_operation_and(self, ref_expressions, original_references=None):
         if len(ref_expressions) == 1:
             return ref_expressions[0]
         if len(ref_expressions) > 1:
@@ -448,7 +460,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
         else:
             return "1"
 
-    def tricc_operation_or(self, ref_expressions):
+    def tricc_operation_or(self, ref_expressions, original_references=None):
         if len(ref_expressions) == 1:
             return ref_expressions[0]
         if len(ref_expressions) > 1:
@@ -460,7 +472,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
         else:
             return "1"
 
-    def tricc_operation_native(self, ref_expressions):
+    def tricc_operation_native(self, ref_expressions, original_references=None):
 
         if len(ref_expressions) > 0:
             if ref_expressions[0].startswith(("'", "`",)):
@@ -477,22 +489,22 @@ class XLSFormStrategy(BaseOutPutStrategy):
             else:
                 return f"{ref_expressions[0]}({','.join(map(str, ref_expressions[1:]))})"
 
-    def tricc_operation_istrue(self, ref_expressions):
+    def tricc_operation_istrue(self, ref_expressions, original_references=None):
         if str(BOOLEAN_MAP[str(TRICC_TRUE_VALUE)]).isnumeric():
             return f"{ref_expressions[0]}>={BOOLEAN_MAP[str(TRICC_TRUE_VALUE)]}"
         else:
             return f"{ref_expressions[0]}={BOOLEAN_MAP[str(TRICC_TRUE_VALUE)]}"
 
-    def tricc_operation_isfalse(self, ref_expressions):
+    def tricc_operation_isfalse(self, ref_expressions, original_references=None):
         if str(BOOLEAN_MAP[str(TRICC_FALSE_VALUE)]).isnumeric():
             return f"{ref_expressions[0]}={BOOLEAN_MAP[str(TRICC_FALSE_VALUE)]}"
         else:
             return f"{ref_expressions[0]}={BOOLEAN_MAP[str(TRICC_FALSE_VALUE)]}"
 
-    def tricc_operation_parenthesis(self, ref_expressions):
+    def tricc_operation_parenthesis(self, ref_expressions, original_references=None):
         return f"({ref_expressions[0]})"
 
-    def tricc_operation_selected(self, ref_expressions):
+    def tricc_operation_selected(self, ref_expressions, original_references=None):
         parts = []
         for s in ref_expressions[1:]:
             # for option with numeric value
@@ -508,49 +520,49 @@ class XLSFormStrategy(BaseOutPutStrategy):
         else:
             return self.tricc_operation_or(parts)
 
-    def tricc_operation_more_or_equal(self, ref_expressions):
+    def tricc_operation_more_or_equal(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]}>={ref_expressions[1]}"
 
-    def tricc_operation_less_or_equal(self, ref_expressions):
+    def tricc_operation_less_or_equal(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]}<={ref_expressions[1]}"
 
-    def tricc_operation_more(self, ref_expressions):
+    def tricc_operation_more(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]}>{ref_expressions[1]}"
 
-    def tricc_operation_less(self, ref_expressions):
+    def tricc_operation_less(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]}<{ref_expressions[1]}"
 
-    def tricc_operation_between(self, ref_expressions):
+    def tricc_operation_between(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]}>={ref_expressions[1]} and {ref_expressions[0]} < {ref_expressions[2]}"
 
-    def tricc_operation_equal(self, ref_expressions):
+    def tricc_operation_equal(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]}={ref_expressions[1]}"
 
-    def tricc_operation_not_equal(self, ref_expressions):
+    def tricc_operation_not_equal(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]}!={ref_expressions[1]}"
 
-    def tricc_operation_isnull(self, ref_expressions):
+    def tricc_operation_isnull(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]}=''"
 
-    def tricc_operation_isnotnull(self, ref_expressions):
+    def tricc_operation_isnotnull(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]}!=''"
 
-    def tricc_operation_isnottrue(self, ref_expressions):
+    def tricc_operation_isnottrue(self, ref_expressions, original_references=None):
         if str(BOOLEAN_MAP[str(TRICC_TRUE_VALUE)]).isnumeric():
             return f"{ref_expressions[0]}<{BOOLEAN_MAP[str(TRICC_TRUE_VALUE)]}"
         else:
             return f"{ref_expressions[0]}!={BOOLEAN_MAP[str(TRICC_TRUE_VALUE)]}"
 
-    def tricc_operation_isnotfalse(self, ref_expressions):
+    def tricc_operation_isnotfalse(self, ref_expressions, original_references=None):
         if str(BOOLEAN_MAP[str(TRICC_FALSE_VALUE)]).isnumeric():
             return f"{ref_expressions[0]}>{BOOLEAN_MAP[str(TRICC_FALSE_VALUE)]}"
         else:
             return f"{ref_expressions[0]}!={BOOLEAN_MAP[str(TRICC_FALSE_VALUE)]}"
 
-    def tricc_operation_notexist(self, ref_expressions):
+    def tricc_operation_notexist(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]}=''"
 
-    def tricc_operation_case(self, ref_expressions):
+    def tricc_operation_case(self, ref_expressions, original_references=None):
         ifs = 0
         parts = []
         else_found = False
@@ -573,7 +585,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
             exp += ")"
         return exp
 
-    def tricc_operation_ifs(self, ref_expressions):
+    def tricc_operation_ifs(self, ref_expressions, original_references=None):
         ifs = 0
         parts = []
         else_found = False
@@ -598,19 +610,19 @@ class XLSFormStrategy(BaseOutPutStrategy):
     def get_empty_label(self):
         return "."
 
-    def tricc_operation_if(self, ref_expressions):
+    def tricc_operation_if(self, ref_expressions, original_references=None):
         return f"if({ref_expressions[0]},{ref_expressions[1]},{ref_expressions[2]})"
 
-    def tricc_operation_contains(self, ref_expressions):
+    def tricc_operation_contains(self, ref_expressions, original_references=None):
         return f"contains({self.clean_coalesce(ref_expressions[0])}, {self.clean_coalesce(ref_expressions[1])})"
 
-    def tricc_operation_exists(self, ref_expressions):
+    def tricc_operation_exists(self, ref_expressions, original_references=None):
         parts = []
         for ref in ref_expressions:
             parts.append(self.tricc_operation_not_equal([self.tricc_operation_coalesce([ref, "''"]), "''"]))
         return self.tricc_operation_and(parts)
 
-    def tricc_operation_cast_number(self, ref_expressions):
+    def tricc_operation_cast_number(self, ref_expressions, original_references=None):
         if isinstance(
             ref_expressions[0],
             (
@@ -637,7 +649,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
         else:
             return f"number({ref_expressions[0]})"
 
-    def tricc_operation_cast_integer(self, ref_expressions):
+    def tricc_operation_cast_integer(self, ref_expressions, original_references=None):
         if isinstance(
             ref_expressions[0],
             (
@@ -664,18 +676,18 @@ class XLSFormStrategy(BaseOutPutStrategy):
         else:
             return f"int({ref_expressions[0]})"
 
-    def tricc_operation_zscore(self, ref_expressions):
+    def tricc_operation_zscore(self, ref_expressions, original_references=None):
         y, ll, m, s = self.get_zscore_params(ref_expressions)
         #  return ((Math.pow((y / m), l) - 1) / (s * l));
         return f"(pow({y} div ({m}), {ll}) -1) div (({s}) div ({ll}))"
 
-    def tricc_operation_datetime_to_decimal(self, ref_expressions):
+    def tricc_operation_datetime_to_decimal(self, ref_expressions, original_references=None):
         return f"decimal-date-time({ref_expressions[0]})"
 
-    def tricc_operation_round(self, ref_expressions):
+    def tricc_operation_round(self, ref_expressions, original_references=None):
         return f"round({ref_expressions[0]})"
 
-    def tricc_operation_izscore(self, ref_expressions):
+    def tricc_operation_izscore(self, ref_expressions, original_references=None):
         z, ll, m, s = self.get_zscore_params(ref_expressions)
         #  return  (m * (z*s*l-1)^(1/l));
         return f"pow({m} * ({z} * {s} * {ll} -1), 1 div {ll})"
@@ -689,41 +701,6 @@ class XLSFormStrategy(BaseOutPutStrategy):
         m = f"number(instance({table})/root/item[sex={sex} and x_max>" + x + " and x_min<=" + x + "]/m)"
         s = f"number(instance({table})/root/item[sex={sex} and x_max>" + x + " and x_min<=" + x + "]/s)"
         return yz, ll, m, s
-
-    # function update the calcualte in the XLSFORM format
-    # @param left part
-    # @param right part
-    def generate_xls_form_calculate(self, node, processed_nodes, stashed_nodes, calculates, **kwargs):
-        if is_ready_to_process(node, processed_nodes, strict=False) and process_reference(
-            node,
-            processed_nodes,
-            calculates,
-            replace_reference=False,
-            codesystems=kwargs.get("codesystems", None),
-        ):
-            if node not in processed_nodes:
-                if kwargs.get("warn", True):
-                    logger.debug("generation of calculate for node {}".format(node.get_name()))
-                if (
-                    hasattr(node, "expression")
-                    and (node.expression is None)
-                    and issubclass(node.__class__, TriccNodeCalculateBase)
-                ):
-                    node.expression = get_node_expressions(
-                        node, processed_nodes, process=kwargs.get("process", "main ")
-                    )
-                    # continue walk
-                if issubclass(
-                    node.__class__,
-                    (
-                        TriccNodeDisplayModel,
-                        TriccNodeDisplayCalculateBase,
-                        TriccNodeEnd,
-                    ),
-                ):
-                    set_last_version_false(node, processed_nodes)
-                return True
-        return False
 
     def get_tricc_operation_operand(self, r, coalesce_fallback="''"):
         # function transform an object to XLSFORM value
@@ -739,15 +716,53 @@ class XLSFormStrategy(BaseOutPutStrategy):
         elif isinstance(r, TriccNodeSelectOption):
             logger.debug(f"select option {r.get_name()} from {r.select.get_name()} was used as a reference")
             return get_export_name(r)
-        elif issubclass(r.__class__, TriccNodeInputModel):
+        elif isinstance(r, TriccNodeActivityStart):
+            if get_export_group_required(r.activity):
+                return f"${{{get_export_group_name(r.activity)}}}"
+            else:
+                return f"({self.get_tricc_operation_expression(r.relevance)})"
+        elif isinstance(r, TriccNodeMainStart):
+            return "1"
+        elif issubclass(r.__class__, (TriccNodeInputModel, TriccNodeSelect)):
             return f"coalesce(${{{get_export_name(r)}}},{coalesce_fallback})"
         elif issubclass(r.__class__, TriccNodeBaseModel):
             return f"${{{get_export_name(r)}}}"
         else:
             raise NotImplementedError(f"This type of node {r.__class__} is not supported within an operation")
 
-    def tricc_operation_concatenate(self, ref_expressions):
+    def tricc_operation_concatenate(self, ref_expressions, original_references=None):
         return f"concat({','.join(map(str, ref_expressions))})"
+
+    def tricc_operation_diagnosis_list(self, ref_expressions, original_references=None):
+        from tricc_oo.converters.datadictionnary import lookup_codesystems_code
+       
+        parts = []
+        for i, orig_ref in enumerate(original_references):
+            expr = ref_expressions[i] if ref_expressions and i < len(ref_expressions) else None
+
+            code = None
+            # Use only original references for code lookup
+            if isinstance(orig_ref, TriccReference):
+                code = orig_ref.value
+            elif issubclass(type(orig_ref), TriccNodeBaseModel):
+                code = orig_ref.name
+            else:
+                logger.critical(f"Unexpected reference type: {type(orig_ref)}, value: {orig_ref}")
+                exit(1)
+
+            concept = lookup_codesystems_code(self.project.code_systems, code)
+            if concept:
+                display = getattr(concept, 'display', code)
+            else:
+                logger.warning(f"Diagnosis code '{code}' not found in codesystems")
+                display = code
+
+            # Always include comma after diagnosis name
+            parts.append(f"if({expr} = 1, '{display},', '')")
+
+        if parts:
+            return f"concat({','.join(parts)})"
+        return "''"
 
     def validate(self):
         """Validate the generated XLS form using pyxform."""

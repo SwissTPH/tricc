@@ -285,6 +285,7 @@ class DrawioStrategy(BaseInputStrategy):
             else:
                 # all good, only one target node found
                 linked_target_node = link_in_list[0]
+
                 # steal the edges
                 replace_node(node, linked_target_node, page)
 

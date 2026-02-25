@@ -56,6 +56,9 @@ from tricc_oo.converters.tricc_to_xls_form import get_list_names, get_export_nam
 logger = logging.getLogger("default")
 ONE_QUESTION_AT_A_TIME = False
 
+# Track the last group that was reordered to avoid unnecessary reordering
+_last_reordered_group = None
+
 
 def merge_node(from_node, to_node):
     if from_node.activity != to_node.activity:
@@ -123,7 +126,7 @@ def get_last_version(name, processed_nodes, _list=None):
 def get_node_expressions(node, processed_nodes, process=None):
     get_overall_exp = issubclass(
         node.__class__,
-        (TriccNodeDisplayCalculateBase, TriccNodeProposedDiagnosis, TriccNodeDiagnosis)
+        (TriccNodeDisplayCalculateBase, TriccNodeProposedDiagnosis, TriccNodeDiagnosis, TriccNodeActivity)
     ) and not isinstance(node, (TriccNodeDisplayBridge))
     expression = None
     # in case of recursive call processed_nodes will be None
@@ -155,19 +158,25 @@ def set_last_version_false(node, processed_nodes):
     return last_version
 
 
-def get_version_inheritance(node, last_version, processed_nodes):
-    # FIXME this is for XLS form where only calculate are evaluated
-    # for a activity that is not triggered
+def get_version_inheritance(node, all_prev_versions, processed_nodes):
+
+    # Updated to merge ALL previous versions, not just the last one
+    # This ensures inheritance works even when intermediate activities weren't triggered
+    
     if not issubclass(node.__class__, (TriccNodeInputModel)):
         node.last = True
         if issubclass(node.__class__, (TriccNodeDisplayCalculateBase, TriccNodeEnd)) and node.name is not None:
             # logger.debug("set last to false for node {}
             # and add its link it to next one".format(last_used_calc.get_name()))
             if node.prev_nodes:
-                set_prev_next_node(last_version, node)
+                # Set prev_next_node only with the immediate last version
+                for pv in  all_prev_versions:
+                    set_prev_next_node(pv, node)
             else:
                 expression = node.expression or node.expression_reference or getattr(node, "relevance", None)
-                expression = merge_expression(expression, last_version)
+                # Merge with ALL previous versions, not just the last one
+                if all_prev_versions:
+                    expression = merge_expressions(expression, *all_prev_versions)
                 if node.expression:
                     node.expression = expression
                 elif node.expression_reference:
@@ -177,17 +186,21 @@ def get_version_inheritance(node, last_version, processed_nodes):
     else:
         node.last = False
 
-        # Create a calculate node that coalesces the previous saved value with the current node value
+        # Create a calculate node that coalesces all previous saved values with the current node value
         calc_id = generate_id(f"save_{node.save}")
+        
+        # Build reference list with current node and all previous versions
+        reference_list = [node] + all_prev_versions if all_prev_versions else []
+        
         calc = TriccNodeCalculate(
             id=calc_id,
             name=node.save,
             path_len=node.path_len + 1,
             expression_reference=TriccOperation(
                 TriccOperator.COALESCE,
-                [TriccReference(node.save), last_version],
+                reference_list,
             ),
-            reference=[TriccReference(node.name)],
+            reference=reference_list,
             activity=node.activity,
             group=node.group,
             label=f"Save calculation for {node.label}",
@@ -198,18 +211,19 @@ def get_version_inheritance(node, last_version, processed_nodes):
         # set_last_version_false(calc, processed_nodes)
         processed_nodes.add(calc)
         if issubclass(node.__class__, TriccNodeInputModel):
-            node.expression = TriccOperation(TriccOperator.COALESCE, ["$this", last_version])
+            # Coalesce with all previous versions
+            coalesce_operands = ["$this"] + (all_prev_versions if all_prev_versions else [])
+            node.expression = TriccOperation(TriccOperator.COALESCE, coalesce_operands)
 
 
-def merge_expression(expression, last_version):
+def merge_expressions(expression, last_version, *argv):
     datatype = expression.get_datatype()
     if datatype == "boolean":
-        expression = or_join([TriccOperation(TriccOperator.ISTRUE, [last_version]), expression])
-
+        expression = or_join([expression] + [TriccOperation(TriccOperator.ISTRUE, [n]) for n in [last_version, *argv]])
     elif datatype == "number":
-        expression = TriccOperation(TriccOperator.PLUS, [last_version, expression])
+        expression = TriccOperation(TriccOperator.PLUS, [last_version, *argv, expression])
     else:
-        expression = TriccOperation(TriccOperator.COALESCE, [last_version, expression])
+        expression = TriccOperation(TriccOperator.COALESCE, [expression, last_version, *argv])
     return expression
 
 
@@ -235,14 +249,20 @@ def load_calculate(
                 logger.debug("Processing relevance for node {0}".format(node.get_name()))
             # tricc diagnostic have the same name as proposed diag but will be serialised with different names
 
-            last_version = set_last_version_false(node, processed_nodes)
-            if last_version:
-                last_version = get_version_inheritance(node, last_version, processed_nodes)
+            set_last_version_false(node, processed_nodes)
+            # Get all previous versions from processed_nodes, not just the last one
+            node_name = node.name if not isinstance(node, TriccNodeEnd) else node.get_reference()
+            all_prev_versions = get_versions(node_name, processed_nodes)
+            # Exclude the current node itself
+            all_prev_versions = [v for v in all_prev_versions if v != node]
+
+            if all_prev_versions:
+                get_version_inheritance(node, all_prev_versions, processed_nodes)
 
             generate_calculates(node, calculates, used_calculates, processed_nodes=processed_nodes, process=process)
 
             # if has prev, create condition
-            if hasattr(node, "relevance") and (node.relevance is None or isinstance(node.relevance, TriccOperation)):
+            if hasattr(node, "relevance") and (node.relevance is None or not isinstance(node.relevance, TriccOperation)):
                 node.relevance = get_node_expressions(node, processed_nodes=processed_nodes, process=process)
                 # manage not Available
                 if isinstance(node, TriccNodeSelectNotAvailable):
@@ -268,16 +288,27 @@ def load_calculate(
                     for r in relevance_reference:
                         if issubclass(r.__class__, (TriccNodeDisplayCalculateBase)):
                             add_used_calculate(node, r, calculates, used_calculates, processed_nodes)
-
-            if last_version and hasattr(node, "relevance"):
-                if isinstance(node, TriccNodeInputModel):
-                    version_relevance = TriccOperation(TriccOperator.ISNULL, [last_version])
-                elif last_version.relevance:
-                    version_relevance = not_clean(last_version.relevance)
-                elif last_version.activity.relevance:
-                    version_relevance = not_clean(
-                        last_version.activity.relevance,
+            # add skip logic for display node ()
+            if all_prev_versions and hasattr(node, "relevance"):
+                # search for same node in completly differnt activity
+                last_expressions_other_activity = [
+                    not_clean(and_join([has_node_data_operation(l),TriccOperation(TriccOperator.ISTRUE,[l.activity.root])])) for l in  all_prev_versions if (
+                        node.is_sequence_defined and
+                        node.activity.base_instance != l.activity.base_instance
                     )
+                ]
+                # search for same some in the same activity (might require a warning)
+                last_expression_same_activity = [
+                    has_node_data_operation(l) for l in  all_prev_versions if (
+                        node.is_sequence_defined and
+                        node.activity == l.activity
+                    )
+                ]
+
+                # we don't care about the same some in other activity isntance because this is managed on activity level
+                last_version_relevance = [*last_expressions_other_activity, *last_expression_same_activity]
+                if last_version_relevance:
+                    version_relevance = or_join(last_version_relevance)
                 else:
                     version_relevance = None
 
@@ -316,6 +347,9 @@ def load_calculate(
     return False
 
 
+def has_node_data_operation(node):
+    return TriccOperation(TriccOperator.ISTRUE if node.get_datatype() == 'boolean' else TriccOperator.ISNOTNULL, [node])
+
 def get_max_named_version(calculates, name):
     max = 0
     if name in calculates:
@@ -337,9 +371,7 @@ def get_count_node(node):
         path_len=node.path_len,
     )
 
-
 # Function that inject a wait after path that will wait for the nodes
-
 
 def get_activity_wait(prev_nodes, nodes_to_wait, next_nodes, replaced_node=None, edge_only=False, activity=None):
 
@@ -405,6 +437,11 @@ def get_bridge_path(prev_nodes, node=None, edge_only=False):
         calc = TriccNodeDisplayBridge(**data)
     else:
         calc = TriccNodeBridge(**data)
+    if node:
+        priority = getattr(node, 'priority', None)
+        if priority:
+            calc.priority = priority
+    
     return calc
 
 
@@ -532,7 +569,7 @@ def generate_calculates(node, calculates, used_calculates, processed_nodes, proc
             node.activity.calculates.append(calc_node)
             last_version = set_last_version_false(calc_node, processed_nodes)
             if last_version:
-                calc_node.expression = merge_expression(calc_node.expression, last_version)
+                calc_node.expression = merge_expressions(calc_node.expression, last_version)
             processed_nodes.add(calc_node)
             logger.debug(
                 "generate_save_calculate:{}:{} as {}".format(
@@ -565,7 +602,7 @@ def generate_calculates(node, calculates, used_calculates, processed_nodes, proc
                 node.activity.calculates.append(calc_node)
                 last_version = set_last_version_false(calc_node, processed_nodes)
                 if last_version:
-                    calc_node.expression = merge_expression(calc_node.expression, last_version)
+                    calc_node.expression = merge_expressions(calc_node.expression, last_version)
                 processed_nodes.add(calc_node)
                 list_calc.append(calc_node)
                 node.activity.nodes[calc_node.id] = calc_node
@@ -805,7 +842,7 @@ def process_operation_reference(
     operation,
     node,
     processed_nodes,
-    calculates,
+    calculates=None,
     used_calculates=None,
     replace_reference=False,
     warn=False,
@@ -968,6 +1005,7 @@ def walktrhough_tricc_node_processed_stached(
     warn=False,
     node_path=[],
     process=None,
+    loop_count=0,
     **kwargs,
 ):
     ended_activity = False
@@ -1133,7 +1171,10 @@ def walktrhough_tricc_node_processed_stached(
                     if nn not in stashed_nodes:
                         stashed_nodes.insert_at_top(nn)
         if not recursive:
-            reorder_node_list(stashed_nodes, node.group, processed_nodes)
+            global _last_reordered_group
+            if _last_reordered_group != node.group:
+                reorder_node_list(stashed_nodes, node.group, processed_nodes)
+                _last_reordered_group = node.group
 
     else:
         if prev_process and process and prev_process != process[0]:
@@ -1280,7 +1321,7 @@ def stashed_node_func(node, callback, recursive=False, **kwargs):
 
 
 # check if the all the prev nodes are processed
-def is_ready_to_process(in_node, processed_nodes, strict=True, local=False):
+def is_ready_to_process(in_node, processed_nodes, strict=True, local=False, loop_count=0):
     if isinstance(in_node, TriccNodeSelectOption):
         node = in_node.select
     elif isinstance(in_node, (TriccNodeActivityStart, TriccNodeMainStart)):
@@ -1291,36 +1332,38 @@ def is_ready_to_process(in_node, processed_nodes, strict=True, local=False):
     if hasattr(node, "prev_nodes"):
         # ensure the  previous node of the select are processed, not the option prev nodes
         for prev_node in node.prev_nodes:
-            if is_prev_processed(prev_node, node, processed_nodes, local) is False:
+            if is_prev_processed(prev_node, node, processed_nodes, local, loop_count) is False:
                 return False
     return True
 
 
-def is_prev_processed(prev_node, node, processed_nodes, local):
+def is_prev_processed(prev_node, node, processed_nodes, local, loop_count=0):
     if hasattr(prev_node, "select"):
-        return is_prev_processed(prev_node.select, node, processed_nodes, local)
+        return is_prev_processed(prev_node.select, node, processed_nodes, local, loop_count)
     if prev_node not in processed_nodes and (not local):
-        if isinstance(prev_node, TriccNodeExclusive):
-            iterator = iter(prev_node.prev_nodes)
-            p_n_node = next(iterator)
+        # Only log detailed failures when we suspect dependency loops (loop_count > 5)
+        if loop_count > 5:
+            if isinstance(prev_node, TriccNodeExclusive):
+                iterator = iter(prev_node.prev_nodes)
+                p_n_node = next(iterator)
+                logger.debug(
+                    "is_ready_to_process:failed:via_excl: {} - {} > {} {}:{}".format(
+                        get_data_for_log(p_n_node), prev_node.get_name(), node.__class__, node.get_name(), node.instance
+                    )
+                )
+
+            else:
+                logger.debug(
+                    "is_ready_to_process:failed: {} -> {} {}:{}".format(
+                        get_data_for_log(prev_node), node.__class__, node.get_name(), node.instance
+                    )
+                )
+
             logger.debug(
-                "is_ready_to_process:failed:via_excl: {} - {} > {} {}:{}".format(
-                    get_data_for_log(p_n_node), prev_node.get_name(), node.__class__, node.get_name(), node.instance
+                "prev node node {}:{} for node {} not in processed".format(
+                    prev_node.__class__, prev_node.get_name(), node.get_name()
                 )
             )
-
-        else:
-            logger.debug(
-                "is_ready_to_process:failed: {} -> {} {}:{}".format(
-                    get_data_for_log(prev_node), node.__class__, node.get_name(), node.instance
-                )
-            )
-
-        logger.debug(
-            "prev node node {}:{} for node {} not in processed".format(
-                prev_node.__class__, prev_node.get_name(), node.get_name()
-            )
-        )
         return False
     return True
 
@@ -1735,29 +1778,36 @@ def replace_next_node(prev_node, next_node, old_node):
 
 
 # Priority constants
-SAME_GROUP_PRIORITY = 7000
-PARENT_GROUP_PRIORITY = 6000
-ACTIVE_ACTIVITY_PRIORITY = 5000
-NON_START_ACTIVITY_PRIORITY = 4000
-ACTIVE_ACTIVITY_LOWER_PRIORITY = 3000
-FLOW_CALCULATE_NODE_PRIORITY = 6500
-RHOMBUS_PRIORITY = 1000
-DEFAULT_PRIORITY = 2000
+SAME_GROUP_PRIORITY = 70
+PARENT_GROUP_PRIORITY = 60
+ACTIVE_ACTIVITY_PRIORITY = 50
+NON_START_ACTIVITY_PRIORITY = 40
+ACTIVE_ACTIVITY_LOWER_PRIORITY = 30
+FLOW_CALCULATE_NODE_PRIORITY_TOP_UP = 3
+RHOMBUS_PRIORITY_TO_UP = 3
 
-
+    
 def reorder_node_list(node_list, group, processed_nodes):
     # Cache active activities for O(1) lookup
     active_activities = {n.activity for n in processed_nodes}
-
+    MAP_PRIORITIES = {}
     def get_priority(node):
+        if node.id in MAP_PRIORITIES:
+            return MAP_PRIORITIES[node.id]
+        if isinstance(node, (TriccNodeActivityStart, TriccNodeMainStart)):
+            return get_priority(node.activity)
+        if isinstance(node, (TriccNodeSelectOption)):
+            return get_priority(node.select)
+
         # Cache attributes to avoid repeated getattr calls
-        priority = int(getattr(node, "priority", 0) or 0)
+        explicit_priority = getattr(node, "priority", None)
+        priority = int(explicit_priority or 0)
         node_group = getattr(node, "group", None)
         activity = getattr(node, "activity", None)
 
         # Check for same group
         if group is not None and node_group and node_group.id == group.id:
-            priority += SAME_GROUP_PRIORITY
+            priority += SAME_GROUP_PRIORITY 
         # Check for parent group
         elif hasattr(group, "group") and group.group and node_group and node_group.id == group.group.id:
             priority += PARENT_GROUP_PRIORITY
@@ -1767,21 +1817,25 @@ def reorder_node_list(node_list, group, processed_nodes):
         # Check for non main activities
         elif activity and isinstance(activity.root, TriccNodeActivityStart):
             priority += NON_START_ACTIVITY_PRIORITY
-        # Check for display calculate and end nodes with prev_nodes
-        elif (
-            issubclass(node.__class__, TriccNodeDisplayCalculateBase) or
-            isinstance(node, TriccNodeEnd)
-        ) and not isinstance(node, TriccNodeActivityEnd) and hasattr(node, 'prev_nodes') and len(node.prev_nodes) > 0:
-            priority += FLOW_CALCULATE_NODE_PRIORITY
         # Check for active activities (lower priority)
         elif activity and activity in active_activities:
             priority += ACTIVE_ACTIVITY_LOWER_PRIORITY
         # Check for rhombus nodes
-        elif issubclass(node.__class__, TriccRhombusMixIn):
-            priority += RHOMBUS_PRIORITY
-        else:
-            priority += DEFAULT_PRIORITY
+        
 
+        if (
+            issubclass(node.__class__, TriccNodeDisplayCalculateBase) or
+            isinstance(node, TriccNodeEnd)
+        ) and not isinstance(node, TriccNodeActivityEnd) and hasattr(node, 'prev_nodes') and len(node.prev_nodes) > 0:
+            priority += FLOW_CALCULATE_NODE_PRIORITY_TOP_UP
+        elif issubclass(node.__class__, TriccRhombusMixIn):
+            priority += RHOMBUS_PRIORITY_TO_UP
+
+        if node.prev_nodes and not explicit_priority and not isinstance(node, TriccNodeMainStart):
+            priority = max(priority, *[get_priority(p) for p in node.prev_nodes])
+        
+        MAP_PRIORITIES[node.id] = priority
+        
         return priority
 
     # Sort in place, highest priority first
@@ -1870,6 +1924,8 @@ def get_node_expression(in_node, processed_nodes, get_overall_exp=False, is_prev
         prev_exp = get_node_expression(
             node.path, processed_nodes=processed_nodes, get_overall_exp=get_overall_exp, is_prev=True, process=process
         )
+        if prev_exp:
+            prev_exp = prev_exp.copy(keep_node=True)
         if prev_exp and expression:
             expression = and_join([prev_exp, expression])
             negate_expression = and_join([prev_exp, negate_expression])
@@ -1921,14 +1977,25 @@ def get_node_expression(in_node, processed_nodes, get_overall_exp=False, is_prev
         (not is_prev or not ONE_QUESTION_AT_A_TIME)
         and hasattr(node, "relevance")
         and isinstance(node.relevance, (TriccOperation, TriccStatic))
+        and getattr(node, 'is_sequence_defined', False)
+        and not get_overall_exp
     ):
         expression = node.relevance
-    elif ONE_QUESTION_AT_A_TIME and is_prev and not get_overall_exp and hasattr(node, "required") and node.required:
+    elif (
+        ONE_QUESTION_AT_A_TIME
+        and is_prev and not get_overall_exp 
+        and hasattr(node, "required") 
+        and node.required
+        and getattr(node, 'is_sequence_defined', False)
+    ):
         expression = get_required_node_expression(node)
-
     if expression is None:
         expression = get_prev_node_expression(
-            node, processed_nodes=processed_nodes, get_overall_exp=get_overall_exp, process=process
+            node,
+            activity=node.activity,
+            processed_nodes=processed_nodes,
+            get_overall_exp=get_overall_exp,
+            process=process
         )
         # in_node not in processed_nodes is need for calculates that can but run after the end of the activity
     # if isinstance(node, TriccNodeActivitiy) and not prev:
@@ -1960,7 +2027,7 @@ def get_applicability_expression(node, processed_nodes, process, expression=None
 def get_prev_instance_skip_expression(node, processed_nodes, process, expression=None):
     if node.base_instance is not None:
         expression_inputs = []
-        past_instances = [n for n in processed_nodes if getattr(n.base_instance, "id", None) == node.base_instance.id]
+        past_instances = [n for n in processed_nodes if getattr(n.base_instance, "id", None) == node.base_instance.id and node != n]
         for past_instance in past_instances:
             add_sub_expression(
                 expression_inputs,
@@ -1977,7 +2044,7 @@ def get_prev_instance_skip_expression(node, processed_nodes, process, expression
 
 # end def
 def get_process_skip_expression(node, processed_nodes, process, expression=None):
-    list_ends = OrderedSet(filter(lambda x: issubclass(x.__class__, TriccNodeEnd), processed_nodes))
+    list_ends = [x for x in processed_nodes if isinstance(x, TriccNodeEnd)]
     if list_ends:
         end_expressions = []
         f_end_expression = get_end_expression(list_ends)
@@ -1986,8 +2053,11 @@ def get_process_skip_expression(node, processed_nodes, process, expression=None)
         b_end_expression = get_end_expression(list_ends, "pause")
         if b_end_expression:
             end_expressions.append(b_end_expression)
-        if process[0] in PROCESSES:
-            for p in PROCESSES[PROCESSES.index(process[0]) + 1:]:
+        process_index = None
+        if process and process[0] in PROCESSES:
+            process_index = PROCESSES.index(process[0])
+        if process_index is not None:
+            for p in PROCESSES[process_index + 1:]:
                 p_end_expression = get_end_expression(list_ends, p)
                 if p_end_expression:
                     end_expressions.append(p_end_expression)
@@ -2148,8 +2218,9 @@ def create_determine_diagnosis_activity(diags):
     return activity
 
 
-def get_prev_node_expression(node, processed_nodes, get_overall_exp=False, excluded_name=None, process=None):
+def get_prev_node_expression(node, activity, processed_nodes, get_overall_exp=False, excluded_name=None, process=None):
     expression = None
+    sub = None
     if node is None:
         pass
     # when getting the prev node, we calculate the
@@ -2158,15 +2229,24 @@ def get_prev_node_expression(node, processed_nodes, get_overall_exp=False, exclu
         expression_inputs = clean_or_list(expression_inputs)
     else:
         expression_inputs = []
-    prev_activities = {}
+    prev_activities = {node.activity.id: []}
+    # sorting prev_nodes per activity
+   
     for prev_node in node.prev_nodes:
         if prev_node.activity.id not in prev_activities:
             prev_activities[prev_node.activity.id] = []
+        if isinstance(prev_node, TriccNodeActivity):
+            for a_prev_node in prev_node.prev_nodes:
+                # if we share the calling contect of the activity
+                if a_prev_node.activity == node.activity:
+                    prev_activities[node.activity.id].append(a_prev_node)
         prev_activities[prev_node.activity.id].append(prev_node)
-
+    # get the or_list expression of all the node per activity
     for act_id in prev_activities:
         act_expression_inputs = []
+        none_sequence_defined_prev_node = False
         for prev_node in prev_activities[act_id]:
+            none_sequence_defined_prev_node = none_sequence_defined_prev_node or not prev_node.is_sequence_defined
             if (
                 excluded_name is None
                 or prev_node != excluded_name
@@ -2178,30 +2258,55 @@ def get_prev_node_expression(node, processed_nodes, get_overall_exp=False, exclu
                 )
             ):
                 # the rhombus should calculate only reference
+                # expression from one prev node
                 sub = get_node_expression(
                     prev_node,
                     processed_nodes=processed_nodes,
                     get_overall_exp=get_overall_exp,
                     is_prev=True,
-                    process=get_overall_exp,
-                )
-                if isinstance(node, TriccNodeActivity) or get_overall_exp:
+                    process=process,
+                ) or TriccStatic(True)
+                # if it is an activity or overall then we add the sub to act expression 
+                # else we update directly the node releavance subs
+                if node.activity.id != act_id or get_overall_exp:
                     add_sub_expression(act_expression_inputs, sub)
                 else:
                     add_sub_expression(expression_inputs, sub)
-
+        # if cur prev node part of prev act elvaluated have some relevance we make an AND with prev act relevance
         if act_expression_inputs:
             act_sub = or_join(act_expression_inputs)
             # if there is condition fallback on the calling activity condition
+            if prev_node.activity.relevance and prev_node.activity.relevance != TriccStatic(True):
+                act_relevance = TriccOperation(TriccOperator.ISTRUE, [prev_node.activity.root])
+            else:
+                act_relevance = TriccStatic(True)
+            # get_node_expression(
+            #         prev_node.activity,
+            #         processed_nodes=processed_nodes,
+            #         get_overall_exp=get_overall_exp,
+            #         is_prev=True,
+            #         negate=False,
+            #         process=process,
+            #     )
             if act_sub == TriccStatic(True):
-                act_sub = get_node_expression(
-                    prev_node.activity,
-                    processed_nodes=processed_nodes,
-                    get_overall_exp=get_overall_exp,
-                    is_prev=True,
-                    negate=False,
-                    process=process,
-                )
+                act_sub = act_relevance
+            elif act_relevance != TriccStatic(True) and none_sequence_defined_prev_node:
+                # For nodes with is_sequence_defined = False, AND the activity relevance with the prev expression
+                # activity_relevance = get_node_expression(
+                #     prev_node.activity,
+                #     processed_nodes=processed_nodes,
+                #     get_overall_exp=get_overall_exp,
+                #     is_prev=True,
+                #     negate=False,
+                #     process=process,
+                # )
+                act_sub = and_join([
+                    TriccOperation(
+                        TriccOperator.ISTRUE,
+                        [prev_node.activity.root]
+                    ),
+                    act_sub
+                ])
             add_sub_expression(expression_inputs, act_sub)
             # avoid void is there is not conditions to avoid looping too much itme
     # expression_inputs = clean_or_list(
@@ -2259,7 +2364,12 @@ def get_none_option(node):
 def get_count_terms_details(prev_node, processed_nodes, get_overall_exp, negate=False, process=None):
     opt_none = get_none_option(prev_node)
     if opt_none:
-        operation_none = TriccOperation(TriccOperator.SELECTED, [prev_node, TriccStatic(opt_none)])
+        if isinstance(opt_none, str):
+            operation_none = TriccOperation(TriccOperator.SELECTED, [prev_node, TriccStatic(opt_none)])
+        elif issubclass(opt_none.__class__, TriccBaseModel):
+            operation_none = TriccOperation(TriccOperator.SELECTED, [prev_node, opt_none])
+        else:
+            logger.critical(f"unexpected none option value {opt_none}")
     else:
         operation_none = TriccOperation(TriccOperator.SELECTED, [prev_node, TriccStatic("opt_none")])
     if isinstance(prev_node, TriccNodeSelectYesNo):
@@ -2463,6 +2573,7 @@ def get_calculation_terms(node, processed_nodes, get_overall_exp=False, negate=F
     elif isinstance(node, (TriccNodeActivityStart)) and get_overall_exp:
         expression = get_prev_node_expression(
             node.activity,
+            node.activity,
             processed_nodes=processed_nodes,
             get_overall_exp=get_overall_exp,
             negate=negate,
@@ -2508,18 +2619,9 @@ def get_calculation_terms(node, processed_nodes, get_overall_exp=False, negate=F
 
     if isinstance(node.expression_reference, (TriccOperation, TriccStatic)):
         expression = node.expression_reference
-    elif node.reference is not None and node.expression_reference is not None:
-        expression = get_prev_node_expression(
-            node, processed_nodes=processed_nodes, get_overall_exp=get_overall_exp, process=process
-        )
-        ref_expression = node.expression_reference.format(*[get_export_name(ref) for ref in node.reference])
-        if expression is not None and expression != "":
-            expression = and_join([expression, ref_expression])
-        else:
-            expression = ref_expression
     elif expression is None:
         expression = get_prev_node_expression(
-            node, processed_nodes=processed_nodes, get_overall_exp=get_overall_exp, process=process
+            node, node.activity, processed_nodes=processed_nodes, get_overall_exp=get_overall_exp, process=process
         )
 
     # manage the generic negation
@@ -2582,13 +2684,10 @@ def get_selected_option_expression_multiple(option_node, negate):
     selected = TriccOperation(TriccOperator.SELECTED, [option_node.select, TriccStatic(option_node)])
 
     if negate:
-        return TriccOperation(
-            operator=TriccOperator.AND,
-            resource=[
+        return and_join([
                 TriccOperation(operator=TriccOperator.NOT, resource=[selected]),
                 TriccOperation(operator=TriccOperator.ISNOTNULL, resource=[option_node.select]),
-            ],
-        )
+            ])
 
     else:
         return selected
@@ -2609,6 +2708,12 @@ def generate_calculate(node, processed_nodes, **kwargs):
     if node not in processed_nodes:
         if kwargs.get("warn", True):
             logger.debug("generation of calculate for node {}".format(node.get_name()))
+
+        # Set is_sequence_defined for calculate nodes based on dependencies
+        if issubclass(node.__class__, TriccNodeCalculateBase):
+            # Calculate node is sequence defined if ALL prev_nodes have is_sequence_defined = True
+            node.is_sequence_defined = all(prev_node.is_sequence_defined for prev_node in node.prev_nodes)
+
         if (
             hasattr(node, "expression")
             and (node.expression is None)
@@ -2693,7 +2798,7 @@ def generate_base(node, processed_nodes, **kwargs):
                         )
                         constraints_max = "The maximum value is {0}.".format(node.max)
                     if len(constraints) > 1:
-                        node.constraint = TriccOperation(TriccOperator.AND, constraints)
+                        node.constraint = and_join(constraints)
                         node.constraint_message = (constraints_min + " " + constraints_max).strip()
                     elif len(constraints) == 1:
                         node.constraint = constraints[0]

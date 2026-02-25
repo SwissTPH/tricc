@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tricc-oo"
-version = "1.6.8"
+version = "1.6.31"
 description = "Python library that converts CDSS L2 in L3"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -27,7 +27,8 @@ dependencies = [
     "antlr4-tools==0.2.1",
     "beautifulsoup4",
     "ocldev",
-    "pyxform"
+    "pyxform",
+    "Sympy"
 ]
 keywords = ["xlsform", "drawio", "authoring"]
 
