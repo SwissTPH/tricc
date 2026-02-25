@@ -39,7 +39,7 @@ pyproject_hooks==1.1.0
 python-dateutil==2.9.0.post0
 pytz==2024.1
 rapidfuzz==3.9.4
-requests==2.32.3
+requests==2.32.4
 requests-toolbelt==1.0.0
 SecretStorage==3.3.3
 shellingham==1.5.4
