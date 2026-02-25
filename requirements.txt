@@ -51,7 +51,7 @@ trove-classifiers==2024.7.2
 typing_extensions==4.12.2
 tzdata==2024.1
 urllib3==2.6.3
-virtualenv==20.26.3
+virtualenv==20.26.6
 XlsxWriter==3.2.0
 zipp==3.19.2
 
