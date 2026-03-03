@@ -851,6 +851,7 @@ def process_operation_reference(
     modified_operation = None
     node_reference = []
     reference = []
+    option_references = []
     option_label = None
     ref_list = [r.value for r in operation.get_references() if isinstance(r, TriccReference)]
     real_ref_list = [r for r in operation.get_references() if issubclass(r.__class__, TriccNodeBaseModel)]
@@ -862,62 +863,74 @@ def process_operation_reference(
         else:
             option_label = None
         node_in_act = [n for n in node.activity.nodes.values() if n.name == ref and n != node]
-        if node_in_act:
-            if any(n not in processed_nodes for n in node_in_act):
+        is_option = any(isinstance(n, TriccNodeSelectOption) for n in node_in_act)
+        if is_option:
+            option_references.append(ref)
+        else:
+            if node_in_act:
+                if any(n not in processed_nodes for n in node_in_act):
+                    return False
+                else:
+                    last_found = node_in_act[0]
+            else:
+                last_found = get_last_version(name=ref, processed_nodes=processed_nodes)
+            if last_found is None:
+                if codesystems:
+                    concept = lookup_codesystems_code(codesystems, ref)
+                    if not concept:
+                        logger.critical(f"reference {ref} not found in the project for{str(node)} ")
+                        exit(1)
+                    else:
+                        if warn:
+                            logger.debug(f"reference {ref}::{concept.display} not yet processed {node.get_name()}")
+
+                elif warn:
+                    logger.debug(f"reference {ref} not found for a calculate {node.get_name()}")
                 return False
             else:
-                last_found = node_in_act[0]
-        else:
-            last_found = get_last_version(name=ref, processed_nodes=processed_nodes)
-        if last_found is None:
-            if codesystems:
-                concept = lookup_codesystems_code(codesystems, ref)
-                if not concept:
-                    logger.critical(f"reference {ref} not found in the project for{str(node)} ")
-                    exit(1)
+                node_reference.append(last_found)
+                reference.append(TriccReference(ref))
+                if replace_reference:
+                    if not issubclass(
+                        last_found.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase, TriccNodeInput)
+                    ):
+                        last_found = get_node_expression(last_found, processed_nodes, is_prev=True)
+                    if isinstance(operation, (TriccOperation)):
+                        if modified_operation is None:
+                            modified_operation = operation.copy(keep_node=True)
+                        modified_operation.replace_node(TriccReference(ref), last_found)
+                    elif operation == TriccReference(ref):
+                        modified_operation = last_found
+                if option_label:
+                    # Resolve human-readable label
+                    option_code = get_option_code_from_label(last_found, option_label)
+                    if option_code:
+                        modified_operation = replace_code_reference(
+                            operation, old=f"{ref}[{option_label}]", new=option_code
+                        )
+                    else:
+                        if warn:
+                            logger.warning(f"Could not resolve label '{option_label}' for reference {ref}")
+                        return False
+                if hasattr(last_found, "path_len"):
+                    path_len = last_found.path_len
+                elif isinstance(last_found, TriccOperation):
+                    path_len = max(getattr(n, "path_len", 0) for n in last_found.get_references())
                 else:
-                    if warn:
-                        logger.debug(f"reference {ref}::{concept.display} not yet processed {node.get_name()}")
-
-            elif warn:
-                logger.debug(f"reference {ref} not found for a calculate {node.get_name()}")
-            return False
-        else:
-            node_reference.append(last_found)
-            reference.append(TriccReference(ref))
-            if replace_reference:
-                if not issubclass(
-                    last_found.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase, TriccNodeInput)
-                ):
-                    last_found = get_node_expression(last_found, processed_nodes, is_prev=True)
-                if isinstance(operation, (TriccOperation)):
-                    if modified_operation is None:
-                        modified_operation = operation.copy(keep_node=True)
-                    modified_operation.replace_node(TriccReference(ref), last_found)
-                elif operation == TriccReference(ref):
-                    modified_operation = last_found
-            if option_label:
-                # Resolve human-readable label
-                option_code = get_option_code_from_label(last_found, option_label)
-                if option_code:
-                    modified_operation = replace_code_reference(
-                        operation, old=f"{ref}[{option_label}]", new=option_code
-                    )
-                else:
-                    if warn:
-                        logger.warning(f"Could not resolve label '{option_label}' for reference {ref}")
-                    return False
-            if hasattr(last_found, "path_len"):
-                path_len = last_found.path_len
-            elif isinstance(last_found, TriccOperation):
-                path_len = max(getattr(n, "path_len", 0) for n in last_found.get_references())
-            else:
-                path_len = 0
-            node.path_len = max(node.path_len, path_len)
+                    path_len = 0
+                node.path_len = max(node.path_len, path_len)
     for ref in real_ref_list:
         if is_prev_processed(ref, node, processed_nodes=processed_nodes, local=False) is False:
             return False
-
+    for optr in list(option_references):
+        for n in [*real_ref_list, *node_reference]:
+            if issubclass(n.__class__, TriccNodeSelect):
+                for o in n.options.values():
+                    if o.name == optr:
+                        node_reference.append(o)
+                        reference.append(TriccReference(optr))
+    
+    
     if used_calculates is not None:
         for ref_nodes in node_reference:
             if issubclass(ref_nodes.__class__, TriccNodeCalculateBase):
@@ -1795,6 +1808,8 @@ def reorder_node_list(node_list, group, processed_nodes):
         if node.id in MAP_PRIORITIES:
             return MAP_PRIORITIES[node.id]
         if isinstance(node, (TriccNodeActivityStart, TriccNodeMainStart)):
+            return get_priority(node.activity)
+        if issubclass(node.__class__, TriccNodeDisplayCalculateBase) and not node.prev_nodes:
             return get_priority(node.activity)
         if isinstance(node, (TriccNodeSelectOption)):
             return get_priority(node.select)
