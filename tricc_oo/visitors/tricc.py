@@ -1798,7 +1798,7 @@ NON_START_ACTIVITY_PRIORITY = 40
 ACTIVE_ACTIVITY_LOWER_PRIORITY = 30
 FLOW_CALCULATE_NODE_PRIORITY_TOP_UP = 3
 RHOMBUS_PRIORITY_TO_UP = 3
-
+MAX_AUTO_PRIORITY = 76
     
 def reorder_node_list(node_list, group, processed_nodes):
     # Cache active activities for O(1) lookup
@@ -1807,8 +1807,6 @@ def reorder_node_list(node_list, group, processed_nodes):
     def get_priority(node):
         if node.id in MAP_PRIORITIES:
             return MAP_PRIORITIES[node.id]
-        if isinstance(node, (TriccNodeActivityStart, TriccNodeMainStart)):
-            return get_priority(node.activity)
         if issubclass(node.__class__, TriccNodeDisplayCalculateBase) and not node.prev_nodes:
             return get_priority(node.activity)
         if isinstance(node, (TriccNodeSelectOption)):
@@ -1845,9 +1843,10 @@ def reorder_node_list(node_list, group, processed_nodes):
             priority += FLOW_CALCULATE_NODE_PRIORITY_TOP_UP
         elif issubclass(node.__class__, TriccRhombusMixIn):
             priority += RHOMBUS_PRIORITY_TO_UP
-
         if node.prev_nodes and not explicit_priority and not isinstance(node, TriccNodeMainStart):
-            priority = max(priority, *[get_priority(p) for p in node.prev_nodes])
+            prev_priority = max(get_priority(p) for p in node.prev_nodes)
+            if prev_priority >  MAX_AUTO_PRIORITY:
+                priority = prev_priority
         
         MAP_PRIORITIES[node.id] = priority
         
