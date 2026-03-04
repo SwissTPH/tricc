@@ -6,7 +6,7 @@ cffi==1.16.0
 charset-normalizer==3.3.2
 cleo==2.1.0
 crashtest==0.4.1
-cryptography==42.0.8
+cryptography==46.0.5
 distlib==0.3.8
 dulwich==0.21.7
 fastjsonschema==2.20.0
@@ -39,7 +39,7 @@ pyproject_hooks==1.1.0
 python-dateutil==2.9.0.post0
 pytz==2024.1
 rapidfuzz==3.9.4
-requests==2.32.3
+requests==2.32.4
 requests-toolbelt==1.0.0
 SecretStorage==3.3.3
 shellingham==1.5.4
@@ -51,7 +51,7 @@ trove-classifiers==2024.7.2
 typing_extensions==4.12.2
 tzdata==2024.1
 urllib3==2.6.3
-virtualenv==20.26.3
+virtualenv==20.26.6
 XlsxWriter==3.2.0
 zipp==3.19.2
 
