@@ -47,6 +47,7 @@ from tricc_oo.models.tricc import (
     TriccNodeSelectOne,
     TriccNodeSelectYesNo,
     TriccNodeNote,
+    TriccNodeLinkOut,
 )
 
 
@@ -738,7 +739,8 @@ def add_tricc_base_node(
                 node.severity = severity_from_color(styles["fillColor"])
 
         set_additional_attributes(attributes, elm, node)
-        load_expressions(node)
+        if not isinstance(node, TriccNodeLinkOut):
+            load_expressions(node)
         nodes[id] = node
 
 

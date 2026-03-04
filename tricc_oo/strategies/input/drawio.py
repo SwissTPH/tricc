@@ -267,11 +267,18 @@ class DrawioStrategy(BaseInputStrategy):
         if node.reference is not None:
             link_in_list = []
             link_in_page = None
-            for page in pages:
-                link_in_list += list(filter(lambda x: (x.name == node.reference), page.nodes))
-                # save the first page where a link is found to continue the walktrhough
-                if len(link_in_list) > 0 and link_in_page is None:
-                    link_in_page = page
+            link_in_list += list(filter(lambda x: (x.name == node.reference), page.nodes.values()))
+            if len(link_in_list) > 0 and link_in_page is None:
+                link_in_page = page
+                
+            if not link_in_list:
+                for page in pages.values():
+                    link_in_list += list(filter(lambda x: (x.name == node.reference), page.nodes.values()))
+                    # save the first page where a link is found to continue the walktrhough
+                    if len(link_in_list) > 0:
+                        if link_in_page is None:
+                            link_in_page = page
+                    break
             if len(link_in_list) == 0:
                 logger.warning(
                     "link in {0} not found for link out {1} in page {2}".format(node.reference, node.name, page.label)

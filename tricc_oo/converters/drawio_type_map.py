@@ -21,6 +21,7 @@ from tricc_oo.models.calculate import (
 from tricc_oo.models.tricc import (
     TriccNodeMainStart,
     TriccNodeLinkIn,
+    TriccNodeLinkOut,
     TriccNodeGoTo,
     TriccNodeSelectMultiple,
     TriccNodeSelectNotAvailable,
@@ -242,7 +243,7 @@ TYPE_MAP = {
         "objects": ["UserObject", "object"],
         "attributes": [],
         "mandatory_attributes": ["reference", "label", "name"],
-        "model": TriccNodeNote,
+        "model": TriccNodeLinkOut,
     },
     TriccNodeType.link_in: {
         "objects": ["UserObject", "object"],
