@@ -288,7 +288,7 @@ TYPE_MAP = {
             "remote_reference",
             "reference",
             "severity",
-            "priority",
+            #"priority",
             "trigger",
         ],
         "mandatory_attributes": ["name", "label"],

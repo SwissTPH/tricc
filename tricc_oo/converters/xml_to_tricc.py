@@ -120,6 +120,7 @@ def create_activity(diagram, media_path, project):
             activity.instance = 0
         # add the group on the root node
         root.group = activity
+        root.activity = activity
         activity.group = activity
         edges = get_edges(diagram)
         if edges and len(edges) > 0:

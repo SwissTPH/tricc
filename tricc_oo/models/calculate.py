@@ -149,7 +149,7 @@ class TriccNodeDiagnosis(TriccNodeDisplayCalculateBase):
         super().__init__(**data)
 
         # rename rhombus
-        self.name = get_rand_name(f"d{data.get('id', None)}")
+        #self.name = get_rand_name(f"d{data.get('id', None)}")
 
 
 class TriccNodeExclusive(TriccNodeFakeCalculateBase):

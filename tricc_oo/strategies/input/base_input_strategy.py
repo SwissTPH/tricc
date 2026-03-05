@@ -9,6 +9,7 @@ from tricc_oo.visitors.tricc import (
     get_activity_wait,
     set_prev_next_node,
     export_proposed_diags,
+    export_diags,
     create_determine_diagnosis_activity,
 )
 import logging
@@ -34,14 +35,22 @@ class BaseInputStrategy:
             ]
             sorted_pages = {}
             diags = []
+            proposed_diags = []
             for a in project.pages.values():
-                diags += export_proposed_diags(a, [])
+                proposed_diags += export_proposed_diags(a, [])
+                diags +=  export_diags(a, [])
             seen_diags = set()
             unique_diags = []
-            for diag in diags:
+            for diag in proposed_diags:
                 if diag.name not in seen_diags:
                     unique_diags.append(diag)
                     seen_diags.add(diag.name)
+            # get the highest priority 
+            for udiag in unique_diags:
+                diag_map = [d.priority or 0 for d in diags if d.name == udiag.name]
+                if diag_map:
+                    udiag.priority = max((udiag.priority or 0), *diag_map)
+            
             severity_order = {"severe": 3, "moderate": 2, "mild": 1, "light": 0}
             unique_diags = sorted(
                 unique_diags,
@@ -68,6 +77,7 @@ class BaseInputStrategy:
             nodes[root.id] = root
             app = TriccNodeActivity(id=generate_id("a-main"), name=root_process.name, root=root, nodes=nodes)
             root.activity = app
+            root.group = app
             # loop back to app to avoid None
             app.activity = app
             app.group = app

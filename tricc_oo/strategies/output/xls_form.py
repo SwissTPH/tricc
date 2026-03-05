@@ -212,6 +212,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
         if processed_nodes is None:
             processed_nodes = OrderedSet()
         stashed_nodes = OrderedSet()
+        priority_map = {}
         # The stashed node are all the node that have all their prevnode processed but not from the same group
         # This logic works only because the prev node are ordered by group/parent ..
         skip_header = 0
@@ -239,6 +240,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
             process=process,
             recursive=False,
             **self.get_kwargs(),
+            priority_map=priority_map
         )
         end_group(self, cur_group=activity, groups=groups, **self.get_kwargs())
         # we save the survey data frame
@@ -287,21 +289,13 @@ class XLSFormStrategy(BaseOutPutStrategy):
                     recursive=False,
                     process=process,
                     **self.get_kwargs(),
+                    priority_map=priority_map
                 )
                 # add end group if new node where added OR if the previous end group was removed
                 end_group(self, cur_group=s_node.group, groups=groups, **self.get_kwargs())
                 # if two line then empty grou
                 if len(self.df_survey) > (2 + skip_header):
                     if cur_group == s_node.group:
-                        # drop the end group (to merge)
-                        logger.debug(
-                            "printing same group {}::{}::{}::{}".format(
-                                s_node.group.__class__,
-                                s_node.group.get_name(),
-                                s_node.id,
-                                s_node.group.instance,
-                            )
-                        )
                         if len(df_survey_final):
                             df_survey_final.drop(index=df_survey_final.index[-1], axis=0, inplace=True)
                             self.df_survey = self.df_survey[(1 + skip_header):]

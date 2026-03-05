@@ -13,7 +13,7 @@ class XLSFormCDSSStrategy(XLSFormStrategy):
     def process_export(self, start_pages, **kwargs):
         self.activity_export(start_pages[self.processes[0]], **kwargs)
         # self.add_tab_breaks_choice()
-        self.add_wfx_choice()
+        # self.add_wfx_choice()
 
     def export_inputs(self, activity, inputs=[], **kwargs):
         for node in activity.nodes.values():

@@ -571,11 +571,11 @@ def generate_calculates(node, calculates, used_calculates, processed_nodes, proc
             if last_version:
                 calc_node.expression = merge_expressions(calc_node.expression, last_version)
             processed_nodes.add(calc_node)
-            logger.debug(
-                "generate_save_calculate:{}:{} as {}".format(
-                    calc_node.tricc_type, node.name if hasattr(node, "name") else node.id, calculate_name
-                )
-            )
+            # logger.debug(
+            #     "generate_save_calculate:{}:{} as {}".format(
+            #         calc_node.tricc_type, node.name if hasattr(node, "name") else node.id, calculate_name
+            #     )
+            # )
 
             list_calc.append(calc_node)
             # add_save_calculate(calc_node, calculates, used_calculates,processed_nodes)
@@ -586,7 +586,7 @@ def generate_calculates(node, calculates, used_calculates, processed_nodes, proc
     # Add CONTAINS calculations for each option in select multiple (except opt_none)
     if isinstance(node, TriccNodeSelectMultiple):
         for option in node.options.values():
-            if not option.name.startswith("opt_"):
+            if not option.name.startswith("opt_") and node.name != 'manual.diag':
                 calc_id = generate_id(f"contains_{node.id}_{option.name}")
                 expression = TriccOperation(TriccOperator.CONTAINS, [node, TriccStatic(option.name)])
                 calc_node = TriccNodeCalculate(
@@ -954,7 +954,7 @@ def add_used_calculate(node, prev_node, calculates, used_calculates, processed_n
         if prev_node in processed_nodes:
             # if not a verison, index will equal -1
             if prev_node.name not in calculates:
-                logger.debug("node {} refered before being processed".format(node.get_name()))
+                #logger.debug("node {} refered before being processed".format(node.get_name()))
                 return False
             max_version = prev_node  # get_max_version(calculates[node_clean_name])
             if prev_node.name not in used_calculates:
@@ -1023,7 +1023,7 @@ def walktrhough_tricc_node_processed_stached(
 ):
     ended_activity = False
     # logger.debug("walkthrough::{}::{}".format(callback.__name__, node.get_name()))
-
+    priority_map = kwargs.get('priority_map', {})
     path_len = max(node.activity.path_len, *[0, *[getattr(n, "path_len", 0) + 1 for n in node.activity.prev_nodes]]) + 1
     if hasattr(node, "prev_nodes"):
         path_len = max(path_len, *[0, *[getattr(n, "path_len", 0) + 1 for n in node.prev_nodes]])
@@ -1184,10 +1184,10 @@ def walktrhough_tricc_node_processed_stached(
                     if nn not in stashed_nodes:
                         stashed_nodes.insert_at_top(nn)
         if not recursive:
-            global _last_reordered_group
-            if _last_reordered_group != node.group:
-                reorder_node_list(stashed_nodes, node.group, processed_nodes)
-                _last_reordered_group = node.group
+            #global _last_reordered_group
+            #if _last_reordered_group != node.group:
+                reorder_node_list(stashed_nodes, node.group, processed_nodes, priority_map)
+            #    _last_reordered_group = n  ode.group
 
     else:
         if prev_process and process and prev_process != process[0]:
@@ -1293,9 +1293,9 @@ def stashed_node_func(node, callback, recursive=False, **kwargs):
     stashed_nodes = kwargs.pop("stashed_nodes", OrderedSet())
     process = kwargs.pop("process", ["main"])
     path_len = 0
-
+    priority_map = {}
     walktrhough_tricc_node_processed_stached(
-        node, callback, processed_nodes, stashed_nodes, path_len, recursive, process=process, **kwargs
+        node, callback, processed_nodes, stashed_nodes, path_len, recursive, process=process, **kwargs, priority_map=priority_map
     )
     # callback( node, **kwargs)
     # MANAGE STASHED NODES
@@ -1313,7 +1313,7 @@ def stashed_node_func(node, callback, recursive=False, **kwargs):
             # remove duplicates
             if s_node in stashed_nodes:
                 stashed_nodes.remove(s_node)
-            if kwargs.get("warn", True):
+            if kwargs.get("warn", False):
                 logger.debug(
                     "{}:: {}: unstashed for processing ({})::{}".format(
                         callback.__name__, s_node.__class__, get_data_for_log(s_node), len(stashed_nodes)
@@ -1330,7 +1330,12 @@ def stashed_node_func(node, callback, recursive=False, **kwargs):
                 warn=warn,
                 process=process,
                 **kwargs,
+                priority_map=priority_map
             )
+            # if len(stashed_nodes) != len(prev_stashed_nodes):
+            #     reorder_node_list(stashed_nodes, node.group, processed_nodes, priority_map)
+
+
 
 
 # check if the all the prev nodes are processed
@@ -1799,21 +1804,30 @@ ACTIVE_ACTIVITY_LOWER_PRIORITY = 30
 FLOW_CALCULATE_NODE_PRIORITY_TOP_UP = 3
 RHOMBUS_PRIORITY_TO_UP = 3
 MAX_AUTO_PRIORITY = 76
-    
-def reorder_node_list(node_list, group, processed_nodes):
+   
+def reorder_node_list(node_list, group, processed_nodes, priority_map = None):
     # Cache active activities for O(1) lookup
+    if priority_map is None:
+        priority_map = {}
     active_activities = {n.activity for n in processed_nodes}
-    MAP_PRIORITIES = {}
+    if not group.id in priority_map:
+        priority_map[group.id] = {}
     def get_priority(node):
-        if node.id in MAP_PRIORITIES:
-            return MAP_PRIORITIES[node.id]
-        if issubclass(node.__class__, TriccNodeDisplayCalculateBase) and not node.prev_nodes:
+        explicit_priority = getattr(node, "priority", None) or 0
+        if node.id in priority_map[group.id]:
+            return priority_map[group.id][node.id]
+        if (
+            (not explicit_priority and  
+            issubclass(node.__class__, TriccNodeDisplayCalculateBase) 
+            and not node.prev_nodes) or
+            isinstance(node, (TriccNodeMainStart, TriccNodeActivityStart))
+        ):    
             return get_priority(node.activity)
         if isinstance(node, (TriccNodeSelectOption)):
             return get_priority(node.select)
 
         # Cache attributes to avoid repeated getattr calls
-        explicit_priority = getattr(node, "priority", None)
+        
         priority = int(explicit_priority or 0)
         node_group = getattr(node, "group", None)
         activity = getattr(node, "activity", None)
@@ -1846,14 +1860,17 @@ def reorder_node_list(node_list, group, processed_nodes):
         if node.prev_nodes and not explicit_priority and not isinstance(node, TriccNodeMainStart):
             prev_priority = max(get_priority(p) for p in node.prev_nodes)
             if prev_priority >  MAX_AUTO_PRIORITY:
-                priority = prev_priority
+                priority = max(priority, prev_priority)
         
-        MAP_PRIORITIES[node.id] = priority
+        priority_map[group.id][node.id] = priority
         
         return priority
 
     # Sort in place, highest priority first
+    # logger.debug(f"Reordering node_list for group {group.id if group else 'None'}: pre {[n.get_name() for n in node_list]}")
     node_list.sort(key=get_priority, reverse=True)
+    # logger.debug(f"Post reorder: {[n.get_name() for n in node_list]}")
+    #print(dict(zip([n.get_name() for n in node_list], list(map(get_priority, node_list)))))
 
 
 def loop_info(loop, **kwargs):
@@ -2102,6 +2119,15 @@ def export_proposed_diags(activity, diags=None, **kwargs):
                 diags.append(node)
     return diags
 
+def export_diags(activity, diags=None, **kwargs):
+    if diags is None:
+        diags = []
+    for node in activity.nodes.values():
+        if isinstance(node, TriccNodeActivity):
+            diags = export_diags(node, diags, **kwargs)
+        if isinstance(node, TriccNodeDiagnosis):
+            diags.append(node)
+    return diags
 
 def get_accept_diagnostic_node(code, display, severity, priority, activity):
     node = TriccNodeAcceptDiagnostic(
@@ -2171,6 +2197,7 @@ def create_determine_diagnosis_activity(diags):
     start.activity = activity
     start.group = activity
     diags_conf = []
+    diags_calc = []
     end = TriccNodeActivityEnd(
         id=generate_id("end.determine-diagnosis"),
         name="end.determine-diagnosis",
@@ -2195,6 +2222,8 @@ def create_determine_diagnosis_activity(diags):
             name=proposed.name,
             label=proposed.label,
             list_name=f.list_name,
+            activity=activity,
+            group=activity,
             relevance=proposed.activity.applicability,
             select=f,
         )
@@ -2202,6 +2231,7 @@ def create_determine_diagnosis_activity(diags):
         d = get_accept_diagnostic_node(proposed.name, proposed.label, proposed.severity, proposed.priority, activity)
         c = get_diagnostic_node(proposed.name, proposed.label, proposed.severity, proposed.priority, activity, option)
         diags_conf.append(d)
+        diags_calc.append(c)
         r = TriccNodeRhombus(
             path=start,
             id=generate_id(f"proposed-rhombus{proposed.id}"),
@@ -2214,17 +2244,21 @@ def create_determine_diagnosis_activity(diags):
         activity.calculates.append(r)
         activity.calculates.append(c)
         set_prev_next_node(r, d, edge_only=False)
-        set_prev_next_node(d, end, edge_only=False)
-        wait2 = get_activity_wait([activity.root], diags_conf, [f], edge_only=False)
+        #set_prev_next_node(d, end, edge_only=False)
+        
+
         activity.nodes[d.options[0].id] = d.options[0]
         activity.nodes[d.options[1].id] = d.options[1]
         activity.nodes[d.id] = d
         activity.nodes[r.id] = r
         activity.nodes[c.id] = c
         activity.nodes[f.id] = f
-        activity.nodes[wait2.id] = wait2
-    # fallback
 
+    # fallback
+    wait1 = get_activity_wait([activity.root], diags_conf, [f], edge_only=False)
+    wait2 = get_activity_wait([activity.root], diags_calc, [end], edge_only=False)
+    activity.nodes[wait1.id] = wait1
+    activity.nodes[wait2.id] = wait2
     f.options = dict(zip(range(0, len(options)), options))
     activity.nodes[f.id] = f
     set_prev_next_node(f, end, edge_only=False)
@@ -2720,7 +2754,7 @@ def generate_calculate(node, processed_nodes, **kwargs):
         return False
 
     if node not in processed_nodes:
-        if kwargs.get("warn", True):
+        if kwargs.get("warn", False):
             logger.debug("generation of calculate for node {}".format(node.get_name()))
 
         # Set is_sequence_defined for calculate nodes based on dependencies
