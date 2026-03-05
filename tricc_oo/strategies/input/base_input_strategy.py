@@ -47,7 +47,7 @@ class BaseInputStrategy:
                     seen_diags.add(diag.name)
             # get the highest priority 
             for udiag in unique_diags:
-                diag_map = [d.priority or 0 for d in diags if d.name == udiag.name]
+                diag_map = [d.priority or 0 for d in diags if udiag.name == d.name[7:]]
                 if diag_map:
                     udiag.priority = max((udiag.priority or 0), *diag_map)
             
