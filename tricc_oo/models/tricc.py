@@ -376,7 +376,7 @@ class TriccNodeSelectOption(TriccNodeDisplayModel):
     def get_name(self):
         name = super().get_name()
         select_name = self.select.get_name()
-        return select_name + "::" + name
+        return select_name + "|" + name
 
 
 class TriccNodeSelect(TriccNodeInputModel):

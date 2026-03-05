@@ -144,7 +144,7 @@ class TriccBaseModel(BaseModel):
         return hash_value
 
     def get_name(self):
-        return f"{self.id}::{self.instance}::{self.version}" 
+        return f"{self.id}|{self.instance}|{self.version}" 
     
     def __str__(self):
         return self.get_name()
@@ -193,9 +193,9 @@ class TriccGroup(TriccBaseModel):
         label = getattr(self, "label", None)
 
         if name:
-            result = result + "::" + name
+            result = result + "|" + name
         if label:
-            result = result + "::" + (next(iter(self.label.values())) if isinstance(self.label, Dict) else self.label)
+            result = result + "|" + (next(iter(self.label.values())) if isinstance(self.label, Dict) else self.label)
         if len(name) < 50:
             return result
         else:
@@ -233,9 +233,9 @@ class TriccNodeBaseModel(TriccBaseModel):
         label = getattr(self, "label", None)
 
         if name:
-            result += f"{name}::{self.instance}::{self.version}" 
+            result += f"|{name}|{self.instance}|{self.version}" 
         if label:
-            result += "::" + (next(iter(self.label.values())) if isinstance(self.label, Dict) else self.label)
+            result += "|" + (next(iter(self.label.values())) if isinstance(self.label, Dict) else self.label)
         if len(result) < 80:
             return result
         else:
@@ -314,7 +314,7 @@ class TriccStatic(BaseModel):
         return self.__copy__()
 
     def __repr__(self):
-        return self.__class__.__name__ + ":" + str(type(self.value)) + ":" + str(self.value)
+        return self.__class__.__name__ + "|" + str(type(self.value)) + "|" + str(self.value)
 
     def get_references(self):
         return OrderedSet()
