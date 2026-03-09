@@ -292,7 +292,7 @@ def load_calculate(
             if all_prev_versions and hasattr(node, "relevance"):
                 # search for same node in completly differnt activity
                 last_expressions_other_activity = [
-                    not_clean(and_join([has_node_data_operation(l),TriccOperation(TriccOperator.ISTRUE,[l.activity.root])])) for l in  all_prev_versions if (
+                    (and_join([has_node_data_operation(l),TriccOperation(TriccOperator.ISTRUE,[l.activity.root])])) for l in  all_prev_versions if (
                         node.is_sequence_defined and
                         node.activity.base_instance != l.activity.base_instance
                     )
