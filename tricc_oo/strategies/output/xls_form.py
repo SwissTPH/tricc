@@ -425,7 +425,12 @@ class XLSFormStrategy(BaseOutPutStrategy):
         return f"{ref_expressions[0]} mod {ref_expressions[1]}"
 
     def tricc_operation_coalesce(self, ref_expressions, original_references=None):
-        return f"coalesce({','.join(map(self.clean_coalesce, ref_expressions))})"
+        if len(ref_expressions) <= 1:
+            return ref_expressions[0] if ref_expressions else ""
+        result = ref_expressions[-1]
+        for expr in reversed(ref_expressions[:-1]):
+            result = f"coalesce({self.clean_coalesce(expr)}, {result})"
+        return result
 
     def tricc_operation_module(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]} mod {ref_expressions[1]}"
