@@ -1,6 +1,6 @@
 <mxfile host="Electron" agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/29.0.3 Chrome/140.0.7339.249 Electron/38.7.0 Safari/537.36" version="29.0.3" pages="2">
   <diagram name="Page-1" id="aJ8MWjX5gSV-QbW_ORv6">
-    <mxGraphModel dx="1037" dy="722" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="850" math="0" shadow="0">
+    <mxGraphModel dx="1040" dy="722" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="850" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -37,7 +37,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="RYit9SA1A9SXWs2JC0D3-4" value="&amp;gt;0" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="ohl9Rrx2-dCzlsjSCRpC-7" target="RYit9SA1A9SXWs2JC0D3-3">
+        <mxCell id="RYit9SA1A9SXWs2JC0D3-4" value="&amp;gt;0" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="ohl9Rrx2-dCzlsjSCRpC-7" target="RYit9SA1A9SXWs2JC0D3-3" edge="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <UserObject label="Why ?" name="select_why" odk_type="select_multiple" filter="demo.reason" id="ohl9Rrx2-dCzlsjSCRpC-7">
@@ -115,7 +115,7 @@
             <mxGeometry x="810" y="300" width="145" height="37" as="geometry" />
           </mxCell>
         </object>
-        <mxCell id="RYit9SA1A9SXWs2JC0D3-2" value="No" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;fillColor=#F8CECC;" edge="1" parent="1" source="ohl9Rrx2-dCzlsjSCRpC-4" target="RYit9SA1A9SXWs2JC0D3-1">
+        <mxCell id="RYit9SA1A9SXWs2JC0D3-2" value="No" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;fillColor=#F8CECC;" parent="1" source="ohl9Rrx2-dCzlsjSCRpC-4" target="RYit9SA1A9SXWs2JC0D3-1" edge="1">
           <mxGeometry x="0.0092" relative="1" as="geometry">
             <mxPoint x="299" y="210" as="targetPoint" />
             <mxPoint as="offset" />
@@ -123,13 +123,21 @@
           </mxGeometry>
         </mxCell>
         <UserObject label="Are you happy" name="demo.filter" odk_type="select_one yesno" id="RYit9SA1A9SXWs2JC0D3-1">
-          <mxCell style="html=1;whiteSpace=wrap;fillColor=none;rounded=0;strokeColor=default;align=left;" vertex="1" parent="1">
+          <mxCell style="html=1;whiteSpace=wrap;fillColor=none;rounded=0;strokeColor=default;align=left;" parent="1" vertex="1">
             <mxGeometry x="220" y="107" width="120" height="40" as="geometry" />
           </mxCell>
         </UserObject>
         <object label="&lt;font style=&quot;font-size: 12px&quot;&gt;You selected at least one choice&lt;/font&gt;" odk_type="note" name="demo.m.select_1" id="RYit9SA1A9SXWs2JC0D3-3">
-          <mxCell style="rounded=0;whiteSpace=wrap;html=1;align=left;fillColor=none;fontSize=12;strokeColor=default;" vertex="1" parent="1">
+          <mxCell style="rounded=0;whiteSpace=wrap;html=1;align=left;fillColor=none;fontSize=12;strokeColor=default;" parent="1" vertex="1">
             <mxGeometry x="565" y="388" width="145" height="37" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="qFkceLY8S44EkVPFjCC4-2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="qFkceLY8S44EkVPFjCC4-1" target="RYit9SA1A9SXWs2JC0D3-3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object label="[tittle help]&lt;br&gt;&lt;br&gt;my help message" odk_type="help-message" id="qFkceLY8S44EkVPFjCC4-1">
+          <mxCell style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=left;fontSize=12;" vertex="1" parent="1">
+            <mxGeometry x="565" y="500" width="120" height="39" as="geometry" />
           </mxCell>
         </object>
       </root>
