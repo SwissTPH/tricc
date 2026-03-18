@@ -175,13 +175,17 @@ def get_version_inheritance(node, all_prev_versions, processed_nodes):
             else:
                 expression = node.expression or node.expression_reference or getattr(node, "relevance", None)
                 # Merge with ALL previous versions, not just the last one
-                if all_prev_versions:
+                if all_prev_versions and expression:
                     expression = merge_expressions(expression, *all_prev_versions)
+                elif len(all_prev_versions) == 1:
+                    expression = all_prev_versions[0]
+                elif all_prev_versions:
+                    expression = merge_expressions(*all_prev_versions)
                 if node.expression:
                     node.expression = expression
                 elif node.expression_reference:
                     node.expression_reference = expression
-                elif node.relevance:
+                elif getattr(node, 'relevance', None):
                     node.relevance = expression
     else:
         node.last = False
@@ -217,14 +221,30 @@ def get_version_inheritance(node, all_prev_versions, processed_nodes):
 
 
 def merge_expressions(expression, last_version, *argv):
+    priors = [last_version] + list(argv)
     datatype = expression.get_datatype()
+
+    def has_input_ref(node_or_op):
+        if issubclass(node_or_op.__class__, (TriccNodeInputModel, TriccNodeSelect)):
+            return True
+        if hasattr(node_or_op, 'get_references') and node_or_op.get_references():
+            return any(has_input_ref(r) for r in node_or_op.get_references() if r != node_or_op)
+        return False
+
+    all_nodes = [expression] + priors
+    has_inputs = any(has_input_ref(n) for n in all_nodes if hasattr(n, 'get_references') or issubclass(type(n), TriccNodeBaseModel))
+
     if datatype == "boolean":
-        expression = or_join([expression] + [TriccOperation(TriccOperator.ISTRUE, [n]) for n in [last_version, *argv]])
-    elif datatype == "number":
-        expression = TriccOperation(TriccOperator.PLUS, [last_version, *argv, expression])
+        return or_join([expression] + [TriccOperation(TriccOperator.ISTRUE, [p]) for p in priors])
+    elif has_inputs and datatype in ("number", "integer"):
+        summed = TriccOperation(TriccOperator.PLUS, priors + [expression])
+        return TriccOperation(TriccOperator.COALESCE, [summed])
+        # Coalesce: inputs/values/strings
+        
     else:
-        expression = TriccOperation(TriccOperator.COALESCE, [expression, last_version, *argv])
-    return expression
+        # Plus then coalesce: pure additive calcs
+        return TriccOperation(TriccOperator.COALESCE, [expression] + priors)
+        
 
 
 def load_calculate(
@@ -318,7 +338,15 @@ def load_calculate(
 
                     elif hasattr(node, "relevance"):
                         node.relevance = version_relevance
-
+            if (
+                not node.is_sequence_defined
+                and issubclass(type(node), TriccNodeDisplayCalculateBase)
+                and not isinstance(node, TriccNodeRhombus)
+                and node.prev_nodes   
+            ):
+                if node.reference:
+                    logger.critical(f"{node.get_name()} has both reference and prev_nodes")
+                node.is_sequence_defined = True
             # if hasattr(node, 'next_nodes'):
             # node.next_nodes=reorder_node_list(node.next_nodes, node.group)
             process_reference(
@@ -588,7 +616,7 @@ def generate_calculates(node, calculates, used_calculates, processed_nodes, proc
         for option in node.options.values():
             if not option.name.startswith("opt_") and node.name != 'manual.diag':
                 calc_id = generate_id(f"contains_{node.id}_{option.name}")
-                expression = TriccOperation(TriccOperator.CONTAINS, [node, TriccStatic(option.name)])
+                expression = TriccOperation(TriccOperator.CONTAINS, [node, option.name])
                 calc_node = TriccNodeCalculate(
                     name=option.name,
                     id=calc_id,
@@ -781,7 +809,7 @@ def process_reference(
             used_calculates=used_calculates,
             replace_reference=replace_reference,
             warn=warn,
-            codesystems=codesystems,
+            codesystems=codesystems
         )
         if modified_expression is False:
             return False
@@ -846,96 +874,172 @@ def process_operation_reference(
     used_calculates=None,
     replace_reference=False,
     warn=False,
-    codesystems=None,
+    codesystems=None
 ):
-    modified_operation = None
-    node_reference = []
-    reference = []
-    option_references = []
-    option_label = None
-    ref_list = [r.value for r in operation.get_references() if isinstance(r, TriccReference)]
-    real_ref_list = [r for r in operation.get_references() if issubclass(r.__class__, TriccNodeBaseModel)]
-    for ref in ref_list:
-        if ref.endswith("]"):
-            terms = ref[:-1].split("[")
-            option_label = terms[1]
-            ref = terms[0]
+    """
+    Process references inside an operation expression.
+    Returns:
+        - modified_operation (or None if no replacement occurred)
+        - False if processing should be deferred (unresolved references)
+    """
+    if not operation or not hasattr(operation, 'get_references') or not operation.get_references():
+        return None  # nothing to do
+
+    modified_op = None
+    resolved_nodes = []           # TriccNodeBaseModel instances
+    resolved_refs = []            # TriccReference objects kept for compatibility
+    unresolved_names = []         # strings that are still not resolved
+    # ───────────────────────────────────────────────
+    # 1. Collect all reference strings and classify them
+    # ───────────────────────────────────────────────
+    string_refs = [r.value for r in operation.get_references() if isinstance(r, TriccReference)]
+    real_node_refs = [r for r in operation.get_references() if issubclass(r.__class__, TriccNodeBaseModel)]
+
+    for ref_str in string_refs:
+        option_label = None
+        clean_ref = ref_str
+
+        # Handle option syntax: question[option_label]
+        if ref_str.endswith("]"):
+            parts = ref_str[:-1].split("[", 1)
+            if len(parts) == 2:
+                clean_ref, option_label = parts
+
+        # Try to find the referenced node
+        candidates_in_activity = [
+            n for n in node.activity.nodes.values()
+            if n.name == clean_ref
+            and n != node
+            and not isinstance(n, TriccNodeSelectOption)
+        ]
+
+        if candidates_in_activity:
+            if any(n not in processed_nodes for n in candidates_in_activity):
+                return False  # defer — not all versions processed yet
+            target_node = candidates_in_activity[0]  # assuming name uniqueness
         else:
-            option_label = None
-        node_in_act = [n for n in node.activity.nodes.values() if n.name == ref and n != node]
-        is_option = any(isinstance(n, TriccNodeSelectOption) for n in node_in_act)
-        if is_option:
-            option_references.append(ref)
-        else:
-            if node_in_act:
-                if any(n not in processed_nodes for n in node_in_act):
+            target_node = get_last_version(name=clean_ref, processed_nodes=processed_nodes)
+
+        if target_node is None or isinstance(target_node, TriccNodeSelectOption):
+            unresolved_names.append(ref_str)  # keep original form with [label] if present
+            continue
+
+        # We found a valid node
+        resolved_nodes.append(target_node)
+        resolved_refs.append(TriccReference(clean_ref))
+
+        # Option syntax handling
+        if option_label:
+            option_code = get_option_code_from_label(target_node, option_label)
+            if option_code:
+                # Replace the full "q[opt]" → option code
+                if modified_op is None:
+                    modified_op = operation.copy(keep_node=True)
+                modified_op = replace_code_reference(
+                    modified_op,
+                    old=f"{clean_ref}[{option_label}]",
+                    new=option_code
+                )
+            else:
+                if warn:
+                    logger.warning(f"Cannot resolve option label '{option_label}' in {clean_ref!r} for {node}")
+                return False
+
+        # Replace node reference in expression if requested
+        if replace_reference:
+            if not issubclass(
+                target_node.__class__,
+                (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase, TriccNodeInput)
+            ):
+                target_node = get_node_expression(target_node, processed_nodes, is_prev=True)
+
+            if modified_op is None:
+                modified_op = operation.copy(keep_node=True)
+
+            if isinstance(operation, TriccOperation):
+                modified_op.replace_node(TriccReference(clean_ref), target_node)
+            elif operation == TriccReference(clean_ref):
+                modified_op = target_node
+
+        # Update path length
+        path_len = getattr(target_node, "path_len", 0)
+        if isinstance(target_node, TriccOperation):
+            path_len = max(getattr(n, "path_len", 0) for n in target_node.get_references())
+        node.path_len = max(node.path_len, path_len)
+
+    # ───────────────────────────────────────────────
+    # 2. Check real node references (already objects)
+    # ───────────────────────────────────────────────
+    for ref_node in real_node_refs:
+        if not is_prev_processed(ref_node, node, processed_nodes=processed_nodes, local=False):
+            return False
+
+    # ───────────────────────────────────────────────
+    # 3. Try to resolve remaining unfound names → maybe they are options
+    # ───────────────────────────────────────────────
+    still_unresolved = []
+
+    for orig_ref in unresolved_names:
+        found = False
+
+        # Check if it's an option of an already resolved select question
+        for sel_node in [*real_node_refs, *resolved_nodes]:
+            if not issubclass(sel_node.__class__, TriccNodeSelect):
+                continue
+
+            for opt in sel_node.options.values():
+                if opt.name == orig_ref:
+                    resolved_nodes.append(opt)
+                    resolved_refs.append(TriccReference(opt.name))
+                    found = True
+
+                    # Important: also inject into modified operation!
+                    if modified_op is None:
+                        modified_op = operation.copy(keep_node=True)
+                    modified_op.replace_node(TriccReference(orig_ref), opt)
+
+                    break
+
+            if found:
+                break
+
+        if not found:
+            still_unresolved.append(orig_ref)
+
+    # ───────────────────────────────────────────────
+    # 4. Handle still unresolved references
+    # ───────────────────────────────────────────────
+    if still_unresolved:
+        for ref in still_unresolved:
+            if codesystems:
+                concept = lookup_codesystems_code(codesystems, ref)
+                if concept:
+                    if warn:
+                        logger.debug(f"Code system ref {ref} → {concept.display} (not processed yet?)")
                     return False
                 else:
-                    last_found = node_in_act[0]
+                    logger.critical(f"Reference not found in codesystems: {ref} in {node}")
+                    exit(1)
             else:
-                last_found = get_last_version(name=ref, processed_nodes=processed_nodes)
-            if last_found is None:
-                if codesystems:
-                    concept = lookup_codesystems_code(codesystems, ref)
-                    if not concept:
-                        logger.critical(f"reference {ref} not found in the project for{str(node)} ")
-                        exit(1)
-                    else:
-                        if warn:
-                            logger.debug(f"reference {ref}::{concept.display} not yet processed {node.get_name()}")
-
-                elif warn:
-                    logger.debug(f"reference {ref} not found for a calculate {node.get_name()}")
+                if warn:
+                    logger.debug(f"Unresolved reference {ref!r} in calculate/display {node.get_name()}")
                 return False
-            else:
-                node_reference.append(last_found)
-                reference.append(TriccReference(ref))
-                if replace_reference:
-                    if not issubclass(
-                        last_found.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase, TriccNodeInput)
-                    ):
-                        last_found = get_node_expression(last_found, processed_nodes, is_prev=True)
-                    if isinstance(operation, (TriccOperation)):
-                        if modified_operation is None:
-                            modified_operation = operation.copy(keep_node=True)
-                        modified_operation.replace_node(TriccReference(ref), last_found)
-                    elif operation == TriccReference(ref):
-                        modified_operation = last_found
-                if option_label:
-                    # Resolve human-readable label
-                    option_code = get_option_code_from_label(last_found, option_label)
-                    if option_code:
-                        modified_operation = replace_code_reference(
-                            operation, old=f"{ref}[{option_label}]", new=option_code
-                        )
-                    else:
-                        if warn:
-                            logger.warning(f"Could not resolve label '{option_label}' for reference {ref}")
-                        return False
-                if hasattr(last_found, "path_len"):
-                    path_len = last_found.path_len
-                elif isinstance(last_found, TriccOperation):
-                    path_len = max(getattr(n, "path_len", 0) for n in last_found.get_references())
-                else:
-                    path_len = 0
-                node.path_len = max(node.path_len, path_len)
-    for ref in real_ref_list:
-        if is_prev_processed(ref, node, processed_nodes=processed_nodes, local=False) is False:
-            return False
-    for optr in list(option_references):
-        for n in [*real_ref_list, *node_reference]:
-            if issubclass(n.__class__, TriccNodeSelect):
-                for o in n.options.values():
-                    if o.name == optr:
-                        node_reference.append(o)
-                        reference.append(TriccReference(optr))
-    
-    
+
+    # ───────────────────────────────────────────────
+    # 5. Register used calculates if requested
+    # ───────────────────────────────────────────────
     if used_calculates is not None:
-        for ref_nodes in node_reference:
-            if issubclass(ref_nodes.__class__, TriccNodeCalculateBase):
-                add_used_calculate(node, ref_nodes, calculates, used_calculates, processed_nodes=processed_nodes)
-    return modified_operation
+        for n in resolved_nodes:
+            if issubclass(n.__class__, TriccNodeCalculateBase):
+                add_used_calculate(
+                    node,
+                    n,
+                    calculates,
+                    used_calculates,
+                    processed_nodes=processed_nodes
+                )
+
+    return modified_op
 
 
 def replace_code_reference(expression, old, new):
@@ -1355,9 +1459,13 @@ def is_ready_to_process(in_node, processed_nodes, strict=True, local=False, loop
     return True
 
 
-def is_prev_processed(prev_node, node, processed_nodes, local, loop_count=0):
+def is_prev_processed(prev_node, node, processed_nodes, local, loop_count=0 ):
     if hasattr(prev_node, "select"):
-        return is_prev_processed(prev_node.select, node, processed_nodes, local, loop_count)
+        if prev_node.select == node:
+            return True
+        else:
+            return is_prev_processed(prev_node.select, node, processed_nodes, local, loop_count )
+
     if prev_node not in processed_nodes and (not local):
         # Only log detailed failures when we suspect dependency loops (loop_count > 5)
         if loop_count > 5:
@@ -2155,7 +2263,7 @@ def get_diagnostic_node(code, display, severity, priority, activity, option):
         expression_reference=or_join(
             [
                 TriccOperation(TriccOperator.ISTRUE, [TriccReference("pre_final." + code)]),
-                TriccOperation(TriccOperator.SELECTED, [TriccReference("tricc.manual.diag"), TriccStatic(option)]),
+                TriccOperation(TriccOperator.SELECTED, [TriccReference("tricc.manual.diag"), option]),
             ]
         ),
     )
@@ -2292,9 +2400,9 @@ def get_prev_node_expression(node, activity, processed_nodes, get_overall_exp=Fa
     # get the or_list expression of all the node per activity
     for act_id in prev_activities:
         act_expression_inputs = []
-        none_sequence_defined_prev_node = False
+        none_sequence_defined_prev_node = len(node.prev_nodes) == 0
         for prev_node in prev_activities[act_id]:
-            none_sequence_defined_prev_node = none_sequence_defined_prev_node or not prev_node.is_sequence_defined
+            none_sequence_defined_prev_node = none_sequence_defined_prev_node and not prev_node.is_sequence_defined
             if (
                 excluded_name is None
                 or prev_node != excluded_name
@@ -2387,6 +2495,10 @@ def get_activity_end_terms(node, processed_nodes, process=None):
 
     return or_join(expression_inputs)
 
+def _cast_number(term):
+    if isinstance(term, TriccOperation) and term.operator in (TriccOperator.CAST_NUMBER, TriccOperator.CAST_INTEGER):
+        return term
+    return TriccOperation(TriccOperator.CAST_NUMBER, [term])
 
 def get_count_terms(node, processed_nodes, get_overall_exp, negate=False, process=None):
     terms = []
@@ -2396,9 +2508,9 @@ def get_count_terms(node, processed_nodes, get_overall_exp, negate=False, proces
         if term:
             terms.append(term)
     if len(terms) == 1:
-        return TriccOperation(TriccOperator.CAST_NUMBER, [terms[0]])
-    elif len(terms) > 0:
-        return TriccOperation(TriccOperator.PLUS, [TriccOperation(TriccOperator.CAST_NUMBER, [term]) for term in terms])
+        return _cast_number(terms[0])
+    elif len(terms) > 0: 
+        return TriccOperation(TriccOperator.PLUS, [_cast_number(term) for term in terms])
 
 
 def get_none_option(node):
@@ -2421,7 +2533,7 @@ def get_count_terms_details(prev_node, processed_nodes, get_overall_exp, negate=
     else:
         operation_none = TriccOperation(TriccOperator.SELECTED, [prev_node, TriccStatic("opt_none")])
     if isinstance(prev_node, TriccNodeSelectYesNo):
-        return TriccOperation(TriccOperator.SELECTED, [prev_node, TriccStatic(prev_node.options[0])])
+        return TriccOperation(TriccOperator.SELECTED, [prev_node, prev_node.options[0]])
     elif issubclass(prev_node.__class__, TriccNodeSelect):
         if negate:
             return
@@ -2667,6 +2779,8 @@ def get_calculation_terms(node, processed_nodes, get_overall_exp=False, negate=F
 
     if isinstance(node.expression_reference, (TriccOperation, TriccStatic)):
         expression = node.expression_reference
+    if isinstance(node.expression, (TriccOperation, TriccStatic)):
+        expression = node.expression
     elif expression is None:
         expression = get_prev_node_expression(
             node, node.activity, processed_nodes=processed_nodes, get_overall_exp=get_overall_exp, process=process
@@ -2729,7 +2843,7 @@ def get_selected_option_expression_single(option_node, negate):
 
 def get_selected_option_expression_multiple(option_node, negate):
 
-    selected = TriccOperation(TriccOperator.SELECTED, [option_node.select, TriccStatic(option_node)])
+    selected = TriccOperation(TriccOperator.SELECTED, [option_node.select, option_node])
 
     if negate:
         return and_join([
@@ -2808,14 +2922,14 @@ def generate_base(node, processed_nodes, **kwargs):
                             [
                                 TriccOperation(
                                     TriccOperator.EQUAL,
-                                    ["$this", TriccStatic(none_opt)],
+                                    ["$this", none_opt],
                                 ),
                                 TriccOperation(
                                     TriccOperator.NOT,
                                     [
                                         TriccOperation(
                                             TriccOperator.SELECTED,
-                                            ["$this", TriccStatic(none_opt)],
+                                            ["$this", none_opt],
                                         )
                                     ],
                                 ),
