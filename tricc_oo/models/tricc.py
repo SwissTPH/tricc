@@ -360,6 +360,7 @@ class TriccNodeSelectOption(TriccNodeDisplayModel):
     save: Optional[str] = None
     select: TriccNodeInputModel
     list_name: str
+    is_none: bool = False
 
     def get_datatype(self):
         if self.name.isnumeric():
