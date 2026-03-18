@@ -550,6 +550,7 @@ def get_select_options(diagram, select_node, nodes):
             list_name=select_node.list_name,
             activity=select_node.activity,
             group=select_node.group,
+            is_none=str(elm.attrib.get("is_none", 'false')) == 'true'
         )
         set_additional_attributes(["save", "relevance", "concept_type"], elm, option)
         load_expressions(option)

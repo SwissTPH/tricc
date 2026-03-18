@@ -2404,7 +2404,7 @@ def get_count_terms(node, processed_nodes, get_overall_exp, negate=False, proces
 def get_none_option(node):
     if hasattr(node, "options"):
         for opt in node.options.values():
-            if opt.name == "opt_none":
+            if opt.name == "opt_none" or opt.is_none == True:
                 return opt
     return None
 
