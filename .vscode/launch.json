@@ -7,30 +7,30 @@
       "default": "tests.test_build",
       "type": "pickString",
       "options": [
-        {
-          "label": "All Build Tests",
-          "value": "tests.test_build"
-        },
-        {
-          "label": "Basic Build Test",
-          "value": "tests.test_build.TestBuildScript.test_basic_build_with_demo_file"
-        },
-        {
-          "label": "Directory Input Test",
-          "value": "tests.test_build.TestBuildScript.test_build_with_directory_input"
-        },
-        {
-          "label": "XLSForm Strategy Test",
-          "value": "tests.test_build.TestBuildScript.test_build_with_xlsform_strategy"
-        },
-        {
-          "label": "HTML Strategy Test",
-          "value": "tests.test_build.TestBuildScript.test_build_with_html_strategy"
-        },
-        {
-          "label": "FHIR Strategy Test",
-          "value": "tests.test_build.TestBuildScript.test_build_with_fhir_strategy"
-        },
+    {
+      "name": "ETAT OPENMRS",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "tests/build.py",
+      "args": [
+        "-i",
+        "https://drive.usercontent.google.com/download?id=1BRXudvhlhFM_gcHErCBxGUReOqYWcvKM",
+        "-l",
+        "d",
+        "-o",
+        "/mnt/data/Development/tricc_oo/tests/output/",
+        "-t",
+        "-O",
+        "OpenMRSStrategy",
+        "-D",
+        "/Users/delcpa/Downloads/"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}${pathSeparator}${env:PYTHONPATH}"
+      }
+    },
         {
           "label": "DHIS2 Strategy Test",
           "value": "tests.test_build.TestBuildScript.test_build_with_dhis2_strategy"
@@ -88,7 +88,7 @@
     },
     {
       "name": "Global",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "tests/build.py",
       "args": [
@@ -112,12 +112,12 @@
     },
     {
       "name": "Adult ODK",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "tests/build.py",
       "args": [
         "-i",
-        "/mnt/data/Development/cht-chad/forms/app/adult_v31.drawio",
+        "/mnt/data/Development/cht-chad/forms/app/adult_v33.drawio",
         "-l",
         "d",
         "-o",
@@ -136,7 +136,7 @@
     },
     {
       "name": "Adult CHT",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "tests/build.py",
       "args": [
@@ -148,7 +148,7 @@
         "/mnt/data/Development/tricc-mage/output",
         "-t",
         "-O",
-        "XLSFormCHTtrategy",
+        "XLSFormCHTStrategy",
         "-D",
         "/mnt/data/Development/tricc-mage/output"
       ],
@@ -160,7 +160,7 @@
     },
     {
       "name": "Combacal",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "tests/build.py",
       "args": [
@@ -182,14 +182,15 @@
         "PYTHONPATH": "${workspaceFolder}${pathSeparator}${env:PYTHONPATH}"
       }
     },
+    
     {
       "name": "ETAT OPENMRS",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "tests/build.py",
       "args": [
         "-i",
-        "/mnt/data/Development/tricc_oo/tests/data/etat.drawio",
+        "https://drive.usercontent.google.com/download?id=1BRXudvhlhFM_gcHErCBxGUReOqYWcvKM",
         "-l",
         "d",
         "-o",
@@ -203,16 +204,16 @@
       "console": "integratedTerminal",
       "justMyCode": true,
       "env": {
-        "PYTHONPATH": "${workspaceFolder}${pathSeparator}${env:PYTHONPATH}"5
+        "PYTHONPATH": "${workspaceFolder}${pathSeparator}${env:PYTHONPATH}"
       }
     },    {
       "name": "ETAT DHIS2",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "tests/build.py",
       "args": [
         "-i",
-        "/mnt/data/Development/tricc_oo/tests/data/etat.drawio",
+        "https://drive.usercontent.google.com/download?id=1BRXudvhlhFM_gcHErCBxGUReOqYWcvKM",
         "-l",
         "d",
         "-o",
@@ -230,12 +231,12 @@
       }
     },   {
       "name": "ETAT FHIR",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "tests/build.py",
       "args": [
         "-i",
-        "/mnt/data/Development/tricc_oo/tests/data/etat.drawio",
+        "https://drive.usercontent.google.com/download?id=1BRXudvhlhFM_gcHErCBxGUReOqYWcvKM",
         "-l",
         "d",
         "-o",
@@ -253,13 +254,36 @@
       }
     },
     {
-      "name": "ETAT ODK",
-      "type": "python",
+      "name": "Combacal WS ODK",
+      "type": "debugpy",
       "request": "launch",
       "program": "tests/build.py",
       "args": [
         "-i",
-        "/mnt/data/Development/tricc_oo/tests/data/etat.drawio",
+        "https://drive.usercontent.google.com/download?id=1VT_DZMHrBLLzTTfFsyJUupfC6i2_XKek",
+        "-l",
+        "d",
+        "-o",
+        "/mnt/data/Development/tricc_oo/tests/output/",
+        "-t",
+        "-O",
+        "XLSFormCDSSStrategy",
+        "-D",
+        "/Users/delcpa/Downloads/"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}${pathSeparator}${env:PYTHONPATH}"
+      }
+    }, {
+      "name": "ETAT ODK",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "tests/build.py",
+      "args": [
+        "-i",
+        "https://drive.usercontent.google.com/download?id=1BRXudvhlhFM_gcHErCBxGUReOqYWcvKM",
         "-l",
         "d",
         "-o",
@@ -278,7 +302,7 @@
     },
     {
       "name": "Demo",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "tests/build.py",
       "args": [
@@ -297,7 +321,7 @@
     },
     {
       "name": "Medtronic TB",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "tests/build.py",
       "args": [
@@ -316,7 +340,7 @@
     },
     {
       "name": "Libya",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "tests/build.py",
       "args": [
@@ -335,7 +359,7 @@
     },
     {
       "name": "Run Build Tests",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "module": "unittest",
       "args": [
@@ -350,7 +374,7 @@
     },
     {
       "name": "Matrix: Demo + XLSForm",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "tests/build.py",
       "args": [
@@ -368,7 +392,7 @@
     },
     {
       "name": "Matrix: Demo + XLSFormCHT",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "tests/build.py",
       "args": [
@@ -386,7 +410,7 @@
     },
     {
       "name": "Matrix: Demo + XLSFormCDSS",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "tests/build.py",
       "args": [
@@ -404,7 +428,7 @@
     },
     {
       "name": "Matrix: Demo + HTML",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "tests/build.py",
       "args": [
@@ -422,7 +446,7 @@
     },
     {
       "name": "Matrix: Demo + FHIR",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "tests/build.py",
       "args": [
@@ -440,7 +464,7 @@
     },
     {
       "name": "Matrix: Demo + DHIS2",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "tests/build.py",
       "args": [
@@ -458,7 +482,7 @@
     },
     {
       "name": "Matrix: Demo + OpenMRS",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "tests/build.py",
       "args": [
@@ -476,7 +500,7 @@
     },
     {
       "name": "Matrix: Combacal + XLSForm",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "tests/build.py",
       "args": [
@@ -494,7 +518,7 @@
     },
     {
       "name": "Matrix: Combacal + XLSFormCHT",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "tests/build.py",
       "args": [
@@ -512,12 +536,12 @@
     },
     {
       "name": "Matrix: Etat + XLSForm",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "tests/build.py",
       "args": [
         "-i",
-        "./tests/data/etat.drawio",
+        "https://drive.usercontent.google.com/download?id=1BRXudvhlhFM_gcHErCBxGUReOqYWcvKM",
         "-l",
         "i",
         "-o",
@@ -530,12 +554,12 @@
     },
     {
       "name": "Matrix: Etat + XLSFormCDSS",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "tests/build.py",
       "args": [
         "-i",
-        "./tests/data/etat.drawio",
+        "https://drive.usercontent.google.com/download?id=1BRXudvhlhFM_gcHErCBxGUReOqYWcvKM",
         "-l",
         "i",
         "-o",
@@ -548,7 +572,7 @@
     },
     {
       "name": "Matrix: All Files + XLSForm",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "tests/build.py",
       "args": [

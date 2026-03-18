@@ -167,3 +167,4 @@ test/data/
 
 # Authentication files
 auth/
+tricc_oo/strategies/output/ODK_Validate.jar
