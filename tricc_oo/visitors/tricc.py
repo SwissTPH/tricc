@@ -2821,7 +2821,7 @@ def generate_base(node, processed_nodes, **kwargs):
                                 ),
                             ]
                         )  # '.=\'opt_none\' or not(selected(.,\'opt_none\'))'
-                        node.constraint_message = "**None** cannot be selected together with choice."
+                        node.constraint_message = f"**{getattr(none_opt, 'label', 'None').strip()}** cannot be selected together with other choice."
                 elif node.tricc_type in (
                     TriccNodeType.integer,
                     TriccNodeType.decimal,

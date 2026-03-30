@@ -425,10 +425,11 @@ class XLSFormStrategy(BaseOutPutStrategy):
         return f"{ref_expressions[0]} mod {ref_expressions[1]}"
 
     def tricc_operation_coalesce(self, ref_expressions, original_references=None):
-        if len(ref_expressions) <= 1:
-            return ref_expressions[0] if ref_expressions else ""
-        result = ref_expressions[-1]
-        for expr in reversed(ref_expressions[:-1]):
+        unique_ref_expressions = list(OrderedSet(ref_expressions))
+        if len(unique_ref_expressions) <= 1:
+            return unique_ref_expressions[0] if unique_ref_expressions else ""
+        result = unique_ref_expressions[-1]
+        for expr in reversed(unique_ref_expressions[:-1]):
             result = f"coalesce({self.clean_coalesce(expr)}, {result})"
         return result
 
