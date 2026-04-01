@@ -1,0 +1,29 @@
+site_name: TRICC Documentation
+site_description: Visual authoring and conversion documentation for TRICC
+site_url: https://swisstph.github.io/tricc/
+repo_url: https://github.com/SwissTPH/tricc
+repo_name: SwissTPH/tricc
+
+docs_dir: docs
+theme:
+  name: material
+  features:
+    - navigation.instant
+    - navigation.sections
+    - navigation.expand
+    - content.code.copy
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - CLI and Inputs: cli-and-inputs.md
+  - Visual Authoring Concepts: visual-authoring-concepts.md
+  - TRICC Elements: tricc-elements.md
+  - Processing Pipeline: pipeline.md
+  - Troubleshooting: troubleshooting.md
+  - GitHub Pages: github-pages.md
+
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
