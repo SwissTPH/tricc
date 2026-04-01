@@ -217,6 +217,7 @@ class TriccNodeEnd(TriccNodeDisplayCalculateBase):
 class TriccNodeActivityStart(TriccNodeFakeCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.activity_start
     relevance: Optional[Union[Expression, TriccOperation]] = None
+    status: Optional[str] = None
 
 
 def get_node_from_list(in_nodes, node_id):

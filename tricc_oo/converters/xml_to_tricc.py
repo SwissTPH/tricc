@@ -96,6 +96,105 @@ def get_all_nodes(diagram, activity, nodes):
 
     return nodes
 
+def get_activity_details(diagram, activity, project, media_path):
+    nodes = get_nodes(diagram, activity)
+    for n in nodes.values():
+        if (
+            issubclass(n.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase, TriccNodeInput))
+            and not isinstance(n, (TriccRhombusMixIn, TriccNodeRhombus, TriccNodeDisplayBridge))
+            and not n.name.startswith("label_")  # FIXME
+        ):
+            system = n.name.split(".")[0] if "." in n.name else "tricc"
+            if isinstance(n, TriccNodeSelectOption) and isinstance(n.select, TriccNodeSelectNotAvailable):
+                add_concept(
+                    project.code_systems,
+                    system,
+                    n.select.name,
+                    n.label,
+                    {"dataType": "Boolean", "conceptType": get_concept_type(n)},
+                )
+            elif not isinstance(n, TriccNodeSelectNotAvailable):
+                add_concept(
+                    project.code_systems,
+                    system,
+                    n.name,
+                    n.label,
+                    {
+                        "dataType": get_data_type(n.tricc_type),
+                        "conceptType": get_concept_type(n),
+                    },
+                )
+            elif not issubclass(n.__class__, TriccNodeCalculate):
+                system = n.name.split(".")[0] if "." in n.name else "calculate"
+                add_concept(
+                    project.code_systems,
+                    system,
+                    n.name,
+                    n.label,
+                    {
+                        "dataType": get_data_type(n.tricc_type),
+                        "conceptType": get_concept_type(n),
+                    },
+                )
+            if getattr(n, "save", None):
+                system = n.save.split(".")[0] if "." in n.save else "tricc"
+                add_concept(
+                    project.code_systems,
+                    system,
+                    n.save,
+                    n.label,
+                    {
+                        "dataType": get_data_type(n.tricc_type),
+                        "conceptType": get_concept_type(n),
+                    },
+                )
+    groups = get_groups(diagram, nodes, activity)
+    if groups and len(groups) > 0:
+        activity.groups = groups
+    if nodes and len(nodes) > 0:
+        activity.nodes = nodes
+    images = process_edges(diagram, media_path, activity, nodes)
+    if images:
+        project.images += images
+    # link back the activity
+    
+    manage_dangling_calculate(activity)
+    # Assign parent to NotAvailable
+    for node in list(
+        filter(
+            lambda p_node: isinstance(p_node, TriccNodeSelectNotAvailable),
+            list(activity.nodes.values()),
+        )
+    ):
+        prev_node = None
+        prev_edges = list(filter(lambda p_e: p_e.target == node.id, list(activity.edges)))
+        if len(prev_edges):
+            prev_node = [n for n in activity.nodes.values() if n.id in [p_e.source for p_e in prev_edges]]
+            if prev_node:
+                node.parent = prev_node[0]
+        if not node.parent:
+            logger.critical(f"unable to find the parent of the NotApplicable node {node.get_name()}")
+            exit(1)
+
+def assign_activity_process(activity, project):
+     if activity.root is not None:
+        project.pages[activity.id] = activity
+        if activity.root.tricc_type == TriccNodeType.start:
+            if "main" not in project.start_pages and (
+                activity.root.process == "main" or activity.root.process is None
+            ):
+                project.start_pages["main"] = activity
+                activity.root.process = "main"
+            elif activity.root.process is not None:
+                if activity.root.process not in project.start_pages:
+                    project.start_pages[activity.root.process] = []
+                project.start_pages[activity.root.process].append(activity)
+            else:
+                logger.warning(
+                    "Page {0} has a start node but there is already a start node in page  {1}".format(
+                        activity.label, project.start_pages[activity.root.process][0]
+                    )
+                )
 
 def create_activity(diagram, media_path, project):
 
@@ -125,107 +224,15 @@ def create_activity(diagram, media_path, project):
         edges = get_edges(diagram)
         if edges and len(edges) > 0:
             activity.edges = edges
-        nodes = get_nodes(diagram, activity)
-        for n in nodes.values():
-
-            if (
-                issubclass(n.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase, TriccNodeInput))
-                and not isinstance(n, (TriccRhombusMixIn, TriccNodeRhombus, TriccNodeDisplayBridge))
-                and not n.name.startswith("label_")  # FIXME
-            ):
-                system = n.name.split(".")[0] if "." in n.name else "tricc"
-                if isinstance(n, TriccNodeSelectOption) and isinstance(n.select, TriccNodeSelectNotAvailable):
-                    add_concept(
-                        project.code_systems,
-                        system,
-                        n.select.name,
-                        n.label,
-                        {"dataType": "Boolean", "conceptType": get_concept_type(n)},
-                    )
-                elif not isinstance(n, TriccNodeSelectNotAvailable):
-                    add_concept(
-                        project.code_systems,
-                        system,
-                        n.name,
-                        n.label,
-                        {
-                            "dataType": get_data_type(n.tricc_type),
-                            "conceptType": get_concept_type(n),
-                        },
-                    )
-                elif not issubclass(n.__class__, TriccNodeCalculate):
-                    system = n.name.split(".")[0] if "." in n.name else "calculate"
-                    add_concept(
-                        project.code_systems,
-                        system,
-                        n.name,
-                        n.label,
-                        {
-                            "dataType": get_data_type(n.tricc_type),
-                            "conceptType": get_concept_type(n),
-                        },
-                    )
-                if getattr(n, "save", None):
-                    system = n.save.split(".")[0] if "." in n.save else "tricc"
-                    add_concept(
-                        project.code_systems,
-                        system,
-                        n.save,
-                        n.label,
-                        {
-                            "dataType": get_data_type(n.tricc_type),
-                            "conceptType": get_concept_type(n),
-                        },
-                    )
-
-        groups = get_groups(diagram, nodes, activity)
-        if groups and len(groups) > 0:
-            activity.groups = groups
-        if nodes and len(nodes) > 0:
-            activity.nodes = nodes
-
-        images = process_edges(diagram, media_path, activity, nodes)
-        # link back the activity
         activity.root.activity = activity
-        manage_dangling_calculate(activity)
+        if not hasattr(root, 'status') or  root.status != 'experimental':
+            get_activity_details(diagram, activity, project, media_path)
+            # add a placeholder node in case the page is only a draft yet
+        else:
+            logger.warning("experimental page limited to root node {0}".format(name))
         # assign the process
         if activity is not None:
-            if activity.root is not None:
-                project.pages[activity.id] = activity
-                if activity.root.tricc_type == TriccNodeType.start:
-                    if "main" not in project.start_pages and (
-                        activity.root.process == "main" or activity.root.process is None
-                    ):
-                        project.start_pages["main"] = activity
-                        activity.root.process = "main"
-                    elif activity.root.process is not None:
-                        if activity.root.process not in project.start_pages:
-                            project.start_pages[activity.root.process] = []
-                        project.start_pages[activity.root.process].append(activity)
-                    else:
-                        logger.warning(
-                            "Page {0} has a start node but there is already a start node in page  {1}".format(
-                                activity.label, project.start_pages[activity.root.process][0]
-                            )
-                        )
-        if images:
-            project.images += images
-        # Assign parent to NotAvailable
-        for node in list(
-            filter(
-                lambda p_node: isinstance(p_node, TriccNodeSelectNotAvailable),
-                list(activity.nodes.values()),
-            )
-        ):
-            prev_node = None
-            prev_edges = list(filter(lambda p_e: p_e.target == node.id, list(activity.edges)))
-            if len(prev_edges):
-                prev_node = [n for n in activity.nodes.values() if n.id in [p_e.source for p_e in prev_edges]]
-                if prev_node:
-                    node.parent = prev_node[0]
-            if not node.parent:
-                logger.critical(f"unable to find the parent of the NotApplicable node {node.get_name()}")
-                exit(1)
+           assign_activity_process(activity, project)
 
     else:
         logger.warning("root not found for page {0}".format(name))
@@ -446,6 +453,7 @@ def create_root_node(diagram):
             external_id=external_id,
             parent=elm.attrib.get("parent"),
             name="ms" + id,
+            status=elm.attrib.get("status") if elm.attrib.get("status") is not None else None,
             label=elm.attrib.get("label"),
             form_id=elm.attrib.get("form_id"),
             relevance=elm.attrib.get("relevance"),
@@ -464,6 +472,7 @@ def create_root_node(diagram):
                 external_id=external_id,
                 # parent=elm.attrib.get("parent"),
                 name=name,
+                status=elm.attrib.get("status") if elm.attrib.get("status") is not None else None,
                 label=diagram.attrib.get("name"),
                 relevance=elm.attrib.get("relevance"),
                 instance=int(elm.attrib.get("instance") if elm.attrib.get("instance") is not None else 1),
