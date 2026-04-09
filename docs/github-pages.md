@@ -13,24 +13,24 @@ Publishing this `docs/` folder is straightforward.
 
 This is easiest and requires no static-site tooling.
 
-## Option B: MkDocs-based site (better navigation/search)
+## Option B: Zensical-based site (better navigation/search)
 
-Use this if you want polished navigation and search.
+Use this if you want polished navigation and search. The project uses
+[Zensical](https://zensical.org/) (the successor to Material for MkDocs, built
+by the same team) to generate a static site from the existing `mkdocs.yml`.
 
 High-level steps:
 
-1. Add `mkdocs.yml`.
-2. Install MkDocs (and optional theme).
+1. Ensure `mkdocs.yml` is present (Zensical reads it directly).
+2. Install Zensical: `pip install zensical`.
 3. Configure a GitHub Actions workflow to build/deploy to Pages.
-
-This is still manageable but adds maintenance overhead.
 
 ## Difficulty estimate
 
 - Basic Pages from `/docs`: easy.
-- MkDocs + CI deployment: moderate.
+- Zensical + CI deployment: moderate.
 - Custom theme/plugins/private auth requirements: higher complexity.
 
 ## Recommended path
 
-Start with Option A now, then move to MkDocs once content stabilizes.
+Start with Option A now, then move to Zensical once content stabilizes.
