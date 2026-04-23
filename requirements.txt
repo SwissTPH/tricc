@@ -6,7 +6,7 @@ cffi==1.16.0
 charset-normalizer==3.3.2
 cleo==2.1.0
 crashtest==0.4.1
-cryptography==46.0.5
+cryptography==46.0.7
 distlib==0.3.8
 dulwich==0.21.7
 fastjsonschema==2.20.0
