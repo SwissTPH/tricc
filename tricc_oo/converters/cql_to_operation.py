@@ -273,8 +273,7 @@ class cqlToXlsFormVisitor(cqlVisitor):
         raise NotImplementedError("Indexer not supported")
 
     def visitCastExpression(self, ctx):
-        # TODO
-        raise NotImplementedError("Cast not supported")
+        return self.visitTypeExpression(ctx)
 
     def visitPolarityExpressionTerm(self, ctx):
         if ctx.getChild(0).getText() == "-":
@@ -303,7 +302,7 @@ class cqlToXlsFormVisitor(cqlVisitor):
     def visitTypeExpression(self, ctx):
         to_type = ctx.getChild(2).getText()
         expression = self.visit(ctx.getChild(0))
-        if to_type == "int" or to_type == "integer":
+        if to_type == "int" or to_type.lower() == "integer":
             return TriccOperation(TriccOperator.CAST_INTEGER, [expression])
         elif to_type == "float" or to_type == "number":
             return TriccOperation(TriccOperator.CAST_NUMBER, [expression])

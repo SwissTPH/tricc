@@ -6,7 +6,7 @@ import base64
 
 from tricc_oo.converters.utils import generate_id
 from tricc_oo.models.base import (
-    TriccBaseModel, TriccNodeType,
+    TriccBaseModel, TriccNodeType, TriccGroup,
     TriccOperator, TriccOperation, TriccStatic, TriccReference, not_clean,
     and_join, or_join, clean_or_list, nand_join, TriccEdge
 )
@@ -246,14 +246,14 @@ def merge_expressions(expression, last_version, *argv):
         return TriccOperation(TriccOperator.COALESCE, [expression] + priors)
         
 
-
 def load_calculate(
     node, processed_nodes, stashed_nodes, calculates, used_calculates, warn=False, process=None, **kwargs
 ):
     # used_calculates dict[name, Dict[id, node]]
     # processed_nodes Dict[id, node]
     # calculates  dict[name, Dict[id, node]]
-
+    if isinstance(node, TriccGroup):
+                return True
     if node not in processed_nodes:
         # generate condition
         if is_ready_to_process(node, processed_nodes, True) and process_reference(
@@ -338,6 +338,8 @@ def load_calculate(
 
                     elif hasattr(node, "relevance"):
                         node.relevance = version_relevance
+            
+
             if (
                 not node.is_sequence_defined
                 and issubclass(type(node), TriccNodeDisplayCalculateBase)

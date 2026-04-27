@@ -784,7 +784,12 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
                 xform_content = convert_result.xform
 
                 # Write XForm to temporary file for validation
-                with tempfile.NamedTemporaryFile(mode='w', suffix='.xml', delete=False) as temp_file:
+                with tempfile.NamedTemporaryFile(
+                    mode='w',
+                    encoding='utf-8',
+                    suffix='.xml',
+                    delete=False
+                ) as temp_file:
                     temp_file.write(xform_content)
                     temp_xform_path = temp_file.name
 

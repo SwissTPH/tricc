@@ -96,6 +96,32 @@ def get_all_nodes(diagram, activity, nodes):
 
     return nodes
 
+
+def get_experimentalactivity_details(diagram, activity, project, media_path):
+    # add a activity end node + set_prev_next_node to the root node
+    activity_end = TriccNodeActivityEnd(id=generate_id(f"e{activity.name}"), activity=activity, group=activity)
+    set_prev_next_node(activity.root, activity_end, edge_only=True)
+    activity.nodes[activity_end.id] = activity_end
+    # add a note node as placeholder to display a message saying the activity was not processed yet
+    note = TriccNodeNote(id=generate_id(f"n{activity.name}"), activity=activity, group=activity, name=f"note_{activity.name}", label=f"Activity {activity.label} was not processed yet")
+    set_prev_next_node(activity.root, note, edge_only=True)
+    activity.nodes[note.id] = note
+    # add a note node as placeholder to display a message saying the activity was not processed yet
+    nodes = {}
+    list = get_tricc_type_list(diagram, "experimental-concept",  ["UserObject", "object"])
+    add_tricc_base_node(
+        diagram,
+        nodes,
+        TriccNodeCalculate,
+        list,
+        activity,
+        attributes=[],
+        mandatory_attributes=['name', 'label'],
+        has_options=False,
+    )
+
+    return nodes
+
 def get_activity_details(diagram, activity, project, media_path):
     nodes = get_nodes(diagram, activity)
     for n in nodes.values():
@@ -221,15 +247,19 @@ def create_activity(diagram, media_path, project):
         root.group = activity
         root.activity = activity
         activity.group = activity
-        edges = get_edges(diagram)
-        if edges and len(edges) > 0:
-            activity.edges = edges
-        activity.root.activity = activity
-        if not hasattr(root, 'status') or  root.status != 'experimental':
+        
+        if not hasattr(root, 'status') or  root.status != 'experimental' or root.status != 'archived':
+            edges = get_edges(diagram)
+            if edges and len(edges) > 0:
+                activity.edges = edges
+            activity.root.activity = activity
             get_activity_details(diagram, activity, project, media_path)
             # add a placeholder node in case the page is only a draft yet
-        else:
+        elif root.status == 'experimental':
+            get_experimentalactivity_details(diagram, activity, project, media_path)
             logger.warning("experimental page limited to root node {0}".format(name))
+        elif root.status == 'archived':
+            logger.warning("archived page limited to root node {0}. Skipped processing".format(name))
         # assign the process
         if activity is not None:
            assign_activity_process(activity, project)
