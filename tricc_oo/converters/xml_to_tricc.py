@@ -293,12 +293,12 @@ def process_edges(diagram, media_path, activity, nodes):
                     edge.source = nodes[edge.source].path.id
                     edge.source_external_id = None
                 elif label.lower() not in [ *TRICC_YES_LABEL,  *TRICC_NO_LABEL]:
-                    logger.critical(f"missing label on Rhombus in {diagram.attrib.get('name', diagram.attrib['id'])} from {edge.source} ")
+                    logger.critical(f"missing label on edge in {diagram.attrib.get('name', diagram.attrib['id'])} from rhombus {edge.source} ")
                     exit(1)
                 else:
                     processed = True
             elif label.lower() in TRICC_FOLLOW_LABEL:
-                logger.warning(f"continue label on unsuported node in {diagram.attrib.get('name', diagram.attrib['id'])} from {edge.source} ")
+                logger.warning(f"continue label on edge in {diagram.attrib.get('name', diagram.attrib['id'])} from rhombus {edge.source} ")
                 processed = True
             elif label.lower() in (TRICC_YES_LABEL) or label == "":
                 # do nothinbg for yes
