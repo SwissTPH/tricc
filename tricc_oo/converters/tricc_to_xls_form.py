@@ -1,7 +1,7 @@
 import logging
 from tricc_oo.converters.utils import clean_name
 from tricc_oo.models.tricc import TriccNodeSelectOption, TRICC_TRUE_VALUE, TRICC_FALSE_VALUE, TriccNodeActivity
-from tricc_oo.models.calculate import TriccNodeInput
+from tricc_oo.models.calculate import TriccNodePopulateBase
 from tricc_oo.models.base import TriccNodeBaseModel, TriccStatic, TriccReference
 
 # from babel import _
@@ -73,12 +73,19 @@ def get_export_name(node, replace_dots=True):
             )
         elif isinstance(node, TriccNodeSelectOption):
             node.export_name = node.name
+        elif getattr(node, "tricc_type", None) == "repeated":
+            # repeated: always use mandatory "last." prefix per calculation expression builder rules
+            # (placed before last=False check to prevent versioned naming for repeated nodes per spec)
+            node.export_name = clean_name(
+                "last." + node.name, replace_dots=replace_dots
+            )
         elif node.last is False:
             node.export_name = clean_name(
                 node.name + VERSION_SEPARATOR + str(node.version),
                 replace_dots=replace_dots,
             )
-        elif isinstance(node, TriccNodeInput):
+        elif issubclass(node.__class__, TriccNodePopulateBase):
+            # persistent & active: load. prefix is optional/droppable in expression contexts per spec
             node.export_name = clean_name("load." + node.name, replace_dots=replace_dots)
         else:
             node.export_name = clean_name(node.name, replace_dots=replace_dots)

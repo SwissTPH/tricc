@@ -27,9 +27,7 @@ class TriccNodeCalculateBase(TriccNodeBaseModel):
     datatype: str = "boolean"
     priority: Union[float, int, None] = None
 
-    # to use the enum value of the TriccNodeType
-    class Config:
-        use_enum_values = True  # <--
+
 
     def make_instance(self, instance_nb, activity, **kwargs):
         # shallow copy

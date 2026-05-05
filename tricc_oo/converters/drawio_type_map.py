@@ -15,7 +15,9 @@ from tricc_oo.models.calculate import (
     TriccNodeExclusive,
     TriccNodeProposedDiagnosis,
     TriccNodeDiagnosis,
-    TriccNodeInput,
+    TriccNodePopulatePersistent,
+    TriccNodePopulateActive,
+    TriccNodePopulateRepeated,
 )
 
 from tricc_oo.models.tricc import (
@@ -294,11 +296,29 @@ TYPE_MAP = {
         "mandatory_attributes": ["name", "label"],
         "model": TriccNodeProposedDiagnosis,
     },
-    TriccNodeType.input: {
+    TriccNodeType.input: { # depreated
         "objects": ["UserObject", "object"],
-        "attributes": ["save", "reference", "data_type", "concept_type"],
+        "attributes": ["save", "reference", "data_type", "concept_type", "context"],
         "mandatory_attributes": ["name", "label"],
-        "model": TriccNodeInput,
+        "model": TriccNodePopulatePersistent,
+    },
+    TriccNodeType.persistent: {
+        "objects": ["UserObject", "object"],
+        "attributes": ["save", "reference", "data_type", "concept_type", "context"],
+        "mandatory_attributes": ["name", "label"],
+        "model": TriccNodePopulatePersistent,
+    },
+    TriccNodeType.active: {
+        "objects": ["UserObject", "object"],
+        "attributes": ["save", "reference", "data_type", "concept_type", "from"],
+        "mandatory_attributes": ["name", "label"],
+        "model": TriccNodePopulateActive,
+    },
+    TriccNodeType.repeated: {
+        "objects": ["UserObject", "object"],
+        "attributes": ["save", "reference", "data_type", "concept_type", "from"],
+        "mandatory_attributes": ["name", "label"],
+        "model": TriccNodePopulateRepeated,
     },
     # TriccNodeType.number: {
     #     "objects": ["UserObject", "object"],

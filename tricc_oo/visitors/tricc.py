@@ -24,7 +24,8 @@ from tricc_oo.models.calculate import (
     TriccNodeAdd,
     TriccNodeFakeCalculateBase,
     TriccRhombusMixIn,
-    TriccNodeInput,
+    TriccNodePopulateBase,
+    TriccNodePopulateRepeated,
     TriccNodeActivityEnd,
     TriccNodeActivityStart,
     TriccNodeEnd,
@@ -90,7 +91,7 @@ def version_filter(name):
         lambda item: hasattr(item, "name")
         and ((isinstance(item, TriccNodeEnd) and name == item.get_reference()) or item.name == name)
         and not isinstance(item, TriccNodeSelectOption)
-    )
+        and not isinstance(item.__class__, TriccNodePopulateRepeated))
 
 
 def get_last_version(name, processed_nodes, _list=None):
@@ -163,6 +164,11 @@ def get_version_inheritance(node, all_prev_versions, processed_nodes):
     # Updated to merge ALL previous versions, not just the last one
     # This ensures inheritance works even when intermediate activities weren't triggered
     
+    if isinstance(node.__class__, TriccNodePopulateRepeated):
+        # repeated nodes excluded from inheritance, last-version, default value logic per spec
+        node.last = False
+        return
+
     if not issubclass(node.__class__, (TriccNodeInputModel)):
         node.last = True
         if issubclass(node.__class__, (TriccNodeDisplayCalculateBase, TriccNodeEnd)) and node.name is not None:
@@ -309,7 +315,12 @@ def load_calculate(
                         if issubclass(r.__class__, (TriccNodeDisplayCalculateBase)):
                             add_used_calculate(node, r, calculates, used_calculates, processed_nodes)
             # add skip logic for display node ()
-            if all_prev_versions and hasattr(node, "relevance"):
+            # Relevance based on last version ONLY for persistent + active (exclude repeated)
+            if (
+                all_prev_versions
+                and hasattr(node, "relevance")
+                and issubclass(node.__class__, TriccNodePopulateBase)
+            ):
                 # search for same node in completly differnt activity
                 last_expressions_other_activity = [
                     (and_join([has_node_data_operation(l),TriccOperation(TriccOperator.ISTRUE,[l.activity.root])])) for l in  all_prev_versions if (
@@ -951,7 +962,7 @@ def process_operation_reference(
         if replace_reference:
             if not issubclass(
                 target_node.__class__,
-                (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase, TriccNodeInput)
+                (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase, TriccNodePopulateBase)
             ):
                 target_node = get_node_expression(target_node, processed_nodes, is_prev=True)
 

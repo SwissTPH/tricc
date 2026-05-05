@@ -25,7 +25,7 @@ from tricc_oo.models.calculate import (
     TriccNodeProposedDiagnosis,
     TriccNodeDiagnosis,
     TriccRhombusMixIn,
-    TriccNodeInput,
+    TriccNodePopulateBase,
 )
 from tricc_oo.models.tricc import (
     TriccNodeCalculateBase,
@@ -126,7 +126,7 @@ def get_activity_details(diagram, activity, project, media_path):
     nodes = get_nodes(diagram, activity)
     for n in nodes.values():
         if (
-            issubclass(n.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase, TriccNodeInput))
+            issubclass(n.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase, TriccNodePopulateBase))
             and not isinstance(n, (TriccRhombusMixIn, TriccNodeRhombus, TriccNodeDisplayBridge))
             and not n.name.startswith("label_")  # FIXME
         ):
@@ -535,6 +535,8 @@ def set_additional_attributes(attribute_names, elm, node):
                 attribute = int(attribute)
             elif attributename == "relevance":
                 attribute = remove_html(attribute.strip())
+            elif attributename == "from":
+                attributename = "from_"
             else:
                 attribute
             setattr(node, attributename, attribute)
@@ -563,7 +565,7 @@ def get_concept_type(node):
             TriccNodeSelectOne,
             TriccNodeSelectYesNo,
             TriccNodeSelectNotAvailable,
-            TriccNodeInput,
+            TriccNodePopulateBase,
         ),
     ):
         return "Symptom-Finding"

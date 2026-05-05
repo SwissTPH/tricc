@@ -1,5 +1,9 @@
 from typing import List, Optional, Union
 import logging
+import re
+from pydantic import field_validator
+from dateutil.relativedelta import relativedelta
+
 from tricc_oo.models.base import (
     TriccBaseModel, TriccOperation, TriccStatic, TriccReference, Expression, TriccNodeType
 )
@@ -13,6 +17,63 @@ from tricc_oo.converters.utils import get_rand_name
 logger = logging.getLogger(__name__)
 
 ACTIVITY_END_NODE_FORMAT = "aend_{}"
+
+
+class TriccFrom:
+    """Object model for the 'from' attribute on active/repeated populate nodes.
+    Supports 'E'/'encounter', 'T'/'today', and ISO 8601 durations like P14D, P1M, P1Y.
+    Used in __init__/validation of from_ field.
+    """
+    def __init__(self, value: str = "E"):
+        self.raw = str(value).strip() if value else "E"
+        self.scope = None
+        self.delta = None
+        self._parse()
+
+    def _parse(self):
+        val = self.raw.upper()
+        if val in ("E", "ENCOUNTER"):
+            self.scope = "encounter"
+            self.delta = None
+        elif val in ("T", "TODAY"):
+            self.scope = "today"
+            self.delta = None
+        else:
+            self.scope = "duration"
+            self.delta = self._parse_iso_duration(val)
+
+    def _parse_iso_duration(self, s: str):
+        # Matches P1Y2M3W4D or P1Y2M3DT4H5M etc.
+        pattern = r'^P(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$'
+        match = re.match(pattern, s)
+        if match:
+            y, m, w, d, h, min_, sec = match.groups()
+            return relativedelta(
+                years=int(y or 0),
+                months=int(m or 0),
+                weeks=int(w or 0),
+                days=int(d or 0),
+                hours=int(h or 0),
+                minutes=int(min_ or 0),
+                seconds=int(sec or 0)
+            )
+        logger.warning(f"Could not parse ISO duration: {s}, treating as raw string")
+        return None
+
+    def __str__(self):
+        return self.raw
+
+    def __repr__(self):
+        return f"TriccFrom({self.raw}, scope={self.scope})"
+
+    def is_encounter(self):
+        return self.scope == "encounter"
+
+    def is_today(self):
+        return self.scope == "today"
+
+    def is_duration(self):
+        return self.scope == "duration"
 
 
 class TriccNodeDisplayCalculateBase(TriccNodeCalculateBase):
@@ -61,11 +122,48 @@ class TriccNodeProposedDiagnosis(TriccNodeDisplayCalculateBase):
 
 
 class TriccNodeFakeCalculateBase(TriccNodeCalculateBase):
-    ...
+    """Base for fake/calculate-only nodes that don't require display attributes."""
+    ... # is_sequence_defined: bool = False
 
 
-class TriccNodeInput(TriccNodeFakeCalculateBase):
-    tricc_type: TriccNodeType = TriccNodeType.input
+class TriccNodePopulateBase(TriccNodeFakeCalculateBase):
+    """Base for all populate/input node types with common attributes."""
+    data_type: Optional[str] = None
+    concept_type: Optional[str] = None
+    is_sequence_defined: bool = False
+
+
+class TriccNodePopulatePersistent(TriccNodePopulateBase):
+    tricc_type: TriccNodeType = TriccNodeType.persistent
+    context: str = "patient"  # patient, practitioner, facility, location - default patient per spec
+
+
+class TriccNodePopulateActive(TriccNodePopulateBase):
+    tricc_type: TriccNodeType = TriccNodeType.active
+    from_: Optional[Union[str, TriccFrom]] = "E"  # 'from' in spec/JSON, from_ in python; supports E,T,ISO via TriccFrom
+
+    @field_validator('from_', mode='before')
+    @classmethod
+    def validate_from(cls, v):
+        if isinstance(v, TriccFrom):
+            return v
+        if v is None:
+            return TriccFrom("E")
+        return TriccFrom(str(v))
+
+
+class TriccNodePopulateRepeated(TriccNodePopulateBase):
+    tricc_type: TriccNodeType = TriccNodeType.repeated
+    from_: Optional[Union[str, TriccFrom]] = "E"  # 'from' in spec/JSON, from_ in python
+
+    @field_validator('from_', mode='before')
+    @classmethod
+    def validate_from(cls, v):
+        if isinstance(v, TriccFrom):
+            return v
+        if v is None:
+            return TriccFrom("E")
+        return TriccFrom(str(v))
 
 
 class TriccNodeDisplayBridge(TriccNodeDisplayCalculateBase):
@@ -231,4 +329,4 @@ class TriccNodeQuantity(TriccNodeDisplayCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.quantity
 
 
-TriccNodeCalculate.update_forward_refs()
+TriccNodeCalculate.model_rebuild()

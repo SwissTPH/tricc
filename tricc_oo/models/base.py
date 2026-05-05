@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Annotated, Dict, ForwardRef, List, Optional, Union
 
-from pydantic import BaseModel, StringConstraints
+from pydantic import BaseModel, StringConstraints, ConfigDict
 from strenum import StrEnum
 
 from tricc_oo.converters.utils import generate_id, get_rand_name
@@ -61,6 +61,9 @@ class TriccNodeType(StrEnum):
     diagnosis = "diagnosis"
     proposed_diagnosis = "proposed_diagnosis"
     input = "input"
+    persistent = "persistent"
+    active = "active"
+    repeated = "repeated"
     remote_reference = "remote_reference"
 
     def __iter__(self):
@@ -156,6 +159,10 @@ class TriccBaseModel(BaseModel):
         if "id" not in data:
             data["id"] = generate_id(str(data))
         super().__init__(**data)
+    model_config = ConfigDict(
+        use_enum_values=True,
+        arbitrary_types_allowed=True,   # <-- this fixes TriccFrom (and similar)
+    )
 
 
 class TriccEdge(TriccBaseModel):
@@ -219,8 +226,6 @@ class TriccNodeBaseModel(TriccBaseModel):
     ref_def: Optional[Union[int, str]] = None  # for medal creator
     is_sequence_defined: bool = False
 
-    class Config:
-        use_enum_values = True  # <--
 
     def __hash__(self):
         return hash(self.id)
