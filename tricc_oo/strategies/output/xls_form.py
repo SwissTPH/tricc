@@ -763,6 +763,42 @@ class XLSFormStrategy(BaseOutPutStrategy):
             return f"concat({','.join(parts)})"
         return "''"
 
+    def tricc_operation_format_date(self, ref_expressions, original_references=None):
+        return f"format-date({ref_expressions[0]})"
+
+    def tricc_operation_length(self, ref_expressions, original_references=None):
+        return f"length({ref_expressions[0]})"
+
+    def tricc_operation_today(self, ref_expressions, original_references=None):
+        return f"today()"
+
+    def tricc_operation_now(self, ref_expressions, original_references=None):
+        return f"now()"
+
+    def tricc_operation_abs(self, ref_expressions, original_references=None):
+        return f"abs({ref_expressions[0]})"
+
+    def tricc_operation_min(self, ref_expressions, original_references=None):
+        return f"min({ref_expressions[0]})"
+
+    def tricc_operation_max(self, ref_expressions, original_references=None):
+        return f"max({ref_expressions[0]})"
+
+    def tricc_operation_sum(self, ref_expressions, original_references=None):
+        return f"sum({ref_expressions[0]})"
+
+    def tricc_operation_count(self, ref_expressions, original_references=None):
+        return f"count({ref_expressions[0]})"
+
+    def tricc_operation_concatenate(self, ref_expressions, original_references=None):
+        return f"concat({','.join(map(str, ref_expressions))})"
+
+    def tricc_operation_datetime_to_decimal(self, ref_expressions, original_references=None):
+        return f"decimal-date-time({ref_expressions[0]})"
+
+    def tricc_operation_cast_date(self, ref_expressions, original_references=None):
+        return f"date({ref_expressions[0]})"
+
     def validate(self):
         """Validate the generated XLS form using pyxform."""
         try:

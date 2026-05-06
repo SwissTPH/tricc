@@ -381,10 +381,22 @@ class TriccOperator(StrEnum):
     DRUG_DOSAGE = "drug_dosage"  # drug name, *param1 (ex: weight, age)
     COALESCE = "coalesce"
     CAST_DATE = "cast_date"
+    CAST_STRING = "cast_string"
+    CAST_BOOLEAN = "cast_boolean"
     PARENTHESIS = "parenthesis"
     CONCATENATE = "concatenate"
     DATETIME_TO_DECIMAL = "datetime_to_decimal"
     DIAGNOSIS_LIST = "diagnosis_list"
+    LENGTH = "length"
+    TODAY = "today"
+    NOW = "now"
+    ABS = "abs"
+    MIN = "min"
+    MAX = "max"
+    SUM = "sum"
+    FORMAT_DATE = "format_date"
+
+
 
 
 RETURNS_BOOLEAN = [
