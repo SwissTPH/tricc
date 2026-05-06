@@ -764,7 +764,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
         return "''"
 
     def tricc_operation_format_date(self, ref_expressions, original_references=None):
-        return f"format-date({ref_expressions[0]})"
+        return f"format-date({ref_expressions[0]}, {ref_expressions[1]})"
 
     def tricc_operation_length(self, ref_expressions, original_references=None):
         return f"string-length({ref_expressions[0]})"
