@@ -324,10 +324,18 @@ def process_edges(diagram, media_path, activity, nodes):
             label_html_free = html2text.html2text(label)
             processed = False
             calc = None
-            if label.lower() in TRICC_FOLLOW_LABEL:
-                if isinstance(nodes[edge.source], TriccNodeRhombus):
+            if isinstance(nodes[edge.source], TriccNodeRhombus):
+                if label.lower() in TRICC_FOLLOW_LABEL:
+                    processed = True
                     edge.source = nodes[edge.source].path.id
                     edge.source_external_id = None
+                elif label.lower() not in [ *TRICC_YES_LABEL,  *TRICC_NO_LABEL]:
+                    logger.critical(f"missing label on edge in {diagram.attrib.get('name', diagram.attrib['id'])} from rhombus {edge.source} ")
+                    exit(1)
+                else:
+                    processed = True
+            elif label.lower() in TRICC_FOLLOW_LABEL:
+                logger.warning(f"continue label on edge in {diagram.attrib.get('name', diagram.attrib['id'])} from rhombus {edge.source} ")
                 processed = True
             elif label.lower() in (TRICC_YES_LABEL) or label == "":
                 # do nothinbg for yes
@@ -1020,6 +1028,14 @@ def get_edges(diagram):
         edge.source = get_id(edge.source, diagram.attrib.get("id"))
         edge.target = get_id(edge.target, diagram.attrib.get("id"))
         set_additional_attributes(["value"], elm, edge)
+        if edge.value is None:
+            values = [e.attrib.get("value") for e in  get_mxcell_parent_list(diagram, external_id, attrib='value')]
+            if len(values) == 1:
+                logger.warning(f"value on the edge childrens beteween {edge.source} & {edge.target}")
+                edge.value = values[0]
+            elif len(values) > 1:
+                logger.critical(f"several value found for edges beteween {edge.source} & {edge.target}")
+                exit(1)
         if edge.value is not None:
             edge.value = remove_html(edge.value)
         edges.append(edge)
