@@ -36,8 +36,21 @@ FUNCTION_MAP = {
     "DrugDosage": TriccOperator.DRUG_DOSAGE,
     "HasQualifier": TriccOperator.HAS_QUALIFIER,
     "DateTimeToDecimal": TriccOperator.DATETIME_TO_DECIMAL,
+    "ToDate": TriccOperator.CAST_DATE,
+    "ToDecimal": TriccOperator.CAST_NUMBER,
+    "ToInteger": TriccOperator.CAST_INTEGER,
+    "ToString": TriccOperator.CAST_STRING,
+    "ToBoolean": TriccOperator.CAST_BOOLEAN,
     "Count": TriccOperator.COUNT,
     "DiagnosisList": TriccOperator.DIAGNOSIS_LIST,
+    "Today": TriccOperator.TODAY,
+    "Now": TriccOperator.NOW,
+    "Abs": TriccOperator.ABS,
+    "Min": TriccOperator.MIN,
+    "Max": TriccOperator.MAX,
+    "Sum": TriccOperator.SUM,
+    "FormatDate": TriccOperator.FORMAT_DATE,
+    "Length": TriccOperator.LENGTH,
 }
 # TODO
 # Min
