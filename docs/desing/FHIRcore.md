@@ -108,15 +108,16 @@ Output: FHIR SDC resources (Questionnaire, PlanDefinition, Library+CQL, Structur
 
 ### Next Steps & Validation Checklist (Implementation-Ready)
 
-- [ ] Implement `get_process()` utility.  
-- [ ] Create node-type mapping table + reuse `pyfhirsdc` questionnaireItemConverter.py logic.  
-- [ ] Implement concept_type → FHIR resource mapping by reusing pyfhirsdc openMRS logic.  
-- [ ] Prototype CQL library generation (helpers + wrappers) and FSH + Composition + Binary manifest.  
-- [ ] Add `OpenSRPStrategy` skeleton in `strategies/` and register it.  
-- [ ] Extend expression visitor for dual FHIRPath + CQL output.  
-- [ ] Add/update documentation (`docs/open-srp-export.md` + mapping tables in `docs/tricc-elements.md`).  
-- [ ] Write unit tests using `tests/data/` drawio files.  
-- [ ] Run full pipeline (`tests/build.py`) and validate against fhircore.  
+- [x] **FHIRPath Expression Improvements**: Enhanced FHIRPath generation to correctly handle list vs scalar contexts. For list-aware operations (`contains`, `selected`, `has_qualifier`), references now omit `.first().value` to work on collections. Scalar operations retain `.first().value` for proper value extraction. CQL methods now delegate to FHIRPath equivalents with `is_cql=True` flag.
+- [ ] Implement `get_process()` utility.
+- [ ] Create node-type mapping table + reuse `pyfhirsdc` questionnaireItemConverter.py logic.
+- [ ] Implement concept_type → FHIR resource mapping by reusing pyfhirsdc openMRS logic.
+- [ ] Prototype CQL library generation (helpers + wrappers) and FSH + Composition + Binary manifest.
+- [ ] Add `OpenSRPStrategy` skeleton in `strategies/` and register it.
+- [ ] Extend expression visitor for dual FHIRPath + CQL output.
+- [ ] Add/update documentation (`docs/open-srp-export.md` + mapping tables in `docs/tricc-elements.md`).
+- [ ] Write unit tests using `tests/data/` drawio files.
+- [ ] Run full pipeline (`tests/build.py`) and validate against fhircore.
 - [ ] PEP 8, type hints, docstrings, logging, 120-char lines, no print statements.
 
 This specification (v4) is now **complete, precise, and implementation-ready**. All clarifications (including the latest on pyfhirsdc openMRS mapping, OCL note, fhircore Composition/Binary, and openSRP profile) have been ordered, cleaned, and integrated.

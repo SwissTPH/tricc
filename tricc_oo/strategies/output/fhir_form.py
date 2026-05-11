@@ -26,9 +26,9 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from tricc_oo.converters.fhir.concept_mapper import get_fhir_resource, get_fhir_value_field
+
 from tricc_oo.converters.fhir.questionnaire_item_mapper import (
     CALCULATE_NODE_TYPES,
-    INITIAL_EXPR_CQL_NODE_TYPES,
     SDC_EXT_CALCULATED_EXPR,
     SDC_EXT_ENABLE_WHEN_EXPR,
     SDC_EXT_HIDDEN,
@@ -36,10 +36,10 @@ from tricc_oo.converters.fhir.questionnaire_item_mapper import (
     build_enable_when_expression,
     build_hidden_extension,
     build_initial_expression,
-    build_initial_expression_cql,
     build_calculated_expression,
     get_display_type_extensions,
     get_fhir_item_type,
+    is_default_or_odk_input,
     is_hidden,
     is_repeating,
     should_skip,
@@ -72,6 +72,9 @@ LIBRARY_PROFILE = "http://hl7.org/fhir/StructureDefinition/Library"
 STRUCTUREMAP_PROFILE = "http://hl7.org/fhir/StructureDefinition/StructureMap"
 VALUESET_PROFILE = "http://hl7.org/fhir/StructureDefinition/ValueSet"
 CODESYSTEM_PROFILE = "http://hl7.org/fhir/StructureDefinition/CodeSystem"
+
+# List-context operators that work on collections without needing .first().value
+LIST_CONTEXT_OPERATORS = {"contains", "selected", "has_qualifier", "count"}
 
 # CQL helper library template (based on pyfhirsdc/core_fhir/cql/pyfhirsdc.cql patterns)
 CQL_HELPER_TEMPLATE = """\
@@ -143,6 +146,7 @@ class FHIRStrategy(BaseOutPutStrategy):
         structuremaps: Dict mapping process name → StructureMap resource dict.
         valuesets: Dict mapping list_name → ValueSet resource dict.
         binaries: List of Binary resource dicts (images).
+        cur_group: Current group context for nesting items (Optional[dict]).
     """
 
     processes = ["main"]
@@ -167,6 +171,7 @@ class FHIRStrategy(BaseOutPutStrategy):
         self.valuesets: Dict[str, dict] = {}
         self.binaries: List[dict] = []
         self._form_id: Optional[str] = None
+        self.cur_group: Optional[dict] = None
 
     # ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -198,6 +203,8 @@ class FHIRStrategy(BaseOutPutStrategy):
     def generate_base(self, node, **kwargs) -> bool:
         """Build a Questionnaire item for the given node.
 
+        Manages group nesting: groups set cur_group context, non-groups append to cur_group or root.
+
         Args:
             node: TRICC node being processed.
             **kwargs: Additional keyword arguments from the walker.
@@ -216,16 +223,31 @@ class FHIRStrategy(BaseOutPutStrategy):
         if not link_id:
             return True
 
-        # Avoid duplicate items
-        existing_ids = {item.get("linkId") for item in q.get("item", [])}
-        if link_id in existing_ids:
+        # Avoid duplicate items (check recursively if nested)
+        if self._find_item(q, link_id) is not None:
             return True
 
         fhir_type = get_fhir_item_type(tricc_type)
+
         item: dict = {
             "linkId": link_id,
             "type": fhir_type,
         }
+
+        # Handle group nesting
+        if fhir_type == "group":
+            # Special case: ignore "main" process root group (matches PD semantics)
+            if process == "main" and tricc_type in ("start", "activity_start"):
+                return True  # Skip emitting the root group
+            # Initialize group with items list
+            item["item"] = []
+           
+            # Append to current group or questionnaire root
+            parent_target = self.cur_group["item"] if self.cur_group else q.setdefault("item", [])
+            parent_target.append(item)
+            # Set as current group context and append to parent
+            self.cur_group = item
+            return True
 
         # Label / text
         label = getattr(node, "label", None)
@@ -282,7 +304,9 @@ class FHIRStrategy(BaseOutPutStrategy):
         if required and not is_hidden(tricc_type):
             item["required"] = True
 
-        q.setdefault("item", []).append(item)
+        # Append to current group or questionnaire root
+        target = self.cur_group["item"] if self.cur_group else q.setdefault("item", [])
+        target.append(item)
         return True
 
     def generate_relevance(self, node, **kwargs) -> bool:
@@ -342,43 +366,42 @@ class FHIRStrategy(BaseOutPutStrategy):
         link_id = get_export_name(node)
         item = self._find_item(q, link_id)
 
+
         tricc_type = str(getattr(node, "tricc_type", ""))
         is_calc = tricc_type in CALCULATE_NODE_TYPES
-        is_initial_cql = tricc_type in INITIAL_EXPR_CQL_NODE_TYPES
+        is_input = is_default_or_odk_input(node)
 
         try:
-            cql_expr = self.convert_expression_to_cql(expression)
-            if cql_expr:
-                define_name = link_id.replace(".", "_").replace("-", "_")
-                if item is not None:
-                    if is_initial_cql:
-                        # Rhombus nodes: initialExpression with inline text/cql
-                        # (no named define added to the CQL library)
-                        ext = build_initial_expression_cql(cql_expr)
+            if is_input or is_calc:
+                cql_expr = self.convert_expression_to_cql(expression)
+                if cql_expr:
+                    define_name = link_id.replace(".", "_").replace("-", "_")
+                    self.cql_defines.setdefault(process, []).append(
+                        f'define "{define_name}":\n  {cql_expr}'
+                    )
+                    if is_calc:
+                        ext = build_calculated_expression(
+                            define_name, library_name=f"{self._form_id}_{process}"
+                        )
                     else:
-                        # All other nodes: add a named define to the CQL library
-                        # and reference it via cql-identifier
-                        self.cql_defines.setdefault(process, []).append(
-                            f'define "{define_name}":\n  {cql_expr}'
+                        ext = build_initial_expression(
+                            define_name, library_name=f"{self._form_id}_{process}"
                         )
-                        if is_calc:
-                            ext = build_calculated_expression(
-                                define_name, library_name=f"{self._form_id}_{process}"
-                            )
-                        else:
-                            ext = build_initial_expression(
-                                define_name, library_name=f"{self._form_id}_{process}"
-                            )
+                    if item is not None:
+                        item.setdefault("extension", []).append(ext)
+            else:
+                fhirpath_expr = self.convert_expression_to_fhirpath(expression)
+                if fhirpath_expr and item is not None:
+                    ext = {
+                        "url": SDC_EXT_INITIAL_EXPR,
+                        "valueExpression": {
+                            "language": "text/fhirpath",
+                            "expression": fhirpath_expr,
+                        },
+                    }
                     item.setdefault("extension", []).append(ext)
-                else:
-                    # No questionnaire item (e.g. skipped node) — still register
-                    # the define for non-rhombus nodes so it can be referenced
-                    if not is_initial_cql:
-                        self.cql_defines.setdefault(process, []).append(
-                            f'define "{define_name}":\n  {cql_expr}'
-                        )
         except NotImplementedError as exc:
-            logger.warning(f"CQL conversion not supported for node {link_id}: {exc}")
+            logger.warning(f"Expression conversion not supported for node {link_id}: {exc}")
         return True
 
     def generate_export(self, node, **kwargs) -> bool:
@@ -431,6 +454,10 @@ class FHIRStrategy(BaseOutPutStrategy):
             start_pages: Dict of start pages from the project.
             version: Build version string.
         """
+        # Prune empty groups before writing
+        for q in self.questionnaires.values():
+            self._prune_empty_groups(q)
+        
         base = Path(self.output_path) / self._form_id
         self._write_questionnaires(base, version)
         self._write_libraries(base, version)
@@ -477,6 +504,8 @@ class FHIRStrategy(BaseOutPutStrategy):
                 "subjectType": ["Patient"],
                 "item": [],
             }
+            # Reset group context per questionnaire
+            self.cur_group = None
         return self.questionnaires[process]
 
     def _get_or_create_structuremap(self, process: str) -> dict:
@@ -732,6 +761,25 @@ class FHIRStrategy(BaseOutPutStrategy):
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
+    def _prune_empty_groups(self, questionnaire: dict) -> None:
+        """Recursively remove empty groups from a Questionnaire.
+
+        Args:
+            questionnaire: Questionnaire resource dict to prune.
+        """
+        def prune_items(items: List[dict]) -> None:
+            to_remove = []
+            for item in items:
+                if item.get("type") == "group":
+                    g_items = item.get("item", [])
+                    prune_items(g_items)
+                    if g_items == []:
+                        to_remove.append(item)
+            for item in to_remove:
+                items.remove(item)
+
+        prune_items(questionnaire.get("item", []))
+
     def _find_item(self, questionnaire: dict, link_id: str) -> Optional[dict]:
         """Find a Questionnaire item by linkId (recursive).
 
@@ -767,6 +815,7 @@ class FHIRStrategy(BaseOutPutStrategy):
         if not hasattr(operation, "reference"):
             return self._operand_to_cql(operation)
         ref_expressions = []
+        original_references = []
         for r in operation.reference:
             if isinstance(r, list):
                 ref_expressions.append([
@@ -774,14 +823,17 @@ class FHIRStrategy(BaseOutPutStrategy):
                     else self._operand_to_cql(sr)
                     for sr in r
                 ])
+                original_references.append(r)
             elif isinstance(r, TriccOperation):
                 ref_expressions.append(self.get_tricc_operation_expression(r))
+                original_references.append(r)
             else:
                 ref_expressions.append(self._operand_to_cql(r))
+                original_references.append(r)
 
         method = f"tricc_operation_{operation.operator}"
         if hasattr(self, method):
-            return getattr(self, method)(ref_expressions)
+            return getattr(self, method)(ref_expressions, original_references)
         raise NotImplementedError(f"CQL: operator '{operation.operator}' not implemented")
 
     def convert_expression_to_cql(self, expression) -> str:
@@ -810,37 +862,83 @@ class FHIRStrategy(BaseOutPutStrategy):
             return self._operation_to_fhirpath(expression)
         return self._operand_to_fhirpath(expression)
 
-    def _operation_to_fhirpath(self, operation) -> str:
+    def _operation_to_fhirpath(self, operation, add_first_value: bool = True, is_cql: bool = False) -> str:
         """Recursively convert a TriccOperation to FHIRPath.
 
         Args:
             operation: TriccOperation to convert.
+            add_first_value: If True (default), append .first().value to reference/node
+                            operands for scalar contexts. If False, emit just the
+                            .answer list reference for list-aware operations.
+            is_cql: If True, this conversion is for CQL context (no .first().value).
 
         Returns:
             FHIRPath expression string.
         """
         if not hasattr(operation, "reference"):
-            return self._operand_to_fhirpath(operation)
+            return self._operand_to_fhirpath(operation, add_first_value=add_first_value and not is_cql)
+
+        # Determine context for operands: list-aware operators don't add .first().value
+        operand_context = (add_first_value and operation.operator not in LIST_CONTEXT_OPERATORS) and not is_cql
+
         ref_expressions = []
+        original_references = []
         for r in operation.reference:
             if isinstance(r, list):
                 ref_expressions.append([
-                    self._operation_to_fhirpath(sr) if isinstance(sr, TriccOperation)
-                    else self._operand_to_fhirpath(sr)
+                    self._operation_to_fhirpath(sr, add_first_value=operand_context, is_cql=is_cql) if isinstance(sr, TriccOperation)
+                    else self._operand_to_fhirpath(sr, add_first_value=operand_context)
                     for sr in r
                 ])
+                original_references.append(r)
             elif isinstance(r, TriccOperation):
-                ref_expressions.append(self._operation_to_fhirpath(r))
+                ref_expressions.append(self._operation_to_fhirpath(r, add_first_value=operand_context, is_cql=is_cql))
+                original_references.append(r)
             else:
-                ref_expressions.append(self._operand_to_fhirpath(r))
+                ref_expressions.append(self._operand_to_fhirpath(r, add_first_value=operand_context))
+                original_references.append(r)
 
         fp_method = f"tricc_operation_fhirpath_{operation.operator}"
         cql_method = f"tricc_operation_{operation.operator}"
         if hasattr(self, fp_method):
-            return getattr(self, fp_method)(ref_expressions)
+            return getattr(self, fp_method)(ref_expressions, original_references, is_cql=is_cql)
         if hasattr(self, cql_method):
-            return getattr(self, cql_method)(ref_expressions)
+            return getattr(self, cql_method)(ref_expressions, original_references)
         raise NotImplementedError(f"FHIRPath: operator '{operation.operator}' not implemented")
+
+    def _operand_to_fhirpath(self, r, add_first_value: bool = True) -> str:
+        """Convert a single operand to a FHIRPath string.
+
+        Handles nested references via repeat(item) which walks groups automatically.
+
+        Args:
+            r: Operand (TriccReference, TriccStatic, node, or primitive).
+            add_first_value: If True (default), append .first().value to reference/node
+                            expressions for scalar contexts. If False, emit just the
+                            .answer list reference for list-aware operations.
+
+        Returns:
+            FHIRPath string representation.
+        """
+        if isinstance(r, TriccOperation):
+            return self._operation_to_fhirpath(r, add_first_value=add_first_value)
+        if isinstance(r, TriccReference):
+            link_id = r.value
+            base_expr = f"%resource.repeat(item).where(linkId='{link_id}').answer"
+            return f"{base_expr}.first().value" if add_first_value else base_expr
+        if isinstance(r, TriccStatic):
+            return f"'{r.value}'" if isinstance(r.value, str) else str(r.value)
+        if isinstance(r, str):
+            return f"'{r}'"
+        if isinstance(r, (int, float, bool)):
+            return str(r).lower() if isinstance(r, bool) else str(r)
+        if isinstance(r, TriccNodeSelectOption):
+            return f"'{r.name}'"
+        if issubclass(r.__class__, TriccNodeBaseModel):
+            link_id = get_export_name(r)
+            base_expr = f"%resource.repeat(item).where(linkId='{link_id}').answer"
+            return f"{base_expr}.first().value" if add_first_value else base_expr
+        raise NotImplementedError(f"FHIRPath operand type not supported: {r.__class__}")
 
     def _operand_to_cql(self, r) -> str:
         """Convert a single operand to a CQL string.
@@ -867,297 +965,276 @@ class FHIRStrategy(BaseOutPutStrategy):
             return f'"{get_export_name(r)}"'
         raise NotImplementedError(f"CQL operand type not supported: {r.__class__}")
 
-    def _operand_to_fhirpath(self, r) -> str:
-        """Convert a single operand to a FHIRPath string.
-
-        Args:
-            r: Operand (TriccReference, TriccStatic, node, or primitive).
-
-        Returns:
-            FHIRPath string representation.
-        """
-        if isinstance(r, TriccOperation):
-            return self._operation_to_fhirpath(r)
-        if isinstance(r, TriccReference):
-            link_id = r.value
-            return f"%resource.item.where(linkId='{link_id}').answer.value"
-        if isinstance(r, TriccStatic):
-            return f"'{r.value}'" if isinstance(r.value, str) else str(r.value)
-        if isinstance(r, str):
-            return f"'{r}'"
-        if isinstance(r, (int, float, bool)):
-            return str(r).lower() if isinstance(r, bool) else str(r)
-        if isinstance(r, TriccNodeSelectOption):
-            return f"'{r.name}'"
-        if issubclass(r.__class__, TriccNodeBaseModel):
-            link_id = get_export_name(r)
-            return f"%resource.item.where(linkId='{link_id}').answer.value"
-        raise NotImplementedError(f"FHIRPath operand type not supported: {r.__class__}")
-
     # ── CQL operator implementations ──────────────────────────────────────────
 
-    def tricc_operation_equal(self, r):
-        return f"{r[0]} = {r[1]}"
+    def tricc_operation_equal(self, ref_expressions, original_references=None):
+        return self.tricc_operation_fhirpath_equal(ref_expressions, original_references, is_cql=True)
 
-    def tricc_operation_not_equal(self, r):
-        return f"{r[0]} != {r[1]}"
+    def tricc_operation_not_equal(self, ref_expressions, original_references=None):
+        return self.tricc_operation_fhirpath_not_equal(ref_expressions, original_references, is_cql=True)
 
-    def tricc_operation_and(self, r):
-        return " and ".join(r)
+    def tricc_operation_and(self, ref_expressions, original_references=None):
+        return self.tricc_operation_fhirpath_and(ref_expressions, original_references, is_cql=True)
 
-    def tricc_operation_and_or(self, r):
-        return f"({r[0]}) and ({' or '.join(r[1:])})"
+    def tricc_operation_and_or(self, ref_expressions, original_references=None):
+        return f"({ref_expressions[0]}) and ({' or '.join(ref_expressions[1:])})"
 
-    def tricc_operation_or(self, r):
-        return " or ".join(r)
+    def tricc_operation_or(self, ref_expressions, original_references=None):
+        return self.tricc_operation_fhirpath_or(ref_expressions, original_references, is_cql=True)
 
-    def tricc_operation_not(self, r):
-        return f"not({r[0]})"
+    def tricc_operation_not(self, ref_expressions, original_references=None):
+        return f"not({ref_expressions[0]})"
 
-    def tricc_operation_istrue(self, r):
-        return f"{r[0]} = true"
+    def tricc_operation_istrue(self, ref_expressions, original_references=None):
+        return self.tricc_operation_fhirpath_istrue(ref_expressions, original_references, is_cql=True)
 
-    def tricc_operation_isnottrue(self, r):
-        return f"{r[0]} != true"
+    def tricc_operation_isnottrue(self, ref_expressions, original_references=None):
+        return self.tricc_operation_fhirpath_isnottrue(ref_expressions, original_references, is_cql=True)
 
-    def tricc_operation_isfalse(self, r):
-        return f"{r[0]} = false"
+    def tricc_operation_isfalse(self, ref_expressions, original_references=None):
+        return self.tricc_operation_fhirpath_isfalse(ref_expressions, original_references, is_cql=True)
 
-    def tricc_operation_isnotfalse(self, r):
-        return f"{r[0]} != false"
+    def tricc_operation_isnotfalse(self, ref_expressions, original_references=None):
+        return self.tricc_operation_fhirpath_isnotfalse(ref_expressions, original_references, is_cql=True)
 
-    def tricc_operation_isnull(self, r):
-        return f"{r[0]} is null"
+    def tricc_operation_isnull(self, ref_expressions, original_references=None):
+        return f"{ref_expressions[0]} is null"
 
-    def tricc_operation_isnotnull(self, r):
-        return f"{r[0]} is not null"
+    def tricc_operation_isnotnull(self, ref_expressions, original_references=None):
+        return f"{ref_expressions[0]} is not null"
 
-    def tricc_operation_exists(self, r):
-        return f"exists({r[0]})"
+    def tricc_operation_exists(self, ref_expressions, original_references=None):
+        return self.tricc_operation_fhirpath_exists(ref_expressions, original_references, is_cql=True)
 
-    def tricc_operation_notexists(self, r):
-        return f"not exists({r[0]})"
+    def tricc_operation_notexists(self, ref_expressions, original_references=None):
+        return self.tricc_operation_fhirpath_notexists(ref_expressions, original_references, is_cql=True)
 
-    def tricc_operation_more(self, r):
-        return f"{r[0]} > {r[1]}"
+    def tricc_operation_more(self, ref_expressions, original_references=None):
+        return self.tricc_operation_fhirpath_more(ref_expressions, original_references, is_cql=True)
 
-    def tricc_operation_less(self, r):
-        return f"{r[0]} < {r[1]}"
+    def tricc_operation_less(self, ref_expressions, original_references=None):
+        return self.tricc_operation_fhirpath_less(ref_expressions, original_references, is_cql=True)
 
-    def tricc_operation_more_or_equal(self, r):
-        return f"{r[0]} >= {r[1]}"
+    def tricc_operation_more_or_equal(self, ref_expressions, original_references=None):
+        return self.tricc_operation_fhirpath_more_or_equal(ref_expressions, original_references, is_cql=True)
 
-    def tricc_operation_less_or_equal(self, r):
-        return f"{r[0]} <= {r[1]}"
+    def tricc_operation_less_or_equal(self, ref_expressions, original_references=None):
+        return self.tricc_operation_fhirpath_less_or_equal(ref_expressions, original_references, is_cql=True)
 
-    def tricc_operation_between(self, r):
-        return f"{r[0]} >= {r[1]} and {r[0]} <= {r[2]}"
+    def tricc_operation_between(self, ref_expressions, original_references=None):
+        return f"{ref_expressions[0]} >= {ref_expressions[1]} and {ref_expressions[0]} <= {ref_expressions[2]}"
 
-    def tricc_operation_plus(self, r):
-        return " + ".join(r)
+    def tricc_operation_plus(self, ref_expressions, original_references=None):
+        return self.tricc_operation_fhirpath_plus(ref_expressions, original_references, is_cql=True)
 
-    def tricc_operation_minus(self, r):
-        return " - ".join(r) if len(r) > 1 else f"-{r[0]}"
+    def tricc_operation_minus(self, ref_expressions, original_references=None):
+        return self.tricc_operation_fhirpath_minus(ref_expressions, original_references, is_cql=True)
 
-    def tricc_operation_multiplied(self, r):
-        return " * ".join(r)
+    def tricc_operation_multiplied(self, ref_expressions, original_references=None):
+        return " * ".join(ref_expressions)
 
-    def tricc_operation_divided(self, r):
-        return f"{r[0]} / {r[1]}"
+    def tricc_operation_divided(self, ref_expressions, original_references=None):
+        return f"{ref_expressions[0]} / {ref_expressions[1]}"
 
-    def tricc_operation_modulo(self, r):
-        return f"{r[0]} mod {r[1]}"
+    def tricc_operation_modulo(self, ref_expressions, original_references=None):
+        return f"{ref_expressions[0]} mod {ref_expressions[1]}"
 
-    def tricc_operation_round(self, r):
-        return f"Round({r[0]}, {r[1] if len(r) > 1 else '0'})"
+    def tricc_operation_round(self, ref_expressions, original_references=None):
+        return f"Round({ref_expressions[0]}, {ref_expressions[1] if len(ref_expressions) > 1 else '0'})"
 
-    def tricc_operation_abs(self, r):
-        return f"Abs({r[0]})"
+    def tricc_operation_abs(self, ref_expressions, original_references=None):
+        return f"Abs({ref_expressions[0]})"
 
-    def tricc_operation_min(self, r):
-        return f"Min({{{', '.join(r)}}})"
+    def tricc_operation_min(self, ref_expressions, original_references=None):
+        return f"Min({{{', '.join(ref_expressions)}}})"
 
-    def tricc_operation_max(self, r):
-        return f"Max({{{', '.join(r)}}})"
+    def tricc_operation_max(self, ref_expressions, original_references=None):
+        return f"Max({{{', '.join(ref_expressions)}}})"
 
-    def tricc_operation_sum(self, r):
-        return f"Sum({{{', '.join(r)}}})"
+    def tricc_operation_sum(self, ref_expressions, original_references=None):
+        return f"Sum({{{', '.join(ref_expressions)}}})"
 
-    def tricc_operation_count(self, r):
-        return f"Count({r[0]})"
+    def tricc_operation_count(self, ref_expressions, original_references=None):
+        return f"Count({ref_expressions[0]})"
 
-    def tricc_operation_coalesce(self, r):
-        return f"Coalesce({', '.join(r)})"
+    def tricc_operation_coalesce(self, ref_expressions, original_references=None):
+        return f"Coalesce({', '.join(ref_expressions)})"
 
-    def tricc_operation_cast_number(self, r):
-        return f"ToDecimal({r[0]})"
+    def tricc_operation_cast_number(self, ref_expressions, original_references=None):
+        return f"ToDecimal({ref_expressions[0]})"
 
-    def tricc_operation_cast_integer(self, r):
-        return f"ToInteger({r[0]})"
+    def tricc_operation_cast_integer(self, ref_expressions, original_references=None):
+        return f"ToInteger({ref_expressions[0]})"
 
-    def tricc_operation_cast_string(self, r):
-        return f"ToString({r[0]})"
+    def tricc_operation_cast_string(self, ref_expressions, original_references=None):
+        return f"ToString({ref_expressions[0]})"
 
-    def tricc_operation_cast_boolean(self, r):
-        return f"ToBoolean({r[0]})"
+    def tricc_operation_cast_boolean(self, ref_expressions, original_references=None):
+        return f"ToBoolean({ref_expressions[0]})"
 
-    def tricc_operation_cast_date(self, r):
-        return f"ToDate({r[0]})"
+    def tricc_operation_cast_date(self, ref_expressions, original_references=None):
+        return f"ToDate({ref_expressions[0]})"
 
-    def tricc_operation_concatenate(self, r):
-        return " + ".join(r)
+    def tricc_operation_concatenate(self, ref_expressions, original_references=None):
+        return self.tricc_operation_fhirpath_plus(ref_expressions, original_references, is_cql=True)
 
-    def tricc_operation_contains(self, r):
-        return f"{r[0]} contains {r[1]}"
+    def tricc_operation_contains(self, ref_expressions, original_references=None):
+        return f"{ref_expressions[0]} contains {ref_expressions[1]}"
 
-    def tricc_operation_selected(self, r):
-        return f"{r[0]} contains {r[1]}"
+    def tricc_operation_selected(self, ref_expressions, original_references=None):
+        return f"{ref_expressions[0]} contains {ref_expressions[1]}"
 
-    def tricc_operation_native(self, r):
-        return r[0] if r else ""
+    def tricc_operation_native(self, ref_expressions, original_references=None):
+        return ref_expressions[0] if ref_expressions else ""
 
-    def tricc_operation_parenthesis(self, r):
-        return f"({r[0]})"
+    def tricc_operation_parenthesis(self, ref_expressions, original_references=None):
+        return f"({ref_expressions[0]})"
 
-    def tricc_operation_if(self, r):
+    def tricc_operation_if(self, ref_expressions, original_references=None):
         # if cond then val_true else val_false
-        if len(r) >= 2:
-            return f"if {r[0]} then {r[1]} else {r[2] if len(r) > 2 else 'null'}"
-        return r[0] if r else "null"
+        if len(ref_expressions) >= 2:
+            return f"if {ref_expressions[0]} then {ref_expressions[1]} else {ref_expressions[2] if len(ref_expressions) > 2 else 'null'}"
+        return ref_expressions[0] if ref_expressions else "null"
 
-    def tricc_operation_ifs(self, r):
+    def tricc_operation_ifs(self, ref_expressions, original_references=None):
         parts = []
-        for pair in r:
+        for pair in ref_expressions:
             if isinstance(pair, list) and len(pair) == 2:
                 parts.append(f"if {pair[0]} then {pair[1]}")
         return " else ".join(parts) + " else null" if parts else "null"
 
-    def tricc_operation_case(self, r):
+    def tricc_operation_case(self, ref_expressions, original_references=None):
         parts = []
-        for pair in r:
+        for pair in ref_expressions:
             if isinstance(pair, list) and len(pair) == 2:
                 parts.append(f"when {pair[0]} then {pair[1]}")
         return f"case {' '.join(parts)} else null end" if parts else "null"
 
-    def tricc_operation_age_day(self, r):
+    def tricc_operation_age_day(self, ref_expressions, original_references=None):
         return "duration in days between Patient.birthDate and Today()"
 
-    def tricc_operation_age_month(self, r):
+    def tricc_operation_age_month(self, ref_expressions, original_references=None):
         return "duration in months between Patient.birthDate and Today()"
 
-    def tricc_operation_age_year(self, r):
+    def tricc_operation_age_year(self, ref_expressions, original_references=None):
         return "AgeInYears()"
 
-    def tricc_operation_today(self, r):
-        return "Today()"
+    def tricc_operation_today(self, ref_expressions, original_references=None):
+        return self.tricc_operation_fhirpath_today(ref_expressions, original_references, is_cql=True)
 
-    def tricc_operation_now(self, r):
-        return "Now()"
+    def tricc_operation_now(self, ref_expressions, original_references=None):
+        return self.tricc_operation_fhirpath_now(ref_expressions, original_references, is_cql=True)
 
-    def tricc_operation_length(self, r):
-        return f"Length({r[0]})"
+    def tricc_operation_length(self, ref_expressions, original_references=None):
+        return f"Length({ref_expressions[0]})"
 
-    def tricc_operation_format_date(self, r):
-        return f"ToString({r[0]})"
+    def tricc_operation_format_date(self, ref_expressions, original_references=None):
+        return f"ToString({ref_expressions[0]})"
 
-    def tricc_operation_datetime_to_decimal(self, r):
-        return f"ToDecimal(duration in days between {r[0]} and Today())"
+    def tricc_operation_datetime_to_decimal(self, ref_expressions, original_references=None):
+        return f"ToDecimal(duration in days between {ref_expressions[0]} and Today())"
 
-    def tricc_operation_zscore(self, r):
-        return f"Helper.ZScore({', '.join(r)})"
+    def tricc_operation_zscore(self, ref_expressions, original_references=None):
+        return f"Helper.ZScore({', '.join(ref_expressions)})"
 
-    def tricc_operation_izscore(self, r):
-        return f"Helper.IZScore({', '.join(r)})"
+    def tricc_operation_izscore(self, ref_expressions, original_references=None):
+        return f"Helper.IZScore({', '.join(ref_expressions)})"
 
-    def tricc_operation_drug_dosage(self, r):
-        return f"Helper.DrugDosage({', '.join(r)})"
+    def tricc_operation_drug_dosage(self, ref_expressions, original_references=None):
+        return f"Helper.DrugDosage({', '.join(ref_expressions)})"
 
-    def tricc_operation_has_qualifier(self, r):
-        return f"{r[0]}.qualifier contains {r[1]}"
+    def tricc_operation_has_qualifier(self, ref_expressions, original_references=None):
+        return f"{ref_expressions[0]}.qualifier contains {ref_expressions[1]}"
 
-    def tricc_operation_diagnosis_list(self, r):
-        return f"Combine({', '.join(r)}, ', ')"
+    def tricc_operation_diagnosis_list(self, ref_expressions, original_references=None):
+        return f"Combine({', '.join(ref_expressions)}, ', ')"
 
-    # ── FHIRPath operator overrides (where syntax differs from CQL) ───────────
+    # ── FHIRPath operator implementations ──────────────────────────────────────
 
-    def tricc_operation_fhirpath_equal(self, r):
-        return f"{r[0]} = {r[1]}"
 
-    def tricc_operation_fhirpath_not_equal(self, r):
-        return f"{r[0]} != {r[1]}"
 
-    def tricc_operation_fhirpath_and(self, r):
-        return " and ".join(r)
+    def tricc_operation_fhirpath_count(self, ref_expressions, original_references=None, is_cql: bool = False):
+        return f"{ref_expressions[0]}.count())"
 
-    def tricc_operation_fhirpath_or(self, r):
-        return " or ".join(r)
+    def tricc_operation_fhirpath_equal(self, ref_expressions, original_references=None, is_cql: bool = False):
+        return f"{ref_expressions[0]} = {ref_expressions[1]}"
 
-    def tricc_operation_fhirpath_not(self, r):
-        return f"({r[0]}).not()"
+    def tricc_operation_fhirpath_not_equal(self, ref_expressions, original_references=None, is_cql: bool = False):
+        return f"{ref_expressions[0]} != {ref_expressions[1]}"
 
-    def tricc_operation_fhirpath_istrue(self, r):
-        return f"({r[0]}) = true"
+    def tricc_operation_fhirpath_and(self, ref_expressions, original_references=None, is_cql: bool = False):
+        return " and ".join(ref_expressions)
 
-    def tricc_operation_fhirpath_isnottrue(self, r):
-        return f"({r[0]}) != true"
+    def tricc_operation_fhirpath_or(self, ref_expressions, original_references=None, is_cql: bool = False):
+        return " or ".join(ref_expressions)
 
-    def tricc_operation_fhirpath_isfalse(self, r):
-        return f"({r[0]}) = false"
+    def tricc_operation_fhirpath_not(self, ref_expressions, original_references=None, is_cql: bool = False):
+        return f"({ref_expressions[0]}).not()"
 
-    def tricc_operation_fhirpath_isnotfalse(self, r):
-        return f"({r[0]}) != false"
+    def tricc_operation_fhirpath_istrue(self, ref_expressions, original_references=None, is_cql: bool = False):
+        return f"({ref_expressions[0]}) = true"
 
-    def tricc_operation_fhirpath_isnull(self, r):
-        return f"({r[0]}).empty()"
+    def tricc_operation_fhirpath_isnottrue(self, ref_expressions, original_references=None, is_cql: bool = False):
+        return f"({ref_expressions[0]}) != true"
 
-    def tricc_operation_fhirpath_isnotnull(self, r):
-        return f"({r[0]}).exists()"
+    def tricc_operation_fhirpath_isfalse(self, ref_expressions, original_references=None, is_cql: bool = False):
+        return f"({ref_expressions[0]}) = false"
 
-    def tricc_operation_fhirpath_exists(self, r):
-        return f"({r[0]}).exists()"
+    def tricc_operation_fhirpath_isnotfalse(self, ref_expressions, original_references=None, is_cql: bool = False):
+        return f"({ref_expressions[0]}) != false"
 
-    def tricc_operation_fhirpath_notexists(self, r):
-        return f"({r[0]}).empty()"
+    def tricc_operation_fhirpath_isnull(self, ref_expressions, original_references=None, is_cql: bool = False):
+        return f"({ref_expressions[0]}).empty()"
 
-    def tricc_operation_fhirpath_more(self, r):
-        return f"{r[0]} > {r[1]}"
+    def tricc_operation_fhirpath_isnotnull(self, ref_expressions, original_references=None, is_cql: bool = False):
+        return f"({ref_expressions[0]}).exists()"
 
-    def tricc_operation_fhirpath_less(self, r):
-        return f"{r[0]} < {r[1]}"
+    def tricc_operation_fhirpath_exists(self, ref_expressions, original_references=None, is_cql: bool = False):
+        return f"({ref_expressions[0]}).exists()"
 
-    def tricc_operation_fhirpath_more_or_equal(self, r):
-        return f"{r[0]} >= {r[1]}"
+    def tricc_operation_fhirpath_notexists(self, ref_expressions, original_references=None, is_cql: bool = False):
+        return f"({ref_expressions[0]}).empty()"
 
-    def tricc_operation_fhirpath_less_or_equal(self, r):
-        return f"{r[0]} <= {r[1]}"
+    def tricc_operation_fhirpath_more(self, ref_expressions, original_references=None, is_cql: bool = False):
+        return f"{ref_expressions[0]} > {ref_expressions[1]}"
 
-    def tricc_operation_fhirpath_selected(self, r):
-        return f"({r[0]}).where($this = {r[1]}).exists()"
+    def tricc_operation_fhirpath_less(self, ref_expressions, original_references=None, is_cql: bool = False):
+        return f"{ref_expressions[0]} < {ref_expressions[1]}"
 
-    def tricc_operation_fhirpath_contains(self, r):
-        return f"({r[0]}).contains({r[1]})"
+    def tricc_operation_fhirpath_more_or_equal(self, ref_expressions, original_references=None, is_cql: bool = False):
+        return f"{ref_expressions[0]} >= {ref_expressions[1]}"
 
-    def tricc_operation_fhirpath_plus(self, r):
-        return " + ".join(r)
+    def tricc_operation_fhirpath_less_or_equal(self, ref_expressions, original_references=None, is_cql: bool = False):
+        return f"{ref_expressions[0]} <= {ref_expressions[1]}"
 
-    def tricc_operation_fhirpath_minus(self, r):
-        return " - ".join(r) if len(r) > 1 else f"-{r[0]}"
+    def tricc_operation_fhirpath_selected(self, ref_expressions, original_references=None, is_cql: bool = False):
+        return f"({ref_expressions[0]}).where($this = {ref_expressions[1]}).exists()"
 
-    def tricc_operation_fhirpath_coalesce(self, r):
-        return f"iif({r[0]}.exists(), {r[0]}, {', '.join(r[1:])})" if len(r) > 1 else r[0]
+    def tricc_operation_fhirpath_contains(self, ref_expressions, original_references=None, is_cql: bool = False):
+        return f"({ref_expressions[0]}).contains({ref_expressions[1]})"
 
-    def tricc_operation_fhirpath_age_day(self, r):
+    def tricc_operation_fhirpath_plus(self, ref_expressions, original_references=None, is_cql: bool = False):
+        return " + ".join(ref_expressions)
+
+    def tricc_operation_fhirpath_minus(self, ref_expressions, original_references=None, is_cql: bool = False):
+        return " - ".join(ref_expressions) if len(ref_expressions) > 1 else f"-{ref_expressions[0]}"
+
+    def tricc_operation_fhirpath_coalesce(self, ref_expressions, original_references=None, is_cql: bool = False):
+        return f"iif({ref_expressions[0]}.exists(), {ref_expressions[0]}, {', '.join(ref_expressions[1:])})" if len(ref_expressions) > 1 else ref_expressions[0]
+
+    def tricc_operation_fhirpath_age_day(self, ref_expressions, original_references=None, is_cql: bool = False):
         return "(today() - Patient.birthDate).value"
 
-    def tricc_operation_fhirpath_age_month(self, r):
+    def tricc_operation_fhirpath_age_month(self, ref_expressions, original_references=None, is_cql: bool = False):
         return "Patient.birthDate.memberOf('http://hl7.org/fhir/ValueSet/age-units')"
 
-    def tricc_operation_fhirpath_today(self, r):
+    def tricc_operation_fhirpath_today(self, ref_expressions, original_references=None, is_cql: bool = False):
         return "today()"
 
-    def tricc_operation_fhirpath_now(self, r):
+    def tricc_operation_fhirpath_now(self, ref_expressions, original_references=None, is_cql: bool = False):
         return "now()"
 
     def get_kwargs(self) -> dict:
         """Return extra kwargs passed to node callbacks."""
         return {}
+

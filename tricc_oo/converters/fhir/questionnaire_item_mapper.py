@@ -12,7 +12,9 @@ from __future__ import annotations
 import logging
 from typing import Dict, Optional, Tuple
 
+
 from tricc_oo.models.base import TriccNodeType
+from tricc_oo.models.calculate import TriccNodeInput
 
 logger = logging.getLogger("default")
 
@@ -106,11 +108,10 @@ CALCULATE_NODE_TYPES = {
     TriccNodeType.proposed_diagnosis,
 }
 
-# Node types that use initialExpression with inline CQL (text/cql), not cql-identifier
-# Rhombus (sequence/logic node) must use initialExpression + text/cql per FHIR SDC spec
-INITIAL_EXPR_CQL_NODE_TYPES = {
-    TriccNodeType.rhombus,
-}
+
+def is_default_or_odk_input(node) -> bool:
+    """Return True only for real TriccNodeInput instances (primitive odk inputs)."""
+    return isinstance(node, TriccNodeInput)
 
 
 def get_fhir_item_type(tricc_type: str) -> str:
