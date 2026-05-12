@@ -48,6 +48,7 @@ class TriccNodeType(StrEnum):
     help = "help-message"
     hint = "hint-message"
     exclusive = "not"
+    trigger = "trigger"
     end = "end"
     activity_end = "activity_end"
     edge = "edge"

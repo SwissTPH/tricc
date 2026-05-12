@@ -248,6 +248,7 @@ ODK_TRICC_TYPE_MAP = {
     "link_in": "",
     "link_out": "",
     "count": "calculate",
+    "trigger": "trigger",
     "add": "calculate",
     "container_hint_media": "",
     "activity": "",

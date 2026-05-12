@@ -319,6 +319,9 @@ class TriccNodeDate(TriccNodeInputModel):
     datatype: str = "date"
 
 
+class TriccNodeTrigger(TriccNodeInputModel):
+    tricc_type: TriccNodeType = TriccNodeType.trigger
+
 class TriccNodeMainStart(TriccNodeBaseModel):
     tricc_type: TriccNodeType = TriccNodeType.start
     form_id: Optional[str] = None

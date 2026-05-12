@@ -28,6 +28,7 @@ from tricc_oo.models.tricc import (
     TriccNodeText,
     TriccNodeDecimal,
     TriccNodeInteger,
+    TriccNodeTrigger,
     TriccNodeDate,
     TriccNodeSelectOne,
     TriccNodeSelectYesNo,
@@ -299,6 +300,12 @@ TYPE_MAP = {
         "attributes": ["save", "reference", "data_type", "concept_type"],
         "mandatory_attributes": ["name", "label"],
         "model": TriccNodeInput,
+    },
+    TriccNodeType.trigger: {
+        "objects": ["UserObject", "object"],
+        "attributes": ["expression", "trigger"],
+        "mandatory_attributes": ["name", "label"],
+        "model": TriccNodeTrigger,
     },
     # TriccNodeType.number: {
     #     "objects": ["UserObject", "object"],
