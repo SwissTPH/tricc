@@ -1,6 +1,13 @@
 import logging
-from tricc_oo.models.tricc import TriccNodeActivity
+from tricc_oo.models.tricc import TriccNodeActivity, TriccNodeBaseModel
 from tricc_oo.models.calculate import TriccNodeInput
+from tricc_oo.models.base import (
+    TriccOperation,
+    TriccOperator,
+    TriccReference,
+    TriccStatic,
+)
+from tricc_oo.converters.tricc_to_xls_form import get_export_name
 from tricc_oo.strategies.output.xls_form import XLSFormStrategy
 from tricc_oo.models.lang import SingletonLangClass
 
@@ -14,6 +21,76 @@ class XLSFormCDSSStrategy(XLSFormStrategy):
         self.activity_export(start_pages[self.processes[0]], **kwargs)
         # self.add_tab_breaks_choice()
         # self.add_wfx_choice()
+
+    def generate_export(self, node, **kwargs):
+        # Detect Coalesce($this, ...) calculations and lift the references
+        # into the trigger column before the expression is translated to XPath.
+        self._extract_this_coalesce_trigger(node)
+        return super().generate_export(node, **kwargs)
+
+    @staticmethod
+    def _is_this_marker(value):
+        if isinstance(value, str):
+            return value == "$this"
+        if isinstance(value, (TriccStatic, TriccReference)):
+            return getattr(value, "value", None) == "$this"
+        return False
+
+    def _extract_this_coalesce_trigger(self, node):
+        """When ``node.expression`` is ``Coalesce($this, ...)``, drop the
+        ``$this`` operand, move the referenced field names into the trigger
+        column, and collapse a 2-arg Coalesce to its remaining argument.
+        """
+        expression = getattr(node, "expression", None)
+        if not isinstance(expression, TriccOperation):
+            return
+        if expression.operator != TriccOperator.COALESCE:
+            return
+
+        refs = list(expression.reference)
+        if len(refs) < 2 or not self._is_this_marker(refs[0]):
+            return
+
+        other_refs = refs[1:]
+
+        # Reuse TriccOperation.get_references(): it walks nested operations,
+        # de-duplicates via OrderedSet, and keeps only TriccNodeBaseModel /
+        # TriccReference operands (so the bare "$this" string is ignored).
+        trigger_refs = TriccOperation(TriccOperator.COALESCE, other_refs).get_references()
+        trigger_tokens = []
+        for ref in trigger_refs:
+            if self._is_this_marker(ref):
+                continue
+            name = ref.value if isinstance(ref, TriccReference) else get_export_name(ref)
+            token = f"${{{name}}}"
+            if token not in trigger_tokens:
+                trigger_tokens.append(token)
+
+        if trigger_tokens:
+            new_trigger = " ".join(trigger_tokens)
+            existing = getattr(node, "trigger", None)
+            if existing:
+                if isinstance(existing, (TriccOperation, TriccStatic, TriccReference)):
+                    existing_str = self.get_tricc_operation_expression(existing)
+                else:
+                    existing_str = str(existing)
+                merged = f"{existing_str} {new_trigger}".strip()
+                node.trigger = merged
+            else:
+                node.trigger = new_trigger
+
+        if len(other_refs) == 1:
+            single = other_refs[0]
+            if isinstance(single, TriccOperation):
+                node.expression = single
+            elif isinstance(single, (TriccStatic, TriccReference)):
+                node.expression = single
+            elif issubclass(single.__class__, TriccNodeBaseModel):
+                node.expression = TriccReference(str(get_export_name(single)))
+            else:
+                node.expression = TriccOperation(TriccOperator.COALESCE, other_refs)
+        else:
+            node.expression = TriccOperation(TriccOperator.COALESCE, other_refs)
 
     def export_inputs(self, activity, inputs=[], **kwargs):
         for node in activity.nodes.values():
