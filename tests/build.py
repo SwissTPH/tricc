@@ -20,6 +20,7 @@ from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 
 # Google API imports for authenticated Drive access
+# pip install google google-api-python-client
 try:
     from google.oauth2 import service_account
     from googleapiclient.discovery import build

@@ -984,11 +984,14 @@ def get_image(diagram, path, id):
 def add_image_from_style(style, path):
     image_attrib = None
     if style is not None and "image=data:image/" in style:
-        image_attrib = style.split("image=data:image/")
+        style_parts = style.split(";")
+        for p in style_parts:
+            if "image=data:image/" in p:
+                image_attrib=p.split("image=data:image/")
     if image_attrib is not None and len(image_attrib) == 2:
         image_parts = image_attrib[1].split(",")
         if len(image_parts) == 2:
-            payload = image_parts[1][:-1]
+            payload = image_parts[1]
             image_name = hashlib.md5(payload.encode("utf-8")).hexdigest()
             path = os.path.join(path, "images")
             file_name = os.path.join(path, image_name + "." + image_parts[0])
