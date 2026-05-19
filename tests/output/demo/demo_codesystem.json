@@ -1,0 +1,238 @@
+{
+    "resourceType": "CodeSystem",
+    "id": "demo",
+    "url": "http://example.com/fhir/CodeSystem/demo",
+    "version": "1.0.0",
+    "name": "demo",
+    "title": "demo",
+    "status": "draft",
+    "description": "Code system for demo",
+    "content": "complete",
+    "concept": [
+        {
+            "id": "db97b170-eee7-510f-8b95-3c6c55169930",
+            "code": "demo.sorry",
+            "display": "Sorry for the bad presentiation",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "InteractSet"
+                }
+            ]
+        },
+        {
+            "id": "573a5cad-32e1-5161-8929-c772c96041ad",
+            "code": "demo.m.select_1",
+            "display": "You selected at least one choice",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "InteractSet"
+                }
+            ]
+        },
+        {
+            "id": "79ca6e34-9564-5a44-82f5-f06cc4fdd0a1",
+            "code": "demo.m.happy",
+            "display": "We are happy for you",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "InteractSet"
+                }
+            ]
+        },
+        {
+            "id": "65e25c4d-9502-59f7-9aad-efdb45435090",
+            "code": "demo.now_eat",
+            "display": "Now eat ! ",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "InteractSet"
+                }
+            ]
+        },
+        {
+            "id": "d4988aae-8e70-55a2-8471-c2560056de45",
+            "code": "demo.bad_p",
+            "display": "Bad presentation",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "111235bd-0856-5e65-aa06-dd7551d16f31",
+            "code": "demo.hungry",
+            "display": "Hungry",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "af785ab2-20e9-5e0c-abcd-a67f0f802cee",
+            "code": "demo.bored",
+            "display": "Bored",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "d89d83d5-6caa-5bff-aa47-644d2d9c8a62",
+            "code": "demo.angry",
+            "display": "Angy",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "aa044c1e-94e6-56a6-a401-70dd9b237203",
+            "code": "demo.is_happy",
+            "display": "Are you happy",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Coded"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "aa044c1e-94e6-56a6-a401-70dd9b237203",
+            "code": "demo.filter",
+            "display": "Are you happy",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Coded"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "175db2cd-067e-55af-bd52-1bad87341428",
+            "code": "demo.discuss",
+            "display": "We will discuss how we could make it better",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "InteractSet"
+                }
+            ]
+        },
+        {
+            "id": "03e663ce-fe9c-50f3-84b8-cde72bf1f81b",
+            "code": "demo.next_time",
+            "display": "Next time we could present with a snack  ",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "InteractSet"
+                }
+            ]
+        },
+        {
+            "id": "033fe516-afb5-5418-908b-2c4e5232b00c",
+            "code": "demo.sorry_p2",
+            "display": "Sorry to hear that, but without your feedback we cannot improve ...   ",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "InteractSet"
+                }
+            ]
+        },
+        {
+            "id": "a2c00382-128b-5205-b131-73c1fd42c4c5",
+            "code": "demo.why_p2",
+            "display": "Please tell us Why",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Text"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "84aa33a9-d496-510a-bc38-55d68577ab37",
+            "code": "demo.agree",
+            "display": "Do you agree to discuss ? ",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Coded"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        }
+    ]
+}

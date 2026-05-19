@@ -1,0 +1,322 @@
+{
+  "resourceType": "Questionnaire",
+  "id": "questionnaire-main",
+  "url": "http://example.com/Questionnaire/main",
+  "status": "draft",
+  "item": [
+    {
+      "linkId": "demo_is_happy",
+      "text": "Are you happy",
+      "type": "choice",
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-enableWhenExpression",
+          "valueExpression": {
+            "language": "text/fhirpath",
+            "expression": "true"
+          }
+        }
+      ],
+      "answerOption": [
+        {
+          "valueCoding": {
+            "code": "true",
+            "display": "Yes"
+          }
+        },
+        {
+          "valueCoding": {
+            "code": "false",
+            "display": "No"
+          }
+        }
+      ]
+    },
+    {
+      "linkId": "demo_filter",
+      "text": "Are you happy",
+      "type": "choice",
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-enableWhenExpression",
+          "valueExpression": {
+            "language": "text/fhirpath",
+            "expression": "%resource.repeat(item).where(linkId='demo_is_happy').answer.where($this.exists()).first().value = 'false'"
+          }
+        }
+      ],
+      "answerOption": [
+        {
+          "valueCoding": {
+            "code": "true",
+            "display": "Yes"
+          }
+        },
+        {
+          "valueCoding": {
+            "code": "false",
+            "display": "No"
+          }
+        }
+      ]
+    },
+    {
+      "linkId": "select_why",
+      "text": "Why ?",
+      "type": "choice",
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-enableWhenExpression",
+          "valueExpression": {
+            "language": "text/fhirpath",
+            "expression": "%resource.repeat(item).where(linkId='demo_is_happy').answer.where($this.exists()).first().value = 'false'"
+          }
+        }
+      ],
+      "answerOption": [
+        {
+          "valueCoding": {
+            "code": "demo.bad_p",
+            "display": "Bad presentation"
+          }
+        },
+        {
+          "valueCoding": {
+            "code": "demo.hungry",
+            "display": "Hungry"
+          }
+        },
+        {
+          "valueCoding": {
+            "code": "demo.bored",
+            "display": "Bored"
+          }
+        },
+        {
+          "valueCoding": {
+            "code": "demo.angry",
+            "display": "Angy"
+          }
+        },
+        {
+          "valueCoding": {
+            "code": "opt_none",
+            "display": "None of the above"
+          }
+        }
+      ]
+    },
+    {
+      "linkId": "demo_m_select_1",
+      "text": "You selected at least one choice",
+      "type": "string",
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-enableWhenExpression",
+          "valueExpression": {
+            "language": "text/fhirpath",
+            "expression": "%resource.repeat(item).where(linkId='demo_is_happy').answer.where($this.exists()).first().value = 'false' and Count({%resource.repeat(item).where(linkId='select_why').answer}) - ToDecimal(('opt_none' in %resource.repeat(item).where(linkId='select_why').answer)) > 0"
+          }
+        }
+      ]
+    },
+    {
+      "linkId": "demo_now_eat",
+      "text": "Now eat !\u00a0",
+      "type": "string",
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-enableWhenExpression",
+          "valueExpression": {
+            "language": "text/fhirpath",
+            "expression": "('demo.hungry' in %resource.repeat(item).where(linkId='select_why').answer)"
+          }
+        }
+      ]
+    },
+    {
+      "linkId": "demo_sorry",
+      "text": "Sorry for the bad presentiation",
+      "type": "string",
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-enableWhenExpression",
+          "valueExpression": {
+            "language": "text/fhirpath",
+            "expression": "('demo.bad_p' in %resource.repeat(item).where(linkId='select_why').answer)"
+          }
+        }
+      ]
+    },
+    {
+      "linkId": "demo_m_happy",
+      "text": "We are happy for you",
+      "type": "string",
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-enableWhenExpression",
+          "valueExpression": {
+            "language": "text/fhirpath",
+            "expression": "%resource.repeat(item).where(linkId='demo_is_happy').answer.where($this.exists()).first().value = 'true'"
+          }
+        }
+      ]
+    },
+    {
+      "linkId": "demo_bad_p",
+      "text": "contains: SelectMultiple|select_why|0|1|Why ? contains 'demo.bad_p'",
+      "type": "string",
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-hidden",
+          "valueBoolean": true
+        },
+        {
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-calculatedExpression",
+          "valueExpression": {
+            "language": "text/fhirpath",
+            "expression": "(%resource.repeat(item).where(linkId='select_why').answer contains 'demo.bad_p')"
+          }
+        }
+      ]
+    },
+    {
+      "linkId": "demo_hungry",
+      "text": "contains: SelectMultiple|select_why|0|1|Why ? contains 'demo.hungry'",
+      "type": "string",
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-hidden",
+          "valueBoolean": true
+        },
+        {
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-calculatedExpression",
+          "valueExpression": {
+            "language": "text/fhirpath",
+            "expression": "(%resource.repeat(item).where(linkId='select_why').answer contains 'demo.hungry')"
+          }
+        }
+      ]
+    },
+    {
+      "linkId": "demo_bored",
+      "text": "contains: SelectMultiple|select_why|0|1|Why ? contains 'demo.bored'",
+      "type": "string",
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-hidden",
+          "valueBoolean": true
+        },
+        {
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-calculatedExpression",
+          "valueExpression": {
+            "language": "text/fhirpath",
+            "expression": "(%resource.repeat(item).where(linkId='select_why').answer contains 'demo.bored')"
+          }
+        }
+      ]
+    },
+    {
+      "linkId": "demo_angry",
+      "text": "contains: SelectMultiple|select_why|0|1|Why ? contains 'demo.angry'",
+      "type": "string",
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-hidden",
+          "valueBoolean": true
+        },
+        {
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-calculatedExpression",
+          "valueExpression": {
+            "language": "text/fhirpath",
+            "expression": "(%resource.repeat(item).where(linkId='select_why').answer contains 'demo.angry')"
+          }
+        }
+      ]
+    },
+    {
+      "linkId": "demo_discuss",
+      "text": "We will discuss how we could make it better",
+      "type": "string",
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-enableWhenExpression",
+          "valueExpression": {
+            "language": "text/fhirpath",
+            "expression": "true"
+          }
+        }
+      ]
+    },
+    {
+      "linkId": "demo_agree",
+      "text": "Do you agree to discuss ?\u00a0",
+      "type": "choice",
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-enableWhenExpression",
+          "valueExpression": {
+            "language": "text/fhirpath",
+            "expression": "not ('demo.hungry' in %resource.repeat(item).where(linkId='select_why').answer)"
+          }
+        }
+      ],
+      "answerOption": [
+        {
+          "valueCoding": {
+            "code": "true",
+            "display": "Yes"
+          }
+        },
+        {
+          "valueCoding": {
+            "code": "false",
+            "display": "No"
+          }
+        }
+      ]
+    },
+    {
+      "linkId": "demo_sorry_p2",
+      "text": "Sorry to hear that, but without your feedback we cannot improve ...\u00a0  ",
+      "type": "string",
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-enableWhenExpression",
+          "valueExpression": {
+            "language": "text/fhirpath",
+            "expression": "%resource.repeat(item).where(linkId='demo_agree').answer.where($this.exists()).first().value = 'false'"
+          }
+        }
+      ]
+    },
+    {
+      "linkId": "demo_why_p2",
+      "text": "Please tell us Why",
+      "type": "string",
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-enableWhenExpression",
+          "valueExpression": {
+            "language": "text/fhirpath",
+            "expression": "%resource.repeat(item).where(linkId='demo_agree').answer.where($this.exists()).first().value = 'true'"
+          }
+        }
+      ]
+    },
+    {
+      "linkId": "demo_next_time",
+      "text": "Next time we could present with a snack  ",
+      "type": "string",
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-enableWhenExpression",
+          "valueExpression": {
+            "language": "text/fhirpath",
+            "expression": "('demo.hungry' in %resource.repeat(item).where(linkId='select_why').answer)"
+          }
+        }
+      ]
+    }
+  ]
+}

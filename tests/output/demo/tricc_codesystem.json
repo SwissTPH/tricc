@@ -1,0 +1,73 @@
+{
+    "resourceType": "CodeSystem",
+    "id": "tricc",
+    "url": "http://example.com/fhir/CodeSystem/tricc",
+    "version": "1.0.0",
+    "name": "tricc",
+    "title": "tricc",
+    "status": "draft",
+    "description": "Code system for tricc",
+    "content": "complete",
+    "concept": [
+        {
+            "id": "1a2da40f-f330-572a-a1db-e7371123b660",
+            "code": "opt_none",
+            "display": "None of the above",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "19671d39-b9f2-5919-9814-00b01aff54b4",
+            "code": "select_why",
+            "display": "Why ?",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Question"
+                }
+            ]
+        },
+        {
+            "id": "9920b352-cff9-5fff-b1f5-fa857c3ca227",
+            "code": "true",
+            "display": "Yes",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Value"
+                }
+            ]
+        },
+        {
+            "id": "1bb46aa4-2804-51d1-8310-c1799c229a4c",
+            "code": "false",
+            "display": "No",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Value"
+                }
+            ]
+        }
+    ]
+}
