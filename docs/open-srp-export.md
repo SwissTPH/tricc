@@ -140,24 +140,30 @@ Relevance conditions from the TRICC graph are converted to **FHIRPath** using
 
 ### Calculations (calculatedExpression / initialExpression)
 
-Calculate nodes are converted to **CQL** and attached as SDC
-`calculatedExpression` (or `initialExpression` for pre-populated fields):
+Calculate nodes (and some relevance logic) are converted to **CQL** using
+`convert_expression_to_cql()`. A shared **Helper** library provides data
+access via FHIR resources (e.g. `GetObsValue("concept.code")`). Per-process
+libraries are thin wrappers that expose named defines.
+
+In the Questionnaire, expressions use **simple define names** (the
+Questionnaire declares its library/libraries at the top level):
 
 ```json
 {
   "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-calculatedExpression",
   "valueExpression": {
     "language": "text/cql-identifier",
-    "expression": "\"bmi\""
+    "expression": "Calc_bmi"
   }
 }
 ```
 
-The CQL define is added to the process Library:
+Example generated CQL style (segment library):
 
 ```cql
-define "bmi":
-  weight / (height * height)
+include fhir_formHelper version '1.0.0' called Helper
+
+define Calc_bmi: Helper.GetObsValue("weight") / (Helper.GetObsValue("height") * Helper.GetObsValue("height"))
 ```
 
 ---

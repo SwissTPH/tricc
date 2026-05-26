@@ -64,7 +64,7 @@ Output: FHIR SDC resources (Questionnaire, PlanDefinition, Library+CQL, Structur
   | primitive (integer, decimal, text, date) | `question` + `answerValueType` | Straight-forward |
   | `select_multiple`     | `choice` (checkbox)             | `answerValueSet` + display_type → SDC extensions |
   | `select_one`          | `choice` (radio)                | `answerValueSet` + display_type → SDC extensions |
-  | `select_yesno`        | `choice` (radio)                | Yes/No ValueSet |
+  | `select_yesno`        | `boolean`                       | Native boolean (preferred for yes/no questions). No answerOption.
   | `note` / display      | `display`                       | display_type handling |
   | `calculate`           | `question` + `initialExpression` (CQL via `$populate`) | — |
   | All others            | Defined in full table           | — |
@@ -84,9 +84,11 @@ Output: FHIR SDC resources (Questionnaire, PlanDefinition, Library+CQL, Structur
   - PlanDefinition: `{project_id}-PD`
 
 - **CQL Library Structure**  
-  - Reusable helper library based on `pyfhirsdc/core_fhir/cql/pyfhirsdc.cql` (observation retrieval, condition retrieval, etc.).  
-  - Per-resource libraries (Questionnaire and PlanDefinition): inherit generic helper library and wrap only the required helpers.  
-  - Library identifier referenced in owning resource (`cqlInputResources`).
+  - One **Helper** library providing generic data access functions (e.g. retrieval of Observations/Conditions by concept name/code, age helpers, etc.). Data access happens via FHIR resources, not raw questionnaire paths.
+  - Thin **per-process/segment** libraries that include the Helper and define named calculations (simple `define "Calc_xxx": ...` expressions, often delegating to the Helper).
+  - A Questionnaire typically references only one main library (declared via the `library` element or SDC `cqlInputResources` extension).
+  - Expressions in the Questionnaire use **simple define names** (e.g. `"Calc_bmi"`) with `text/cql-identifier`. No need to qualify with library name.
+  - This design follows patterns from pyfhirsdc and WHO SMART CQL libraries.
 
 - **Advanced TRICC Navigation**  
   - `goto`, `link_in`/`link_out`, `bridge`, multi-instance activities: already managed in the input strategy → no additional handling required.
@@ -108,17 +110,15 @@ Output: FHIR SDC resources (Questionnaire, PlanDefinition, Library+CQL, Structur
 
 ### Next Steps & Validation Checklist (Implementation-Ready)
 
-- [x] **FHIRPath Expression Improvements**: Enhanced FHIRPath generation to correctly handle list vs scalar contexts. For list-aware operations (`contains`, `selected`, `has_qualifier`), references now omit `.first().value` to work on collections. Scalar operations retain `.first().value` for proper value extraction. CQL methods now delegate to FHIRPath equivalents with `is_cql=True` flag.
-- [ ] Implement `get_process()` utility.
-- [ ] Create node-type mapping table + reuse `pyfhirsdc` questionnaireItemConverter.py logic.
-- [ ] Implement concept_type → FHIR resource mapping by reusing pyfhirsdc openMRS logic.
-- [ ] Prototype CQL library generation (helpers + wrappers) and FSH + Composition + Binary manifest.
-- [ ] Add `OpenSRPStrategy` skeleton in `strategies/` and register it.
-- [ ] Extend expression visitor for dual FHIRPath + CQL output.
-- [ ] Add/update documentation (`docs/open-srp-export.md` + mapping tables in `docs/tricc-elements.md`).
-- [ ] Write unit tests using `tests/data/` drawio files.
-- [ ] Run full pipeline (`tests/build.py`) and validate against fhircore.
-- [ ] PEP 8, type hints, docstrings, logging, 120-char lines, no print statements.
+- [x] Core FHIRStrategy + OpenSRPStrategy implemented (Questionnaire with FHIRPath/CQL expressions, CQL Library generation, StructureMap stubs, export).
+- [x] `select_yesno` nodes now emit native `boolean` items (no answerOption).
+- [x] CQL architecture: Helper library for FHIR resource access by concept + thin per-segment libraries. Simple define names used in Questionnaire expressions.
+- [x] Basic nesting support for groups/activities in Questionnaires.
+- [ ] Full StructureMap / data extraction driven by concept_type (in progress).
+- [ ] Complete ValueSet + Binary (images) generation.
+- [ ] Full $populate-ready wiring (Questionnaire.library declaration + properly qualified cql-identifier expressions).
+- [ ] Comprehensive tests + golden CQL output validation.
+- [ ] Documentation updates reflecting final CQL patterns (see this spec + user's pyfhirsdc reference implementation).
 
 This specification (v4) is now **complete, precise, and implementation-ready**. All clarifications (including the latest on pyfhirsdc openMRS mapping, OCL note, fhircore Composition/Binary, and openSRP profile) have been ordered, cleaned, and integrated.
 

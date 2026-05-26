@@ -128,7 +128,7 @@ library {library_id} version '1.0.0'
 using FHIR version '{fhir_version}'
 
 include FHIRHelpers version '{fhir_version}' called FHIRHelpers
-include {helper_library_id}Helper version '1.0.0' called Helper
+include {helper_library_id} version '1.0.0' called Helper
 
 context Patient
 
@@ -176,6 +176,7 @@ class FHIRStrategy(BaseOutPutStrategy):
         self.binaries: List[dict] = []
         self._form_id: Optional[str] = None
         self.cql_libraries: Dict[str, str] = {}
+        self.libraries: Dict[str, dict] = {}   # Phase 2: actual FHIR Library resources
         self.fml_mappings: Dict[str, str] = {}
         # Simple stack for building nested Questionnaire items (groups/activities)
         self._group_stack: list[tuple[str, dict]] = []
@@ -234,10 +235,16 @@ class FHIRStrategy(BaseOutPutStrategy):
         self.process_calculate(self.project.start_pages, pages=self.project.pages)
         logger.info("FHIRStrategy: generating export (StructureMap)")
         self.process_export(self.project.start_pages, pages=self.project.pages)
+
+        # Build the actual CQL library texts from collected defines (Phase 2)
+        # Must happen before export()
+        self._assemble_cql_libraries()
+
         logger.info("FHIRStrategy: writing output files")
         self.export(self.project.start_pages, version=version)
         logger.info("FHIRStrategy: validating")
         self.validate()
+
         # Final visibility log (helps developers immediately see the state of the FHIR export)
         logger.info(
             f"FHIRStrategy complete: {len(self.questionnaires)} questionnaire(s), "
@@ -367,23 +374,44 @@ class FHIRStrategy(BaseOutPutStrategy):
         return True
 
     def generate_calculate(self, node, **kwargs):
-        """Attach calculatedExpression using the mapper builder (fixed signature)."""
+        """Record CQL define for this calculate node and attach calculatedExpression extension."""
         segment = getattr(node, "segment", "main")
         q = self.questionnaires.get(segment)
         if not q:
             return True
 
-        # For now we attach a placeholder — real CQL expression will be wired in Phase 2
-        # The mapper function expects (cql_expr: str, library_name: Optional[str])
-        # We pass a reference name; the actual define will be populated later.
-        calc_name = f"calc_{get_export_name(node)}"
+        link_id = get_export_name(node)
+        calc_name = f"Calc_{link_id}"
 
+        # Try to produce a real CQL expression from the node's calculation / expression_reference
+        cql_expr = None
+        if hasattr(node, "expression_reference") and node.expression_reference:
+            try:
+                cql_expr = self.convert_expression_to_cql(node.expression_reference)
+            except Exception as e:
+                logger.debug(f"Could not convert calculate expression for {link_id}: {e}")
+
+        if not cql_expr:
+            # Fallback for simple cases or nodes that only have 'calculation' / reference
+            if hasattr(node, "reference") and node.reference:
+                try:
+                    cql_expr = self.convert_expression_to_cql(node.reference)
+                except Exception:
+                    pass
+
+        if cql_expr:
+            # Store the define for later Library assembly
+            if segment not in self.cql_defines:
+                self.cql_defines[segment] = []
+            self.cql_defines[segment].append(f"define {calc_name}: {cql_expr}")
+
+        # Always attach the extension (even if we only have a name for now)
         for item in q.get("item", []):
-            if item.get("linkId") == get_export_name(node):
-                # This will be improved in Phase 2 when we actually emit CQL defines
+            if item.get("linkId") == link_id:
                 expr_ext = build_calculated_expression(calc_name)
                 item.setdefault("extension", []).append(expr_ext)
                 break
+
         return True
 
     def generate_export(self, node, **kwargs):
@@ -409,12 +437,18 @@ class FHIRStrategy(BaseOutPutStrategy):
             with open(path, 'w') as f:
                 json.dump(q, f, indent=2)
 
-        # Export CQL
+        # Export CQL source + Library JSON resources (Phase 2)
         for segment, cql in self.cql_libraries.items():
-            file_name = f"{segment}.cql"
-            path = os.path.join(base_path, file_name)
-            with open(path, 'w') as f:
+            # .cql source (useful for debugging)
+            cql_path = os.path.join(base_path, f"{segment}.cql")
+            with open(cql_path, 'w') as f:
                 f.write(cql)
+
+            # Corresponding FHIR Library JSON
+            if segment in self.libraries:
+                lib_path = os.path.join(base_path, f"Library-{segment}.json")
+                with open(lib_path, 'w') as f:
+                    json.dump(self.libraries[segment], f, indent=2)
 
         # Export FML
         for content_type, fml in self.fml_mappings.items():
@@ -463,6 +497,77 @@ class FHIRStrategy(BaseOutPutStrategy):
             return self.get_tricc_operation_expression(expression)
         else:
             return self.get_tricc_operation_operand(expression)
+
+    def _assemble_cql_libraries(self):
+        """Turn collected cql_defines into full CQL text + Library resources (Phase 2)."""
+        if not self.cql_defines:
+            return
+
+        import base64
+
+        form_id = self._form_id or "fhir_form"
+        helper_id = f"{form_id}Helper"
+
+        # Build helper library (once)
+        helper_cql = CQL_HELPER_TEMPLATE.format(
+            library_id=helper_id,
+            fhir_version=FHIR_VERSION,
+        )
+        self.cql_libraries[helper_id] = helper_cql
+
+        # Create FHIR Library resource for helper
+        self.libraries[helper_id] = self._make_library_resource(
+            helper_id, helper_cql, form_id
+        )
+
+        # Build one child library per segment/process
+        for segment, defines in self.cql_defines.items():
+            lib_id = f"{form_id}-{segment}"
+            defines_block = "\n\n".join(defines)
+
+            child_cql = CQL_CHILD_TEMPLATE.format(
+                library_id=lib_id,
+                fhir_version=FHIR_VERSION,
+                helper_library_id=helper_id,
+            )
+            child_cql += "\n\n" + defines_block + "\n"
+
+            self.cql_libraries[segment] = child_cql
+
+            # Create FHIR Library resource
+            self.libraries[segment] = self._make_library_resource(
+                lib_id, child_cql, form_id
+            )
+
+    def _make_library_resource(self, lib_id: str, cql_text: str, form_id: str) -> dict:
+        """Create a FHIR Library resource with embedded CQL."""
+        import base64
+
+        encoded = base64.b64encode(cql_text.encode("utf-8")).decode("ascii")
+
+        return {
+            "resourceType": "Library",
+            "id": lib_id,
+            "url": f"{self.base_url}/Library/{lib_id}",
+            "version": "1.0.0",
+            "name": lib_id,
+            "title": f"{form_id} - {lib_id} CQL Library",
+            "status": "draft",
+            "type": {
+                "coding": [
+                    {
+                        "system": "http://terminology.hl7.org/CodeSystem/library-type",
+                        "code": "logic-library",
+                    }
+                ]
+            },
+            "content": [
+                {
+                    "contentType": "text/cql",
+                    "data": encoded,
+                }
+            ],
+        }
 
     def convert_expression_to_fhirpath(self, expression):
         # For FHIRPath, similar to CQL but in FHIR context
@@ -1021,7 +1126,7 @@ class FHIRStrategy(BaseOutPutStrategy):
 
         if q_count == 0:
             logger.warning("FHIRStrategy: No questionnaires were generated")
-        if cql_count == 0:
+        if cql_count == 0 and not self.cql_defines:
             logger.warning(
                 "FHIRStrategy: No CQL libraries generated (calculate / complex "
                 "relevance logic not yet implemented in this strategy)"

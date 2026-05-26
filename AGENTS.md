@@ -100,6 +100,9 @@ The system uses various node types defined in `TriccNodeType` enum:
 - `docs/pipeline.md` - Processing pipeline explanation
 - `docs/visual-authoring-concepts.md` - Visual design patterns
 - `docs/troubleshooting.md` - Common issues and solutions
+- `docs/desing/FHIRcore.md` - Detailed spec for the FHIR / OpenSRP output strategy (including CQL architecture)
+- `docs/open-srp-export.md` - User-facing guide for OpenSRP/FHIR-Core export
+- `docs/planning/` - Implementation plans (e.g. FHIR remediation plan)
 
 ## Common Workflows
 
@@ -109,6 +112,12 @@ The system uses various node types defined in `TriccNodeType` enum:
 3. Register strategy in strategy factory
 4. Add tests for conversion logic
 5. Document strategy capabilities and limitations
+
+**FHIR-specific notes** (when working on `FHIRStrategy` / `OpenSRPStrategy`):
+- Follow the refined CQL architecture: one Helper library + thin per-segment libraries.
+- Use simple names in Questionnaire expressions.
+- Prefer concept-driven data access in the Helper library over raw paths.
+- Update the FHIR remediation plan and main docs when making architectural changes.
 
 ### Adding a New Node Type
 1. Add to `TriccNodeType` enum in `models/base.py`
@@ -123,6 +132,15 @@ The system uses various node types defined in `TriccNodeType` enum:
 3. Update operator mappings and evaluation logic
 4. Add comprehensive tests for expression evaluation
 5. Document operator behavior and return types
+
+### FHIR CQL / Library Generation (FHIRStrategy)
+- Use a **Helper** library for all FHIR resource access (Observations, Conditions, etc.) keyed by concept name/code.
+- Keep per-process/segment libraries **thin** — they should mostly contain named `define` statements that delegate to the Helper.
+- In Questionnaire `calculatedExpression` / `initialExpression`, use **simple define names only** (e.g. `"Calc_bmi"`). Do not qualify with library name.
+- The Questionnaire declares its library/libraries at the top level (via `library` element or SDC `cqlInputResources` extension).
+- Avoid embedding raw questionnaire answer paths (`%resource.item.where(...)`) in CQL. Route data access through the Helper using concept identifiers.
+- Follow patterns from pyfhirsdc and WHO SMART CQL examples (thin form libs + rich base/helper libs).
+- When adding new CQL helpers or changing the template, update `docs/desing/FHIRcore.md` and `docs/open-srp-export.md`.
 
 ## Validation Checklist
 
