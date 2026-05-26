@@ -156,6 +156,8 @@ These are usually exercised indirectly by the higher-level methods above.
 - Before releasing, review this matrix to ensure no critical method is only covered by opaque large draw.io files.
 - Use this as a checklist when doing major refactors of the expression or inheritance logic.
 
+**Recommended helper**: Use `tests/helpers.py` (`load_yaml_project`, `assert_last_version`, etc.) to keep test code short and readable.
+
 ---
 
 **Last updated**: 2026-05 (after introduction of `YamlStrategy` and registry)
