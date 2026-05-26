@@ -122,10 +122,13 @@ These are usually exercised indirectly by the higher-level methods above.
 - `minimal_decision.yaml` — Rhombus + reference expression + conditional edges
 
 **Gap**: We currently lack dedicated fixtures for:
-- Inheritance/versioning across activities (`inheritance_*.yaml`)
 - Multi-process + diagnosis ordering
 - Complex count/add/rhombus expression trees
 - Applicability at activity level
+
+**Now covered** (as of this commit):
+- `inheritance_versioning_basic.yaml` — basic name collision + versioning
+- `inheritance_relevance_merge.yaml` — relevance + expression merging across versions + rhombus using the inherited name
 
 ### Existing Python Tests
 - `tests/test_strategies/test_opensrp_strategy.py` — Mostly output + FHIR pipeline (heavy mocking)
