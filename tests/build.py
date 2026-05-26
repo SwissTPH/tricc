@@ -1,14 +1,5 @@
-from tricc_oo.strategies.output.spice import SpiceStrategy  # noqa: F401
-from tricc_oo.strategies.output.xlsform_cht_hf import XLSFormCHTHFStrategy  # noqa: F401
-from tricc_oo.strategies.output.xlsform_cht import XLSFormCHTStrategy  # noqa: F401
-from tricc_oo.strategies.output.xlsform_cdss import XLSFormCDSSStrategy  # noqa: F401
-from tricc_oo.strategies.output.xls_form import XLSFormStrategy  # noqa: F401
-from tricc_oo.strategies.output.openmrs_form import OpenMRSStrategy  # noqa: F401
-from tricc_oo.strategies.output.fhir_form import FHIRStrategy  # noqa: F401
-from tricc_oo.strategies.output.opensrp import OpenSRPStrategy  # noqa: F401
-from tricc_oo.strategies.output.html_form import HTMLStrategy  # noqa: F401
-from tricc_oo.strategies.output.dhis2_form import DHIS2Strategy  # noqa: F401
-from tricc_oo.strategies.input.drawio import DrawioStrategy  # noqa: F401
+# Strategy loading is now done via the registry (much cleaner + supports direct class usage)
+from tricc_oo.strategies.registry import get_input_strategy, get_output_strategy
 import getopt
 import logging
 import os
@@ -310,12 +301,16 @@ if __name__ == "__main__":
                 sys.exit(1)
         else:
             # Handle local files/directories
+            # Accept common formats used by input strategies (.drawio, .yaml/.yml for testing, etc.)
+            valid_exts = (".drawio", ".yaml", ".yml")
             if os.path.isdir(current_input):
-                files.extend([os.path.join(current_input, f) for f in os.listdir(current_input) if f.endswith(".drawio")])
-            elif os.path.isfile(current_input) and current_input.endswith(".drawio"):
+                for f in os.listdir(current_input):
+                    if f.lower().endswith(valid_exts):
+                        files.append(os.path.join(current_input, f))
+            elif os.path.isfile(current_input) and current_input.lower().endswith(valid_exts):
                 files.append(current_input)
             else:
-                logger.warning(f"Skipping invalid input: {current_input}")
+                logger.warning(f"Skipping invalid input (unknown extension): {current_input}")
 
     # Read content from all files
     for f in files:
@@ -331,14 +326,16 @@ if __name__ == "__main__":
         logger.critical("No valid drawio files found or loaded")
         exit(1)
 
-    strategy = globals()[input_strategy](files)
-    logger.info(f"build the graph from strategy {input_strategy}")
+    InputStrategyCls = get_input_strategy(input_strategy)
+    strategy = InputStrategyCls(files)
+    logger.info(f"build the graph from strategy {InputStrategyCls.__name__}")
     media_path = os.path.join(out_path, "media-tmp")
     project = strategy.execute(file_content, media_path)
 
-    strategy = globals()[output_strategy](project, out_path)
+    OutputStrategyCls = get_output_strategy(output_strategy)
+    strategy = OutputStrategyCls(project, out_path)
 
-    logger.info("Using strategy {}".format(strategy.__class__))
+    logger.info("Using strategy {}".format(OutputStrategyCls.__name__))
     logger.info("update the node with basic information")
     # create constraints, clean name
 

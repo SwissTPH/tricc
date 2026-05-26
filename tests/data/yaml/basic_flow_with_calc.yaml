@@ -1,0 +1,37 @@
+# Basic flow with a calculate.
+# Good for smoke-testing node creation, edges, and simple calculate attachment.
+
+id: basic_flow
+title: Basic Flow with Calculate
+process: main
+
+nodes:
+  - id: start
+    type: start
+    label: "Start"
+    name: start_basic
+
+  - id: q_age
+    type: integer
+    name: age
+    label: "Age in years"
+    required: true
+
+  - id: calc_adult
+    type: calculate
+    name: is_adult
+    label: "Is adult?"
+    calculate: "age >= 18"
+
+  - id: end
+    type: end
+    label: "End"
+    name: end_basic
+
+edges:
+  - source: start
+    target: q_age
+  - source: q_age
+    target: calc_adult
+  - source: calc_adult
+    target: end

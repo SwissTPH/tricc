@@ -7,11 +7,13 @@ from tricc_oo.serializers.xls_form import (
     SURVEY_MAP,
 )
 from tricc_oo.strategies.output.xlsform_cht import XLSFormCHTStrategy
+from tricc_oo.strategies.registry import register_output_strategy
 
 langs = SingletonLangClass()
 logger = logging.getLogger("default")
 
 
+@register_output_strategy("XLSFormCHTHFStrategy")
 class XLSFormCHTHFStrategy(XLSFormCHTStrategy):
 
     def get_contact_inputs(self, df_inputs):

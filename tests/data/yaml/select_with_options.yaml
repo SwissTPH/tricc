@@ -1,0 +1,34 @@
+# Select question with explicit options.
+# Tests option wiring and select node construction.
+
+id: select_example
+title: Select with Options
+process: main
+
+nodes:
+  - id: start
+    type: start
+    label: "Start"
+
+  - id: q_fever
+    type: select_one
+    name: fever
+    label: "Does the patient have fever?"
+    required: true
+    options:
+      - id: opt_yes
+        name: "yes"
+        label: "Yes"
+      - id: opt_no
+        name: "no"
+        label: "No"
+
+  - id: end
+    type: end
+    label: "End"
+
+edges:
+  - source: start
+    target: q_fever
+  - source: q_fever
+    target: end

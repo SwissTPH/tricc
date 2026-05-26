@@ -1,0 +1,59 @@
+# Minimal decision logic using a rhombus.
+# Useful for testing conditional edges and basic expression parsing.
+
+id: decision_example
+title: Minimal Decision
+process: main
+
+nodes:
+  - id: start
+    type: start
+    label: "Start"
+
+  - id: q_has_symptom
+    type: select_yesno
+    name: has_symptom
+    label: "Has symptom?"
+    required: true
+    options:
+      - id: opt_yes
+        name: "yes"
+        label: "Yes"
+      - id: opt_no
+        name: "no"
+        label: "No"
+
+  - id: rhombus_symptom
+    type: rhombus
+    label: "Symptom present?"
+    reference: "has_symptom = true"   # will be parsed
+
+  - id: note_positive
+    type: note
+    name: note_positive
+    label: "Positive case - follow protocol"
+
+  - id: note_negative
+    type: note
+    name: note_negative
+    label: "Negative - routine care"
+
+  - id: end
+    type: end
+    label: "End"
+
+edges:
+  - source: start
+    target: q_has_symptom
+  - source: q_has_symptom
+    target: rhombus_symptom
+  - source: rhombus_symptom
+    target: note_positive
+    value: "yes"
+  - source: rhombus_symptom
+    target: note_negative
+    value: "no"
+  - source: note_positive
+    target: end
+  - source: note_negative
+    target: end

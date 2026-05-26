@@ -38,3 +38,6 @@ Issues = "https://github.com/SwissTPH/tricc/issues"
 
 [tool.setuptools.packages.find]
 exclude = ["locales"]
+
+[project.scripts]
+tricc = "tricc_oo.cli:main"

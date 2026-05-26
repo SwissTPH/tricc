@@ -13,6 +13,7 @@ from tricc_oo.visitors.tricc import (
 from tricc_oo.converters.tricc_to_xls_form import get_export_name
 import datetime
 from tricc_oo.strategies.output.base_output_strategy import BaseOutPutStrategy
+from tricc_oo.strategies.registry import register_output_strategy
 from tricc_oo.models.base import (
     not_clean, TriccOperation,
     TriccStatic, TriccReference
@@ -30,13 +31,8 @@ from tricc_oo.models.ordered_set import OrderedSet
 
 logger = logging.getLogger("default")
 
-# Namespace for deterministic UUIDs
-UUID_NAMESPACE = uuid.UUID('12345678-1234-5678-9abc-def012345678')
 
-CIEL_YES = "1065AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-CIEL_NO = "1066AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-
-
+@register_output_strategy("OpenMRSStrategy")
 class OpenMRSStrategy(BaseOutPutStrategy):
     processes = ["main"]
     project = None
