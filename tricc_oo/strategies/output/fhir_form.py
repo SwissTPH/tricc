@@ -177,6 +177,8 @@ class FHIRStrategy(BaseOutPutStrategy):
         self._form_id: Optional[str] = None
         self.cql_libraries: Dict[str, str] = {}
         self.fml_mappings: Dict[str, str] = {}
+        # Simple stack for building nested Questionnaire items (groups/activities)
+        self._group_stack: list[tuple[str, dict]] = []
 
     def get_tricc_operation_expression(self, operation):
         # For CQL
@@ -219,6 +221,7 @@ class FHIRStrategy(BaseOutPutStrategy):
         version = datetime.datetime.now().strftime("%Y%m%d%H%M")
         logger.info(f"FHIRStrategy: build version {version}")
         if "main" in self.project.start_pages:
+            self._group_stack = []  # reset nesting stack for a fresh run
             self.process_base(self.project.start_pages, pages=self.project.pages, version=version)
         else:
             logger.critical("Main process required")
@@ -244,13 +247,29 @@ class FHIRStrategy(BaseOutPutStrategy):
         )
 
     def generate_base(self, node, **kwargs):
-        if (
-            not issubclass(node.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase)) 
-            or isinstance(node, TriccNodeSelectOption)
-        ):
+        """Build a Questionnaire.item from a TRICC node using the central mapper.
+
+        Supports basic nesting: group-like nodes (activity_start, start, etc.)
+        become "group" items and subsequent siblings are attached under them
+        until a corresponding end node is seen.
+        """
+        tricc_type = getattr(node, 'tricc_type', None)
+        if tricc_type is None:
+            tricc_type = getattr(node, 'type', None) or str(getattr(node, '__class__', '')).lower()
+
+        if should_skip(tricc_type) or isinstance(node, TriccNodeSelectOption):
             return True
-        # Generate Questionnaire items per segment
-        segment = getattr(node, 'segment', 'main')
+
+        # Segment / process
+        segment = getattr(node, 'segment', None) or getattr(node, 'process', None) or 'main'
+        try:
+            from tricc_oo.visitors.tricc import get_process
+            proc = get_process(node)
+            if proc:
+                segment = proc
+        except Exception:
+            pass
+
         if segment not in self.questionnaires:
             self.questionnaires[segment] = {
                 "resourceType": "Questionnaire",
@@ -259,83 +278,112 @@ class FHIRStrategy(BaseOutPutStrategy):
                 "status": "draft",
                 "item": []
             }
+
+        fhir_type = get_fhir_item_type(tricc_type)
+
+        # Special case requested: treat "yesno" style select_one as native boolean
+        if fhir_type == "choice" and hasattr(node, "options") and len(node.options or {}) == 2:
+            opt_names = {str(o.name).lower() for o in (node.options or {}).values()}
+            opt_codes = {str(getattr(o, "code", "")).lower() for o in (node.options or {}).values()}
+            yesno_markers = {"true", "false", "yes", "no", "1", "0", "y", "n"}
+            if opt_names & yesno_markers or opt_codes & yesno_markers:
+                fhir_type = "boolean"
+
         item = {
             "linkId": get_export_name(node),
-            "text": getattr(node, 'label', ''),
-            "type": self.map_tricc_type_to_fhir(node.tricc_type if hasattr(node, 'tricc_type') else 'text')
+            "text": getattr(node, 'label', '') or getattr(node, 'text', ''),
+            "type": fhir_type,
         }
-        item["extension"] = []
-        if isinstance(node, TriccNodeDisplayCalculateBase):
-            item["extension"] = [
-                self.get_hidden_extention()
-            ]
-        if hasattr(node, 'options') and node.options:
+
+        if is_repeating(tricc_type):
+            item["repeats"] = True
+
+        extensions = get_display_type_extensions(
+            getattr(node, 'display_type', None), tricc_type
+        )
+        if is_hidden(tricc_type) or isinstance(node, TriccNodeDisplayCalculateBase):
+            extensions.append(build_hidden_extension())
+        if extensions:
+            item["extension"] = extensions
+
+        # Handle options (same logic as before)
+        # Skip for boolean (e.g. select_yesno) — they use native true/false instead of choice options
+        if fhir_type != "boolean" and hasattr(node, 'options') and node.options:
+            if self.use_value_sets:
+                pass  # Phase 3
             item["answerOption"] = []
             for opt in node.options.values():
                 concept = lookup_codesystems_code(self.project.code_systems, opt.name)
                 if concept:
-                    item["answerOption"].append(
-                        {
-                            "valueCoding": {
-                                "code": concept.code,
-                                "display": concept.display
-                            }
-                        } 
-                    )
+                    item["answerOption"].append({"valueCoding": {"code": concept.code, "display": concept.display}})
                 else:
-                    item["answerOption"].append(
-                        {
-                            "valueCoding": {
-                                "code": opt.name,
-                                "display": getattr(opt, 'label', opt.name)
-                            }
-                        }
-                    )
+                    item["answerOption"].append({"valueCoding": {"code": opt.name, "display": getattr(opt, 'label', opt.name)}})
 
-        self.questionnaires[segment]["item"].append(item)
+        # === Nesting logic (basic) ===
+        is_group_starter = fhir_type == "group" and tricc_type in (
+            "start", "activity_start", "page"
+        )
+        is_group_ender = tricc_type in ("end", "activity_end")
+
+        q = self.questionnaires[segment]
+        target_list = q["item"]
+
+        if self._group_stack:
+            # We are inside a group — append to the top of the stack's "item" list
+            _, parent_item = self._group_stack[-1]
+            target_list = parent_item.setdefault("item", [])
+
+        target_list.append(item)
+
+        if is_group_starter:
+            # Push this item onto the stack so children attach under it
+            self._group_stack.append((segment, item))
+        elif is_group_ender and self._group_stack:
+            # Pop the matching group
+            self._group_stack.pop()
+
         return True
 
-    def get_hidden_extention(self):
-        return {
-            "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-hidden",
-            "valueBoolean": True
-        }
-
-
-    def get_enable_when_extention(self, expr, language="text/fhirpath"):
-        return {
-                "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-enableWhenExpression",
-                "valueExpression": {
-                    "language": language,
-                    "expression": expr
-                }
-            }
-
     def generate_relevance(self, node, **kwargs):
-        # Add enableWhen to Questionnaire item with FHIRPath
-        if hasattr(node, 'relevance') and node.relevance:
-            segment = getattr(node, 'segment', 'main')
-            if segment in self.questionnaires:
-                for item in self.questionnaires[segment]["item"]:
-                    if item["linkId"] == get_export_name(node):
-                        # Use FHIRPath expression
-                        fhirpath_expr = self.convert_expression_to_fhirpath(node.relevance)
-                        # Alternatively, use expression for complex logic
-                        if fhirpath_expr == 'false':
-                            item["extension"].append(self.get_hidden_extention())
-                        elif fhirpath_expr != 'true':
-                            item["extension"].append(self.get_enable_when_extention(fhirpath_expr) )
-                        break
+        """Attach enableWhenExpression (or hide the item) using the mapper builder."""
+        if not (hasattr(node, 'relevance') and node.relevance):
+            return True
+
+        segment = getattr(node, 'segment', None) or 'main'
+        if segment not in self.questionnaires:
+            return True
+
+        fhirpath_expr = self.convert_expression_to_fhirpath(node.relevance)
+
+        for item in self.questionnaires[segment].get("item", []):
+            if item.get("linkId") == get_export_name(node):
+                if fhirpath_expr == 'false':
+                    item.setdefault("extension", []).append(build_hidden_extension())
+                elif fhirpath_expr != 'true':
+                    item.setdefault("extension", []).append(
+                        build_enable_when_expression(fhirpath_expr)
+                    )
+                break
         return True
 
     def generate_calculate(self, node, **kwargs):
+        """Attach calculatedExpression using the mapper builder (fixed signature)."""
         segment = getattr(node, "segment", "main")
         q = self.questionnaires.get(segment)
-        if q:
-            for item in q.get("item", []):
-                if item.get("linkId") == get_export_name(node):
-                    build_calculated_expression(item, node)
-                    break
+        if not q:
+            return True
+
+        # For now we attach a placeholder — real CQL expression will be wired in Phase 2
+        # The mapper function expects (cql_expr: str, library_name: Optional[str])
+        # We pass a reference name; the actual define will be populated later.
+        calc_name = f"calc_{get_export_name(node)}"
+
+        for item in q.get("item", []):
+            if item.get("linkId") == get_export_name(node):
+                # This will be improved in Phase 2 when we actually emit CQL defines
+                expr_ext = build_calculated_expression(calc_name)
+                item.setdefault("extension", []).append(expr_ext)
+                break
         return True
 
     def generate_export(self, node, **kwargs):
@@ -378,19 +426,6 @@ class FHIRStrategy(BaseOutPutStrategy):
 
         logger.info(f"Exported FHIR resources to {base_path}")
 
-    def map_tricc_type_to_fhir(self, tricc_type):
-        mapping = {
-            'text': 'string',
-            'integer': 'integer',
-            'decimal': 'decimal',
-            'select_one': 'choice',
-            'select_multiple': 'choice',
-            'date': 'date',
-            'time': 'time',
-            'datetime': 'dateTime',
-            'boolean': 'boolean'
-        }
-        return mapping.get(tricc_type, 'string')
 
     def get_tricc_operation_operand(self, r):
         if isinstance(r, TriccOperation):
@@ -863,7 +898,7 @@ class FHIRStrategy(BaseOutPutStrategy):
 
     def tricc_operation_fhirpath_more_or_equal(self, ref_expressions, original_references=None):
         # Operands are already scalar-wrapped; just build the comparison.
-        r_expr =  self.tricc_operation__more_or_equal(ref_expressions)
+        r_expr = self.tricc_operation_more_or_equal(ref_expressions)
         return self._wrap_operand_if_needed(r_expr, original_references)
 
 
@@ -907,7 +942,8 @@ class FHIRStrategy(BaseOutPutStrategy):
         return self.tricc_operation_notexists(ref_expressions)
 
     def tricc_operation_fhirpath_coalesce(self, ref_expressions, original_references=None):
-        return f"({ref_expressions.join("|")}).where($this.exists()).first())"
+        joined = "|".join(ref_expressions) if ref_expressions else ""
+        return f"({joined}).where($this.exists()).first()"
 
     def tricc_operation_fhirpath_if(self, ref_expressions, original_references=None):
         r_expr =  self.tricc_operation_if(ref_expressions)
@@ -932,26 +968,6 @@ class FHIRStrategy(BaseOutPutStrategy):
     def tricc_operation_fhirpath_has_qualifier(self, ref_expressions, original_references=None):
         raise NotImplementedError("HAS_QUALIFIER is not supported by FHIRPath 2.0")
 
-
-    def tricc_operation_fhirpath_istrue(self, ref_expressions, original_references=None):
-        # CQL: treat as identity or explicit comparison
-        return self._wrap_operand_if_needed(f"({ref_expressions[0]} = true)", original_references)
-
-    def tricc_operation_fhirpath_isnottrue(self, ref_expressions, original_references=None):
-        return self._wrap_operand_if_needed(f"({ref_expressions[0]} != true)", original_references) 
-
-    def tricc_operation_fhirpath_isfalse(self, ref_expressions, original_references=None):
-        return self._wrap_operand_if_needed(f"({ref_expressions[0]} = false)", original_references)
-
-    def tricc_operation_fhirpath_isnotfalse(self, ref_expressions, original_references=None):
-        return self._wrap_operand_if_needed(f"({ref_expressions[0]} != false)", original_references)
-
-    def tricc_operation_fhirpath_isnull(self, ref_expressions, original_references=None):
-        return f"({ref_expressions[0]}.empty())"
-
-    def tricc_operation_fhirpath_isnotnull(self, ref_expressions, original_references=None):
-        return f"({ref_expressions[0]}.exists())"
-
     def tricc_operation_fhirpath_count(self, ref_expressions, original_references=None):
         if len(ref_expressions)>1:
             items = ", ".join(ref_expressions)
@@ -968,7 +984,7 @@ class FHIRStrategy(BaseOutPutStrategy):
         return f"{ref_expressions[0]}.toInteger()"
 
     def tricc_operation_fhirpath_cast_date(self, ref_expressions, original_references=None):
-        return f"({ref_expressions[0]}.toDate()"
+        return f"({ref_expressions[0]}.toDate())"
 
     def tricc_operation_fhirpath_cast_string(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]}.toString()"

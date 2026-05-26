@@ -58,7 +58,7 @@ NODE_TYPE_TO_FHIR: Dict[str, Tuple[str, bool, bool]] = {
     TriccNodeType.quantity:         (FHIR_TYPE_QUANTITY, False, False),
     # Select questions
     TriccNodeType.select_one:       (FHIR_TYPE_CHOICE,   False, False),
-    TriccNodeType.select_yesno:     (FHIR_TYPE_CHOICE,   False, False),
+    TriccNodeType.select_yesno:     (FHIR_TYPE_BOOLEAN,  False, False),
     TriccNodeType.select_multiple:  (FHIR_TYPE_CHOICE,   True,  False),
     # Display / note
     TriccNodeType.note:             (FHIR_TYPE_DISPLAY,  False, False),
@@ -309,15 +309,18 @@ def get_display_type_extensions(display_type: Optional[str], tricc_type: str) ->
         # Apply defaults based on node type
         if tricc_type == TriccNodeType.select_multiple:
             extensions.append(build_item_control_extension("check-box"))
-        elif tricc_type in (TriccNodeType.select_one, TriccNodeType.select_yesno):
+        elif tricc_type == TriccNodeType.select_one:
             extensions.append(build_item_control_extension("radio-button"))
+        # select_yesno is now boolean — no itemControl needed
         return extensions
 
     dt = display_type.lower().strip()
     if dt in ("dropdown", "drop-down", "select"):
         extensions.append(build_item_control_extension("drop-down"))
     elif dt in ("radio", "radio-button"):
-        extensions.append(build_item_control_extension("radio-button"))
+        # Only apply to choice-based selects (not yesno, which is now boolean)
+        if tricc_type != TriccNodeType.select_yesno:
+            extensions.append(build_item_control_extension("radio-button"))
     elif dt in ("checkbox", "check-box"):
         extensions.append(build_item_control_extension("check-box"))
     elif dt in ("slider",):
