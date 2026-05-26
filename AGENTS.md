@@ -109,7 +109,7 @@ The system uses various node types defined in `TriccNodeType` enum:
 ### Adding a New Output Strategy
 1. Create class inheriting from `BaseOutputStrategy`
 2. Implement required methods: `convert()`, `validate()`
-3. Register strategy in strategy factory
+3. Register strategy using `@register_input_strategy("Name")` or `@register_output_strategy("Name")` (see `tricc_oo/strategies/registry.py`)
 4. Add tests for conversion logic
 5. Document strategy capabilities and limitations
 
@@ -175,7 +175,10 @@ python tests/build.py -i tests/data/demo.drawio -o tests/output/
 ### Test Data
 - Use files in `tests/data/` directory
 - Draw.io files: `demo.drawio`, `combacal.drawio`, `etat.drawio`
+- YAML fixtures (preferred for transformation testing): `tests/data/yaml/`
 - JSON files for specific formats: `medlacreator.json`
+
+See `docs/testing/transformation-test-coverage.md` for a detailed mapping of core transformation methods (`load_calculate`, inheritance/versioning, expression generation, etc.) to recommended test cases.
 
 ### Expected Outputs
 - Check `tests/output/` directory for generated files

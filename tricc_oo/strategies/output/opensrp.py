@@ -38,6 +38,7 @@ from tricc_oo.strategies.output.fhir_form import (
     FHIR_VERSION,
     FHIRStrategy,
 )
+from tricc_oo.strategies.registry import register_output_strategy
 from tricc_oo.visitors.utils import PROCESSES
 
 logger = logging.getLogger("default")
@@ -67,6 +68,7 @@ FHIRCORE_EXT_PLAN_DEFINITIONS = (
 )
 
 
+@register_output_strategy("OpenSRPStrategy")
 class OpenSRPStrategy(FHIRStrategy):
     """openSRP / fhircore output strategy.
 

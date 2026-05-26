@@ -14,6 +14,7 @@ This documentation is organized for two audiences:
 - [Visual Authoring Concepts](./visual-authoring-concepts.md): WHO-oriented authoring concepts, challenges, and implementation recommendations.
 - [Troubleshooting](./troubleshooting.md): common failures and practical fixes.
 - [Publishing with GitHub Pages](./github-pages.md): easiest way to publish docs.
+- [Transformation Test Coverage](./testing/transformation-test-coverage.md): mapping of core transformation methods to test cases (especially useful with `YamlStrategy`).
 
 ## Key behavior notes
 

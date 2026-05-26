@@ -18,6 +18,7 @@ from tricc_oo.serializers.xls_form import (
     get_input_calc_line,
 )
 from tricc_oo.strategies.output.xlsform_cdss import XLSFormCDSSStrategy
+from tricc_oo.strategies.registry import register_output_strategy
 from tricc_oo.converters.tricc_to_xls_form import get_export_name
 from tricc_oo.converters.utils import clean_name, remove_html
 from tricc_oo.visitors.xform_pd import make_breakpoints, get_task_js
@@ -26,6 +27,7 @@ langs = SingletonLangClass()
 logger = logging.getLogger("default")
 
 
+@register_output_strategy("XLSFormCHTStrategy")
 class XLSFormCHTStrategy(XLSFormCDSSStrategy):
     def process_export(self, start_pages, **kwargs):
         self.activity_export(start_pages[self.processes[0]], **kwargs)

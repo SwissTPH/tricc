@@ -57,6 +57,7 @@ from tricc_oo.serializers.xls_form import (
     start_group,
 )
 from tricc_oo.strategies.output.base_output_strategy import BaseOutPutStrategy
+from tricc_oo.strategies.registry import register_output_strategy
 
 logger = logging.getLogger("default")
 
@@ -97,6 +98,7 @@ OPERATOR_COALESCE_FALLBACK = {
 }
 
 
+@register_output_strategy("XLSFormStrategy")
 class XLSFormStrategy(BaseOutPutStrategy):
     pd.set_option("display.max_colwidth", None)
     df_survey = pd.DataFrame(columns=SURVEY_MAP.keys())

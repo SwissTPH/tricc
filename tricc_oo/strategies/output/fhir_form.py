@@ -61,6 +61,7 @@ from tricc_oo.models.tricc import (
 )
 from tricc_oo.models.calculate import TriccNodeDisplayCalculateBase
 from tricc_oo.strategies.output.base_output_strategy import BaseOutPutStrategy
+from tricc_oo.strategies.registry import register_output_strategy
 from tricc_oo.visitors.tricc import get_process
 
 logger = logging.getLogger("default")
