@@ -6,7 +6,7 @@ import datetime
 logger = logging.getLogger("default")
 
 
-class BaseOutPutStrategy:
+class BaseOutPutStrategy(abc.ABC):
     processes = ["main"]
     project = None
     output_path = None

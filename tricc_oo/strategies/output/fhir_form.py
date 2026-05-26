@@ -60,7 +60,6 @@ from tricc_oo.models.tricc import (
     TriccNodeDisplayModel, 
 )
 from tricc_oo.models.calculate import TriccNodeDisplayCalculateBase
-from tricc_oo.converters.tricc_to_xls_form import get_export_name
 from tricc_oo.strategies.output.base_output_strategy import BaseOutPutStrategy
 from tricc_oo.visitors.tricc import get_process
 
@@ -150,7 +149,6 @@ class FHIRStrategy(BaseOutPutStrategy):
         structuremaps: Dict mapping process name → StructureMap resource dict.
         valuesets: Dict mapping list_name → ValueSet resource dict.
         binaries: List of Binary resource dicts (images).
-        cur_group: Current group context for nesting items (Optional[dict]).
     """
 
     processes = ["main"]
@@ -177,9 +175,8 @@ class FHIRStrategy(BaseOutPutStrategy):
         self.valuesets: Dict[str, dict] = {}
         self.binaries: List[dict] = []
         self._form_id: Optional[str] = None
-        self.cur_group: Optional[dict] = None
-        self.cql_libraries = {} # FIXME
-        self.fml_mappings = {}
+        self.cql_libraries: Dict[str, str] = {}
+        self.fml_mappings: Dict[str, str] = {}
 
     def get_tricc_operation_expression(self, operation):
         # For CQL
@@ -238,6 +235,13 @@ class FHIRStrategy(BaseOutPutStrategy):
         self.export(self.project.start_pages, version=version)
         logger.info("FHIRStrategy: validating")
         self.validate()
+        # Final visibility log (helps developers immediately see the state of the FHIR export)
+        logger.info(
+            f"FHIRStrategy complete: {len(self.questionnaires)} questionnaire(s), "
+            f"{len(self.cql_libraries)} CQL library file(s) written, "
+            f"{len(self.fml_mappings)} FML mapping(s). "
+            "See validate() output above for completeness warnings."
+        )
 
     def generate_base(self, node, **kwargs):
         if (
@@ -345,6 +349,7 @@ class FHIRStrategy(BaseOutPutStrategy):
 
     def export(self, start_pages, version):
         form_id = start_pages["main"].root.form_id or "fhir_form"
+        self._form_id = form_id  # Ensure OpenSRPStrategy (and any later code) can rely on it
         base_path = os.path.join(self.output_path, form_id)
         if not os.path.exists(base_path):
             os.makedirs(base_path)
@@ -386,18 +391,6 @@ class FHIRStrategy(BaseOutPutStrategy):
             'boolean': 'boolean'
         }
         return mapping.get(tricc_type, 'string')
-
-    def get_question_link(self, expression):
-        # Simplified, assume first reference
-        if isinstance(expression, TriccOperation) and hasattr(expression, 'reference'):
-            for r in expression.reference:
-                if isinstance(r, TriccReference):
-                    return get_export_name(r.value)
-        return ""
-
-    def get_answer_value(self, expression):
-        # Simplified
-        return "true"
 
     def get_tricc_operation_operand(self, r):
         if isinstance(r, TriccOperation):
@@ -988,3 +981,37 @@ class FHIRStrategy(BaseOutPutStrategy):
     # For any other fhirpath_* not explicitly defined above, the fallback in
     # get_tricc_operation_expression_fhirpath will call the CQL handler directly.
     # Per-operand .first() wrapping has already been applied before reaching here.
+
+    # ---------------------------------------------------------------------------
+    # Validation (implements the abstract method from BaseOutPutStrategy)
+    # ---------------------------------------------------------------------------
+
+    def validate(self):
+        """Basic structural validation of the generated FHIR resources.
+
+        Logs counts and emits warnings when the export is obviously incomplete
+        (the current state of the FHIRStrategy implementation).
+        """
+        q_count = len(self.questionnaires)
+        cql_count = len(self.cql_libraries)
+        fml_count = len(self.fml_mappings)
+        lib_count = len(getattr(self, "cql_defines", {}))
+
+        logger.info(
+            f"FHIRStrategy validate: questionnaires={q_count}, "
+            f"cql_libraries={cql_count}, fml_mappings={fml_count}, "
+            f"cql_defines={lib_count}"
+        )
+
+        if q_count == 0:
+            logger.warning("FHIRStrategy: No questionnaires were generated")
+        if cql_count == 0:
+            logger.warning(
+                "FHIRStrategy: No CQL libraries generated (calculate / complex "
+                "relevance logic not yet implemented in this strategy)"
+            )
+        if fml_count == 0:
+            logger.warning("FHIRStrategy: No FML/StructureMap mappings generated")
+
+        # Future: add deeper checks (linkId uniqueness, expression syntax, etc.)
+        logger.info("FHIRStrategy: basic validation complete")

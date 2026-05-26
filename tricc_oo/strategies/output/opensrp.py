@@ -112,6 +112,12 @@ class OpenSRPStrategy(FHIRStrategy):
             start_pages: Dict of start pages from the project.
             version: Build version string.
         """
+        # Defensive: ensure _form_id is available even if parent export ordering changes
+        # or if OpenSRPStrategy is used in isolation during development.
+        if not getattr(self, "_form_id", None):
+            form_id = start_pages.get("main").root.form_id or "fhir_form" if start_pages else "fhir_form"
+            self._form_id = form_id
+
         base = Path(self.output_path) / self._form_id
 
         # Build openSRP-specific resources before writing
@@ -135,10 +141,9 @@ class OpenSRPStrategy(FHIRStrategy):
         logger.info(f"OpenSRPStrategy: exported openSRP package to {base}")
 
     def validate(self):
-        """Validate the generated openSRP resources.
+        """Validate the generated openSRP resources (calls parent FHIR validation first).
 
-        Raises:
-            Warning logs for any detected issues.
+        Emits warnings (never raises) for detected issues.
         """
         super().validate()
         for process, pd in self.plan_definitions.items():
