@@ -263,10 +263,7 @@ class FHIRStrategy(BaseOutPutStrategy):
         item["extension"] = []
         if isinstance(node, TriccNodeDisplayCalculateBase):
             item["extension"] = [
-                {
-                    "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-hidden",
-                    "valueBoolean": True
-                }
+                self.get_hidden_extention()
             ]
         if hasattr(node, 'options') and node.options:
             item["answerOption"] = []
@@ -294,6 +291,22 @@ class FHIRStrategy(BaseOutPutStrategy):
         self.questionnaires[segment]["item"].append(item)
         return True
 
+    def get_hidden_extention(self):
+        return {
+            "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-hidden",
+            "valueBoolean": True
+        }
+
+
+    def get_enable_when_extention(self, expr, language="text/fhirpath"):
+        return {
+                "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-enableWhenExpression",
+                "valueExpression": {
+                    "language": language,
+                    "expression": expr
+                }
+            }
+
     def generate_relevance(self, node, **kwargs):
         # Add enableWhen to Questionnaire item with FHIRPath
         if hasattr(node, 'relevance') and node.relevance:
@@ -304,13 +317,10 @@ class FHIRStrategy(BaseOutPutStrategy):
                         # Use FHIRPath expression
                         fhirpath_expr = self.convert_expression_to_fhirpath(node.relevance)
                         # Alternatively, use expression for complex logic
-                        item["extension"].append( {
-                            "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-enableWhenExpression",
-                            "valueExpression": {
-                                "language": "text/fhirpath",
-                                "expression": fhirpath_expr
-                            }
-                        })
+                        if fhirpath_expr == 'false':
+                            item["extension"].append(self.get_hidden_extention())
+                        elif fhirpath_expr != 'true':
+                            item["extension"].append(self.get_enable_when_extention(fhirpath_expr) )
                         break
         return True
 
@@ -457,7 +467,7 @@ class FHIRStrategy(BaseOutPutStrategy):
 
         if self._should_wrap_first(original_ref):
             search = self.get_tricc_operation_operand_fhirpath(original_ref)
-            replace = f"{search}.where($this.exists()).first().value"
+            replace = f"{search}.where($this.exists()).value"
             return r_expr.replace(search, replace)
 
         return r_expr
@@ -507,7 +517,7 @@ class FHIRStrategy(BaseOutPutStrategy):
             return self.get_tricc_operation_expression_fhirpath(r)
         elif isinstance(r, TriccReference):
             # In FHIRPath, reference to another question's answer
-            return f"%resource.repeat(item).where(linkId='{get_export_name(r.value)}').answer"
+            return f"%resource.item.where(linkId='{get_export_name(r.value)}').answer"
         elif isinstance(r, TriccStatic):
             if isinstance(r.value, str):
                 value = f"'{r.value}'"
@@ -528,9 +538,9 @@ class FHIRStrategy(BaseOutPutStrategy):
         elif isinstance(r, TriccNodeSelectOption):
             return f"'{r.name}'"
         elif issubclass(r.__class__, TriccNodeInputModel):
-            return f"%resource.repeat(item).where(linkId='{get_export_name(r)}').answer"
+            return f"%resource.item.where(linkId='{get_export_name(r)}').answer"
         elif issubclass(r.__class__, TriccNodeBaseModel):
-            return f"%resource.repeat(item).where(linkId='{get_export_name(r)}').answer"
+            return f"%resource.item.where(linkId='{get_export_name(r)}').answer"
         else:
             raise NotImplementedError(f"This type of node {r.__class__} is not supported within an operation")
 
@@ -943,12 +953,38 @@ class FHIRStrategy(BaseOutPutStrategy):
     def tricc_operation_fhirpath_isnotfalse(self, ref_expressions, original_references=None):
         return self._wrap_operand_if_needed(f"({ref_expressions[0]} != false)", original_references)
 
-    def tricc_operation_isnull(self, ref_expressions, original_references=None):
+    def tricc_operation_fhirpath_isnull(self, ref_expressions, original_references=None):
         return f"({ref_expressions[0]}.empty())"
 
-    def tricc_operation_isnotnull(self, ref_expressions, original_references=None):
+    def tricc_operation_fhirpath_isnotnull(self, ref_expressions, original_references=None):
         return f"({ref_expressions[0]}.exists())"
 
+    def tricc_operation_fhirpath_count(self, ref_expressions, original_references=None):
+        if len(ref_expressions)>1:
+            items = ", ".join(ref_expressions)
+            return f"{{{items}}}.count()"
+        else:
+            return f"{ref_expressions[0]}.count()"
+    # ============================================================
+    # CASTING & CONVERSION
+    # ============================================================
+    def tricc_operation_fhirpath_cast_number(self, ref_expressions, original_references=None):
+        return f"{ref_expressions[0]}.toDecimal()"
+
+    def tricc_operation_fhirpath_cast_integer(self, ref_expressions, original_references=None):
+        return f"{ref_expressions[0]}.toInteger()"
+
+    def tricc_operation_fhirpath_cast_date(self, ref_expressions, original_references=None):
+        return f"({ref_expressions[0]}.toDate()"
+
+    def tricc_operation_fhirpath_cast_string(self, ref_expressions, original_references=None):
+        return f"{ref_expressions[0]}.toString()"
+
+    def tricc_operation_fhirpath_cast_boolean(self, ref_expressions, original_references=None):
+        return f"{ref_expressions[0]}.toBoolean()"
+
+    def tricc_operation_fhirpath_datetime_to_decimal(self, ref_expressions, original_references=None):
+        return f"{ref_expressions[0]}.toDecimal()"
     # For any other fhirpath_* not explicitly defined above, the fallback in
     # get_tricc_operation_expression_fhirpath will call the CQL handler directly.
     # Per-operand .first() wrapping has already been applied before reaching here.
