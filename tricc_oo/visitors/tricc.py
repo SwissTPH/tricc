@@ -81,27 +81,36 @@ def get_max_version(dict):
     return max_version
 
 
-def get_versions(name, iterable):
-    return [n for n in iterable if version_filter(name)(n)]
+def get_versions(name, iterable, repeat=None):
+    return [n for n in iterable if version_filter(name, repeat)(n)]
 
 
-def version_filter(name):
-    return (
-        lambda item: hasattr(item, "name")
-        and ((isinstance(item, TriccNodeEnd) and name == item.get_reference()) or item.name == name)
-        and not isinstance(item, TriccNodeSelectOption)
-    )
+def version_filter(name, repeat=None):
+    from tricc_oo.models.base import get_repeat as _get_repeat
+
+    def _matches(item):
+        if isinstance(item, TriccNodeSelectOption):
+            return False
+        if isinstance(item, TriccNodeEnd):
+            return name == item.get_reference()
+        if not hasattr(item, "name") or item.name != name:
+            return False
+        if repeat is not None:
+            return _get_repeat(item) == repeat
+        return True
+
+    return _matches
 
 
-def get_last_version(name, processed_nodes, _list=None):
+def get_last_version(name, processed_nodes, _list=None, repeat=None):
     max_version = None
     if isinstance(_list, dict):
         _list = _list[name].values() if name in _list else []
     if _list is None:
         if isinstance(processed_nodes, OrderedSet):
-            return processed_nodes.find_last(version_filter(name))
+            return processed_nodes.find_last(version_filter(name, repeat))
         else:
-            _list = get_versions(name, processed_nodes)
+            _list = get_versions(name, processed_nodes, repeat)
     if _list:
         for sim_node in _list:
             # get the max version while not taking a node that have a next node before next calc
@@ -113,7 +122,11 @@ def get_last_version(name, processed_nodes, _list=None):
             ):
                 max_version = sim_node
     if not max_version:
-        already_processed = list(filter(lambda p_node: hasattr(p_node, "name") and p_node.name == name, _list))
+        already_processed = [
+            p_node for p_node in _list
+            if hasattr(p_node, "name") and p_node.name == name
+            and (repeat is None or version_filter(name, repeat)(p_node))
+        ]
         if already_processed:
             max_version = sorted(already_processed, key=lambda x: x.path_len, reverse=False)[0]
 
@@ -148,11 +161,16 @@ def get_node_expressions(node, processed_nodes, process=None):
 def set_last_version_false(node, processed_nodes):
     if isinstance(node, (TriccNodeSelectOption)):
         return
+    from tricc_oo.models.base import get_repeat
+
     node_name = node.name if not isinstance(node, TriccNodeEnd) else node.get_reference()
-    last_version = processed_nodes.find_prev(node, version_filter(node_name))
+    node_repeat = None if isinstance(node, TriccNodeEnd) else get_repeat(node)
+    last_version = processed_nodes.find_prev(node, version_filter(node_name, node_repeat))
     if last_version and getattr(node, "process", "") != "pause":
         # 0-100 for manually specified instance.  100-200 for auto instance
-        node.version = get_next_version(node.name, processed_nodes, last_version.version, 0)
+        node.version = get_next_version(
+            node.name, processed_nodes, last_version.version, 0, repeat=node_repeat
+        )
         last_version.last = False
         node.path_len = max(node.path_len, last_version.path_len + 1)
     return last_version
@@ -272,7 +290,9 @@ def load_calculate(
             set_last_version_false(node, processed_nodes)
             # Get all previous versions from processed_nodes, not just the last one
             node_name = node.name if not isinstance(node, TriccNodeEnd) else node.get_reference()
-            all_prev_versions = get_versions(node_name, processed_nodes)
+            from tricc_oo.models.base import get_repeat
+
+            all_prev_versions = get_versions(node_name, processed_nodes, get_repeat(node))
             # Exclude the current node itself
             all_prev_versions = [v for v in all_prev_versions if v != node]
 
@@ -908,11 +928,15 @@ def process_operation_reference(
                 clean_ref, option_label = parts
 
         # Try to find the referenced node
+        from tricc_oo.models.base import get_repeat
+
+        ref_repeat = get_repeat(node)
         candidates_in_activity = [
             n for n in node.activity.nodes.values()
             if n.name == clean_ref
             and n != node
             and not isinstance(n, TriccNodeSelectOption)
+            and get_repeat(n) == ref_repeat
         ]
 
         if candidates_in_activity:
@@ -920,7 +944,9 @@ def process_operation_reference(
                 return False  # defer — not all versions processed yet
             target_node = candidates_in_activity[0]  # assuming name uniqueness
         else:
-            target_node = get_last_version(name=clean_ref, processed_nodes=processed_nodes)
+            target_node = get_last_version(
+                name=clean_ref, processed_nodes=processed_nodes, repeat=ref_repeat
+            )
 
         if target_node is None or isinstance(target_node, TriccNodeSelectOption):
             unresolved_names.append(ref_str)  # keep original form with [label] if present
@@ -1370,14 +1396,14 @@ def walkthrough_tricc_option(
                                 )
 
 
-def get_next_version(name, processed_nodes, version=0, min=100):
+def get_next_version(name, processed_nodes, version=0, min=100, repeat=None):
     return (
         max(
             version,
             min,
             *[
                 (getattr(n, "version", None) or getattr(n, "instance", None) or 0)
-                for n in get_versions(name, processed_nodes)
+                for n in get_versions(name, processed_nodes, repeat)
             ],
         )
         + 1
@@ -1582,8 +1608,11 @@ def reverse_walkthrough(in_node, next_node, callback, processed_nodes, stashed_n
 
 
 def get_prev_node_by_name(processed_nodes, name, node):
+    from tricc_oo.models.base import get_repeat
+
+    node_repeat = get_repeat(node)
     # look for the node in the same activity
-    last_calc = get_last_version(name, processed_nodes)
+    last_calc = get_last_version(name, processed_nodes, repeat=node_repeat)
     if last_calc:
         return last_calc
 
@@ -1591,13 +1620,21 @@ def get_prev_node_by_name(processed_nodes, name, node):
         filter(
             lambda p_node: hasattr(p_node, "name")
             and p_node.name == name
+            and get_repeat(p_node) == node_repeat
             and p_node.instance == node.instance
             and p_node.path_len <= node.path_len,
             processed_nodes,
         )
     )
     if len(filtered) == 0:
-        filtered = list(filter(lambda p_node: hasattr(p_node, "name") and p_node.name == name, processed_nodes))
+        filtered = list(
+            filter(
+                lambda p_node: hasattr(p_node, "name")
+                and p_node.name == name
+                and get_repeat(p_node) == node_repeat,
+                processed_nodes,
+            )
+        )
     if len(filtered) > 0:
         return sorted(filtered, key=lambda x: x.path_len, reverse=False)[0]
 

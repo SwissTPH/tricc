@@ -23,7 +23,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 from tricc_oo.strategies.input.base_input_strategy import BaseInputStrategy
 from tricc_oo.converters.utils import generate_id
-from tricc_oo.converters.xml_to_tricc import parse_expression, load_expressions
+from tricc_oo.converters.xml_to_tricc import parse_expression, load_expressions, propagate_activity_repeat
 from tricc_oo.visitors.tricc import set_prev_next_node
 from tricc_oo.strategies.registry import register_input_strategy
 
@@ -92,6 +92,7 @@ class YamlNode(BaseModel):
     # For goto / link nodes
     link: Optional[str] = None
     instance: Optional[int] = 1
+    repeat: Optional[int] = None
 
 
 class YamlEdge(BaseModel):
@@ -123,7 +124,7 @@ NODE_TYPE_MAP: Dict[str, Dict[str, Any]] = {
     },
     "activity_start": {
         "model": TriccNodeActivityStart,
-        "attrs": ["label", "name", "relevance", "instance"],
+        "attrs": ["label", "name", "relevance", "instance", "repeat"],
         "tricc_type": TriccNodeType.activity_start,
     },
     "activity_end": {
@@ -143,40 +144,40 @@ NODE_TYPE_MAP: Dict[str, Dict[str, Any]] = {
     },
     "integer": {
         "model": TriccNodeInteger,
-        "attrs": ["label", "name", "required", "min", "max", "relevance", "save"],
+        "attrs": ["label", "name", "required", "min", "max", "relevance", "save", "repeat"],
         "tricc_type": TriccNodeType.integer,
     },
     "decimal": {
         "model": TriccNodeDecimal,
-        "attrs": ["label", "name", "required", "min", "max", "relevance", "save"],
+        "attrs": ["label", "name", "required", "min", "max", "relevance", "save", "repeat"],
         "tricc_type": TriccNodeType.decimal,
     },
     "text": {
         "model": TriccNodeText,
-        "attrs": ["label", "name", "required", "relevance", "save"],
+        "attrs": ["label", "name", "required", "relevance", "save", "repeat"],
         "tricc_type": TriccNodeType.text,
     },
     "select_one": {
         "model": TriccNodeSelectOne,
-        "attrs": ["label", "name", "required", "relevance", "save"],
+        "attrs": ["label", "name", "required", "relevance", "save", "repeat"],
         "has_options": True,
         "tricc_type": TriccNodeType.select_one,
     },
     "select_multiple": {
         "model": TriccNodeSelectMultiple,
-        "attrs": ["label", "name", "required", "relevance", "save"],
+        "attrs": ["label", "name", "required", "relevance", "save", "repeat"],
         "has_options": True,
         "tricc_type": TriccNodeType.select_multiple,
     },
     "select_yesno": {
         "model": TriccNodeSelectYesNo,
-        "attrs": ["label", "name", "required", "relevance", "save"],
+        "attrs": ["label", "name", "required", "relevance", "save", "repeat"],
         "has_options": True,
         "tricc_type": TriccNodeType.select_yesno,
     },
     "calculate": {
         "model": TriccNodeCalculate,
-        "attrs": ["label", "name", "calculate", "relevance", "save", "reference"],
+        "attrs": ["label", "name", "calculate", "relevance", "save", "reference", "repeat"],
         "tricc_type": TriccNodeType.calculate,
     },
     "rhombus": {
@@ -234,29 +235,32 @@ class YamlStrategy(BaseInputStrategy):
                 continue
 
             try:
-                loaded = yaml.safe_load(raw_content)
+                loaded_docs = list(yaml.safe_load_all(raw_content))
             except yaml.YAMLError as exc:
                 logger.error(f"Failed to parse YAML content: {exc}")
                 continue
 
-            # Support either a single activity dict or a list of activities
-            activities_data: List[Dict[str, Any]] = (
-                loaded if isinstance(loaded, list) else [loaded]
-            )
-
-            for act_dict in activities_data:
-                if not act_dict:
+            for loaded in loaded_docs:
+                if not loaded:
                     continue
-                try:
-                    yaml_activity = YamlActivity(**act_dict)
-                except ValidationError as exc:
-                    logger.error(f"Invalid YAML activity definition: {exc}")
-                    continue
+                # Support either a single activity dict or a list of activities
+                activities_data: List[Dict[str, Any]] = (
+                    loaded if isinstance(loaded, list) else [loaded]
+                )
 
-                activity = self._build_activity(yaml_activity, project)
-                if activity is not None:
-                    project.pages[activity.id] = activity
-                    self._assign_start_page(activity, project)
+                for act_dict in activities_data:
+                    if not act_dict:
+                        continue
+                    try:
+                        yaml_activity = YamlActivity(**act_dict)
+                    except ValidationError as exc:
+                        logger.error(f"Invalid YAML activity definition: {exc}")
+                        continue
+
+                    activity = self._build_activity(yaml_activity, project)
+                    if activity is not None:
+                        project.pages[activity.id] = activity
+                        self._assign_start_page(activity, project)
 
         # Re-use the sophisticated linking / inheritance / calculate logic
         # already present in the base class and DrawioStrategy.
@@ -330,6 +334,8 @@ class YamlStrategy(BaseInputStrategy):
         # Wire root to activity
         root_node.activity = activity
         root_node.group = activity
+        if getattr(root_node, "process", None) is None:
+            root_node.process = yaml_act.process
         for node in nodes.values():
             node.activity = activity
             node.group = activity
@@ -343,6 +349,8 @@ class YamlStrategy(BaseInputStrategy):
 
         # 6. Handle dangling calculates (important for many test cases)
         self._collect_dangling_calculates(activity)
+
+        propagate_activity_repeat(activity)
 
         if yaml_act.applicability:
             activity.applicability = parse_expression("", yaml_act.applicability)

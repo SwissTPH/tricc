@@ -26,6 +26,15 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from tricc_oo.converters.fhir.concept_mapper import get_fhir_resource, get_fhir_value_field
+from tricc_oo.converters.fhir.repeat_helper import (
+    build_questionnaire_repeat_extension,
+    cql_helper_repeat_block,
+    fml_repeat_extension_rule,
+    get_observation_cql_accessor_for_node,
+    should_emit_repeat_metadata,
+)
+from tricc_oo.models.base import get_repeat
+from tricc_oo.models.calculate import TriccNodeInput
 
 from tricc_oo.converters.fhir.questionnaire_item_mapper import (
     CALCULATE_NODE_TYPES,
@@ -90,17 +99,9 @@ include FHIRHelpers version '{fhir_version}' called FHIRHelpers
 
 context Patient
 
-// ── Observation helpers ──────────────────────────────────────────────────────
+// ── Observation helpers (repeat-aware) ───────────────────────────────────────
 
-define function GetObservation(code String):
-  First(
-    [Observation: Code code from "http://snomed.info/sct"] O
-      where O.status in {{'final', 'amended', 'corrected'}}
-      sort by effective desc
-  )
-
-define function GetObservationValue(code String):
-  GetObservation(code).value
+{repeat_helpers}
 
 // ── Condition helpers ─────────────────────────────────────────────────────────
 
@@ -314,6 +315,11 @@ class FHIRStrategy(BaseOutPutStrategy):
         if extensions:
             item["extension"] = extensions
 
+        if should_emit_repeat_metadata(node):
+            item.setdefault("extension", []).append(
+                build_questionnaire_repeat_extension(get_repeat(node))
+            )
+
         # Handle options (same logic as before)
         # Skip for boolean (e.g. select_yesno) — they use native true/false instead of choice options
         if fhir_type != "boolean" and hasattr(node, 'options') and node.options:
@@ -417,11 +423,17 @@ class FHIRStrategy(BaseOutPutStrategy):
 
     def generate_export(self, node, **kwargs):
         # Generate FML for saving based on content_type
-        content_type = getattr(node, 'content_type', 'Observation')
+        concept_type = getattr(node, "concept_type", None)
+        fhir_resource, _, _ = get_fhir_resource(concept_type, getattr(node, "tricc_type", None))
+        content_type = getattr(node, "content_type", None) or fhir_resource
         if content_type not in self.fml_mappings:
             self.fml_mappings[content_type] = f"map \"{content_type}\" {{\n"
-        # Add mapping rules
-        self.fml_mappings[content_type] += f"  {get_export_name(node)} -> {content_type}.{get_export_name(node)}\n"
+        link_id = get_export_name(node)
+        self.fml_mappings[content_type] += f"  {link_id} -> {content_type}.{link_id}\n"
+        if should_emit_repeat_metadata(node):
+            self.fml_mappings[content_type] += fml_repeat_extension_rule(
+                link_id, get_repeat(node)
+            )
         return True
 
     def export(self, start_pages, version):
@@ -466,6 +478,8 @@ class FHIRStrategy(BaseOutPutStrategy):
         if isinstance(r, TriccOperation):
             return self.get_tricc_operation_expression(r)
         elif isinstance(r, TriccReference):
+            if isinstance(r.value, str):
+                return get_observation_cql_accessor(r.value, 1)
             return get_export_name(r.value)
         elif isinstance(r, TriccStatic):
             if isinstance(r.value, str):
@@ -486,6 +500,8 @@ class FHIRStrategy(BaseOutPutStrategy):
             return str(r)
         elif isinstance(r, TriccNodeSelectOption):
             return f"'{r.name}'"
+        elif isinstance(r, TriccNodeInput):
+            return get_observation_cql_accessor_for_node(r)
         elif issubclass(r.__class__, TriccNodeInputModel):
             return get_export_name(r)
         elif issubclass(r.__class__, TriccNodeBaseModel):
@@ -513,6 +529,7 @@ class FHIRStrategy(BaseOutPutStrategy):
         helper_cql = CQL_HELPER_TEMPLATE.format(
             library_id=helper_id,
             fhir_version=FHIR_VERSION,
+            repeat_helpers=cql_helper_repeat_block(FHIR_VERSION),
         )
         self.cql_libraries[helper_id] = helper_cql
 

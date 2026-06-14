@@ -2,7 +2,7 @@ import logging
 from tricc_oo.converters.utils import clean_name
 from tricc_oo.models.tricc import TriccNodeSelectOption, TRICC_TRUE_VALUE, TRICC_FALSE_VALUE, TriccNodeActivity
 from tricc_oo.models.calculate import TriccNodeInput
-from tricc_oo.models.base import TriccNodeBaseModel, TriccStatic, TriccReference
+from tricc_oo.models.base import TriccNodeBaseModel, TriccStatic, TriccReference, get_repeat
 
 # from babel import _
 
@@ -19,6 +19,7 @@ TRICC_NEGATE = "not({})"
 # TRICC_AND_EXPRESSION = '{0} and {1}'
 VERSION_SEPARATOR = "_Vv_"
 INSTANCE_SEPARATOR = "_Ii_"
+REPEAT_SEPARATOR = "_Rr_"
 BOOLEAN_MAP = {
     str(TRICC_TRUE_VALUE): 1,
     str(TRICC_FALSE_VALUE): 0,
@@ -28,6 +29,15 @@ BOOLEAN_MAP = {
 logger = logging.getLogger("default")
 
 # gettext language dict {'code':gettext}
+
+
+def _concept_export_base_name(node, replace_dots=True):
+    """Build the concept base name, including repeat suffix when repeat != 1."""
+    name = node.name
+    repeat = get_repeat(node)
+    if repeat != 1:
+        name = name + REPEAT_SEPARATOR + str(repeat)
+    return clean_name(name, replace_dots=replace_dots)
 
 
 def get_export_name(node, replace_dots=True):
@@ -74,14 +84,12 @@ def get_export_name(node, replace_dots=True):
         elif isinstance(node, TriccNodeSelectOption):
             node.export_name = node.name
         elif node.last is False:
-            node.export_name = clean_name(
-                node.name + VERSION_SEPARATOR + str(node.version),
-                replace_dots=replace_dots,
-            )
+            node.export_name = _concept_export_base_name(node, replace_dots) + VERSION_SEPARATOR + str(node.version)
+            node.export_name = clean_name(node.export_name, replace_dots=replace_dots)
         elif isinstance(node, TriccNodeInput):
             node.export_name = clean_name("load." + node.name, replace_dots=replace_dots)
         else:
-            node.export_name = clean_name(node.name, replace_dots=replace_dots)
+            node.export_name = _concept_export_base_name(node, replace_dots)
         return node.export_name
 
 
