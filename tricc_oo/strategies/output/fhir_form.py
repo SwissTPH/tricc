@@ -1,8 +1,30 @@
 import logging
 import os
-import json
-import datetime
-from tricc_oo.strategies.output.base_output_strategy import BaseOutPutStrategy
+import re
+from pathlib import Path
+from typing import Dict, List, Optional
+
+from tricc_oo.converters.fhir.concept_mapper import get_fhir_resource, get_fhir_value_field
+
+from tricc_oo.converters.fhir.questionnaire_item_mapper import (
+    CALCULATE_NODE_TYPES,
+    SDC_EXT_CALCULATED_EXPR,
+    SDC_EXT_ENABLE_WHEN_EXPR,
+    SDC_EXT_HIDDEN,
+    SDC_EXT_INITIAL_EXPR,
+    build_enable_when_expression,
+    build_hidden_extension,
+    build_initial_expression,
+    build_initial_expression_cql,
+    build_calculated_expression,
+    get_display_type_extensions,
+    get_fhir_item_type,
+    is_hidden,
+    is_repeating,
+    should_skip,
+)
+from tricc_oo.converters.tricc_<<to_xls_form import get_export_name
+from tricc_oo.converters.datadictionnary import lookup_codesystems_code
 from tricc_oo.models.base import (
     TriccOperation,
     TriccStatic, TriccReference
@@ -15,6 +37,75 @@ from tricc_oo.models.tricc import (
 from tricc_oo.converters.tricc_to_xls_form import get_export_name
 
 logger = logging.getLogger("default")
+
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+DEFAULT_BASE_URL = "https://fhir.tricc.io"
+FHIR_VERSION = "4.0.1"
+QUESTIONNAIRE_PROFILE = "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire"
+LIBRARY_PROFILE = "http://hl7.org/fhir/StructureDefinition/Library"
+STRUCTUREMAP_PROFILE = "http://hl7.org/fhir/StructureDefinition/StructureMap"
+VALUESET_PROFILE = "http://hl7.org/fhir/StructureDefinition/ValueSet"
+CODESYSTEM_PROFILE = "http://hl7.org/fhir/StructureDefinition/CodeSystem"
+
+# List-context operators that work on collections without needing .first().value
+LIST_CONTEXT_OPERATORS = {"contains", "selected", "has_qualifier", "count"}
+
+# CQL helper library template (based on pyfhirsdc/core_fhir/cql/pyfhirsdc.cql patterns)
+CQL_HELPER_TEMPLATE = """\
+library {library_id}Helper version '1.0.0'
+
+using FHIR version '{fhir_version}'
+
+include FHIRHelpers version '{fhir_version}' called FHIRHelpers
+
+context Patient
+
+// ── Observation helpers ──────────────────────────────────────────────────────
+
+define function GetObservation(code String):
+  First(
+    [Observation: Code code from "http://snomed.info/sct"] O
+      where O.status in {{'final', 'amended', 'corrected'}}
+      sort by effective desc
+  )
+
+define function GetObservationValue(code String):
+  GetObservation(code).value
+
+// ── Condition helpers ─────────────────────────────────────────────────────────
+
+define function HasCondition(code String):
+  exists(
+    [Condition: Code code from "http://snomed.info/sct"] C
+      where C.clinicalStatus ~ "active"
+  )
+
+// ── Age helpers ───────────────────────────────────────────────────────────────
+
+define AgeInDays:
+  duration in days between Patient.birthDate and Today()
+
+define AgeInMonths:
+  duration in months between Patient.birthDate and Today()
+
+define AgeInYears:
+  AgeInYears()
+"""
+
+# CQL child library template (per Questionnaire / PlanDefinition)
+CQL_CHILD_TEMPLATE = """\
+library {library_id} version '1.0.0'
+
+using FHIR version '{fhir_version}'
+
+include FHIRHelpers version '{fhir_version}' called FHIRHelpers
+include {helper_library_id} version '1.0.0' called Helper
+
+context Patient
+
+"""
 
 
 class FHIRStrategy(BaseOutPutStrategy):
@@ -93,12 +184,57 @@ class FHIRStrategy(BaseOutPutStrategy):
             }
         item = {
             "linkId": get_export_name(node),
-            "text": getattr(node, 'label', ''),
-            "type": self.map_tricc_type_to_fhir(node.tricc_type if hasattr(node, 'tricc_type') else 'text')
+            "text": getattr(node, 'label', '') or getattr(node, 'text', ''),
+            "type": fhir_type,
         }
-        if hasattr(node, 'options') and node.options:
-            item["answerOption"] = [{"valueString": opt.name} for opt in node.options]
-        self.questionnaires[segment]["item"].append(item)
+
+        if is_repeating(tricc_type):
+            item["repeats"] = True
+
+        extensions = get_display_type_extensions(
+            getattr(node, 'display_type', None), tricc_type
+        )
+        if is_hidden(tricc_type) or isinstance(node, TriccNodeDisplayCalculateBase):
+            extensions.append(build_hidden_extension())
+        if extensions:
+            item["extension"] = extensions
+
+        # Handle options (same logic as before)
+        # Skip for boolean (e.g. select_yesno) — they use native true/false instead of choice options
+        if fhir_type != "boolean" and hasattr(node, 'options') and node.options:
+            if self.use_value_sets:
+                pass  # Phase 3
+            item["answerOption"] = []
+            for opt in node.options.values():
+                concept = lookup_codesystems_code(self.project.code_systems, opt.name)
+                if concept:
+                    item["answerOption"].append({"valueCoding": {"code": concept.code, "display": concept.display}})
+                else:
+                    item["answerOption"].append({"valueCoding": {"code": opt.name, "display": getattr(opt, 'label', opt.name)}})
+
+        # === Nesting logic (basic) ===
+        is_group_starter = fhir_type == "group" and tricc_type in (
+            "start", "activity_start", "page"
+        )
+        is_group_ender = tricc_type in ("end", "activity_end")
+
+        q = self.questionnaires[segment]
+        target_list = q["item"]
+
+        if self._group_stack:
+            # We are inside a group — append to the top of the stack's "item" list
+            _, parent_item = self._group_stack[-1]
+            target_list = parent_item.setdefault("item", [])
+
+        target_list.append(item)
+
+        if is_group_starter:
+            # Push this item onto the stack so children attach under it
+            self._group_stack.append((segment, item))
+        elif is_group_ender and self._group_stack:
+            # Pop the matching group
+            self._group_stack.pop()
+
         return True
 
     def generate_relevance(self, node, **kwargs):
@@ -145,11 +281,17 @@ class FHIRStrategy(BaseOutPutStrategy):
 
     def generate_export(self, node, **kwargs):
         # Generate FML for saving based on content_type
-        content_type = getattr(node, 'content_type', 'Observation')
+        concept_type = getattr(node, "concept_type", None)
+        fhir_resource, _, _ = get_fhir_resource(concept_type, getattr(node, "tricc_type", None))
+        content_type = getattr(node, "content_type", None) or fhir_resource
         if content_type not in self.fml_mappings:
             self.fml_mappings[content_type] = f"map \"{content_type}\" {{\n"
-        # Add mapping rules
-        self.fml_mappings[content_type] += f"  {get_export_name(node)} -> {content_type}.{get_export_name(node)}\n"
+        link_id = get_export_name(node)
+        self.fml_mappings[content_type] += f"  {link_id} -> {content_type}.{link_id}\n"
+        if should_emit_repeat_metadata(node):
+            self.fml_mappings[content_type] += fml_repeat_extension_rule(
+                link_id, get_repeat(node)
+            )
         return True
 
     def export(self, start_pages, version):
@@ -212,6 +354,8 @@ class FHIRStrategy(BaseOutPutStrategy):
         if isinstance(r, TriccOperation):
             return self.get_tricc_operation_expression(r)
         elif isinstance(r, TriccReference):
+            if isinstance(r.value, str):
+                return get_observation_cql_accessor(r.value, 1)
             return get_export_name(r.value)
         elif isinstance(r, TriccStatic):
             if isinstance(r.value, str):
@@ -224,6 +368,8 @@ class FHIRStrategy(BaseOutPutStrategy):
             return str(r)
         elif isinstance(r, TriccNodeSelectOption):
             return f"'{r.name}'"
+        elif isinstance(r, TriccNodeInput):
+            return get_observation_cql_accessor_for_node(r)
         elif issubclass(r.__class__, TriccNodeInputModel):
             return get_export_name(r)
         elif issubclass(r.__class__, TriccNodeBaseModel):
@@ -236,6 +382,77 @@ class FHIRStrategy(BaseOutPutStrategy):
             return self.get_tricc_operation_expression(expression)
         else:
             return self.get_tricc_operation_operand(expression)
+
+    def _assemble_cql_libraries(self):
+        """Turn collected cql_defines into full CQL text + Library resources (Phase 2)."""
+        if not self.cql_defines:
+            return
+
+        import base64
+
+        form_id = self._form_id or "fhir_form"
+        helper_id = f"{form_id}Helper"
+
+        # Build helper library (once)
+        helper_cql = CQL_HELPER_TEMPLATE.format(
+            library_id=helper_id,
+            fhir_version=FHIR_VERSION,
+        )
+        self.cql_libraries[helper_id] = helper_cql
+
+        # Create FHIR Library resource for helper
+        self.libraries[helper_id] = self._make_library_resource(
+            helper_id, helper_cql, form_id
+        )
+
+        # Build one child library per segment/process
+        for segment, defines in self.cql_defines.items():
+            lib_id = f"{form_id}-{segment}"
+            defines_block = "\n\n".join(defines)
+
+            child_cql = CQL_CHILD_TEMPLATE.format(
+                library_id=lib_id,
+                fhir_version=FHIR_VERSION,
+                helper_library_id=helper_id,
+            )
+            child_cql += "\n\n" + defines_block + "\n"
+
+            self.cql_libraries[segment] = child_cql
+
+            # Create FHIR Library resource
+            self.libraries[segment] = self._make_library_resource(
+                lib_id, child_cql, form_id
+            )
+
+    def _make_library_resource(self, lib_id: str, cql_text: str, form_id: str) -> dict:
+        """Create a FHIR Library resource with embedded CQL."""
+        import base64
+
+        encoded = base64.b64encode(cql_text.encode("utf-8")).decode("ascii")
+
+        return {
+            "resourceType": "Library",
+            "id": lib_id,
+            "url": f"{self.base_url}/Library/{lib_id}",
+            "version": "1.0.0",
+            "name": lib_id,
+            "title": f"{form_id} - {lib_id} CQL Library",
+            "status": "draft",
+            "type": {
+                "coding": [
+                    {
+                        "system": "http://terminology.hl7.org/CodeSystem/library-type",
+                        "code": "logic-library",
+                    }
+                ]
+            },
+            "content": [
+                {
+                    "contentType": "text/cql",
+                    "data": encoded,
+                }
+            ],
+        }
 
     def convert_expression_to_fhirpath(self, expression):
         # For FHIRPath, similar to CQL but in FHIR context

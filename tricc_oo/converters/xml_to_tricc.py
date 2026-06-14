@@ -122,6 +122,38 @@ def get_experimentalactivity_details(diagram, activity, project, media_path):
 
     return nodes
 
+def propagate_activity_repeat(activity):
+    """Apply activity_start.repeat to in-scope descendant nodes (overrides node-level repeat)."""
+    root = activity.root
+    if not isinstance(root, TriccNodeActivityStart):
+        return
+    activity_repeat = getattr(root, "repeat", None)
+    if activity_repeat is None:
+        return
+    try:
+        activity_repeat = int(activity_repeat)
+    except (TypeError, ValueError):
+        logger.warning(f"Invalid repeat on activity {activity.get_name()}: {activity_repeat}")
+        return
+
+    for node in activity.nodes.values():
+        if isinstance(node, TriccNodeInput):
+            continue
+        if isinstance(node, TriccNodeSelectOption):
+            continue
+        in_scope = isinstance(node, TriccNodeInputModel) or (
+            issubclass(node.__class__, TriccNodeDisplayCalculateBase) and getattr(node, "name", None)
+        )
+        if not in_scope:
+            continue
+        node_repeat = getattr(node, "repeat", None)
+        if node_repeat is not None and int(node_repeat) != activity_repeat:
+            logger.debug(
+                f"Activity repeat={activity_repeat} overrides node repeat={node_repeat} on {node.get_name()}"
+            )
+        node.repeat = activity_repeat
+
+
 def get_activity_details(diagram, activity, project, media_path):
     nodes = get_nodes(diagram, activity)
     for n in nodes.values():
@@ -185,6 +217,7 @@ def get_activity_details(diagram, activity, project, media_path):
     # link back the activity
     
     manage_dangling_calculate(activity)
+    propagate_activity_repeat(activity)
     # Assign parent to NotAvailable
     for node in list(
         filter(
@@ -532,8 +565,10 @@ def set_additional_attributes(attribute_names, elm, node):
             # input expression can add a condition to either relevance (display) or calculate expression
             if attributename == "expression_inputs":
                 attribute = [attribute]
-            elif attributename in ["priority", "instance"]:
+            elif attributename in ["priority", "instance", "repeat"]:
                 attribute = int(attribute)
+                if attributename == "repeat" and attribute < 0:
+                    logger.warning(f"Invalid repeat={attribute} on node; must be non-negative")
             elif attributename == "relevance":
                 attribute = remove_html(attribute.strip())
             else:

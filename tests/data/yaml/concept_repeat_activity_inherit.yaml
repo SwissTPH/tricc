@@ -1,0 +1,36 @@
+# Activity-level repeat overrides node-level repeat
+id: activity_repeat_override
+title: "Activity repeat override"
+process: main
+
+nodes:
+  - id: start_act
+    type: activity_start
+    label: "Post-treatment"
+    name: activity_repeat_override
+    repeat: 3
+
+  - id: weight_node
+    type: integer
+    name: weight
+    label: "Weight"
+    repeat: 1
+    required: true
+
+  - id: height_node
+    type: integer
+    name: height
+    label: "Height"
+    required: true
+
+  - id: end_act
+    type: end
+    label: "End"
+
+edges:
+  - source: start_act
+    target: weight_node
+  - source: weight_node
+    target: height_node
+  - source: height_node
+    target: end_act

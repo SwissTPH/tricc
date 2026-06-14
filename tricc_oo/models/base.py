@@ -205,10 +205,21 @@ class TriccGroup(TriccBaseModel):
 FwTriccNodeBaseModel = ForwardRef("TriccNodeBaseModel")
 
 
+def get_repeat(node) -> int:
+    """Return effective repeat slot for concept instance scoping. Default 1."""
+    if node is None:
+        return 1
+    value = getattr(node, "repeat", None)
+    if value is None:
+        return 1
+    return int(value)
+
+
 class TriccNodeBaseModel(TriccBaseModel):
     path_len: int = 0
     group: Optional[Union[TriccGroup, FwTriccNodeBaseModel]] = None
     name: Optional[str] = None
+    repeat: Optional[int] = None
     export_name: Optional[str] = None
     label: Optional[Union[str, Dict[str, str]]] = None
     next_nodes: OrderedSet[TriccNodeBaseModel] = OrderedSet()
