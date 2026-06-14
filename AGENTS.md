@@ -23,6 +23,7 @@ tricc_oo/
 ├── strategies/      # Input/output strategy implementations
 ├── tools/           # Draw.io templates and utilities
 └── visitors/        # Graph traversal and processing
+feature/             # Feature specs (business + technical); Draft → Approved gate
 tests/               # Test suite and build scripts
 docs/                # MkDocs documentation
 ```
@@ -84,14 +85,39 @@ The system uses various node types defined in `TriccNodeType` enum:
 - Support for multiple activity instances and cross-page linking
 - Experimental pages have limited processing
 
+## Feature Development Workflow
+
+New capabilities follow a **two-step gate** before code changes land:
+
+### Step 1 — Feature specification (`feature/`)
+
+1. Create `feature/<feature-name>.md` (or update an existing spec).
+2. Structure the document in **two parts**:
+   - **Part I — Business description** — for clinical authors, guideline developers, and implementers evaluating workflows. Plain language, examples, benefits, limitations. No file paths or function names unless unavoidable.
+   - **Part II — Technical specification** — for developers: formal semantics, pipeline, code checklist, tests, acceptance criteria, implementation phases.
+3. Set the status table at the top to **`Draft`**.
+4. Do **not** implement until the spec is approved.
+
+### Step 2 — User approval
+
+1. The user reviews Part I (and Part II if needed).
+2. When the user approves, update the spec status to **`Approved`** in the same `feature/<feature-name>.md` file.
+3. Only then begin implementation, following Part II.
+4. After implementation and tests pass, update status to **`Implemented`**.
+
+**Status values:** `Draft` → `Approved` → `Implemented` → `Superseded`
+
+Example specs live under `feature/` (e.g. `feature/concept-repeat.md`).
+
 ## Documentation Requirements
 
 ### When Adding Features
-1. Update relevant documentation in `docs/` directory
-2. Add inline code comments for complex logic
-3. Update README if user-facing changes
-4. Add type hints to all function signatures
-5. Include docstrings with Args, Returns, Raises sections
+1. Complete Step 1 and Step 2 above (feature MD + user approval) before coding
+2. Update relevant documentation in `docs/` directory
+3. Add inline code comments for complex logic
+4. Update README if user-facing changes
+5. Add type hints to all function signatures
+6. Include docstrings with Args, Returns, Raises sections
 
 ### Documentation Structure
 - `docs/getting-started.md` - Installation and basic usage
