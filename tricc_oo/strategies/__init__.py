@@ -25,9 +25,14 @@ from tricc_oo.strategies.input.drawio import DrawioStrategy  # noqa: F401
 from tricc_oo.strategies.input.yaml import YamlStrategy  # noqa: F401
 
 from tricc_oo.strategies.output.xls_form import XLSFormStrategy  # noqa: F401
+from tricc_oo.strategies.output.xlsform_cdss import XLSFormCDSSStrategy  # noqa: F401
+from tricc_oo.strategies.output.xlsform_cht import XLSFormCHTStrategy  # noqa: F401
+from tricc_oo.strategies.output.xlsform_cht_hf import XLSFormCHTHFStrategy  # noqa: F401
+from tricc_oo.strategies.output.html_form import HTMLStrategy  # noqa: F401
+from tricc_oo.strategies.output.dhis2_form import DHIS2Strategy  # noqa: F401
+from tricc_oo.strategies.output.openmrs_form import OpenMRSStrategy  # noqa: F401
 from tricc_oo.strategies.output.fhir_form import FHIRStrategy  # noqa: F401
 from tricc_oo.strategies.output.opensrp import OpenSRPStrategy  # noqa: F401
-# Add other commonly used strategies here as needed (they self-register on import)
 
 __all__ = [
     "register_input_strategy",

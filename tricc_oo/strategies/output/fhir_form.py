@@ -26,7 +26,14 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from tricc_oo.converters.fhir.concept_mapper import get_fhir_resource, get_fhir_value_field
-
+from tricc_oo.converters.fhir.repeat_helper import (
+    build_questionnaire_repeat_extension,
+    cql_helper_repeat_block,
+    fml_repeat_extension_rule,
+    get_observation_cql_accessor,
+    get_observation_cql_accessor_for_node,
+    should_emit_repeat_metadata,
+)
 from tricc_oo.converters.fhir.questionnaire_item_mapper import (
     CALCULATE_NODE_TYPES,
     SDC_EXT_CALCULATED_EXPR,
@@ -44,17 +51,6 @@ from tricc_oo.converters.fhir.questionnaire_item_mapper import (
     is_repeating,
     should_skip,
 )
-from tricc_oo.converters.tricc_<<to_xls_form import get_export_name
-from tricc_oo.converters.datadictionnary import lookup_codesystems_code
-from tricc_oo.models.base import (
-    TriccOperation,
-    TriccStatic, TriccReference
-)
-from tricc_oo.models.tricc import (
-    TriccNodeSelectOption,
-    TriccNodeInputModel,
-    TriccNodeBaseModel
-)
 from tricc_oo.converters.tricc_to_xls_form import get_export_name
 from tricc_oo.converters.datadictionnary import lookup_codesystems_code
 from tricc_oo.models.base import (
@@ -62,15 +58,16 @@ from tricc_oo.models.base import (
     TriccOperator,
     TriccReference,
     TriccStatic,
+    get_repeat,
 )
 from tricc_oo.models.tricc import (
     TriccNodeBaseModel,
     TriccNodeInputModel,
     TriccNodeSelect,
     TriccNodeSelectOption,
-    TriccNodeDisplayModel, 
+    TriccNodeDisplayModel,
 )
-from tricc_oo.models.calculate import TriccNodeDisplayCalculateBase
+from tricc_oo.models.calculate import TriccNodeDisplayCalculateBase, TriccNodeInput
 from tricc_oo.strategies.output.base_output_strategy import BaseOutPutStrategy
 from tricc_oo.strategies.registry import register_output_strategy
 from tricc_oo.visitors.tricc import get_process
@@ -101,17 +98,9 @@ include FHIRHelpers version '{fhir_version}' called FHIRHelpers
 
 context Patient
 
-// ── Observation helpers ──────────────────────────────────────────────────────
+// ── Observation helpers (repeat-aware) ───────────────────────────────────────
 
-define function GetObservation(code String):
-  First(
-    [Observation: Code code from "http://snomed.info/sct"] O
-      where O.status in {{'final', 'amended', 'corrected'}}
-      sort by effective desc
-  )
-
-define function GetObservationValue(code String):
-  GetObservation(code).value
+{repeat_helpers}
 
 // ── Condition helpers ─────────────────────────────────────────────────────────
 
@@ -147,6 +136,7 @@ context Patient
 """
 
 
+@register_output_strategy("FHIRStrategy")
 class FHIRStrategy(BaseOutPutStrategy):
     """Standard FHIR SDC output strategy.
 
@@ -324,6 +314,11 @@ class FHIRStrategy(BaseOutPutStrategy):
             extensions.append(build_hidden_extension())
         if extensions:
             item["extension"] = extensions
+
+        if should_emit_repeat_metadata(node):
+            item.setdefault("extension", []).append(
+                build_questionnaire_repeat_extension(get_repeat(node))
+            )
 
         # Handle options (same logic as before)
         # Skip for boolean (e.g. select_yesno) — they use native true/false instead of choice options
@@ -534,6 +529,7 @@ class FHIRStrategy(BaseOutPutStrategy):
         helper_cql = CQL_HELPER_TEMPLATE.format(
             library_id=helper_id,
             fhir_version=FHIR_VERSION,
+            repeat_helpers=cql_helper_repeat_block(FHIR_VERSION),
         )
         self.cql_libraries[helper_id] = helper_cql
 

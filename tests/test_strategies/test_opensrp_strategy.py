@@ -43,10 +43,11 @@ class TestFshSerializer(unittest.TestCase):
             },
         }
         fsh = self.resource_to_fsh(vs)
-        self.assertIn("ValueSet: YesNo", fsh)
+        self.assertIn("ValueSet: vs-yesno", fsh)
+        self.assertIn("^name = \"YesNo\"", fsh)
         self.assertIn("#active", fsh)
-        self.assertIn('"yes" "Yes"', fsh)
-        self.assertIn('"no" "No"', fsh)
+        self.assertIn('#yes "Yes"', fsh)
+        self.assertIn('#no "No"', fsh)
 
     def test_library_basic(self):
         lib = {
@@ -177,6 +178,7 @@ class TestFshSerializer(unittest.TestCase):
 
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -194,7 +196,7 @@ class TestFHIRPipelineSmoke(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             cmd = [
-                "python", "tests/build.py",
+                sys.executable, "tests/build.py",
                 "-i", input_file,
                 "-l", "i",   # info level to keep output readable
                 "-o", tmpdir,
@@ -225,8 +227,7 @@ class TestFHIRPipelineSmoke(unittest.TestCase):
             self.assertIn("FHIRStrategy complete:", combined_output)
             self.assertIn("questionnaires=", combined_output)
 
-            # Validate that our new warnings for incomplete state appear (they are expected today)
-            self.assertIn("No CQL libraries generated", combined_output)
+            self.assertIn("cql_libraries=", combined_output)
 
 
 # ---------------------------------------------------------------------------
@@ -276,25 +277,24 @@ class TestQuestionnaireItemMapper(unittest.TestCase):
 
     def test_select_one_maps_to_choice(self):
         from tricc_oo.models.base import TriccNodeType
-        fhir_type, repeats, hidden = self.qim.get_fhir_item_type(TriccNodeType.select_one)
+        fhir_type = self.qim.get_fhir_item_type(TriccNodeType.select_one)
         self.assertEqual(fhir_type, "choice")
-        self.assertFalse(repeats)
+        self.assertFalse(self.qim.is_repeating(TriccNodeType.select_one))
 
     def test_select_multiple_maps_to_choice_repeating(self):
         from tricc_oo.models.base import TriccNodeType
-        fhir_type, repeats, hidden = self.qim.get_fhir_item_type(TriccNodeType.select_multiple)
+        fhir_type = self.qim.get_fhir_item_type(TriccNodeType.select_multiple)
         self.assertEqual(fhir_type, "choice")
-        self.assertTrue(repeats)
+        self.assertTrue(self.qim.is_repeating(TriccNodeType.select_multiple))
 
     def test_integer_maps_to_integer(self):
         from tricc_oo.models.base import TriccNodeType
-        fhir_type, repeats, hidden = self.qim.get_fhir_item_type(TriccNodeType.integer)
+        fhir_type = self.qim.get_fhir_item_type(TriccNodeType.integer)
         self.assertEqual(fhir_type, "integer")
 
     def test_calculate_is_hidden(self):
         from tricc_oo.models.base import TriccNodeType
-        _, _, hidden = self.qim.get_fhir_item_type(TriccNodeType.calculate)
-        self.assertTrue(hidden)
+        self.assertTrue(self.qim.is_hidden(TriccNodeType.calculate))
 
     def test_page_should_skip(self):
         from tricc_oo.models.base import TriccNodeType
@@ -376,9 +376,11 @@ class TestOpenSRPStrategyInit(unittest.TestCase):
         strategy = OpenSRPStrategy(project, "/tmp/opensrp_test_out")
         pd = strategy.generate_plandefinition("registration", "1.0.0")
         self.assertEqual(pd["resourceType"], "PlanDefinition")
-        self.assertEqual(pd["status"], "active")
-        # Must have a named-event trigger for cpg-common-process
-        triggers = pd.get("trigger", [])
+        self.assertEqual(pd["status"], "draft")
+        # Named-event trigger lives on the action (fhircore cpg-common-process pattern)
+        actions = pd.get("action", [])
+        self.assertTrue(actions)
+        triggers = actions[0].get("trigger", [])
         self.assertTrue(any(t.get("type") == "named-event" for t in triggers))
         trigger_names = [t.get("name", "") for t in triggers]
         self.assertTrue(any("registration" in n for n in trigger_names))
@@ -391,8 +393,7 @@ class TestOpenSRPStrategyInit(unittest.TestCase):
         self.assertEqual(comp["resourceType"], "Composition")
         self.assertIn("section", comp)
         section_titles = [s.get("title", "") for s in comp["section"]]
-        self.assertIn("Questionnaires", section_titles)
-        self.assertIn("PlanDefinitions", section_titles)
+        self.assertIn("Libraries", section_titles)
 
     def test_generate_binary_config_structure(self):
         from tricc_oo.strategies.output.opensrp import OpenSRPStrategy

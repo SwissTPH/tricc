@@ -3034,16 +3034,16 @@ def get_process(node) -> str | None:
     activity = getattr(node, "activity", None)
     if activity is not None:
         root = getattr(activity, "root", None)
-    if isinstance(root, TriccNodeMainStart):
-        return getattr(root, "process", None)
-     # Rule 3: recurse on the activity itself (which may have its own activity/root)
-    if activity is not node:
-        return get_process(activity)
-     # Fallback: try prev_nodes
+        if isinstance(root, TriccNodeMainStart):
+            return getattr(root, "process", None)
+        # Rule 3: recurse on the activity itself (which may have its own activity/root)
+        if activity is not node:
+            return get_process(activity)
+    # Fallback: try prev_nodes
     for prev in getattr(node, "prev_nodes", []):
         result = get_process(prev)
-    if result is not None:
-        return result
+        if result is not None:
+            return result
     return None
 
     

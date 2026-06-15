@@ -139,7 +139,7 @@ def download_google_drive_file(file_id, temp_dir, original_url=None):
 
     # Try authenticated download first
     if GOOGLE_AUTH_AVAILABLE:
-        auth_path = os.path.join(os.path.dirname(__file__), '..', 'auth', 'google.json')
+        auth_path = os.path.join(os.path.dirname(__file__), '..', '.secrets', 'google.json')
         auth_path = os.path.abspath(auth_path)
 
         if os.path.exists(auth_path):
