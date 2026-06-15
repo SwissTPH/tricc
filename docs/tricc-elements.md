@@ -32,6 +32,9 @@ This page documents TRICC modeling elements and their meaning based on:
 - `add`: arithmetic compute helper.
 - `count`: option/count compute helper.
 - `rhombus`: decision/condition gate using `reference` and labeled out-edges.
+- `factor`: sequence scoring node (non-display calculate). Created from numeric edge
+  labels; stores the factor in `reference`, uses `path` for the branch condition.
+  Expression semantics: **if path then factor else 0** (feeds `count` / `add` nodes).
 - `wait`: synchronization gate based on references.
 - `exclusive`: exclusivity helper.
 
@@ -107,8 +110,10 @@ interpreted as branch semantics. Labels are case-insensitive unless noted.
 
 **Integer factors on rhombus:** a numeric out-edge label (for example `-1` on a
 condition gate feeding a `count` node) is treated as an affirmative (**yes**) path.
-When the factor is not `1`, TRICC inserts a `calculate` node that multiplies the
-source reference by that factor — the same mechanism used on non-rhombus edges.
+When the factor is not `1`, TRICC inserts a **`factor`** node (`TriccNodeFactor`) with
+`path` set to the source and `reference` set to the numeric value. This is a
+non-display sequence calculate (like `rhombus` / `wait`), not a regular `calculate`
+with both `reference` and `prev_nodes`. Expression: **if path then factor else 0**.
 This supports clinical scoring patterns (e.g. subtract points when a risk factor is present).
 
 ## Sequence-node semantics (from visual authoring guidance)

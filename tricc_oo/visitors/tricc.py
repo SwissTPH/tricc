@@ -17,6 +17,7 @@ from tricc_oo.models.calculate import (
     TriccNodeWait,
     TriccNodeCalculate,
     TriccNodeRhombus,
+    TriccNodeFactor,
     TriccNodeDisplayCalculateBase,
     TriccNodeExclusive,
     TriccNodeProposedDiagnosis,
@@ -363,8 +364,8 @@ def load_calculate(
             if (
                 not node.is_sequence_defined
                 and issubclass(type(node), TriccNodeDisplayCalculateBase)
-                and not isinstance(node, TriccNodeRhombus)
-                and node.prev_nodes   
+                and not isinstance(node, (TriccNodeRhombus, TriccNodeFactor))
+                and node.prev_nodes
             ):
                 if node.reference:
                     logger.critical(f"{node.get_name()} has both reference and prev_nodes")
@@ -2746,6 +2747,58 @@ def get_rhombus_terms(node, processed_nodes, get_overall_exp=False, negate=False
     return expression
 
 
+def _get_factor_path_condition(path, processed_nodes, get_overall_exp=False, process=None):
+    """Boolean condition for whether a factor node's path branch was taken."""
+    if isinstance(path, TriccNodeRhombus):
+        return get_rhombus_terms(path, processed_nodes, get_overall_exp=get_overall_exp, process=process)
+    if isinstance(path, TriccNodeSelectYesNo):
+        yes_option = next(
+            (opt for opt in path.options.values() if str(opt.label).lower() in ("yes", "oui")),
+            next(iter(path.options.values()), None),
+        )
+        if yes_option:
+            return TriccOperation(TriccOperator.SELECTED, [path, yes_option])
+    if issubclass(path.__class__, TriccNodeSelect):
+        return TriccOperation(TriccOperator.ISTRUE, [path])
+    if issubclass(path.__class__, TriccNodeCalculateBase):
+        return get_node_expression(
+            path,
+            processed_nodes=processed_nodes,
+            get_overall_exp=get_overall_exp,
+            is_prev=True,
+            process=process,
+        )
+    return TriccOperation(TriccOperator.ISTRUE, [path])
+
+
+def get_factor_terms(node, processed_nodes, get_overall_exp=False, negate=False, process=None):
+    """Return ``if path then factor else 0`` for sequence scoring nodes."""
+    if node.path is None:
+        if len(node.prev_nodes) == 1:
+            node.path = list(node.prev_nodes)[0]
+        elif len(node.prev_nodes) > 1:
+            logger.critical(f"missing path for Factor {node.get_name()}")
+            exit(1)
+
+    factor_value = node.reference
+    if isinstance(factor_value, list) and factor_value:
+        factor_value = factor_value[0]
+    if not isinstance(factor_value, TriccStatic):
+        factor_value = TriccStatic(float(factor_value))
+
+    path_condition = _get_factor_path_condition(
+        node.path, processed_nodes, get_overall_exp=get_overall_exp, process=process
+    )
+    if path_condition is None:
+        path_condition = TriccStatic(False)
+
+    if negate:
+        path_condition = not_clean(path_condition)
+
+    scored = TriccOperation(TriccOperator.IF, [path_condition, factor_value, TriccStatic(0)])
+    return TriccOperation(TriccOperator.CAST_NUMBER, [scored])
+
+
 # function that generate the calculation terms return by calculate node
 # @param node calculate node to assess
 # @param processed_nodes list of node already processed, importnat because only processed node could be use
@@ -2762,6 +2815,10 @@ def get_calculation_terms(node, processed_nodes, get_overall_exp=False, negate=F
         return get_count_terms(node, False, negate, process=process)
     elif isinstance(node, TriccNodeRhombus):
         return get_rhombus_terms(
+            node, processed_nodes=processed_nodes, get_overall_exp=get_overall_exp, negate=negate, process=process
+        )
+    elif isinstance(node, TriccNodeFactor):
+        return get_factor_terms(
             node, processed_nodes=processed_nodes, get_overall_exp=get_overall_exp, negate=negate, process=process
         )
     elif isinstance(node, (TriccNodeWait)):

@@ -36,6 +36,7 @@ class TriccNodeType(StrEnum):
     text = "text"
     date = "date"
     rhombus = "rhombus"  # fetch data
+    factor = "factor"  # sequence scoring: if path then reference else 0
     goto = "goto"  #: start the linked activity within the target activity
     start = "start"  #: main start of the algo
     activity_start = "activity_start"  #: start of an activity (link in)

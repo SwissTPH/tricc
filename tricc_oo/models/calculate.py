@@ -118,6 +118,25 @@ class TriccRhombusMixIn:
         return instance
 
 
+class TriccNodeFactor(TriccNodeFakeCalculateBase):
+    """Sequence scoring node: contributes *reference* when *path* is true, else 0.
+
+    Created from numeric edge labels (e.g. ``-1`` on a rhombus yes-branch).
+    Non-display calculate — similar to rhombus/wait, not a ``TriccNodeDisplayCalculateBase``.
+    """
+
+    tricc_type: TriccNodeType = TriccNodeType.factor
+    path: Optional[TriccNodeBaseModel] = None
+    reference: Optional[TriccStatic] = None
+
+    def make_instance(self, instance_nb, activity, **kwargs):
+        instance = super().make_instance(instance_nb, activity, **kwargs)
+        instance.path = self.path
+        if isinstance(self.reference, TriccStatic):
+            instance.reference = TriccStatic(self.reference.value)
+        return instance
+
+
 class TriccNodeRhombus(TriccNodeCalculateBase, TriccRhombusMixIn):
     tricc_type: TriccNodeType = TriccNodeType.rhombus
     path: Optional[TriccNodeBaseModel] = None

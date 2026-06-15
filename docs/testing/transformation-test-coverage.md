@@ -71,7 +71,7 @@ This is the most important area for regression testing.
 | `get_version_inheritance`          | `visitors/tricc.py:161`   | Merges applicability/relevance/calculate from all previous versions of a node | **High priority** |
 | `get_versions` / `version_filter`  | `visitors/tricc.py`       | Finds prior versions scoped by `(name, repeat)` | `test_concept_repeat.py`, inheritance YAML fixtures |
 | `get_repeat` / `propagate_activity_repeat` | `models/base.py`, `xml_to_tricc.py` | Concept repeat slot resolution and activity propagation | `test_concept_repeat.py`, `concept_repeat_activity_inherit.yaml` |
-| `is_factor_edge_label` / `process_factor_edge` | `xml_to_tricc.py` | Rhombus/select factor edges (integer +/- labels) | `test_rhombus_factor_edge.py`, clinical scoring draw.io |
+| `is_factor_edge_label` / `process_factor_edge` / `get_factor_terms` | `xml_to_tricc.py`, `visitors/tricc.py` | Rhombus/select factor edges → `TriccNodeFactor` (if path then factor else 0) | `test_rhombus_factor_edge.py`, clinical scoring draw.io |
 | `get_last_version`                 | `visitors/tricc.py:96`    | Finds the most recent prior version | Same |
 | `get_max_version`                  | `visitors/tricc.py:76`    | Internal max version helper | Covered by above |
 

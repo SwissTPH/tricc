@@ -242,6 +242,7 @@ ODK_TRICC_TYPE_MAP = {
     "integer": "integer",
     "text": "text",
     "rhombus": "calculate",
+    "factor": "calculate",
     "goto": "",  #: start the linked activity within the target activity
     "start": "",
     "activity_start": "calculate",

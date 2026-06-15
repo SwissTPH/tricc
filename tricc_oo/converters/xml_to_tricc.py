@@ -19,6 +19,7 @@ from tricc_oo.models.calculate import (
     TriccNodeActivityStart,
     TriccNodeEnd,
     TriccNodeCalculate,
+    TriccNodeFactor,
     TriccNodeRhombus,
     TriccNodeDisplayCalculateBase,
     TriccNodeExclusive,
@@ -1098,20 +1099,17 @@ def get_edges(diagram):
 def process_factor_edge(edge, nodes):
     factor = edge.value.strip()
     factor_value = float(factor.replace(",", "."))
-    if factor_value != 1:
-        source = nodes[edge.source]
-        return TriccNodeCalculate(
-            id=edge.id,
-            expression_reference=TriccOperation(
-                TriccOperator.MULTIPLIED,
-                [TriccReference(nodes[edge.source].name), TriccStatic(factor_value)],
-            ),
-            reference=[TriccReference(source.name)],
-            activity=source.activity,
-            group=source.group,
-            label="factor {}".format(factor),
-        )
-    return None
+    if factor_value == 1:
+        return None
+    source = nodes[edge.source]
+    return TriccNodeFactor(
+        id=edge.id,
+        path=source,
+        reference=TriccStatic(factor_value),
+        activity=source.activity,
+        group=source.group,
+        label="factor {}".format(factor),
+    )
 
 
 def process_condition_edge(edge, label, nodes):

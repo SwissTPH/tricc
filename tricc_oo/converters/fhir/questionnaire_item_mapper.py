@@ -77,6 +77,7 @@ NODE_TYPE_TO_FHIR: Dict[str, Tuple[str, bool, bool]] = {
     TriccNodeType.activity_end:     (FHIR_TYPE_GROUP,    False, True),
     TriccNodeType.end:              (FHIR_TYPE_GROUP,    False, True),
     TriccNodeType.rhombus:          (FHIR_TYPE_BOOLEAN,  False, True),
+    TriccNodeType.factor:           (FHIR_TYPE_DECIMAL,  False, True),
     TriccNodeType.bridge:           (FHIR_TYPE_BOOLEAN,  False, True),
     TriccNodeType.wait:             (FHIR_TYPE_BOOLEAN,  False, True),
     TriccNodeType.goto:             (FHIR_TYPE_GROUP,    False, True),
