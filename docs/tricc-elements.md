@@ -17,7 +17,7 @@ This page documents TRICC modeling elements and their meaning based on:
 - `note`: informational text shown to users.
 - `select_one`: single-choice question.
 - `select_multiple`: multiple-choice question.
-- `select_yesno`: yes/no convenience selection.
+- `select_yesno`: yes/no convenience selection. In FHIR output this typically becomes a native `boolean` item type (preferred over `choice` for simple yes/no questions).
 - `integer`, `decimal`, `text`, `date`: typed user inputs.
 - `input`: generic input node used in conversion workflows.
 

@@ -1,0 +1,73 @@
+# More advanced inheritance test: relevance + calculate merging
+# across versions of the same named node.
+
+id: relevance_base
+title: Relevance Base
+process: registration
+
+nodes:
+  - id: s1
+    type: start
+    label: Start
+
+  - id: calc_risk
+    type: calculate
+    name: risk_score
+    label: Base risk
+    calculate: "age * 0.5"
+
+  - id: e1
+    type: end
+    label: End
+
+edges:
+  - source: s1
+    target: calc_risk
+  - source: calc_risk
+    target: e1
+
+
+---
+id: relevance_extension
+title: Relevance Extension
+process: registration
+
+nodes:
+  - id: s2
+    type: start
+    label: Start
+
+  - id: calc_risk_v2
+    type: calculate
+    name: risk_score
+    label: Extended risk
+    calculate: "risk_score + comorbidities * 10"
+    relevance: "${age} >= 50"     # This version only applies for older patients
+
+  - id: rhombus_high_risk
+    type: rhombus
+    label: High risk?
+    reference: "risk_score > 30"  # Should be able to see the merged version
+
+  - id: note_high
+    type: note
+    name: note_high
+    label: "High risk - escalate"
+
+  - id: e2
+    type: end
+    label: End
+
+edges:
+  - source: s2
+    target: calc_risk_v2
+  - source: calc_risk_v2
+    target: rhombus_high_risk
+  - source: rhombus_high_risk
+    target: note_high
+    value: "yes"
+  - source: rhombus_high_risk
+    target: e2
+    value: "no"
+  - source: note_high
+    target: e2

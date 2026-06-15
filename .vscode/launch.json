@@ -230,13 +230,13 @@
         "PYTHONPATH": "${workspaceFolder}${pathSeparator}${env:PYTHONPATH}"
       }
     },   {
-      "name": "ETAT FHIR",
+      "name": "DEMO FHIR",
       "type": "debugpy",
       "request": "launch",
       "program": "tests/build.py",
       "args": [
         "-i",
-        "https://drive.usercontent.google.com/download?id=1BRXudvhlhFM_gcHErCBxGUReOqYWcvKM",
+        "./tests/data/demo.drawio",
         "-l",
         "d",
         "-o",

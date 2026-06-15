@@ -3007,3 +3007,43 @@ def generate_base(node, processed_nodes, **kwargs):
         # continue walk
         return True
     return False
+
+def get_process(node) -> str | None:
+
+    """Walk the TRICC graph upward to find the cpg-common-process name for a node.
+     Rules (per FHIRcore.md v4 spec):
+     1. If the node is a ``TriccNodeMainStart`` → return ``node.process``.
+     2. If the node's activity root is a ``TriccNodeMainStart`` → return that root's process.
+     3. Otherwise recurse on the node's activity (which itself has prev_nodes / a root).
+    
+     Args:
+
+     node: Any TRICC node (``TriccNodeBaseModel`` subclass).
+
+     Returns:
+
+     The cpg-common-process string (e.g. ``"registration"``) or ``None`` if not found.
+
+    """
+    if node is None:
+        return None
+     # Rule 1: node itself is the main start
+    if isinstance(node, TriccNodeMainStart):
+        return getattr(node, "process", None)
+    # Rule 2: node's activity root is the main start
+    activity = getattr(node, "activity", None)
+    if activity is not None:
+        root = getattr(activity, "root", None)
+    if isinstance(root, TriccNodeMainStart):
+        return getattr(root, "process", None)
+     # Rule 3: recurse on the activity itself (which may have its own activity/root)
+    if activity is not node:
+        return get_process(activity)
+     # Fallback: try prev_nodes
+    for prev in getattr(node, "prev_nodes", []):
+        result = get_process(prev)
+    if result is not None:
+        return result
+    return None
+
+    

@@ -14,6 +14,7 @@ from tricc_oo.visitors.tricc import (
 from tricc_oo.converters.tricc_to_xls_form import get_export_name
 import datetime
 from tricc_oo.strategies.output.base_output_strategy import BaseOutPutStrategy
+from tricc_oo.strategies.registry import register_output_strategy
 from tricc_oo.models.base import (
     not_clean, TriccOperation,
     TriccStatic, TriccReference

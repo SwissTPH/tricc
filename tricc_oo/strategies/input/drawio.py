@@ -26,10 +26,12 @@ from tricc_oo.models import (
 
 from tricc_oo.strategies.input.base_input_strategy import BaseInputStrategy
 from tricc_oo.parsers.xml import read_drawio
+from tricc_oo.strategies.registry import register_input_strategy
 
 logger = logging.getLogger("default")
 
 
+@register_input_strategy("DrawioStrategy")
 class DrawioStrategy(BaseInputStrategy):
 
     processes = PROCESSES
