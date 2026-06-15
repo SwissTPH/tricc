@@ -27,6 +27,7 @@ from tricc_oo.models.calculate import (
     TriccNodeDiagnosis,
     TriccRhombusMixIn,
     TriccNodeInput,
+    TriccNodePopulate,
 )
 from tricc_oo.models.tricc import (
     TriccNodeCalculateBase,
@@ -144,7 +145,7 @@ def propagate_activity_repeat(activity):
         return
 
     for node in activity.nodes.values():
-        if isinstance(node, TriccNodeInput):
+        if isinstance(node, (TriccNodeInput, TriccNodePopulate)):
             continue
         if isinstance(node, TriccNodeSelectOption):
             continue
@@ -165,7 +166,7 @@ def get_activity_details(diagram, activity, project, media_path):
     nodes = get_nodes(diagram, activity)
     for n in nodes.values():
         if (
-            issubclass(n.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase, TriccNodeInput))
+            issubclass(n.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase, TriccNodeInput, TriccNodePopulate))
             and not isinstance(n, (TriccRhombusMixIn, TriccNodeRhombus, TriccNodeDisplayBridge))
             and not n.name.startswith("label_")  # FIXME
         ):
@@ -612,6 +613,7 @@ def get_concept_type(node):
             TriccNodeSelectYesNo,
             TriccNodeSelectNotAvailable,
             TriccNodeInput,
+            TriccNodePopulate,
         ),
     ):
         return "Symptom-Finding"
@@ -836,6 +838,10 @@ def add_tricc_base_node(
                 node.severity = severity_from_color(styles["fillColor"])
 
         set_additional_attributes(attributes, elm, node)
+        if isinstance(node, TriccNodePopulate):
+            from tricc_oo.converters.fhir.populate_helper import normalize_populate_node
+
+            normalize_populate_node(node)
         if not isinstance(node, TriccNodeLinkOut):
             load_expressions(node)
         nodes[id] = node

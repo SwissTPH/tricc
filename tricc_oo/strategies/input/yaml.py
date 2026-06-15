@@ -51,6 +51,7 @@ from tricc_oo.models.calculate import (
     TriccNodeActivityStart,
     TriccNodeActivityEnd,
     TriccNodeEnd,
+    TriccNodePopulate,
 )
 
 logger = logging.getLogger("default")
@@ -93,6 +94,8 @@ class YamlNode(BaseModel):
     link: Optional[str] = None
     instance: Optional[int] = 1
     repeat: Optional[int] = None
+    context: Optional[str] = None
+    period: Optional[str] = None
 
 
 class YamlEdge(BaseModel):
@@ -185,6 +188,11 @@ NODE_TYPE_MAP: Dict[str, Dict[str, Any]] = {
         "attrs": ["label", "name", "expression", "reference", "relevance"],
         "tricc_type": TriccNodeType.rhombus,
     },
+    "populate": {
+        "model": TriccNodePopulate,
+        "attrs": ["label", "name", "context", "period", "repeat", "data_type", "concept_type"],
+        "tricc_type": TriccNodeType.populate,
+    },
 }
 
 # Map YAML type strings to TriccNodeType (for nodes where the map above does not list it)
@@ -202,6 +210,7 @@ YAML_TYPE_TO_TRICC_TYPE = {
     "select_yesno": TriccNodeType.select_yesno,
     "calculate": TriccNodeType.calculate,
     "rhombus": TriccNodeType.rhombus,
+    "populate": TriccNodeType.populate,
 }
 
 
@@ -429,6 +438,11 @@ class YamlStrategy(BaseInputStrategy):
         # Special case: calculate nodes often use the 'calculate' field as expression source
         if ynode.type == "calculate" and ynode.calculate:
             node.expression = parse_expression(ynode.label or "", ynode.calculate)
+
+        if isinstance(node, TriccNodePopulate):
+            from tricc_oo.converters.fhir.populate_helper import normalize_populate_node
+
+            normalize_populate_node(node)
 
         return node
 

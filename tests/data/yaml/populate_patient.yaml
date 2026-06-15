@@ -1,0 +1,26 @@
+id: populate_patient
+title: Populate patient context
+process: main
+
+nodes:
+  - id: start
+    type: start
+    label: Start
+    name: start_pop
+
+  - id: pop_age
+    type: populate
+    name: p_age_year
+    label: Patient age
+    context: patient
+
+  - id: end
+    type: end
+    label: End
+    name: end_pop
+
+edges:
+  - source: start
+    target: pop_age
+  - source: pop_age
+    target: end

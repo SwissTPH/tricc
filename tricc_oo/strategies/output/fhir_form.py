@@ -26,6 +26,10 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from tricc_oo.converters.fhir.concept_mapper import get_fhir_resource, get_fhir_value_field
+from tricc_oo.converters.fhir.populate_helper import (
+    cql_helper_populate_block,
+    resolve_populate_reference,
+)
 from tricc_oo.converters.fhir.repeat_helper import (
     build_questionnaire_repeat_extension,
     cql_helper_repeat_block,
@@ -67,7 +71,7 @@ from tricc_oo.models.tricc import (
     TriccNodeSelectOption,
     TriccNodeDisplayModel,
 )
-from tricc_oo.models.calculate import TriccNodeDisplayCalculateBase, TriccNodeInput
+from tricc_oo.models.calculate import TriccNodeDisplayCalculateBase, TriccNodeInput, TriccNodePopulate
 from tricc_oo.strategies.output.base_output_strategy import BaseOutPutStrategy
 from tricc_oo.strategies.registry import register_output_strategy
 from tricc_oo.visitors.tricc import get_process
@@ -101,6 +105,10 @@ context Patient
 // ── Observation helpers (repeat-aware) ───────────────────────────────────────
 
 {repeat_helpers}
+
+// ── Populate context helpers ─────────────────────────────────────────────────
+
+{populate_helpers}
 
 // ── Condition helpers ─────────────────────────────────────────────────────────
 
@@ -390,6 +398,17 @@ class FHIRStrategy(BaseOutPutStrategy):
         link_id = get_export_name(node)
         calc_name = f"Calc_{link_id}"
 
+        if isinstance(node, TriccNodePopulate):
+            cql_expr = resolve_populate_reference(node, qualified=True)
+            if segment not in self.cql_defines:
+                self.cql_defines[segment] = []
+            self.cql_defines[segment].append(f"define {calc_name}: {cql_expr}")
+            for item in q.get("item", []):
+                if item.get("linkId") == link_id:
+                    item.setdefault("extension", []).append(build_initial_expression(calc_name))
+                    break
+            return True
+
         # Try to produce a real CQL expression from the node's calculation / expression_reference
         cql_expr = None
         if hasattr(node, "expression_reference") and node.expression_reference:
@@ -502,6 +521,8 @@ class FHIRStrategy(BaseOutPutStrategy):
             return f"'{r.name}'"
         elif isinstance(r, TriccNodeInput):
             return get_observation_cql_accessor_for_node(r)
+        elif isinstance(r, TriccNodePopulate):
+            return resolve_populate_reference(r, qualified=True)
         elif issubclass(r.__class__, TriccNodeInputModel):
             return get_export_name(r)
         elif issubclass(r.__class__, TriccNodeBaseModel):
@@ -530,6 +551,7 @@ class FHIRStrategy(BaseOutPutStrategy):
             library_id=helper_id,
             fhir_version=FHIR_VERSION,
             repeat_helpers=cql_helper_repeat_block(FHIR_VERSION),
+            populate_helpers=cql_helper_populate_block(),
         )
         self.cql_libraries[helper_id] = helper_cql
 

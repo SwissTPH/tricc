@@ -111,16 +111,31 @@ define function GetNumberOfRepeat(code String):
     )
   )
 
-define function GetLast(code String, reverseOrderPosition Integer):
+define function GetHistory(
+  code String,
+  period String,
+  reverseOrderPosition Integer,
+  repeatIndex Integer
+):
   First(
     (
       GetObservations(code) O
+        where (
+          repeatIndex is null
+          or ObservationRepeatIndex(O) = repeatIndex
+          or (repeatIndex = 1 and ObservationRepeatIndex(O) is null)
+        )
         sort by effective desc
     ) O
       skip reverseOrderPosition - 1
       take 1
   )
 
-define function GetLastValue(code String, reverseOrderPosition Integer):
-  GetLast(code, reverseOrderPosition).value
+define function GetHistoryValue(
+  code String,
+  period String,
+  reverseOrderPosition Integer,
+  repeatIndex Integer
+):
+  GetHistory(code, period, reverseOrderPosition, repeatIndex).value
 """

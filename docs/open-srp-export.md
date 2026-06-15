@@ -171,7 +171,7 @@ define Calc_bmi: Helper.GetObservationValue("weight") / (Helper.GetObservationVa
 When a TRICC node has `repeat != 1`, export adds:
 
 - **Questionnaire item extension** — `https://fhir.tricc.io/StructureDefinition/questionnaire-concept-repeat` (`valueInteger`)
-- **Helper CQL functions** — `GetRepeated`, `GetRepeatedValue`, `GetNumberOfRepeat`, `GetLast`, `GetLastValue` (see `tricc_oo/converters/fhir/repeat_helper.py`)
+- **Helper CQL functions** — `GetRepeated`, `GetRepeatedValue`, `GetNumberOfRepeat`, `GetHistory`, `GetHistoryValue` (see `repeat_helper.py`); populate accessors `GetPatientValue`, `GetFacilityValue`, `GetLocationValue`, `GetPractitionerValue`, `GetEncounterValue` (see `populate_helper.py`)
 - **StructureMap hints** — FML comments for Observation repeat extension on extraction
 
 CQL references to repeated concepts use `Helper.GetRepeatedValue("code", n)` when `n != 1`;

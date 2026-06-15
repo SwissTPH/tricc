@@ -10,12 +10,13 @@ import pandas as pd
 from pyxform.xls2xform import convert
 
 from tricc_oo.models.lang import SingletonLangClass
-from tricc_oo.models.calculate import TriccNodeEnd
+from tricc_oo.models.calculate import TriccNodeEnd, TriccNodePopulate
 from tricc_oo.models.tricc import TriccNodeDisplayModel
 from tricc_oo.serializers.xls_form import (
     SURVEY_MAP,
     get_input_line,
     get_input_calc_line,
+    get_populate_calc_line,
 )
 from tricc_oo.strategies.output.xlsform_cdss import XLSFormCDSSStrategy
 from tricc_oo.strategies.registry import register_output_strategy
@@ -242,7 +243,12 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
         ]
         inputs = self.export_inputs(start_pages[self.processes[0]], **kwargs)
         for input in inputs:
-            df_input.loc[len(df_input)] = get_input_line(input)
+            if isinstance(input, TriccNodePopulate):
+                row = get_input_line(input)
+                row[1] = get_export_name(input)
+                df_input.loc[len(df_input)] = row
+            else:
+                df_input.loc[len(df_input)] = get_input_line(input)
         self.get_contact_inputs(df_input)
         df_input.loc[len(df_input)] = [
             "hidden",
@@ -483,7 +489,10 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
         ]
 
         for input in inputs:
-            df_input.loc[len(df_input)] = get_input_calc_line(input)
+            if isinstance(input, TriccNodePopulate):
+                df_input.loc[len(df_input)] = get_populate_calc_line(input)
+            else:
+                df_input.loc[len(df_input)] = get_input_calc_line(input)
 
         return df_input
 

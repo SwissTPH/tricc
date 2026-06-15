@@ -1,6 +1,6 @@
 import logging
 from tricc_oo.models.tricc import TriccNodeActivity
-from tricc_oo.models.calculate import TriccNodeInput
+from tricc_oo.models.calculate import TriccNodeInput, TriccNodePopulate
 from tricc_oo.strategies.output.xls_form import XLSFormStrategy
 from tricc_oo.strategies.registry import register_output_strategy
 from tricc_oo.models.lang import SingletonLangClass
@@ -21,7 +21,7 @@ class XLSFormCDSSStrategy(XLSFormStrategy):
         for node in activity.nodes.values():
             if isinstance(node, TriccNodeActivity):
                 inputs = self.export_inputs(node, inputs, **kwargs)
-            if isinstance(node, TriccNodeInput):
+            if isinstance(node, (TriccNodeInput, TriccNodePopulate)):
                 inputs.append(node)
         return inputs
 

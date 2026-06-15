@@ -20,6 +20,11 @@ This page documents TRICC modeling elements and their meaning based on:
 - `select_yesno`: yes/no convenience selection. In FHIR output this typically becomes a native `boolean` item type (preferred over `choice` for simple yes/no questions).
 - `integer`, `decimal`, `text`, `date`: typed user inputs.
 - `input`: generic input node used in conversion workflows.
+- `populate`: pre-loaded data node (non-display calculate). Attributes: `context`
+  (`patient`, `facility`, `practitioner`, `location`, `encounter`, `history`),
+  optional `period` (ISO Duration/Period; default `P1Y` for `history` only),
+  optional `repeat` (read slot). Excluded from activity `repeat` propagation.
+  See `feature/populate-context.md`.
 
 ## Option and list elements
 
@@ -78,7 +83,7 @@ integer `repeat` on a capture node or on `activity_start`.
 | Scope | Attribute | Effect |
 |-------|-----------|--------|
 | Capture node | `repeat=<n>` | Versioning and skip logic use `(name, repeat)` instead of `name` alone |
-| Activity start | `repeat=<n>` | Propagated to in-scope descendants (overrides node-level `repeat`; excludes `input` nodes) |
+| Activity start | `repeat=<n>` | Propagated to in-scope descendants (overrides node-level `repeat`; excludes `input` and `populate` nodes) |
 
 **Defaults and rules:**
 
@@ -89,7 +94,7 @@ integer `repeat` on a capture node or on `activity_start`.
 - `repeat=0` on `input` / pre-filled nodes forces in-form collection even when pre-encounter data exists.
 
 **FHIR / OpenSRP:** non-default repeat slots emit Questionnaire item extensions and
-repeat-aware Helper CQL (`GetRepeatedValue`, `GetNumberOfRepeat`, `GetLastValue`). See
+repeat-aware Helper CQL (`GetRepeatedValue`, `GetNumberOfRepeat`, `GetHistoryValue`). See
 [OpenSRP / FHIR-Core Export](./open-srp-export.md#concept-repeat-fhir--cql).
 
 Full specification: `feature/concept-repeat.md` (status: Implemented).

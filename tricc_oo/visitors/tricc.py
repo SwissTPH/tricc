@@ -26,6 +26,7 @@ from tricc_oo.models.calculate import (
     TriccNodeFakeCalculateBase,
     TriccRhombusMixIn,
     TriccNodeInput,
+    TriccNodePopulate,
     TriccNodeActivityEnd,
     TriccNodeActivityStart,
     TriccNodeEnd,
@@ -181,7 +182,11 @@ def get_version_inheritance(node, all_prev_versions, processed_nodes):
 
     # Updated to merge ALL previous versions, not just the last one
     # This ensures inheritance works even when intermediate activities weren't triggered
-    
+
+    if isinstance(node, TriccNodePopulate) and node.context == "history":
+        node.last = True
+        return
+
     if not issubclass(node.__class__, (TriccNodeInputModel)):
         node.last = True
         if issubclass(node.__class__, (TriccNodeDisplayCalculateBase, TriccNodeEnd)) and node.name is not None:
@@ -300,6 +305,12 @@ def load_calculate(
             if all_prev_versions:
                 get_version_inheritance(node, all_prev_versions, processed_nodes)
 
+            if isinstance(node, TriccNodePopulate):
+                from tricc_oo.converters.fhir.populate_helper import resolve_populate_reference
+
+                node.expression_reference = TriccStatic(resolve_populate_reference(node))
+                node.is_sequence_defined = True
+
             generate_calculates(node, calculates, used_calculates, processed_nodes=processed_nodes, process=process)
 
             # if has prev, create condition
@@ -332,15 +343,18 @@ def load_calculate(
             # add skip logic for display node ()
             if all_prev_versions and hasattr(node, "relevance"):
                 # search for same node in completly differnt activity
+                from tricc_oo.converters.fhir.populate_helper import populate_participates_in_skip
+
+                skip_prev_versions = [l for l in all_prev_versions if populate_participates_in_skip(l)]
                 last_expressions_other_activity = [
-                    (and_join([has_node_data_operation(l),TriccOperation(TriccOperator.ISTRUE,[l.activity.root])])) for l in  all_prev_versions if (
+                    (and_join([has_node_data_operation(l),TriccOperation(TriccOperator.ISTRUE,[l.activity.root])])) for l in skip_prev_versions if (
                         node.is_sequence_defined and
                         node.activity.base_instance != l.activity.base_instance
                     )
                 ]
                 # search for same some in the same activity (might require a warning)
                 last_expression_same_activity = [
-                    has_node_data_operation(l) for l in  all_prev_versions if (
+                    has_node_data_operation(l) for l in skip_prev_versions if (
                         node.is_sequence_defined and
                         node.activity == l.activity
                     )
@@ -978,7 +992,7 @@ def process_operation_reference(
         if replace_reference:
             if not issubclass(
                 target_node.__class__,
-                (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase, TriccNodeInput)
+                (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase, TriccNodeInput, TriccNodePopulate)
             ):
                 target_node = get_node_expression(target_node, processed_nodes, is_prev=True)
 
@@ -2972,7 +2986,12 @@ def generate_calculate(node, processed_nodes, **kwargs):
             # Calculate node is sequence defined if ALL prev_nodes have is_sequence_defined = True
             node.is_sequence_defined = all(prev_node.is_sequence_defined for prev_node in node.prev_nodes)
 
-        if (
+        if isinstance(node, TriccNodePopulate):
+            from tricc_oo.converters.fhir.populate_helper import resolve_populate_reference
+
+            if node.expression is None and node.expression_reference is None:
+                node.expression_reference = TriccStatic(resolve_populate_reference(node))
+        elif (
             hasattr(node, "expression")
             and (node.expression is None)
             and issubclass(node.__class__, TriccNodeCalculateBase)

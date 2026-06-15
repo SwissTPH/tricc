@@ -265,6 +265,7 @@ ODK_TRICC_TYPE_MAP = {
     "diagnosis": "calculate",
     "proposed_diagnosis": "calculate",
     "input": "",
+    "populate": "calculate",
 }
 
 GROUP_TRICC_TYPE = [TriccNodeType.page, TriccNodeType.activity]
@@ -638,6 +639,31 @@ def get_input_line(node, replace_dots=True):
         "",  # 'expression'
         "",  # 'repeat_count'
         "",  # 'image'
+        "",
+    ]
+
+
+def get_populate_calc_line(node, replace_dots=True):
+    """CHT calculate row for a populate node (contact-summary context binding)."""
+    from tricc_oo.converters.fhir.populate_helper import get_cht_contact_summary_expression
+
+    empty = langs.get_trads("", force_dict=True)
+    return [
+        "calculate",
+        get_export_name(node),
+        *list(empty.values()),
+        *list(empty.values()),
+        *list(empty.values()),
+        "",
+        "",
+        *list(empty.values()),
+        "",
+        "",
+        "",
+        *list(empty.values()),
+        get_cht_contact_summary_expression(node, replace_dots=replace_dots),
+        "",
+        "",
         "",
     ]
 

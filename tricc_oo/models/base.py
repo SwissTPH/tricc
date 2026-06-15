@@ -62,6 +62,7 @@ class TriccNodeType(StrEnum):
     diagnosis = "diagnosis"
     proposed_diagnosis = "proposed_diagnosis"
     input = "input"
+    populate = "populate"
     remote_reference = "remote_reference"
 
     def __iter__(self):

@@ -1,0 +1,26 @@
+id: populate_encounter
+title: Populate encounter context
+process: main
+
+nodes:
+  - id: start
+    type: start
+    label: Start
+    name: start_enc
+
+  - id: pop_weight
+    type: populate
+    name: weight
+    label: Weight from triage
+    context: encounter
+
+  - id: end
+    type: end
+    label: End
+    name: end_enc
+
+edges:
+  - source: start
+    target: pop_weight
+  - source: pop_weight
+    target: end

@@ -68,6 +68,18 @@ class TriccNodeInput(TriccNodeFakeCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.input
 
 
+class TriccNodePopulate(TriccNodeFakeCalculateBase):
+    """Pre-loaded data node (non-display calculate) with explicit data context."""
+
+    tricc_type: TriccNodeType = TriccNodeType.populate
+    context: str = "patient"
+    period: Optional[str] = None
+    data_type: Optional[str] = None
+    concept_type: Optional[str] = None
+    repeat: Optional[int] = None
+    is_sequence_defined: bool = False
+
+
 class TriccNodeDisplayBridge(TriccNodeDisplayCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.bridge
 

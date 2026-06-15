@@ -4,6 +4,7 @@ import unittest
 
 from tricc_oo.models.tricc import TriccNodeInteger
 from tricc_oo.models.calculate import TriccNodeInput
+from tricc_oo.converters.fhir.populate_helper import cql_helper_populate_block
 from tricc_oo.converters.fhir.repeat_helper import (
     TRICC_OBSERVATION_REPEAT_EXT,
     TRICC_QUESTIONNAIRE_REPEAT_EXT,
@@ -53,7 +54,8 @@ class TestRepeatHelper(unittest.TestCase):
         block = cql_helper_repeat_block()
         self.assertIn("GetRepeated", block)
         self.assertIn("GetNumberOfRepeat", block)
-        self.assertIn("GetLast", block)
+        self.assertIn("GetHistoryValue", block)
+        self.assertNotIn("GetLast", block)
         self.assertIn(TRICC_OBSERVATION_REPEAT_EXT, block)
 
 
@@ -63,10 +65,13 @@ class TestFHIRStrategyRepeatCQL(unittest.TestCase):
             library_id="demo",
             fhir_version=FHIR_VERSION,
             repeat_helpers=cql_helper_repeat_block(FHIR_VERSION),
+            populate_helpers=cql_helper_populate_block(),
         )
         self.assertIn("define function GetRepeated", helper)
         self.assertIn("define function GetNumberOfRepeat", helper)
-        self.assertIn("define function GetLast", helper)
+        self.assertIn("define function GetHistoryValue", helper)
+        self.assertIn("define function GetPatientValue", helper)
+        self.assertNotIn("define function GetLast", helper)
         self.assertIn("define function GetObservations", helper)
         self.assertEqual(helper.count("define function GetObservation(code String)"), 1)
 

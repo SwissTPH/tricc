@@ -117,7 +117,7 @@ Three new Helper functions are planned (exact names to align with FHIR CQL conve
 |----------|---------|
 | `GetRepeated(code, repeat)` | Value for a specific repeat slot |
 | `GetNumberOfRepeat(code)` | How many repeat slots have been captured for this concept |
-| `GetLast(code, reverseOrderPosition)` | Nth most recent capture (1 = latest, 2 = second latest, …) |
+| `GetHistoryValue(code, period, reverseOrderPosition, repeatIndex)` | Nth most recent capture in window (`period` null = entire chart; see `feature/populate-context.md`) |
 
 On FHIR export, repeat index is stored as an **extension on the Observation** (and related resources) so downstream systems can distinguish multiple readings of the same code.
 
@@ -195,8 +195,8 @@ define function GetRepeated(code String, repeatIndex Integer):
 define function GetNumberOfRepeat(code String):
   -- Count of distinct repeat slots captured for code
 
-define function GetLast(code String, reverseOrderPosition Integer):
-  -- Nth most recent Observation for code (by effective date / encounter order)
+define function GetHistoryValue(code String, period String, reverseOrderPosition Integer, repeatIndex Integer):
+  -- Nth most recent Observation for code (supersedes GetLast; see populate-context spec)
 ```
 
 - Persist repeat index via **Observation extension** on export.
@@ -325,7 +325,7 @@ Apply suffix only when `get_repeat(node) != 1`.
 - [ ] `get_export_name`: no `_Rr_` suffix when `repeat=1`; suffix when `repeat>=2`.
 - [ ] FHIR: two repeat slots → two Questionnaire items; Observation carries repeat extension.
 - [ ] No COALESCE / expression merge across different `repeat` values for the same `name`.
-- [ ] `GetRepeated`, `GetNumberOfRepeat`, `GetLast` covered by CQL tests.
+- [ ] `GetRepeated`, `GetNumberOfRepeat`, `GetHistoryValue` covered by CQL tests.
 
 ---
 

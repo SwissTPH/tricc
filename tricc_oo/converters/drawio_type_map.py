@@ -16,6 +16,7 @@ from tricc_oo.models.calculate import (
     TriccNodeProposedDiagnosis,
     TriccNodeDiagnosis,
     TriccNodeInput,
+    TriccNodePopulate,
 )
 
 from tricc_oo.models.tricc import (
@@ -308,6 +309,20 @@ TYPE_MAP = {
         "attributes": ["save", "reference", "data_type", "concept_type", "repeat"],
         "mandatory_attributes": ["name", "label"],
         "model": TriccNodeInput,
+    },
+    TriccNodeType.populate: {
+        "objects": ["UserObject", "object"],
+        "attributes": [
+            "save",
+            "reference",
+            "data_type",
+            "concept_type",
+            "context",
+            "period",
+            "repeat",
+        ],
+        "mandatory_attributes": ["name", "label"],
+        "model": TriccNodePopulate,
     },
     # TriccNodeType.number: {
     #     "objects": ["UserObject", "object"],

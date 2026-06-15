@@ -85,7 +85,9 @@ Output: FHIR SDC resources (Questionnaire, PlanDefinition, Library+CQL, Structur
 
 - **CQL Library Structure**  
   - One **Helper** library providing generic data access functions (e.g. retrieval of Observations/Conditions by concept name/code, age helpers, etc.). Data access happens via FHIR resources, not raw questionnaire paths.
-  - **Repeat-aware helpers** (when `repeat != 1` on capture nodes): `GetRepeated`, `GetRepeatedValue`, `GetNumberOfRepeat`, `GetLast`, `GetLastValue` — implemented in `tricc_oo/converters/fhir/repeat_helper.py` and injected into the Helper template.
+  - **Repeat-aware helpers** (when `repeat != 1` on capture nodes): `GetRepeated`, `GetRepeatedValue`, `GetNumberOfRepeat` — in `repeat_helper.py`.
+  - **History helpers**: `GetHistory` (resource, generated CQL only), `GetHistoryValue` (author-facing scalar) — replace legacy `GetLast` / `GetLastValue`.
+  - **Populate helpers**: `GetPatientValue`, `GetFacilityValue`, `GetLocationValue`, `GetPractitionerValue`, `GetEncounterValue`, `GetHistoryValue` — in `populate_helper.py`, injected into the Helper template.
   - Thin **per-process/segment** libraries that include the Helper and define named calculations (simple `define "Calc_xxx": ...` expressions, often delegating to the Helper).
   - A Questionnaire typically references only one main library (declared via the `library` element or SDC `cqlInputResources` extension).
   - Expressions in the Questionnaire use **simple define names** (e.g. `"Calc_bmi"`) with `text/cql-identifier`. No need to qualify with library name.
