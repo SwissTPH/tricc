@@ -65,12 +65,60 @@ Examples used across element families:
 - `relevance`, `priority`
 - `save`, `expression`, `trigger`
 - `reference`, `instance`, `process`, `form_id`
+- `repeat` — concept capture slot (see [Concept repeat](#concept-repeat) below)
+
+## Concept repeat
+
+Authors can collect the **same concept more than once** in one encounter by setting an
+integer `repeat` on a capture node or on `activity_start`.
+
+| Scope | Attribute | Effect |
+|-------|-----------|--------|
+| Capture node | `repeat=<n>` | Versioning and skip logic use `(name, repeat)` instead of `name` alone |
+| Activity start | `repeat=<n>` | Propagated to in-scope descendants (overrides node-level `repeat`; excludes `input` nodes) |
+
+**Defaults and rules:**
+
+- Omitted `repeat` behaves as **`repeat=1`** (backward compatible with existing diagrams).
+- Same `name` + same `repeat` in a later activity is skipped if already captured (encounter-wide).
+- **No cross-repeat inheritance** — a value at `repeat=1` is not merged into logic at `repeat=2`.
+- Export suffix when `repeat != 1`: `_Rr_<n>` (alongside existing `_Vv_<n>` version and `_Ii_<n>` instance suffixes).
+- `repeat=0` on `input` / pre-filled nodes forces in-form collection even when pre-encounter data exists.
+
+**FHIR / OpenSRP:** non-default repeat slots emit Questionnaire item extensions and
+repeat-aware Helper CQL (`GetRepeatedValue`, `GetNumberOfRepeat`, `GetLastValue`). See
+[OpenSRP / FHIR-Core Export](./open-srp-export.md#concept-repeat-fhir--cql).
+
+Full specification: `feature/concept-repeat.md` (status: Implemented).
+
+## Edge labels (conditional flow)
+
+During draw.io conversion (`process_edges` in `xml_to_tricc.py`), arrow labels are
+interpreted as branch semantics. Labels are case-insensitive unless noted.
+
+| Label pattern | Meaning | Typical source node |
+|---------------|---------|---------------------|
+| `yes`, `oui` | Affirmative branch | `select_yesno`, `rhombus` |
+| `no`, `non` | Negative / exclusive branch | `select_yesno`, `rhombus`, calculates |
+| `follow`, `suivre`, `continue` | Continue without branching | `select_yesno`, `rhombus` |
+| *(empty)* | Treated as **yes** on `rhombus` out-edges | `rhombus` |
+| Integer factor (`-1`, `+2`, `3`, …) | **Yes** branch with optional score factor | `rhombus`, selects, calculates |
+| Reserved expression tokens | Condition edge → may insert a nested `rhombus` | Any calculate-capable node |
+
+**Integer factors on rhombus:** a numeric out-edge label (for example `-1` on a
+condition gate feeding a `count` node) is treated as an affirmative (**yes**) path.
+When the factor is not `1`, TRICC inserts a `calculate` node that multiplies the
+source reference by that factor — the same mechanism used on non-rhombus edges.
+This supports clinical scoring patterns (e.g. subtract points when a risk factor is present).
 
 ## Sequence-node semantics (from visual authoring guidance)
 
-- **Rhombus**: conditional split; out-edges usually use `Yes` / `No` / `Continue` or `Follow`.
+- **Rhombus**: conditional split using `reference` (condition) and labeled out-edges.
+  Use `Yes` / `No` / `Continue` / `Follow`, or integer factors as above.
 - **GoTo**: placeholder link to another activity/tab, replaced during graph construction.
 - **Start nodes**: `start` begins process; `activity_start` begins activity.
+  `activity_start` may also carry `process` (cpg-common-process name for FHIR export)
+  and `repeat` (activity-wide concept capture slot).
 - **Wait**: ensures downstream progression only after referenced nodes are reached.
 - **Bridge**: merge helper for readability when many paths converge.
 - **Ends**:

@@ -69,7 +69,9 @@ This is the most important area for regression testing.
 |------------------------------------|---------------------------|----------------|------------------------|
 | `set_last_version_false`           | `visitors/tricc.py:148`   | Marks older versions of a node as `last=False` and assigns increasing `version` | **Must-have dedicated test** |
 | `get_version_inheritance`          | `visitors/tricc.py:161`   | Merges applicability/relevance/calculate from all previous versions of a node | **High priority** |
-| `get_versions` / `version_filter`  | `visitors/tricc.py:84`    | Finds all prior versions of a named node | Same as above |
+| `get_versions` / `version_filter`  | `visitors/tricc.py`       | Finds prior versions scoped by `(name, repeat)` | `test_concept_repeat.py`, inheritance YAML fixtures |
+| `get_repeat` / `propagate_activity_repeat` | `models/base.py`, `xml_to_tricc.py` | Concept repeat slot resolution and activity propagation | `test_concept_repeat.py`, `concept_repeat_activity_inherit.yaml` |
+| `is_factor_edge_label` / `process_factor_edge` | `xml_to_tricc.py` | Rhombus/select factor edges (integer +/- labels) | `test_rhombus_factor_edge.py`, clinical scoring draw.io |
 | `get_last_version`                 | `visitors/tricc.py:96`    | Finds the most recent prior version | Same |
 | `get_max_version`                  | `visitors/tricc.py:76`    | Internal max version helper | Covered by above |
 
@@ -114,7 +116,7 @@ These are usually exercised indirectly by the higher-level methods above.
 
 ---
 
-## 3. Current Test Assets (as of 2026-05)
+## 3. Current Test Assets (as of 2026-06)
 
 ### YAML Fixtures (under `tests/data/yaml/`)
 - `basic_flow_with_calc.yaml` — Foundational calculate + simple flow
@@ -126,13 +128,17 @@ These are usually exercised indirectly by the higher-level methods above.
 - Complex count/add/rhombus expression trees
 - Applicability at activity level
 
-**Now covered** (as of this commit):
+**Now covered** (as of 2026-06):
 - `inheritance_versioning_basic.yaml` — basic name collision + versioning
 - `inheritance_relevance_merge.yaml` — relevance + expression merging across versions + rhombus using the inherited name
+- `concept_repeat_activity_inherit.yaml` — activity-level `repeat` propagation
 
 ### Existing Python Tests
-- `tests/test_strategies/test_opensrp_strategy.py` — Mostly output + FHIR pipeline (heavy mocking)
-- Very limited deep coverage of `visitors/tricc.py` logic today
+- `tests/test_concept_repeat.py` — Concept repeat versioning, skip logic, activity propagation, export suffixes
+- `tests/test_fhir_repeat.py` — FHIR repeat extensions and Helper CQL accessors
+- `tests/test_rhombus_factor_edge.py` — Integer (+/-) factor labels on rhombus out-edges
+- `tests/test_strategies/test_opensrp_strategy.py` — OpenSRP / FHIR pipeline (FSH, PlanDefinition, smoke build)
+- Limited deep coverage of `visitors/tricc.py` beyond the fixtures above
 
 ---
 
@@ -160,7 +166,7 @@ These are usually exercised indirectly by the higher-level methods above.
 
 ---
 
-**Last updated**: 2026-05 (after introduction of `YamlStrategy` and registry)
+**Last updated**: 2026-06 (concept repeat, rhombus factor edges, strategy registry, FHIR repeat helpers)
 
 **Owner**: Core engine maintainers
 

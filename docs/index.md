@@ -15,12 +15,20 @@ This documentation is organized for two audiences:
 - [Troubleshooting](./troubleshooting.md): common failures and practical fixes.
 - [Publishing with GitHub Pages](./github-pages.md): easiest way to publish docs.
 - [Transformation Test Coverage](./testing/transformation-test-coverage.md): mapping of core transformation methods to test cases (especially useful with `YamlStrategy`).
+- [OpenSRP / FHIR-Core Export](./open-srp-export.md): FHIR SDC + OpenSRP bundle export (`FHIRStrategy`, `OpenSRPStrategy`).
 
 ## Key behavior notes
 
 - TRICC can ingest multiple inputs from `-i` using comma-separated values.
 - For Google Drive URLs, authenticated download is attempted first, then fallback to direct download.
 - Pages whose root node has `status="experimental"` are intentionally limited during processing.
+- **Concept repeat:** nodes and activities may set `repeat=<integer>` for multiple independent
+  captures of the same concept name; see [TRICC Elements](./tricc-elements.md#concept-repeat).
+- **Rhombus edge labels:** out-edges accept `yes`/`no`/`follow`, empty (yes), and
+  **integer factors** (`-1`, `+2`, …) that imply yes and feed `count` scoring; see
+  [Edge labels](./tricc-elements.md#edge-labels-conditional-flow).
+- **Strategy registry:** output/input strategies register via decorators; built-ins are
+  imported in `tricc_oo/strategies/__init__.py` — see [CLI and Inputs](./cli-and-inputs.md#strategy-registration-and-lookup-new).
 
 ## Visual authoring framing
 

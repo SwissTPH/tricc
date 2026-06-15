@@ -44,11 +44,26 @@ For restricted files:
 
 ## Output strategy selection
 
-Use `-O` to select a strategy class (examples in codebase include `XLSFormStrategy`, `XLSFormCHTStrategy`, and others).
+Use `-O` to select a strategy class. Common examples:
+
+| `-O` value | Use case |
+|------------|----------|
+| `XLSFormStrategy` | Standard ODK / XLSForm (default) |
+| `XLSFormCDSSStrategy` | CDSS-oriented forms (e.g. ETAT, Adult ODK) |
+| `XLSFormCHTStrategy` | Community Health Toolkit |
+| `XLSFormCHTHFStrategy` | CHT + HF combined workflows |
+| `FHIRStrategy` | FHIR SDC Questionnaire + CQL |
+| `OpenSRPStrategy` | Full OpenSRP / FHIR-Core package |
+| `OpenMRSStrategy` | OpenMRS |
+| `DHIS2Strategy` | DHIS2 |
+| `HTMLStrategy` | HTML preview |
 
 ```bash
 python tests/build.py -i "./uploads" -o "./out" -O XLSFormCHTStrategy
 ```
+
+Run from the project virtual environment (`.venv/bin/python`) so dependencies and
+registered strategies match CI and VS Code `launch.json` configurations.
 
 ## Modeling mindset (recommended)
 

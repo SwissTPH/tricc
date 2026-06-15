@@ -142,7 +142,7 @@ Relevance conditions from the TRICC graph are converted to **FHIRPath** using
 
 Calculate nodes (and some relevance logic) are converted to **CQL** using
 `convert_expression_to_cql()`. A shared **Helper** library provides data
-access via FHIR resources (e.g. `GetObsValue("concept.code")`). Per-process
+access via FHIR resources (e.g. `GetObservationValue("concept.code")`). Per-process
 libraries are thin wrappers that expose named defines.
 
 In the Questionnaire, expressions use **simple define names** (the
@@ -163,8 +163,22 @@ Example generated CQL style (segment library):
 ```cql
 include fhir_formHelper version '1.0.0' called Helper
 
-define Calc_bmi: Helper.GetObsValue("weight") / (Helper.GetObsValue("height") * Helper.GetObsValue("height"))
+define Calc_bmi: Helper.GetObservationValue("weight") / (Helper.GetObservationValue("height") * Helper.GetObservationValue("height"))
 ```
+
+### Concept repeat (FHIR / CQL)
+
+When a TRICC node has `repeat != 1`, export adds:
+
+- **Questionnaire item extension** — `https://fhir.tricc.io/StructureDefinition/questionnaire-concept-repeat` (`valueInteger`)
+- **Helper CQL functions** — `GetRepeated`, `GetRepeatedValue`, `GetNumberOfRepeat`, `GetLast`, `GetLastValue` (see `tricc_oo/converters/fhir/repeat_helper.py`)
+- **StructureMap hints** — FML comments for Observation repeat extension on extraction
+
+CQL references to repeated concepts use `Helper.GetRepeatedValue("code", n)` when `n != 1`;
+default slot (`repeat=1`) uses `Helper.GetObservationValue("code")`.
+
+Authoring surface: `repeat` on capture nodes or `activity_start` in draw.io / YAML.
+See [TRICC Elements — Concept repeat](./tricc-elements.md#concept-repeat).
 
 ---
 
@@ -172,23 +186,31 @@ define Calc_bmi: Helper.GetObsValue("weight") / (Helper.GetObsValue("height") * 
 
 Each cpg-common-process gets a `PlanDefinition` with:
 
-- **trigger**: `named-event` → `cpg-common-process-<process>`
-- **condition**: CQL applicability expression `"Is Applicable"`
-- **action**: `definitionCanonical` pointing to the Questionnaire
+- **status**: `draft` (experimental export)
+- **library**: reference to the per-process CQL Library
+- **action.trigger**: `named-event` on the action (cpg-common-process name)
+- **action.condition**: CQL applicability via `text/cql-identifier` (`"Is Applicable"`)
+- **action.definitionCanonical**: pointing to the Questionnaire
 
 ```json
 {
   "resourceType": "PlanDefinition",
-  "id": "pd-registration",
-  "status": "active",
-  "trigger": [{ "type": "named-event", "name": "cpg-common-process-registration" }],
+  "id": "demo-registration-PD",
+  "status": "draft",
+  "library": ["https://fhir.tricc.io/Library/demo-registration"],
   "action": [{
-    "title": "Fill registration form",
-    "definitionCanonical": "http://example.org/Questionnaire/registration",
+    "id": "action-registration",
+    "title": "Launch registration questionnaire",
+    "trigger": [{ "type": "named-event", "name": "registration" }],
     "condition": [{
       "kind": "applicability",
-      "expression": { "language": "text/cql", "expression": "Is Applicable" }
-    }]
+      "expression": {
+        "language": "text/cql-identifier",
+        "expression": "Is Applicable",
+        "reference": "https://fhir.tricc.io/Library/demo-registration"
+      }
+    }],
+    "definitionCanonical": "https://fhir.tricc.io/Questionnaire/demo-registration"
   }]
 }
 ```
@@ -266,18 +288,24 @@ The FSH serializer (`tricc_oo/converters/fhir/fsh_serializer.py`) supports:
 ## Testing
 
 ```bash
-# Run all strategy tests
-python -m pytest tests/test_strategies/ -v
+# Run all tests (project venv recommended)
+.venv/bin/python -m unittest discover -s tests -p "test_*.py" -v
 
-# Run a specific test class
-python -m pytest tests/test_strategies/test_opensrp_strategy.py::TestFshSerializer -v
+# FHIR / OpenSRP focused tests
+.venv/bin/python -m unittest tests.test_strategies.test_opensrp_strategy tests.test_fhir_repeat -v
 
 # Full integration test (requires a draw.io file)
-python tests/build.py \
+.venv/bin/python tests/build.py \
+  -i tests/data/demo.drawio \
+  -o tests/output/opensrp/ \
+  -O FHIRStrategy \
+  -l i
+
+.venv/bin/python tests/build.py \
   -i tests/data/demo.drawio \
   -o tests/output/opensrp/ \
   -O OpenSRPStrategy \
-  -l d
+  -l i
 ```
 
 ---
@@ -291,8 +319,11 @@ python tests/build.py \
 | `tricc_oo/converters/fhir/questionnaire_item_mapper.py` | Node type → FHIR item type mapping |
 | `tricc_oo/converters/fhir/concept_mapper.py` | Concept type → FHIR resource mapping |
 | `tricc_oo/converters/fhir/fsh_serializer.py` | FHIR dict → FSH text serializer |
+| `tricc_oo/converters/fhir/repeat_helper.py` | Concept repeat extensions + Helper CQL block |
 | `tricc_oo/visitors/tricc.py` | `get_process()` graph walker |
-| `tests/test_strategies/test_opensrp_strategy.py` | Unit tests |
+| `tricc_oo/strategies/__init__.py` | Eager strategy registration imports |
+| `tests/test_strategies/test_opensrp_strategy.py` | OpenSRP / FHIR unit + smoke tests |
+| `tests/test_fhir_repeat.py` | Repeat-aware FHIR/CQL export tests |
 
 ---
 

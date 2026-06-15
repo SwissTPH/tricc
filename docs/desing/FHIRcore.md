@@ -85,6 +85,7 @@ Output: FHIR SDC resources (Questionnaire, PlanDefinition, Library+CQL, Structur
 
 - **CQL Library Structure**  
   - One **Helper** library providing generic data access functions (e.g. retrieval of Observations/Conditions by concept name/code, age helpers, etc.). Data access happens via FHIR resources, not raw questionnaire paths.
+  - **Repeat-aware helpers** (when `repeat != 1` on capture nodes): `GetRepeated`, `GetRepeatedValue`, `GetNumberOfRepeat`, `GetLast`, `GetLastValue` — implemented in `tricc_oo/converters/fhir/repeat_helper.py` and injected into the Helper template.
   - Thin **per-process/segment** libraries that include the Helper and define named calculations (simple `define "Calc_xxx": ...` expressions, often delegating to the Helper).
   - A Questionnaire typically references only one main library (declared via the `library` element or SDC `cqlInputResources` extension).
   - Expressions in the Questionnaire use **simple define names** (e.g. `"Calc_bmi"`) with `text/cql-identifier`. No need to qualify with library name.
@@ -113,6 +114,8 @@ Output: FHIR SDC resources (Questionnaire, PlanDefinition, Library+CQL, Structur
 - [x] Core FHIRStrategy + OpenSRPStrategy implemented (Questionnaire with FHIRPath/CQL expressions, CQL Library generation, StructureMap stubs, export).
 - [x] `select_yesno` nodes now emit native `boolean` items (no answerOption).
 - [x] CQL architecture: Helper library for FHIR resource access by concept + thin per-segment libraries. Simple define names used in Questionnaire expressions.
+- [x] Concept repeat: Questionnaire item extension + Helper repeat functions + FML hints (`repeat_helper.py`).
+- [x] `FHIRStrategy` registered via `@register_output_strategy("FHIRStrategy")` and eager import in `strategies/__init__.py`.
 - [x] Basic nesting support for groups/activities in Questionnaires.
 - [ ] Full StructureMap / data extraction driven by concept_type (in progress).
 - [ ] Complete ValueSet + Binary (images) generation.

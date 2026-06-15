@@ -74,6 +74,12 @@ TRICC_NO_LABEL = ["no", "non"]
 TRICC_FOLLOW_LABEL = ["follow", "suivre", "continue"]
 NO_LABEL = "NO_LABEL"
 TRICC_LIST_NAME = "list_{0}"
+FACTOR_EDGE_PATTERN = re.compile(r"^[\+\-]?[0-9]+([.,][0-9]+)?$")
+
+
+def is_factor_edge_label(label: str) -> bool:
+    """Return True when *label* is a numeric factor (e.g. -1, +2, 3)."""
+    return bool(FACTOR_EDGE_PATTERN.match(label.strip()))
 
 DISPLAY_ATTRIBUTES = ["label", "hint", "help"]
 logger = logging.getLogger("default")
@@ -364,7 +370,12 @@ def process_edges(diagram, media_path, activity, nodes):
                     edge.source_external_id = None
                 elif label.lower() in TRICC_NO_LABEL:
                     calc = process_exclusive_edge(edge, nodes)
-                elif label.lower() not in TRICC_YES_LABEL:
+                elif label.lower() in TRICC_YES_LABEL or label == "":
+                    pass
+                elif is_factor_edge_label(label):
+                    # Integer (+/-) factor on a rhombus out-edge implies "yes"
+                    calc = process_factor_edge(edge, nodes)
+                else:
                     logger.critical(f"missing label on edge in {diagram.attrib.get('name', diagram.attrib['id'])} from rhombus {edge.source} ")
                     exit(1)
                 processed = True
@@ -374,7 +385,7 @@ def process_edges(diagram, media_path, activity, nodes):
             elif label.lower() in (TRICC_YES_LABEL) or label == "":
                 # do nothinbg for yes
                 processed = True
-            elif re.search(r"^\-?[0-9]+([.,][0-9]+)?$", edge.value.strip()):
+            elif is_factor_edge_label(label):
                 calc = process_factor_edge(edge, nodes)
             elif label.lower() in TRICC_NO_LABEL:
                 calc = process_exclusive_edge(edge, nodes)
@@ -1086,13 +1097,14 @@ def get_edges(diagram):
 
 def process_factor_edge(edge, nodes):
     factor = edge.value.strip()
-    if factor != 1:
+    factor_value = float(factor.replace(",", "."))
+    if factor_value != 1:
         source = nodes[edge.source]
         return TriccNodeCalculate(
             id=edge.id,
             expression_reference=TriccOperation(
                 TriccOperator.MULTIPLIED,
-                [TriccReference(nodes[edge.source].name), TriccStatic(float(factor))],
+                [TriccReference(nodes[edge.source].name), TriccStatic(factor_value)],
             ),
             reference=[TriccReference(source.name)],
             activity=source.activity,

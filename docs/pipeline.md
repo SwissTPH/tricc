@@ -19,7 +19,9 @@ The parser expects draw.io XML (`<mxfile ...>`). Non-XML or HTML content fails e
 - resolves root node (`start` or `activity_start`)
 - creates activity object
 - loads edges and nodes
+- runs `process_edges` (interprets arrow labels: yes/no, factors, conditions)
 - enriches nodes (hints/help/media)
+- runs `propagate_activity_repeat` when `activity_start.repeat` is set
 - assigns process/start-page metadata
 
 ## 4) Experimental page control
@@ -39,8 +41,21 @@ This allows draft pages to stay in the model without entering full downstream ge
 
 ## 6) Output strategy execution
 
-After project graph creation, selected output strategy runs (`-O`):
+After project graph creation, selected output strategy runs (`-O`).
 
-- XLSForm variants
-- CHT variants
-- OpenMRS / FHIR / HTML / DHIS2 (availability varies by maturity)
+Built-in output strategies (registered in `tricc_oo/strategies/__init__.py`):
+
+| Strategy class | Purpose |
+|----------------|---------|
+| `XLSFormStrategy` | Standard ODK XLSForm |
+| `XLSFormCDSSStrategy` | CDSS-oriented XLSForm variant |
+| `XLSFormCHTStrategy` | Community Health Toolkit (CHT) XLSForm |
+| `XLSFormCHTHFStrategy` | CHT + HF combined variant |
+| `HTMLStrategy` | HTML form preview |
+| `DHIS2Strategy` | DHIS2 program export |
+| `OpenMRSStrategy` | OpenMRS form export |
+| `FHIRStrategy` | FHIR SDC (Questionnaire, Library/CQL, StructureMap, ValueSet) |
+| `OpenSRPStrategy` | FHIR-Core / OpenSRP bundle (extends `FHIRStrategy`) |
+
+Lookup by name: `get_output_strategy("XLSFormCHTHFStrategy")` or pass the class directly in tests.
+List registered names: `list_output_strategies()` from `tricc_oo.strategies.registry`.

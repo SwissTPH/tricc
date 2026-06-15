@@ -79,3 +79,37 @@ OutputCls = get_output_strategy(MyOutputClass)     # direct class (great for tes
 
 This replaces the old fragile `globals()[name]()` pattern and makes the system
 much more testable and extensible.
+
+Built-in strategies are eagerly imported in `tricc_oo/strategies/__init__.py` so their
+`@register_*` decorators run at import time. If a strategy name is reported as
+**unknown** at runtime, ensure its module is imported there (or import it yourself
+before calling `get_output_strategy`).
+
+### Registered input strategies
+
+| Name | Class |
+|------|-------|
+| `DrawioStrategy` | Default draw.io XML input |
+| `YamlStrategy` | YAML fixtures for transformation tests |
+
+### Registered output strategies
+
+| Name | Class |
+|------|-------|
+| `XLSFormStrategy` | Standard ODK XLSForm |
+| `XLSFormCDSSStrategy` | CDSS XLSForm |
+| `XLSFormCHTStrategy` | CHT XLSForm |
+| `XLSFormCHTHFStrategy` | CHT HF XLSForm |
+| `HTMLStrategy` | HTML export |
+| `DHIS2Strategy` | DHIS2 export |
+| `OpenMRSStrategy` | OpenMRS export |
+| `FHIRStrategy` | FHIR SDC export |
+| `OpenSRPStrategy` | OpenSRP / FHIR-Core bundle |
+| `BaseOutPutStrategy` | Abstract base (not for CLI use) |
+
+Discover at runtime:
+
+```python
+from tricc_oo.strategies.registry import list_input_strategies, list_output_strategies
+print(list_output_strategies())
+```

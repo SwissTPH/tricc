@@ -1,5 +1,13 @@
 # FHIR Output Strategy Remediation Plan
 
+> **2026-06 update:** Significant remediation has landed on `develop` since this plan was
+> written — DEMO FHIR now produces Questionnaires, CQL libraries, FML mappings, ValueSets,
+> repeat-aware Helper CQL, registered `FHIRStrategy` / `OpenSRPStrategy`, and passing unit
+> tests. Treat the executive summary below as **historical context**; see
+> [OpenSRP / FHIR-Core Export](../open-srp-export.md) and [FHIRcore.md](../desing/FHIRcore.md)
+> for current behaviour. Remaining gaps (full StructureMap extraction, golden CQL validation,
+> complete Binary/Composition packaging) are still tracked in the checklist sections.
+
 **Date**: 2026-05-26  
 **Context**: Review of `tricc_oo` FHIR outstrategy (`FHIRStrategy` + `OpenSRPStrategy` + `converters/fhir/*`) on `feature/fhir` branch.  
 **Trigger**: User observed that "DEMO FHIR" launch config produces a (partial) Questionnaire + crude `.map` file, but nothing else (CQL, Libraries, proper StructureMaps, ValueSets, full layout, etc.).  

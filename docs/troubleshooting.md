@@ -55,6 +55,50 @@ Use file URL style:
 
 - `https://drive.google.com/file/d/<FILE_ID>/view`
 
+## `missing label on edge` from rhombus
+
+Symptom:
+
+- `CRITICAL - missing label on edge in <activity> from rhombus <id>`
+- Build exits during `process_edges` in `xml_to_tricc.py`.
+
+Cause:
+
+- A `rhombus` out-edge has a label TRICC does not recognise.
+
+Supported rhombus out-edge labels:
+
+- `yes` / `oui` — affirmative branch
+- `no` / `non` — negative branch (exclusive)
+- `follow` / `suivre` / `continue` — follow-through (rewires to rhombus path)
+- *(empty)* — treated as yes
+- **Integer factors** — `-1`, `+2`, `3`, etc. (implies **yes**; inserts a factor
+  `calculate` when the value is not `1`, commonly used with `count` scoring nodes)
+
+Fix:
+
+- Relabel the edge in draw.io using one of the patterns above.
+- For scoring flows (rhombus → `count`), use a signed integer on the true branch
+  instead of leaving the edge unlabeled with a non-standard text label.
+
+See [TRICC Elements — Edge labels](./tricc-elements.md#edge-labels-conditional-flow).
+
+## `Unknown output strategy`
+
+Symptom:
+
+- `ValueError: Unknown output strategy 'XLSFormCHTHFStrategy'` (or similar).
+
+Cause:
+
+- Strategy class not registered because its module was not imported before lookup.
+
+Fix:
+
+- Ensure the strategy module is listed in `tricc_oo/strategies/__init__.py`, or
+  import it explicitly before `get_output_strategy`.
+- Use the project venv: `.venv/bin/python tests/build.py ...`
+
 ## Windows dependency build failures (`cffi`, `numpy`)
 
 Symptoms:

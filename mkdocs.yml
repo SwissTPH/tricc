@@ -22,6 +22,7 @@ nav:
   - Processing Pipeline: pipeline.md
   - Troubleshooting: troubleshooting.md
   - OpenSRP / FHIR-Core Export: open-srp-export.md
+  - Transformation Test Coverage: testing/transformation-test-coverage.md
   - GitHub Pages: github-pages.md
 
 markdown_extensions:
