@@ -1963,6 +1963,7 @@ PARENT_GROUP_PRIORITY = 60
 ACTIVE_ACTIVITY_PRIORITY = 50
 NON_START_ACTIVITY_PRIORITY = 40
 ACTIVE_ACTIVITY_LOWER_PRIORITY = 30
+FOLLOW_NODE = 4
 FLOW_CALCULATE_NODE_PRIORITY_TOP_UP = 3
 RHOMBUS_PRIORITY_TO_UP = 3
 MAX_AUTO_PRIORITY = 76
@@ -2023,7 +2024,8 @@ def reorder_node_list(node_list, group, processed_nodes, priority_map = None):
             prev_priority = max(get_priority(p) for p in node.prev_nodes)
             if prev_priority >  MAX_AUTO_PRIORITY:
                 priority = max(priority, prev_priority)
-        
+        if isinstance(node, TriccNodeSelectNotAvailable):
+            priority += FOLLOW_NODE
         priority_map[group.id][node.id] = priority
         
         return priority
