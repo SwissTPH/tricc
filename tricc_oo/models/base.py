@@ -36,6 +36,7 @@ class TriccNodeType(StrEnum):
     text = "text"
     date = "date"
     rhombus = "rhombus"  # fetch data
+    factor = "factor"  # sequence scoring: if path then reference else 0
     goto = "goto"  #: start the linked activity within the target activity
     start = "start"  #: main start of the algo
     activity_start = "activity_start"  #: start of an activity (link in)
@@ -62,6 +63,7 @@ class TriccNodeType(StrEnum):
     diagnosis = "diagnosis"
     proposed_diagnosis = "proposed_diagnosis"
     input = "input"
+    populate = "populate"
     remote_reference = "remote_reference"
 
     def __iter__(self):
@@ -206,10 +208,21 @@ class TriccGroup(TriccBaseModel):
 FwTriccNodeBaseModel = ForwardRef("TriccNodeBaseModel")
 
 
+def get_repeat(node) -> int:
+    """Return effective repeat slot for concept instance scoping. Default 1."""
+    if node is None:
+        return 1
+    value = getattr(node, "repeat", None)
+    if value is None:
+        return 1
+    return int(value)
+
+
 class TriccNodeBaseModel(TriccBaseModel):
     path_len: int = 0
     group: Optional[Union[TriccGroup, FwTriccNodeBaseModel]] = None
     name: Optional[str] = None
+    repeat: Optional[int] = None
     export_name: Optional[str] = None
     label: Optional[Union[str, Dict[str, str]]] = None
     next_nodes: OrderedSet[TriccNodeBaseModel] = OrderedSet()
@@ -381,6 +394,7 @@ class TriccOperator(StrEnum):
     CAST_INTEGER = "cast_integer"
     DRUG_DOSAGE = "drug_dosage"  # drug name, *param1 (ex: weight, age)
     COALESCE = "coalesce"
+    GET_INHERITED_VALUE = "get_inherited_value"
     CAST_DATE = "cast_date"
     CAST_STRING = "cast_string"
     CAST_BOOLEAN = "cast_boolean"
@@ -959,6 +973,7 @@ def simplify_with_sympy(operation):
 
         # Special operations (placeholders for now)
         TriccOperator.COALESCE: None,  # Will use placeholder
+        TriccOperator.GET_INHERITED_VALUE: None,  # Will use placeholder
         TriccOperator.CONCATENATE: None,  # Will use placeholder
         TriccOperator.CASE: None,  # Will use placeholder
         TriccOperator.IFS: None,  # Will use placeholder

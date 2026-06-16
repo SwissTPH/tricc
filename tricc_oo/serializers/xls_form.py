@@ -3,8 +3,10 @@ import hashlib
 
 # from bs4 import BeautifulSoup
 from tricc_oo.converters.tricc_to_xls_form import (
-    get_export_name, BOOLEAN_MAP
+    get_export_name, BOOLEAN_MAP,
 )
+
+
 from tricc_oo.models.lang import SingletonLangClass
 from tricc_oo.converters.utils import clean_name, remove_html, generate_id
 from tricc_oo.models.base import (
@@ -24,6 +26,7 @@ from tricc_oo.models.tricc import (
     TriccNodeAcceptDiagnostic,
     TriccNodeNote,
 )
+
 from typing import Dict
 from tricc_oo.visitors.tricc import (
     is_ready_to_process,
@@ -33,6 +36,7 @@ from tricc_oo.visitors.tricc import (
     get_prev_instance_skip_expression,
     get_process_skip_expression,
     process_operation_reference,
+    NO_LABEL,
 )
 
 logger = logging.getLogger("default")
@@ -242,6 +246,7 @@ ODK_TRICC_TYPE_MAP = {
     "integer": "integer",
     "text": "text",
     "rhombus": "calculate",
+    "factor": "calculate",
     "goto": "",  #: start the linked activity within the target activity
     "start": "",
     "activity_start": "calculate",
@@ -265,6 +270,7 @@ ODK_TRICC_TYPE_MAP = {
     "diagnosis": "calculate",
     "proposed_diagnosis": "calculate",
     "input": "",
+    "populate": "calculate",
 }
 
 GROUP_TRICC_TYPE = [TriccNodeType.page, TriccNodeType.activity]
@@ -303,7 +309,6 @@ CHOICE_MAP = {
     "m": "",
 }
 
-
 TRAD_MAP = ["label", "constraint_message", "required_message", "hint", "help"]
 
 
@@ -324,6 +329,8 @@ def get_xfrom_trad(strategy, node, column, mapping, clean_html=False):
     if clean_html and isinstance(value, str):
         value = remove_html(value)
     if column in TRAD_MAP:
+        if value == NO_LABEL:
+            value = strategy.get_empty_label()
         value = langs.get_trads(value, trad=trad)
     elif column == "appearance":
         if (
@@ -595,10 +602,14 @@ def generate_xls_form_export(
                     elif ODK_TRICC_TYPE_MAP[node.tricc_type] != "":
                         values = []
                         for column in SURVEY_MAP:
-                            values.append(get_xfrom_trad(strategy, node, column, SURVEY_MAP))
+                            if column == 'trigger' and isinstance(node.expression, TriccOperation):
+                                values.append(strategy._get_trigger(node.expression) or "")
+                            else:
+                                values.append(get_xfrom_trad(strategy, node, column, SURVEY_MAP))
                         df_survey.loc[len(df_survey)] = values
                     else:
                         logger.warning("node {} have an unmapped type {}".format(node.get_name(), node.tricc_type))
+                    
                 else:
                     logger.warning("node {} have an unsupported type {}".format(node.get_name(), node.tricc_type))
             if not help_before and getattr(node, 'help', None):
@@ -638,6 +649,31 @@ def get_input_line(node, replace_dots=True):
         "",  # 'expression'
         "",  # 'repeat_count'
         "",  # 'image'
+        "",
+    ]
+
+
+def get_populate_calc_line(node, replace_dots=True):
+    """CHT calculate row for a populate node (contact-summary context binding)."""
+    from tricc_oo.converters.fhir.populate_helper import get_cht_contact_summary_expression
+
+    empty = langs.get_trads("", force_dict=True)
+    return [
+        "calculate",
+        get_export_name(node),
+        *list(empty.values()),
+        *list(empty.values()),
+        *list(empty.values()),
+        "",
+        "",
+        *list(empty.values()),
+        "",
+        "",
+        "",
+        *list(empty.values()),
+        get_cht_contact_summary_expression(node, replace_dots=replace_dots),
+        "",
+        "",
         "",
     ]
 

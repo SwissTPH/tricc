@@ -59,3 +59,12 @@ TRICC implements this through start/process orchestration, activity diagrams, an
 - Work in small iterations: change, convert, test.
 - Keep at least one file per segment for parallel authoring.
 - Treat warnings/errors as first-class signals before debugging assumptions.
+
+## Sequence and scoring patterns
+
+- **Rhombus gates** split flow on a `reference` condition; label out-edges with
+  `yes`/`no` (or `oui`/`non`) or use **integer factors** (`-1`, `+2`, …) on the
+  true branch when feeding a `count` score node.
+- **Concept repeat** (`repeat` on nodes or `activity_start`) models multiple timed
+  captures of the same concept without duplicating concept codes — see
+  [TRICC Elements](./tricc-elements.md#concept-repeat).

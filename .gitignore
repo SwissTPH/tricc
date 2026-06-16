@@ -25,6 +25,7 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+tests/output
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -168,3 +169,4 @@ test/data/
 # Authentication files
 auth/
 tricc_oo/strategies/output/ODK_Validate.jar
+.secrets/

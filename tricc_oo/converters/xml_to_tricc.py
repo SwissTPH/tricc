@@ -19,6 +19,7 @@ from tricc_oo.models.calculate import (
     TriccNodeActivityStart,
     TriccNodeEnd,
     TriccNodeCalculate,
+    TriccNodeFactor,
     TriccNodeRhombus,
     TriccNodeDisplayCalculateBase,
     TriccNodeExclusive,
@@ -26,6 +27,7 @@ from tricc_oo.models.calculate import (
     TriccNodeDiagnosis,
     TriccRhombusMixIn,
     TriccNodeInput,
+    TriccNodePopulate,
 )
 from tricc_oo.models.tricc import (
     TriccNodeCalculateBase,
@@ -65,15 +67,21 @@ import hashlib
 from tricc_oo.visitors.tricc import (
     get_select_yes_no_options, get_select_not_available_options,
     set_prev_next_node,  inject_node_before,
-    merge_node, remove_prev_next, get_activity_wait, get_count_terms_details
+    merge_node, remove_prev_next, get_activity_wait, get_count_terms_details, NO_LABEL
 )
 from tricc_oo.converters.datadictionnary import add_concept
 
 TRICC_YES_LABEL = ["yes", "oui"]
 TRICC_NO_LABEL = ["no", "non"]
 TRICC_FOLLOW_LABEL = ["follow", "suivre", "continue"]
-NO_LABEL = "NO_LABEL"
+
 TRICC_LIST_NAME = "list_{0}"
+FACTOR_EDGE_PATTERN = re.compile(r"^[\+\-]?[0-9]+([.,][0-9]+)?$")
+
+
+def is_factor_edge_label(label: str) -> bool:
+    """Return True when *label* is a numeric factor (e.g. -1, +2, 3)."""
+    return bool(FACTOR_EDGE_PATTERN.match(label.strip()))
 
 DISPLAY_ATTRIBUTES = ["label", "hint", "help"]
 logger = logging.getLogger("default")
@@ -122,11 +130,43 @@ def get_experimentalactivity_details(diagram, activity, project, media_path):
 
     return nodes
 
+def propagate_activity_repeat(activity):
+    """Apply activity_start.repeat to in-scope descendant nodes (overrides node-level repeat)."""
+    root = activity.root
+    if not isinstance(root, TriccNodeActivityStart):
+        return
+    activity_repeat = getattr(root, "repeat", None)
+    if activity_repeat is None:
+        return
+    try:
+        activity_repeat = int(activity_repeat)
+    except (TypeError, ValueError):
+        logger.warning(f"Invalid repeat on activity {activity.get_name()}: {activity_repeat}")
+        return
+
+    for node in activity.nodes.values():
+        if isinstance(node, (TriccNodeInput, TriccNodePopulate)):
+            continue
+        if isinstance(node, TriccNodeSelectOption):
+            continue
+        in_scope = isinstance(node, TriccNodeInputModel) or (
+            issubclass(node.__class__, TriccNodeDisplayCalculateBase) and getattr(node, "name", None)
+        )
+        if not in_scope:
+            continue
+        node_repeat = getattr(node, "repeat", None)
+        if node_repeat is not None and int(node_repeat) != activity_repeat:
+            logger.debug(
+                f"Activity repeat={activity_repeat} overrides node repeat={node_repeat} on {node.get_name()}"
+            )
+        node.repeat = activity_repeat
+
+
 def get_activity_details(diagram, activity, project, media_path):
     nodes = get_nodes(diagram, activity)
     for n in nodes.values():
         if (
-            issubclass(n.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase, TriccNodeInput))
+            issubclass(n.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase, TriccNodeInput, TriccNodePopulate))
             and not isinstance(n, (TriccRhombusMixIn, TriccNodeRhombus, TriccNodeDisplayBridge))
             and not n.name.startswith("label_")  # FIXME
         ):
@@ -185,6 +225,7 @@ def get_activity_details(diagram, activity, project, media_path):
     # link back the activity
     
     manage_dangling_calculate(activity)
+    propagate_activity_repeat(activity)
     # Assign parent to NotAvailable
     for node in list(
         filter(
@@ -331,7 +372,12 @@ def process_edges(diagram, media_path, activity, nodes):
                     edge.source_external_id = None
                 elif label.lower() in TRICC_NO_LABEL:
                     calc = process_exclusive_edge(edge, nodes)
-                elif label.lower() not in TRICC_YES_LABEL:
+                elif label.lower() in TRICC_YES_LABEL or label == "":
+                    pass
+                elif is_factor_edge_label(label):
+                    # Integer (+/-) factor on a rhombus out-edge implies "yes"
+                    calc = process_factor_edge(edge, nodes)
+                else:
                     logger.critical(f"missing label on edge in {diagram.attrib.get('name', diagram.attrib['id'])} from rhombus {edge.source} ")
                     exit(1)
                 processed = True
@@ -341,7 +387,7 @@ def process_edges(diagram, media_path, activity, nodes):
             elif label.lower() in (TRICC_YES_LABEL) or label == "":
                 # do nothinbg for yes
                 processed = True
-            elif re.search(r"^\-?[0-9]+([.,][0-9]+)?$", edge.value.strip()):
+            elif is_factor_edge_label(label):
                 calc = process_factor_edge(edge, nodes)
             elif label.lower() in TRICC_NO_LABEL:
                 calc = process_exclusive_edge(edge, nodes)
@@ -532,8 +578,10 @@ def set_additional_attributes(attribute_names, elm, node):
             # input expression can add a condition to either relevance (display) or calculate expression
             if attributename == "expression_inputs":
                 attribute = [attribute]
-            elif attributename in ["priority", "instance"]:
+            elif attributename in ["priority", "instance", "repeat"]:
                 attribute = int(attribute)
+                if attributename == "repeat" and attribute < 0:
+                    logger.warning(f"Invalid repeat={attribute} on node; must be non-negative")
             elif attributename == "relevance":
                 attribute = remove_html(attribute.strip())
             else:
@@ -565,6 +613,7 @@ def get_concept_type(node):
             TriccNodeSelectYesNo,
             TriccNodeSelectNotAvailable,
             TriccNodeInput,
+            TriccNodePopulate,
         ),
     ):
         return "Symptom-Finding"
@@ -789,6 +838,10 @@ def add_tricc_base_node(
                 node.severity = severity_from_color(styles["fillColor"])
 
         set_additional_attributes(attributes, elm, node)
+        if isinstance(node, TriccNodePopulate):
+            from tricc_oo.converters.fhir.populate_helper import normalize_populate_node
+
+            normalize_populate_node(node)
         if not isinstance(node, TriccNodeLinkOut):
             load_expressions(node)
         nodes[id] = node
@@ -984,11 +1037,14 @@ def get_image(diagram, path, id):
 def add_image_from_style(style, path):
     image_attrib = None
     if style is not None and "image=data:image/" in style:
-        image_attrib = style.split("image=data:image/")
+        style_parts = style.split(";")
+        for p in style_parts:
+            if "image=data:image/" in p:
+                image_attrib=p.split("image=data:image/")
     if image_attrib is not None and len(image_attrib) == 2:
         image_parts = image_attrib[1].split(",")
         if len(image_parts) == 2:
-            payload = image_parts[1][:-1]
+            payload = image_parts[1]
             image_name = hashlib.md5(payload.encode("utf-8")).hexdigest()
             path = os.path.join(path, "images")
             file_name = os.path.join(path, image_name + "." + image_parts[0])
@@ -1048,20 +1104,18 @@ def get_edges(diagram):
 
 def process_factor_edge(edge, nodes):
     factor = edge.value.strip()
-    if factor != 1:
-        source = nodes[edge.source]
-        return TriccNodeCalculate(
-            id=edge.id,
-            expression_reference=TriccOperation(
-                TriccOperator.MULTIPLIED,
-                [TriccReference(nodes[edge.source].name), TriccStatic(float(factor))],
-            ),
-            reference=[TriccReference(source.name)],
-            activity=source.activity,
-            group=source.group,
-            label="factor {}".format(factor),
-        )
-    return None
+    factor_value = float(factor.replace(",", "."))
+    if factor_value == 1:
+        return None
+    source = nodes[edge.source]
+    return TriccNodeFactor(
+        id=edge.id,
+        path=source,
+        reference=TriccStatic(factor_value),
+        activity=source.activity,
+        group=source.group,
+        label="factor {}".format(factor),
+    )
 
 
 def process_condition_edge(edge, label, nodes):

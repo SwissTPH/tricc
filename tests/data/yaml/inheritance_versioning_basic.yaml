@@ -1,0 +1,72 @@
+# Inheritance / Versioning test case (high priority for regression)
+#
+# Purpose: Exercise get_version_inheritance, set_last_version_false,
+# get_versions, and the merging of relevance/calculate/expression
+# across multiple nodes that share the same name.
+#
+# This is deliberately hard to author and maintain in draw.io.
+
+id: inheritance_base
+title: "Inheritance Base Activity"
+process: main
+
+nodes:
+  - id: start_base
+    type: start
+    label: "Start Base"
+
+  - id: calc_eligible_v1
+    type: calculate
+    name: is_eligible
+    label: "Is eligible (v1 - base)"
+    calculate: "age >= 18"
+
+  - id: end_base
+    type: end
+    label: "End Base"
+
+edges:
+  - source: start_base
+    target: calc_eligible_v1
+  - source: calc_eligible_v1
+    target: end_base
+
+
+---
+# Second activity that defines a node with the *same name* ("is_eligible")
+# but different expression and relevance. When both activities are
+# processed together, the second version should inherit from the first.
+
+id: inheritance_override
+title: "Inheritance Override Activity"
+process: main
+
+nodes:
+  - id: start_override
+    type: start
+    label: "Start Override"
+
+  - id: q_extra_check
+    type: select_yesno
+    name: extra_check
+    label: "Extra check passed?"
+    required: true
+
+  - id: calc_eligible_v2
+    type: calculate
+    name: is_eligible
+    label: "Is eligible (v2 - override)"
+    calculate: "age >= 21 and extra_check = true"
+    relevance: "${age} >= 18"   # still depends on the earlier version's input
+
+  - id: end_override
+    type: end
+    label: "End Override"
+
+edges:
+  - source: start_override
+    target: q_extra_check
+  - source: q_extra_check
+    target: calc_eligible_v2
+  - source: calc_eligible_v2
+    target: end_override

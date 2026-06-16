@@ -2,11 +2,13 @@ import abc
 import logging
 from tricc_oo.visitors.tricc import stashed_node_func
 import datetime
+from tricc_oo.strategies.registry import register_output_strategy
 
 logger = logging.getLogger("default")
 
 
-class BaseOutPutStrategy:
+@register_output_strategy("BaseOutPutStrategy")
+class BaseOutPutStrategy(abc.ABC):
     processes = ["main"]
     project = None
     output_path = None

@@ -1,0 +1,27 @@
+id: populate_history
+title: Populate history context
+process: main
+
+nodes:
+  - id: start
+    type: start
+    label: Start
+    name: start_hist
+
+  - id: pop_bp
+    type: populate
+    name: bp_systolic
+    label: Prior BP
+    context: history
+    period: P14D
+
+  - id: end
+    type: end
+    label: End
+    name: end_hist
+
+edges:
+  - source: start
+    target: pop_bp
+  - source: pop_bp
+    target: end

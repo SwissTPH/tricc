@@ -17,6 +17,7 @@ from tricc_oo.models.calculate import (
     TriccNodeWait,
     TriccNodeCalculate,
     TriccNodeRhombus,
+    TriccNodeFactor,
     TriccNodeDisplayCalculateBase,
     TriccNodeExclusive,
     TriccNodeProposedDiagnosis,
@@ -25,6 +26,7 @@ from tricc_oo.models.calculate import (
     TriccNodeFakeCalculateBase,
     TriccRhombusMixIn,
     TriccNodeInput,
+    TriccNodePopulate,
     TriccNodeActivityEnd,
     TriccNodeActivityStart,
     TriccNodeEnd,
@@ -55,7 +57,7 @@ from tricc_oo.converters.tricc_to_xls_form import get_list_names, get_export_nam
 
 logger = logging.getLogger("default")
 ONE_QUESTION_AT_A_TIME = False
-
+NO_LABEL = "__NO_LABEL__"
 # Track the last group that was reordered to avoid unnecessary reordering
 _last_reordered_group = None
 
@@ -81,27 +83,36 @@ def get_max_version(dict):
     return max_version
 
 
-def get_versions(name, iterable):
-    return [n for n in iterable if version_filter(name)(n)]
+def get_versions(name, iterable, repeat=None):
+    return [n for n in iterable if version_filter(name, repeat)(n)]
 
 
-def version_filter(name):
-    return (
-        lambda item: hasattr(item, "name")
-        and ((isinstance(item, TriccNodeEnd) and name == item.get_reference()) or item.name == name)
-        and not isinstance(item, TriccNodeSelectOption)
-    )
+def version_filter(name, repeat=None):
+    from tricc_oo.models.base import get_repeat as _get_repeat
+
+    def _matches(item):
+        if isinstance(item, TriccNodeSelectOption):
+            return False
+        if isinstance(item, TriccNodeEnd):
+            return name == item.get_reference()
+        if not hasattr(item, "name") or item.name != name:
+            return False
+        if repeat is not None:
+            return _get_repeat(item) == repeat
+        return True
+
+    return _matches
 
 
-def get_last_version(name, processed_nodes, _list=None):
+def get_last_version(name, processed_nodes, _list=None, repeat=None):
     max_version = None
     if isinstance(_list, dict):
         _list = _list[name].values() if name in _list else []
     if _list is None:
         if isinstance(processed_nodes, OrderedSet):
-            return processed_nodes.find_last(version_filter(name))
+            return processed_nodes.find_last(version_filter(name, repeat))
         else:
-            _list = get_versions(name, processed_nodes)
+            _list = get_versions(name, processed_nodes, repeat)
     if _list:
         for sim_node in _list:
             # get the max version while not taking a node that have a next node before next calc
@@ -113,7 +124,11 @@ def get_last_version(name, processed_nodes, _list=None):
             ):
                 max_version = sim_node
     if not max_version:
-        already_processed = list(filter(lambda p_node: hasattr(p_node, "name") and p_node.name == name, _list))
+        already_processed = [
+            p_node for p_node in _list
+            if hasattr(p_node, "name") and p_node.name == name
+            and (repeat is None or version_filter(name, repeat)(p_node))
+        ]
         if already_processed:
             max_version = sorted(already_processed, key=lambda x: x.path_len, reverse=False)[0]
 
@@ -148,11 +163,16 @@ def get_node_expressions(node, processed_nodes, process=None):
 def set_last_version_false(node, processed_nodes):
     if isinstance(node, (TriccNodeSelectOption)):
         return
+    from tricc_oo.models.base import get_repeat
+
     node_name = node.name if not isinstance(node, TriccNodeEnd) else node.get_reference()
-    last_version = processed_nodes.find_prev(node, version_filter(node_name))
+    node_repeat = None if isinstance(node, TriccNodeEnd) else get_repeat(node)
+    last_version = processed_nodes.find_prev(node, version_filter(node_name, node_repeat))
     if last_version and getattr(node, "process", "") != "pause":
         # 0-100 for manually specified instance.  100-200 for auto instance
-        node.version = get_next_version(node.name, processed_nodes, last_version.version, 0)
+        node.version = get_next_version(
+            node.name, processed_nodes, last_version.version, 0, repeat=node_repeat
+        )
         last_version.last = False
         node.path_len = max(node.path_len, last_version.path_len + 1)
     return last_version
@@ -162,7 +182,11 @@ def get_version_inheritance(node, all_prev_versions, processed_nodes):
 
     # Updated to merge ALL previous versions, not just the last one
     # This ensures inheritance works even when intermediate activities weren't triggered
-    
+
+    if isinstance(node, TriccNodePopulate) and node.context == "history":
+        node.last = True
+        return
+
     if not issubclass(node.__class__, (TriccNodeInputModel)):
         node.last = True
         if issubclass(node.__class__, (TriccNodeDisplayCalculateBase, TriccNodeEnd)) and node.name is not None:
@@ -216,8 +240,8 @@ def get_version_inheritance(node, all_prev_versions, processed_nodes):
         processed_nodes.add(calc)
         if issubclass(node.__class__, TriccNodeInputModel):
             # Coalesce with all previous versions
-            coalesce_operands = ["$this"] + (all_prev_versions if all_prev_versions else [])
-            node.expression = TriccOperation(TriccOperator.COALESCE, coalesce_operands)
+            inheritance_operands = (all_prev_versions if all_prev_versions else [])
+            node.expression = TriccOperation(TriccOperator.GET_INHERITED_VALUE, inheritance_operands)
 
 
 def merge_expressions(expression, last_version, *argv):
@@ -272,12 +296,20 @@ def load_calculate(
             set_last_version_false(node, processed_nodes)
             # Get all previous versions from processed_nodes, not just the last one
             node_name = node.name if not isinstance(node, TriccNodeEnd) else node.get_reference()
-            all_prev_versions = get_versions(node_name, processed_nodes)
+            from tricc_oo.models.base import get_repeat
+
+            all_prev_versions = get_versions(node_name, processed_nodes, get_repeat(node))
             # Exclude the current node itself
             all_prev_versions = [v for v in all_prev_versions if v != node]
 
             if all_prev_versions:
                 get_version_inheritance(node, all_prev_versions, processed_nodes)
+
+            if isinstance(node, TriccNodePopulate):
+                from tricc_oo.converters.fhir.populate_helper import resolve_populate_reference
+
+                node.expression_reference = TriccStatic(resolve_populate_reference(node))
+                node.is_sequence_defined = True
 
             generate_calculates(node, calculates, used_calculates, processed_nodes=processed_nodes, process=process)
 
@@ -311,15 +343,18 @@ def load_calculate(
             # add skip logic for display node ()
             if all_prev_versions and hasattr(node, "relevance"):
                 # search for same node in completly differnt activity
+                from tricc_oo.converters.fhir.populate_helper import populate_participates_in_skip
+
+                skip_prev_versions = [l for l in all_prev_versions if populate_participates_in_skip(l)]
                 last_expressions_other_activity = [
-                    (and_join([has_node_data_operation(l),TriccOperation(TriccOperator.ISTRUE,[l.activity.root])])) for l in  all_prev_versions if (
+                    (and_join([has_node_data_operation(l),TriccOperation(TriccOperator.ISTRUE,[l.activity.root])])) for l in skip_prev_versions if (
                         node.is_sequence_defined and
                         node.activity.base_instance != l.activity.base_instance
                     )
                 ]
                 # search for same some in the same activity (might require a warning)
                 last_expression_same_activity = [
-                    has_node_data_operation(l) for l in  all_prev_versions if (
+                    has_node_data_operation(l) for l in skip_prev_versions if (
                         node.is_sequence_defined and
                         node.activity == l.activity
                     )
@@ -343,8 +378,8 @@ def load_calculate(
             if (
                 not node.is_sequence_defined
                 and issubclass(type(node), TriccNodeDisplayCalculateBase)
-                and not isinstance(node, TriccNodeRhombus)
-                and node.prev_nodes   
+                and not isinstance(node, (TriccNodeRhombus, TriccNodeFactor))
+                and node.prev_nodes
             ):
                 if node.reference:
                     logger.critical(f"{node.get_name()} has both reference and prev_nodes")
@@ -908,11 +943,15 @@ def process_operation_reference(
                 clean_ref, option_label = parts
 
         # Try to find the referenced node
+        from tricc_oo.models.base import get_repeat
+
+        ref_repeat = get_repeat(node)
         candidates_in_activity = [
             n for n in node.activity.nodes.values()
             if n.name == clean_ref
             and n != node
             and not isinstance(n, TriccNodeSelectOption)
+            and get_repeat(n) == ref_repeat
         ]
 
         if candidates_in_activity:
@@ -920,7 +959,9 @@ def process_operation_reference(
                 return False  # defer — not all versions processed yet
             target_node = candidates_in_activity[0]  # assuming name uniqueness
         else:
-            target_node = get_last_version(name=clean_ref, processed_nodes=processed_nodes)
+            target_node = get_last_version(
+                name=clean_ref, processed_nodes=processed_nodes, repeat=ref_repeat
+            )
 
         if target_node is None or isinstance(target_node, TriccNodeSelectOption):
             unresolved_names.append(ref_str)  # keep original form with [label] if present
@@ -951,7 +992,7 @@ def process_operation_reference(
         if replace_reference:
             if not issubclass(
                 target_node.__class__,
-                (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase, TriccNodeInput)
+                (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase, TriccNodeInput, TriccNodePopulate)
             ):
                 target_node = get_node_expression(target_node, processed_nodes, is_prev=True)
 
@@ -1370,14 +1411,14 @@ def walkthrough_tricc_option(
                                 )
 
 
-def get_next_version(name, processed_nodes, version=0, min=100):
+def get_next_version(name, processed_nodes, version=0, min=100, repeat=None):
     return (
         max(
             version,
             min,
             *[
                 (getattr(n, "version", None) or getattr(n, "instance", None) or 0)
-                for n in get_versions(name, processed_nodes)
+                for n in get_versions(name, processed_nodes, repeat)
             ],
         )
         + 1
@@ -1582,8 +1623,11 @@ def reverse_walkthrough(in_node, next_node, callback, processed_nodes, stashed_n
 
 
 def get_prev_node_by_name(processed_nodes, name, node):
+    from tricc_oo.models.base import get_repeat
+
+    node_repeat = get_repeat(node)
     # look for the node in the same activity
-    last_calc = get_last_version(name, processed_nodes)
+    last_calc = get_last_version(name, processed_nodes, repeat=node_repeat)
     if last_calc:
         return last_calc
 
@@ -1591,13 +1635,21 @@ def get_prev_node_by_name(processed_nodes, name, node):
         filter(
             lambda p_node: hasattr(p_node, "name")
             and p_node.name == name
+            and get_repeat(p_node) == node_repeat
             and p_node.instance == node.instance
             and p_node.path_len <= node.path_len,
             processed_nodes,
         )
     )
     if len(filtered) == 0:
-        filtered = list(filter(lambda p_node: hasattr(p_node, "name") and p_node.name == name, processed_nodes))
+        filtered = list(
+            filter(
+                lambda p_node: hasattr(p_node, "name")
+                and p_node.name == name
+                and get_repeat(p_node) == node_repeat,
+                processed_nodes,
+            )
+        )
     if len(filtered) > 0:
         return sorted(filtered, key=lambda x: x.path_len, reverse=False)[0]
 
@@ -1911,6 +1963,7 @@ PARENT_GROUP_PRIORITY = 60
 ACTIVE_ACTIVITY_PRIORITY = 50
 NON_START_ACTIVITY_PRIORITY = 40
 ACTIVE_ACTIVITY_LOWER_PRIORITY = 30
+FOLLOW_NODE = 4
 FLOW_CALCULATE_NODE_PRIORITY_TOP_UP = 3
 RHOMBUS_PRIORITY_TO_UP = 3
 MAX_AUTO_PRIORITY = 76
@@ -1971,7 +2024,8 @@ def reorder_node_list(node_list, group, processed_nodes, priority_map = None):
             prev_priority = max(get_priority(p) for p in node.prev_nodes)
             if prev_priority >  MAX_AUTO_PRIORITY:
                 priority = max(priority, prev_priority)
-        
+        if isinstance(node, TriccNodeSelectNotAvailable):
+            priority += FOLLOW_NODE
         priority_map[group.id][node.id] = priority
         
         return priority
@@ -2709,6 +2763,58 @@ def get_rhombus_terms(node, processed_nodes, get_overall_exp=False, negate=False
     return expression
 
 
+def _get_factor_path_condition(path, processed_nodes, get_overall_exp=False, process=None):
+    """Boolean condition for whether a factor node's path branch was taken."""
+    if isinstance(path, TriccNodeRhombus):
+        return get_rhombus_terms(path, processed_nodes, get_overall_exp=get_overall_exp, process=process)
+    if isinstance(path, TriccNodeSelectYesNo):
+        yes_option = next(
+            (opt for opt in path.options.values() if str(opt.label).lower() in ("yes", "oui")),
+            next(iter(path.options.values()), None),
+        )
+        if yes_option:
+            return TriccOperation(TriccOperator.SELECTED, [path, yes_option])
+    if issubclass(path.__class__, TriccNodeSelect):
+        return TriccOperation(TriccOperator.ISTRUE, [path])
+    if issubclass(path.__class__, TriccNodeCalculateBase):
+        return get_node_expression(
+            path,
+            processed_nodes=processed_nodes,
+            get_overall_exp=get_overall_exp,
+            is_prev=True,
+            process=process,
+        )
+    return TriccOperation(TriccOperator.ISTRUE, [path])
+
+
+def get_factor_terms(node, processed_nodes, get_overall_exp=False, negate=False, process=None):
+    """Return ``if path then factor else 0`` for sequence scoring nodes."""
+    if node.path is None:
+        if len(node.prev_nodes) == 1:
+            node.path = list(node.prev_nodes)[0]
+        elif len(node.prev_nodes) > 1:
+            logger.critical(f"missing path for Factor {node.get_name()}")
+            exit(1)
+
+    factor_value = node.reference
+    if isinstance(factor_value, list) and factor_value:
+        factor_value = factor_value[0]
+    if not isinstance(factor_value, TriccStatic):
+        factor_value = TriccStatic(float(factor_value))
+
+    path_condition = _get_factor_path_condition(
+        node.path, processed_nodes, get_overall_exp=get_overall_exp, process=process
+    )
+    if path_condition is None:
+        path_condition = TriccStatic(False)
+
+    if negate:
+        path_condition = not_clean(path_condition)
+
+    scored = TriccOperation(TriccOperator.IF, [path_condition, factor_value, TriccStatic(0)])
+    return TriccOperation(TriccOperator.CAST_NUMBER, [scored])
+
+
 # function that generate the calculation terms return by calculate node
 # @param node calculate node to assess
 # @param processed_nodes list of node already processed, importnat because only processed node could be use
@@ -2725,6 +2831,10 @@ def get_calculation_terms(node, processed_nodes, get_overall_exp=False, negate=F
         return get_count_terms(node, False, negate, process=process)
     elif isinstance(node, TriccNodeRhombus):
         return get_rhombus_terms(
+            node, processed_nodes=processed_nodes, get_overall_exp=get_overall_exp, negate=negate, process=process
+        )
+    elif isinstance(node, TriccNodeFactor):
+        return get_factor_terms(
             node, processed_nodes=processed_nodes, get_overall_exp=get_overall_exp, negate=negate, process=process
         )
     elif isinstance(node, (TriccNodeWait)):
@@ -2878,7 +2988,12 @@ def generate_calculate(node, processed_nodes, **kwargs):
             # Calculate node is sequence defined if ALL prev_nodes have is_sequence_defined = True
             node.is_sequence_defined = all(prev_node.is_sequence_defined for prev_node in node.prev_nodes)
 
-        if (
+        if isinstance(node, TriccNodePopulate):
+            from tricc_oo.converters.fhir.populate_helper import resolve_populate_reference
+
+            if node.expression is None and node.expression_reference is None:
+                node.expression_reference = TriccStatic(resolve_populate_reference(node))
+        elif (
             hasattr(node, "expression")
             and (node.expression is None)
             and issubclass(node.__class__, TriccNodeCalculateBase)
@@ -2970,3 +3085,43 @@ def generate_base(node, processed_nodes, **kwargs):
         # continue walk
         return True
     return False
+
+def get_process(node) -> str | None:
+
+    """Walk the TRICC graph upward to find the cpg-common-process name for a node.
+     Rules (per FHIRcore.md v4 spec):
+     1. If the node is a ``TriccNodeMainStart`` → return ``node.process``.
+     2. If the node's activity root is a ``TriccNodeMainStart`` → return that root's process.
+     3. Otherwise recurse on the node's activity (which itself has prev_nodes / a root).
+    
+     Args:
+
+     node: Any TRICC node (``TriccNodeBaseModel`` subclass).
+
+     Returns:
+
+     The cpg-common-process string (e.g. ``"registration"``) or ``None`` if not found.
+
+    """
+    if node is None:
+        return None
+     # Rule 1: node itself is the main start
+    if isinstance(node, TriccNodeMainStart):
+        return getattr(node, "process", None)
+    # Rule 2: node's activity root is the main start
+    activity = getattr(node, "activity", None)
+    if activity is not None:
+        root = getattr(activity, "root", None)
+        if isinstance(root, TriccNodeMainStart):
+            return getattr(root, "process", None)
+        # Rule 3: recurse on the activity itself (which may have its own activity/root)
+        if activity is not node:
+            return get_process(activity)
+    # Fallback: try prev_nodes
+    for prev in getattr(node, "prev_nodes", []):
+        result = get_process(prev)
+        if result is not None:
+            return result
+    return None
+
+    

@@ -68,6 +68,18 @@ class TriccNodeInput(TriccNodeFakeCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.input
 
 
+class TriccNodePopulate(TriccNodeFakeCalculateBase):
+    """Pre-loaded data node (non-display calculate) with explicit data context."""
+
+    tricc_type: TriccNodeType = TriccNodeType.populate
+    context: str = "patient"
+    period: Optional[str] = None
+    data_type: Optional[str] = None
+    concept_type: Optional[str] = None
+    repeat: Optional[int] = None
+    is_sequence_defined: bool = False
+
+
 class TriccNodeDisplayBridge(TriccNodeDisplayCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.bridge
 
@@ -115,6 +127,25 @@ class TriccRhombusMixIn:
         instance.reference = reference
         instance.expression_reference = expression_reference
         instance.name = get_rand_name(self.id)
+        return instance
+
+
+class TriccNodeFactor(TriccNodeFakeCalculateBase):
+    """Sequence scoring node: contributes *reference* when *path* is true, else 0.
+
+    Created from numeric edge labels (e.g. ``-1`` on a rhombus yes-branch).
+    Non-display calculate — similar to rhombus/wait, not a ``TriccNodeDisplayCalculateBase``.
+    """
+
+    tricc_type: TriccNodeType = TriccNodeType.factor
+    path: Optional[TriccNodeBaseModel] = None
+    reference: Optional[TriccStatic] = None
+
+    def make_instance(self, instance_nb, activity, **kwargs):
+        instance = super().make_instance(instance_nb, activity, **kwargs)
+        instance.path = self.path
+        if isinstance(self.reference, TriccStatic):
+            instance.reference = TriccStatic(self.reference.value)
         return instance
 
 
@@ -218,6 +249,7 @@ class TriccNodeActivityStart(TriccNodeFakeCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.activity_start
     relevance: Optional[Union[Expression, TriccOperation]] = None
     status: Optional[str] = None
+    process: Optional[str] = None
 
 
 def get_node_from_list(in_nodes, node_id):
