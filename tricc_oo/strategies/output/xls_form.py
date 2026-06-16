@@ -789,9 +789,6 @@ class XLSFormStrategy(BaseOutPutStrategy):
     def tricc_operation_sum(self, ref_expressions, original_references=None):
         return f"sum({ref_expressions[0]})"
 
-    def tricc_operation_count(self, ref_expressions, original_references=None):
-        return f"count({ref_expressions[0]})"
-
     def tricc_operation_concatenate(self, ref_expressions, original_references=None):
         return f"concat({','.join(map(str, ref_expressions))})"
 
@@ -800,6 +797,19 @@ class XLSFormStrategy(BaseOutPutStrategy):
 
     def tricc_operation_cast_date(self, ref_expressions, original_references=None):
         return f"date({ref_expressions[0]})"
+
+    def tricc_operation_get_inherited_value(self, ref_expressions, original_references=None):
+        return self.tricc_operation_coalesce(ref_expressions, original_references=None)
+    
+    
+    def _get_trigger(self, expression):
+        """ODK trigger column: comma-separated field refs (no coalesce(., …))."""
+        refs = expression.get_references()
+        parts = []
+        for ref in refs:
+            if issubclass(ref.__class__, (TriccNodeDisplayCalculateBase, TriccNodeDisplayModel)) and not isinstance(ref, TriccNodeSelectOption):
+                parts.append(f"${{{get_export_name(ref)}}}")
+        return ",".join(parts)
 
     def validate(self):
         """Validate the generated XLS form using pyxform."""

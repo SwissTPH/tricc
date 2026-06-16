@@ -67,14 +67,14 @@ import hashlib
 from tricc_oo.visitors.tricc import (
     get_select_yes_no_options, get_select_not_available_options,
     set_prev_next_node,  inject_node_before,
-    merge_node, remove_prev_next, get_activity_wait, get_count_terms_details
+    merge_node, remove_prev_next, get_activity_wait, get_count_terms_details, NO_LABEL
 )
 from tricc_oo.converters.datadictionnary import add_concept
 
 TRICC_YES_LABEL = ["yes", "oui"]
 TRICC_NO_LABEL = ["no", "non"]
 TRICC_FOLLOW_LABEL = ["follow", "suivre", "continue"]
-NO_LABEL = "NO_LABEL"
+
 TRICC_LIST_NAME = "list_{0}"
 FACTOR_EDGE_PATTERN = re.compile(r"^[\+\-]?[0-9]+([.,][0-9]+)?$")
 

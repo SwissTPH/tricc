@@ -393,6 +393,7 @@ class TriccOperator(StrEnum):
     CAST_INTEGER = "cast_integer"
     DRUG_DOSAGE = "drug_dosage"  # drug name, *param1 (ex: weight, age)
     COALESCE = "coalesce"
+    GET_INHERITED_VALUE = "get_inherited_value"
     CAST_DATE = "cast_date"
     CAST_STRING = "cast_string"
     CAST_BOOLEAN = "cast_boolean"
@@ -971,6 +972,7 @@ def simplify_with_sympy(operation):
 
         # Special operations (placeholders for now)
         TriccOperator.COALESCE: None,  # Will use placeholder
+        TriccOperator.GET_INHERITED_VALUE: None,  # Will use placeholder
         TriccOperator.CONCATENATE: None,  # Will use placeholder
         TriccOperator.CASE: None,  # Will use placeholder
         TriccOperator.IFS: None,  # Will use placeholder

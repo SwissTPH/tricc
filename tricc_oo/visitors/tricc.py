@@ -57,7 +57,7 @@ from tricc_oo.converters.tricc_to_xls_form import get_list_names, get_export_nam
 
 logger = logging.getLogger("default")
 ONE_QUESTION_AT_A_TIME = False
-
+NO_LABEL = "__NO_LABEL__"
 # Track the last group that was reordered to avoid unnecessary reordering
 _last_reordered_group = None
 
@@ -240,8 +240,8 @@ def get_version_inheritance(node, all_prev_versions, processed_nodes):
         processed_nodes.add(calc)
         if issubclass(node.__class__, TriccNodeInputModel):
             # Coalesce with all previous versions
-            coalesce_operands = ["$this"] + (all_prev_versions if all_prev_versions else [])
-            node.expression = TriccOperation(TriccOperator.COALESCE, coalesce_operands)
+            inheritance_operands = (all_prev_versions if all_prev_versions else [])
+            node.expression = TriccOperation(TriccOperator.GET_INHERITED_VALUE, inheritance_operands)
 
 
 def merge_expressions(expression, last_version, *argv):
