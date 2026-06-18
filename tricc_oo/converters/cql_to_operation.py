@@ -51,6 +51,7 @@ FUNCTION_MAP = {
     "Sum": TriccOperator.SUM,
     "FormatDate": TriccOperator.FORMAT_DATE,
     "Length": TriccOperator.LENGTH,
+    "CountSelected": TriccOperator.COUNT_SELECTED,
 }
 # TODO
 # Min

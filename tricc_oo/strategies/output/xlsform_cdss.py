@@ -1,12 +1,42 @@
 import logging
 from tricc_oo.models.tricc import TriccNodeActivity
 from tricc_oo.models.calculate import TriccNodeInput, TriccNodePopulate
+import re
+from typing import List
+
+from tricc_oo.models.tricc import TriccNodeActivity
+from tricc_oo.models.calculate import TriccNodeInput
+from tricc_oo.models.base import (
+    TriccOperation,
+    TriccOperator,
+    TriccReference,
+    TriccStatic,
+)
+from tricc_oo.converters.tricc_to_xls_form import get_export_name
 from tricc_oo.strategies.output.xls_form import XLSFormStrategy
 from tricc_oo.strategies.registry import register_output_strategy
 from tricc_oo.models.lang import SingletonLangClass
 
 langs = SingletonLangClass()
 logger = logging.getLogger("default")
+
+_TRIGGER_REF_SPLIT = re.compile(r"\s*,\s*|\s+")
+
+
+def _comma_join_survey_trigger_refs(*chunks: str) -> str:
+    """ODK/pyxform require comma-separated ``${field}`` tokens in the survey trigger column."""
+    parts: List[str] = []
+    for ch in chunks:
+        if not ch:
+            continue
+        s = str(ch).strip()
+        if not s:
+            continue
+        for p in _TRIGGER_REF_SPLIT.split(s):
+            p = p.strip()
+            if p and p not in parts:
+                parts.append(p)
+    return ", ".join(parts)
 
 
 @register_output_strategy("XLSFormCDSSStrategy")
@@ -18,8 +48,7 @@ class XLSFormCDSSStrategy(XLSFormStrategy):
         # self.add_wfx_choice()
 
     def generate_export(self, node, **kwargs):
-        # Detect Coalesce($this, ...) calculations and lift the references
-        # into the trigger column before the expression is translated to XPath.
+        # Coalesce($this, …) becomes coalesce(${…},'') plus triggers (CDSS only).
         self._extract_this_coalesce_trigger(node)
         return super().generate_export(node, **kwargs)
 
@@ -30,62 +59,70 @@ class XLSFormCDSSStrategy(XLSFormStrategy):
         if isinstance(value, (TriccStatic, TriccReference)):
             return getattr(value, "value", None) == "$this"
         return False
+    def _coalesce_operand_is_this(self, value):
+        """True for ``$this`` markers, including legacy ``\"\"`` from string operands."""
+        if self._is_this_marker(value):
+            return True
+        return isinstance(value, str) and value == ""
 
     def _extract_this_coalesce_trigger(self, node):
-        """When ``node.expression`` is ``Coalesce($this, ...)``, drop the
-        ``$this`` operand, move the referenced field names into the trigger
-        column, and collapse a 2-arg Coalesce to its remaining argument.
+        """When ``node.expression`` contains ``$this`` inside ``coalesce``, drop
+        ``$this``, set ``trigger`` to every remaining field reference (same refs
+        that stay in the calculation), and simplify the expression before XPath.
+
+        Only ``node.expression`` is considered (not ``expression_reference``),
+        so hidden save calculates without ``$this`` are unchanged.
         """
+
+        def _clean_this_in_coalesce(expression):
+            if not isinstance(expression, TriccOperation):
+                return expression
+            if expression.operator != TriccOperator.COALESCE:
+                return expression
+            refs = list(expression.reference)
+            if any(self._coalesce_operand_is_this(r) for r in refs):
+                if len(refs) == 2:
+                    return [r for r in refs if not self._coalesce_operand_is_this(r)][0]
+                expression.reference = [r for r in refs if not self._coalesce_operand_is_this(r)]
+                return expression
+
+            expression.reference = [_clean_this_in_coalesce(ref) for ref in refs]
+            return expression
+
         expression = getattr(node, "expression", None)
-        if not isinstance(expression, TriccOperation):
+        if not isinstance(expression, TriccOperation) or expression.operator != TriccOperator.COALESCE:
             return
-        if expression.operator != TriccOperator.COALESCE:
-            return
-
-        refs = list(expression.reference)
-        if len(refs) < 2 or not self._is_this_marker(refs[0]):
+        if not any(self._coalesce_operand_is_this(r) for r in expression.reference):
             return
 
-        other_refs = refs[1:]
+        node.expression = _clean_this_in_coalesce(expression)
+        cleaned = node.expression
+        if isinstance(cleaned, TriccOperation):
+            trigger_refs = cleaned.get_references()
+        else:
+            trigger_refs = [cleaned]
 
-        # Reuse TriccOperation.get_references(): it walks nested operations,
-        # de-duplicates via OrderedSet, and keeps only TriccNodeBaseModel /
-        # TriccReference operands (so the bare "$this" string is ignored).
-        trigger_refs = TriccOperation(TriccOperator.COALESCE, other_refs).get_references()
         trigger_tokens = []
         for ref in trigger_refs:
-            if self._is_this_marker(ref):
+            if self._coalesce_operand_is_this(ref):
                 continue
             name = ref.value if isinstance(ref, TriccReference) else get_export_name(ref)
             token = f"${{{name}}}"
             if token not in trigger_tokens:
                 trigger_tokens.append(token)
 
-        if trigger_tokens:
-            new_trigger = " ".join(trigger_tokens)
-            existing = getattr(node, "trigger", None)
-            if existing:
-                if isinstance(existing, (TriccOperation, TriccStatic, TriccReference)):
-                    existing_str = self.get_tricc_operation_expression(existing)
-                else:
-                    existing_str = str(existing)
-                merged = f"{existing_str} {new_trigger}".strip()
-                node.trigger = merged
+        if not trigger_tokens:
+            return
+        new_trigger = ", ".join(trigger_tokens)
+        existing = getattr(node, "trigger", None)
+        if existing:
+            if isinstance(existing, (TriccOperation, TriccStatic, TriccReference)):
+                existing_str = self.get_tricc_operation_expression(existing)
             else:
-                node.trigger = new_trigger
-
-        if len(other_refs) == 1:
-            single = other_refs[0]
-            if isinstance(single, TriccOperation):
-                node.expression = single
-            elif isinstance(single, (TriccStatic, TriccReference)):
-                node.expression = single
-            elif issubclass(single.__class__, TriccNodeBaseModel):
-                node.expression = TriccReference(str(get_export_name(single)))
-            else:
-                node.expression = TriccOperation(TriccOperator.COALESCE, other_refs)
+                existing_str = str(existing)
+            node.trigger = _comma_join_survey_trigger_refs(existing_str, new_trigger)
         else:
-            node.expression = TriccOperation(TriccOperator.COALESCE, other_refs)
+            node.trigger = new_trigger
 
     def export_inputs(self, activity, inputs=[], **kwargs):
         for node in activity.nodes.values():
@@ -94,7 +131,7 @@ class XLSFormCDSSStrategy(XLSFormStrategy):
             if isinstance(node, (TriccNodeInput, TriccNodePopulate)):
                 inputs.append(node)
         return inputs
-
+   
     def tricc_operation_has_qualifier(self, ref_expressions):
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 

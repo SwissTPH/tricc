@@ -309,12 +309,33 @@
         "-l",
         "d",
         "-o",
-        "../tests/output/",
+        "./tests/output/",
         "-t",
         "-O",
         "XLSFormCDSSStrategy",
         "-D",
-        "/Users/delcpa/Downloads/"
+        "./output_drive/"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}${pathSeparator}${env:PYTHONPATH}"
+      }
+    },{
+      "name": "CECA",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "tests/build.py",
+      "args": [
+        "-i",
+        "C:\\Users\\perema\\Documents\\XLSForm_visualise\\xlsx_forms\\L2\\ceca_vacc_og.drawio",
+        "-l",
+        "d",
+        "-o",
+        ".\\output_ceca",
+        "-t",
+        "-O",
+        "XLSFormCDSSStrategy"
       ],
       "console": "integratedTerminal",
       "justMyCode": true,

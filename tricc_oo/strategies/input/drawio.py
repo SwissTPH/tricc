@@ -1,7 +1,7 @@
 import logging
 import os
 
-from tricc_oo.converters.xml_to_tricc import create_activity
+from tricc_oo.converters.xml_to_tricc import apply_goto_repeat_to_activity, create_activity
 from tricc_oo.visitors.tricc import (
     load_calculate,
     set_prev_next_node,
@@ -236,6 +236,7 @@ class DrawioStrategy(BaseInputStrategy):
             else:
                 # return existing instance if any
                 next_page = next_page.make_instance(node.instance)
+            apply_goto_repeat_to_activity(node, next_page)
             if next_page.id not in pages:
                 pages[next_page.id] = next_page
             logger.debug(

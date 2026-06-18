@@ -4,7 +4,7 @@ import string
 import hashlib
 from markdownify import markdownify as md
 import warnings
-from bs4 import MarkupResemblesLocatorWarning
+from bs4 import MarkupResemblesLocatorWarning, BeautifulSoup
 
 warnings.filterwarnings("ignore", category=MarkupResemblesLocatorWarning)
 logger = logging.getLogger("default")
@@ -50,16 +50,32 @@ def get_rand_name(name=None, length=8):
 
 # the soup.text strips off the html formatting also
 def remove_html(string):
-
     if " " in string:
         text = md(
             string,
-            strip=["img", "table", "a"],
+            strip=["img", "table", "a", "div", "span", "font"],
             strong_em_symbol="*",
             escape_underscores=False,
             escape_asterisks=False,
             bullets=["-", "*"],
         )
-
+        # Fallback: strip any remaining HTML tags
+        text = BeautifulSoup(text, "html.parser").get_text()
         return text
     return string
+
+
+def remove_html_full(string):
+    """Strip all HTML from a string (used for hint text where draw.io markup must be removed)."""
+    if not string or not isinstance(string, str):
+        return string
+    text = md(
+        string,
+        strip=["img", "table", "a", "div", "span", "font"],
+        strong_em_symbol="*",
+        escape_underscores=False,
+        escape_asterisks=False,
+        bullets=["-", "*"],
+    )
+    text = BeautifulSoup(text, "html.parser").get_text()
+    return text.strip()

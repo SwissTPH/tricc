@@ -560,7 +560,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
         else:
             return f"{ref_expressions[0]}!={BOOLEAN_MAP[str(TRICC_FALSE_VALUE)]}"
 
-    def tricc_operation_notexist(self, ref_expressions, original_references=None):
+    def tricc_operation_notexists(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]}=''"
 
     def tricc_operation_case(self, ref_expressions, original_references=None):
@@ -609,7 +609,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
         return exp
 
     def get_empty_label(self):
-        return "."
+        return "---"
 
     def tricc_operation_if(self, ref_expressions, original_references=None):
         return f"if({ref_expressions[0]},{ref_expressions[1]},{ref_expressions[2]})"
@@ -770,6 +770,9 @@ class XLSFormStrategy(BaseOutPutStrategy):
 
     def tricc_operation_length(self, ref_expressions, original_references=None):
         return f"string-length({ref_expressions[0]})"
+
+    def tricc_operation_count_selected(self, ref_expressions, original_references=None):
+        return f"count-selected({ref_expressions[0]})"
 
     def tricc_operation_today(self, ref_expressions, original_references=None):
         return f"today()"

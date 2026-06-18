@@ -3,7 +3,7 @@ import logging
 import requests
 import base64
 
-
+from tricc_oo.models.base import get_repeat
 from tricc_oo.converters.utils import generate_id
 from tricc_oo.models.base import (
     TriccBaseModel, TriccNodeType, TriccGroup,
@@ -2222,8 +2222,9 @@ def get_applicability_expression(node, processed_nodes, process, expression=None
 def get_prev_instance_skip_expression(node, processed_nodes, process, expression=None):
     if node.base_instance is not None:
         expression_inputs = []
+        node_repeat = get_repeat(node)
         past_instances = [n for n in processed_nodes if getattr(n.base_instance, "id", None) == node.base_instance.id and node != n]
-        for past_instance in past_instances:
+        for past_instance in [n for n in past_instances if get_repeat(n) == node_repeat]:
             add_sub_expression(
                 expression_inputs,
                 get_node_expression(
@@ -3039,14 +3040,14 @@ def generate_base(node, processed_nodes, **kwargs):
                             [
                                 TriccOperation(
                                     TriccOperator.EQUAL,
-                                    ["$this", none_opt],
+                                    [TriccStatic("$this"), none_opt],
                                 ),
                                 TriccOperation(
                                     TriccOperator.NOT,
                                     [
                                         TriccOperation(
                                             TriccOperator.SELECTED,
-                                            ["$this", none_opt],
+                                            [TriccStatic("$this"), none_opt],
                                         )
                                     ],
                                 ),
@@ -3065,7 +3066,7 @@ def generate_base(node, processed_nodes, **kwargs):
                         if int(node.min) == node.min:
                             node.min = int(node.min)
                         constraints.append(
-                            TriccOperation(TriccOperator.MORE_OR_EQUAL, ["$this", TriccStatic(node.min)])
+                            TriccOperation(TriccOperator.MORE_OR_EQUAL, [TriccStatic("$this"), TriccStatic(node.min)])
                         )
                         constraints_min = "The minimum value is {0}.".format(node.min)
                     if node.max is not None and node.max != "":
@@ -3073,7 +3074,7 @@ def generate_base(node, processed_nodes, **kwargs):
                         if int(node.max) == node.max:
                             node.max = int(node.max)
                         constraints.append(
-                            TriccOperation(TriccOperator.LESS_OR_EQUAL, ["$this", TriccStatic(node.max)])
+                            TriccOperation(TriccOperator.LESS_OR_EQUAL, [TriccStatic("$this"), TriccStatic(node.max)])
                         )
                         constraints_max = "The maximum value is {0}.".format(node.max)
                     if len(constraints) > 1:

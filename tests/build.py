@@ -115,6 +115,15 @@ def is_google_drive_url(url):
     return url.startswith("https://drive.usercontent.google.com/download?id=") or url.startswith("https://drive.google.com/file/d/")
 
 
+def is_google_drive_folder_url(url):
+    """Check if the given string is a Google Drive folder URL."""
+    return (
+        "https://drive.google.com/drive/folders/" in url
+        or "https://drive.google.com/drive/u/" in url and "/folders/" in url
+        or "https://drive.google.com/open?id=" in url
+    )
+
+
 def extract_google_drive_file_id(url):
     """Extract file ID from Google Drive URL."""
     # Pattern: https://drive.google.com/file/d/{file_id}/view?usp=drive_link
@@ -128,6 +137,140 @@ def extract_google_drive_file_id(url):
     return None
 
 
+def extract_google_drive_folder_id(url):
+    """Extract folder ID from Google Drive folder URL."""
+    match = re.search(r'https://drive.google.com/drive/folders/([a-zA-Z0-9_-]+)', url)
+    if match:
+        return match.group(1)
+
+    match = re.search(r'https://drive.google.com/drive/u/\d+/folders/([a-zA-Z0-9_-]+)', url)
+    if match:
+        return match.group(1)
+
+    parsed_url = urlparse(url)
+    if parsed_url.netloc == "drive.google.com":
+        query_params = parse_qs(parsed_url.query)
+        folder_ids = query_params.get("id", [])
+        if folder_ids:
+            return folder_ids[0]
+
+    return None
+
+
+def get_drive_service():
+    """Return an authenticated Google Drive service client when available."""
+    if not GOOGLE_AUTH_AVAILABLE:
+        return None
+
+    auth_path = os.path.join(os.path.dirname(__file__), '..', 'auth', 'google.json')
+    auth_path = os.path.abspath(auth_path)
+    if not os.path.exists(auth_path):
+        return None
+
+    credentials = service_account.Credentials.from_service_account_file(
+        auth_path,
+        scopes=['https://www.googleapis.com/auth/drive.readonly']
+    )
+    return build('drive', 'v3', credentials=credentials)
+
+
+def list_google_drive_folder_files(folder_id, drawio_only=True):
+    """List files in a Google Drive folder."""
+    try:
+        service = get_drive_service()
+        if service is None:
+            logger.error(
+                "Google Drive folder listing requires service account auth "
+                "(missing Google libs or auth/google.json)."
+            )
+            return []
+
+        files = []
+        page_token = None
+        while True:
+            response = service.files().list(
+                q=f"'{folder_id}' in parents and trashed=false",
+                fields=(
+                    "nextPageToken, "
+                    "files(id, name, mimeType, shortcutDetails/targetId, shortcutDetails/targetMimeType)"
+                ),
+                pageSize=1000,
+                pageToken=page_token,
+                includeItemsFromAllDrives=True,
+                supportsAllDrives=True,
+            ).execute()
+            files.extend(response.get("files", []))
+            page_token = response.get("nextPageToken", None)
+            if page_token is None:
+                break
+
+        expanded_files = []
+        for file_item in files:
+            mime_type = file_item.get("mimeType")
+            if mime_type == "application/vnd.google-apps.folder":
+                continue
+
+            if mime_type == "application/vnd.google-apps.shortcut":
+                target_id = file_item.get("shortcutDetails", {}).get("targetId")
+                if target_id:
+                    try:
+                        target_meta = service.files().get(
+                            fileId=target_id,
+                            fields="id,name,mimeType",
+                            supportsAllDrives=True,
+                        ).execute()
+                        expanded_files.append(target_meta)
+                    except Exception as exc:
+                        logger.warning(
+                            f"Could not resolve shortcut target for {file_item.get('name', 'unknown')}: {exc}"
+                        )
+                continue
+
+            expanded_files.append(file_item)
+
+        non_folders = expanded_files
+        if not drawio_only:
+            return non_folders
+        return [f for f in non_folders if f.get("name", "").lower().endswith(".drawio")]
+    except Exception as exc:
+        logger.error(f"Error listing Google Drive folder files: {exc}")
+        return []
+
+
+def list_google_drive_sibling_files(file_id):
+    """List files from the first parent folder of a Google Drive file."""
+    try:
+        service = get_drive_service()
+        if service is None:
+            return []
+
+        metadata = service.files().get(
+            fileId=file_id,
+            fields="id,name,parents,mimeType,shortcutDetails/targetId",
+            supportsAllDrives=True,
+        ).execute()
+        effective_file_id = file_id
+        if metadata.get("mimeType") == "application/vnd.google-apps.shortcut":
+            effective_file_id = metadata.get("shortcutDetails", {}).get("targetId", file_id)
+            metadata = service.files().get(
+                fileId=effective_file_id,
+                fields="id,name,parents,mimeType",
+                supportsAllDrives=True,
+            ).execute()
+
+        parents = metadata.get("parents", [])
+        if not parents:
+            logger.warning(f"No parent folder found for file {effective_file_id}")
+            return []
+
+        sibling_files = list_google_drive_folder_files(parents[0], drawio_only=True)
+        logger.info(f"Parent folder has {len(sibling_files)} .drawio file(s) visible to the service account.")
+        return sibling_files or []
+    except Exception as exc:
+        logger.warning(f"Could not list sibling files for {file_id}: {exc}")
+        return []
+
+
 def download_google_drive_file(file_id, temp_dir, original_url=None):
     """Download a file from Google Drive using authenticated access and return the local path.
 
@@ -139,27 +282,26 @@ def download_google_drive_file(file_id, temp_dir, original_url=None):
 
     # Try authenticated download first
     if GOOGLE_AUTH_AVAILABLE:
-        auth_path = os.path.join(os.path.dirname(__file__), '..', '.secrets', 'google.json')
-        auth_path = os.path.abspath(auth_path)
-
-        if os.path.exists(auth_path):
+        try:
             try:
-                logger.info(f"Attempting authenticated download using service account: {auth_path}")
-                credentials = service_account.Credentials.from_service_account_file(
-                    auth_path, scopes=['https://www.googleapis.com/auth/drive.readonly']
-                )
-
-                service = build('drive', 'v3', credentials=credentials)
+                service = get_drive_service()
+                if service is None:
+                    raise RuntimeError("No service account auth available")
+                logger.info("Attempting authenticated download using service account")
 
                 # Get file metadata to determine filename
-                file_metadata = service.files().get(fileId=file_id, fields='name,mimeType').execute()
+                file_metadata = service.files().get(
+                    fileId=file_id,
+                    fields='name,mimeType',
+                    supportsAllDrives=True
+                ).execute()
                 filename = file_metadata.get('name', f"{file_id}")
 
                 # Create temp file path
                 local_path = os.path.join(temp_dir, f"drive_{file_id}_{filename}")
 
                 # Download the file
-                request = service.files().get_media(fileId=file_id)
+                request = service.files().get_media(fileId=file_id, supportsAllDrives=True)
                 with open(local_path, 'wb') as f:
                     downloader = MediaIoBaseDownload(f, request)
                     done = False
@@ -172,6 +314,8 @@ def download_google_drive_file(file_id, temp_dir, original_url=None):
 
             except Exception as auth_error:
                 logger.warning(f"Authenticated download failed: {auth_error}. Falling back to direct download.")
+        except Exception:
+            pass
 
     # Fallback to direct download (for public files)
     try:
@@ -225,7 +369,8 @@ if __name__ == "__main__":
     trad = False
     download_dir = None
     input_strategy = "DrawioStrategy"
-    output_strategy = "XLSFormStrategy"
+    ##output_strategy = "XLSFormCHTStrategy"
+    output_strategy = "XLSFormCDSSStrategy"
     try:
         opts, args = getopt.getopt(sys.argv[1:], "hti:o:s:I:O:l:d:D:", ["input=", "output=", "help", "trads"])
     except getopt.GetoptError:
@@ -281,22 +426,69 @@ if __name__ == "__main__":
     for current_input in in_filepath_list:
         current_input = current_input.strip()
 
-        if is_google_drive_url(current_input):
+        if is_google_drive_folder_url(current_input):
+            logger.info(f"Detected Google Drive folder URL: {current_input}")
+            folder_id = extract_google_drive_folder_id(current_input)
+            if not folder_id:
+                logger.error(f"Could not extract folder ID from Google Drive URL: {current_input}")
+                sys.exit(1)
+
+            folder_files = list_google_drive_folder_files(folder_id, drawio_only=True)
+            if not folder_files:
+                logger.error(f"No .drawio files found (or folder inaccessible): {current_input}")
+                sys.exit(1)
+            logger.info(f"Found {len(folder_files)} .drawio file(s) in folder.")
+
+            for drive_file in folder_files:
+                file_id = drive_file.get("id")
+                file_name = drive_file.get("name", file_id)
+                if not file_id:
+                    continue
+                local_path = download_google_drive_file(file_id, tempfile.gettempdir(), current_input)
+                if local_path:
+                    downloaded_files.append(local_path)
+                    files.append(local_path)
+                    logger.info(f"Downloaded from folder: {file_name}")
+                else:
+                    logger.warning(f"Failed to download file from folder: {file_name} ({file_id})")
+
+        elif is_google_drive_url(current_input):
             # Handle Google Drive URL
             logger.info(f"Detected Google Drive URL: {current_input}")
             file_id = extract_google_drive_file_id(current_input)
             if file_id:
                 logger.info(f"Extracted file ID: {file_id}")
-                # Use temp directory for Google Drive downloads
-                temp_dir = tempfile.gettempdir()
-                local_path = download_google_drive_file(file_id, temp_dir, current_input)
-                if local_path:
-                    downloaded_files.append(local_path)
-                    files.append(local_path)
-                    logger.info(f"Successfully processed Google Drive file: {local_path}")
+                sibling_files = list_google_drive_sibling_files(file_id)
+                if sibling_files:
+                    logger.info(f"Found {len(sibling_files)} .drawio file(s) in parent folder; downloading all.")
+                    downloaded_count = 0
+                    for drive_file in sibling_files:
+                        sibling_id = drive_file.get("id")
+                        sibling_name = drive_file.get("name", sibling_id)
+                        if not sibling_id:
+                            continue
+                        local_path = download_google_drive_file(sibling_id, tempfile.gettempdir(), current_input)
+                        if local_path:
+                            downloaded_files.append(local_path)
+                            files.append(local_path)
+                            downloaded_count += 1
+                            logger.info(f"Downloaded sibling file: {sibling_name}")
+                        else:
+                            logger.warning(f"Failed to download sibling file: {sibling_name} ({sibling_id})")
+                    if downloaded_count == 0:
+                        logger.error("Could not download any files from the parent folder.")
+                        sys.exit(1)
                 else:
-                    logger.error(f"Failed to download Google Drive file: {current_input}")
-                    sys.exit(1)  # Exit on download failure as requested
+                    # Fallback to single file download (public files or no folder metadata access)
+                    temp_dir = tempfile.gettempdir()
+                    local_path = download_google_drive_file(file_id, temp_dir, current_input)
+                    if local_path:
+                        downloaded_files.append(local_path)
+                        files.append(local_path)
+                        logger.info(f"Successfully processed Google Drive file: {local_path}")
+                    else:
+                        logger.error(f"Failed to download Google Drive file: {current_input}")
+                        sys.exit(1)  # Exit on download failure as requested
             else:
                 logger.error(f"Could not extract file ID from Google Drive URL: {current_input}")
                 sys.exit(1)

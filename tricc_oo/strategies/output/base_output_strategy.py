@@ -39,6 +39,7 @@ class BaseOutPutStrategy(abc.ABC):
         self.process_calculate(self.project.start_pages, pages=self.project.pages)
         logger.info("generate the export format")
         # create calculate Expression
+        
         self.process_export(self.project.start_pages, pages=self.project.pages)
 
         logger.info("print the export")

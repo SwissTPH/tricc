@@ -263,7 +263,7 @@ TYPE_MAP = {
     },
     TriccNodeType.goto: {
         "objects": ["UserObject", "object"],
-        "attributes": ["instance", "priority"],
+        "attributes": ["instance", "priority", "repeat"],
         "mandatory_attributes": ["link", "label", "name"],
         "model": TriccNodeGoTo,
     },

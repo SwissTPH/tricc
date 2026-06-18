@@ -5,7 +5,7 @@ import os
 import re
 
 
-from tricc_oo.converters.utils import remove_html, clean_str
+from tricc_oo.converters.utils import remove_html, remove_html_full, clean_str
 from tricc_oo.converters.cql_to_operation import transform_cql_to_operation
 from tricc_oo.converters.utils import generate_id
 from tricc_oo.models.base import (
@@ -160,6 +160,27 @@ def propagate_activity_repeat(activity):
                 f"Activity repeat={activity_repeat} overrides node repeat={node_repeat} on {node.get_name()}"
             )
         node.repeat = activity_repeat
+
+
+def apply_goto_repeat_to_activity(goto, activity):
+    """Apply goto repeat to a cloned activity instance (overrides activity_start repeat for this invocation)."""
+    goto_repeat = getattr(goto, "repeat", None)
+    if goto_repeat is None:
+        return
+    try:
+        goto_repeat = int(goto_repeat)
+    except (TypeError, ValueError):
+        logger.warning(f"Invalid repeat on goto {goto.get_name()}: {goto_repeat}")
+        return
+    if goto_repeat < 0:
+        logger.warning(f"Invalid repeat on goto {goto.get_name()}: {goto_repeat}")
+        return
+
+    activity.repeat = goto_repeat
+    root = activity.root
+    if isinstance(root, TriccNodeActivityStart):
+        root.repeat = goto_repeat
+    propagate_activity_repeat(activity)
 
 
 def get_activity_details(diagram, activity, project, media_path):
@@ -1065,7 +1086,10 @@ def get_message(diagram, id):
         if type is not None:
             if type.endswith("-message"):
                 type = type[:-8]
-            return type, elm.attrib.get("label")
+            label = elm.attrib.get("label")
+            if label and type == "hint":
+                label = remove_html_full(label)
+            return type, label
         # use only the first one
     return None, None
 

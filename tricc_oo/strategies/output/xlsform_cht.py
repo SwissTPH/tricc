@@ -20,6 +20,7 @@ from tricc_oo.serializers.xls_form import (
 )
 from tricc_oo.strategies.output.xlsform_cdss import XLSFormCDSSStrategy
 from tricc_oo.strategies.registry import register_output_strategy
+from tricc_oo.strategies.output.xls_form import XLSFormStrategy
 from tricc_oo.converters.tricc_to_xls_form import get_export_name
 from tricc_oo.converters.utils import clean_name, remove_html
 from tricc_oo.visitors.xform_pd import make_breakpoints, get_task_js
@@ -30,6 +31,10 @@ logger = logging.getLogger("default")
 
 @register_output_strategy("XLSFormCHTStrategy")
 class XLSFormCHTStrategy(XLSFormCDSSStrategy):
+    def generate_export(self, node, **kwargs):
+        # CDSS-only coalesce/$this handling must not run for CHT exports.
+        return XLSFormStrategy.generate_export(self, node, **kwargs)
+
     def process_export(self, start_pages, **kwargs):
         self.activity_export(start_pages[self.processes[0]], **kwargs)
         # self.add_tab_breaks_choice()
@@ -520,11 +525,11 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
                 "",
                 "",
             ]
-        if not len(df_input[df_input["name"] == "date_of_birth"]):
+        if not len(df_input[df_input["name"] == "name"]):
             df_input.loc[len(df_input)] = [
                 "hidden",
-                "date_of_birth",
-                *list(langs.get_trads("Date of birth", force_dict=True).values()),
+                "name",
+                *list(langs.get_trads("Name", force_dict=True).values()),
                 *list(empty.values()),
                 *list(empty.values()),
                 "",
@@ -542,8 +547,31 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
                 "",
                 "",
             ]
+        ## TODO We removed date_of_birth from header to not overwrite from drawing @pdx let us know if this is required
+        #f not len(df_input[df_input["name"] == "date_of_birth"]):
+        #   df_input.loc[len(df_input)] = [
+        #       "hidden",
+        #       "date_of_birth",
+        #       *list(langs.get_trads("Date of birth", force_dict=True).values()),
+        #       *list(empty.values()),
+        #       *list(empty.values()),
+        #       "",
+        #       "hidden",
+        #       "",
+        #       *list(empty.values()),
+        #       "",
+        #       "",
+        #       "",
+        #       *list(empty.values()),
+        #       "",
+        #       "",
+        #       "",
+        #       "",
+        #       "",
+        #       "",
+        #   ]
 
-            return df_input
+        return df_input
 
     def get_contact_inputs_calculate(self, df_input):
         empty = langs.get_trads("", force_dict=True)
@@ -570,8 +598,8 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
         ]
         df_input.loc[len(df_input)] = [
             "calculate",
-            "patient_dob",
-            *list(langs.get_trads("Date of birth", force_dict=True).values()),
+            "patient_name",
+            *list(langs.get_trads("Name", force_dict=True).values()),
             *list(empty.values()),
             *list(empty.values()),
             "",
@@ -583,12 +611,36 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             "",
             *list(empty.values()),
             "",
-            "date(../inputs/contact/date_of_birth)",
+            "../inputs/contact/patient_name",
             "",
             "",
             "",
             "",
         ]
+        
+                ## TODO We removed patient_dob from header because it refers to the removed dob @pdx let us know if this is required
+
+        #df_input.loc[len(df_input)] = [
+        #    "calculate",
+        #    "patient_dob",
+        #    *list(langs.get_trads("Date of birth", force_dict=True).values()),
+        #    *list(empty.values()),
+        #    *list(empty.values()),
+        #    "",
+        #    "hidden",
+        #    "",
+        #    *list(empty.values()),
+        #    "",
+        #    "",
+        #    "",
+        #    *list(empty.values()),
+        #    "",
+        #    "coalesce(date(../inputs/contact/date_of_birth),today())",
+        #    "",
+        #    "",
+        #    "",
+        #    "",
+        #]
 
         return df_input
 

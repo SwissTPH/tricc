@@ -8,7 +8,7 @@ from tricc_oo.converters.tricc_to_xls_form import (
 
 
 from tricc_oo.models.lang import SingletonLangClass
-from tricc_oo.converters.utils import clean_name, remove_html, generate_id
+from tricc_oo.converters.utils import clean_name, remove_html, remove_html_full, generate_id
 from tricc_oo.models.base import (
     TriccOperator,
     TriccOperation, TriccStatic, TriccReference, and_join, TriccNodeType
@@ -50,13 +50,21 @@ def extract_help_title(help_message):
     Extract title from help message if it starts with [title].
     Returns (title, stripped_help_message) or (None, help_message)
     """
-    if help_message and isinstance(help_message, str) and help_message.startswith('['):
-        end = help_message.find(']')
+    if help_message and isinstance(help_message, str) and remove_html_full(help_message).startswith('**[') or remove_html_full(help_message).startswith('['):
+        if remove_html_full(help_message).startswith('**['):
+            end = remove_html_full(help_message).find(']**')
+            bold = True
+        else:
+            bold = False
+            end = remove_html_full(help_message).find(']')
         if end != -1:
-            title = help_message[1:end]
-            stripped_help = help_message[end+1:].strip()
-            return title, stripped_help
-    return None, help_message
+            if bold: 
+                title = remove_html_full(help_message)[3:end]
+            else:
+                title = remove_html_full(help_message)[1:end]
+            stripped_help = remove_html_full(help_message)[end+1:].strip()
+            return title, remove_html(stripped_help)
+    return None, remove_html(help_message)
 
 
 def get_export_group_name(in_node): return f"gcalc_{get_export_name(in_node)}"
@@ -328,9 +336,15 @@ def get_xfrom_trad(strategy, node, column, mapping, clean_html=False):
         value = f"number({value})" if str(value) not in ["0", "1"] else value
     if clean_html and isinstance(value, str):
         value = remove_html(value)
-    if column in TRAD_MAP:
-        if value == NO_LABEL:
-            value = strategy.get_empty_label()
+    if new_column == "hint":
+        if isinstance(value, str):
+            value = remove_html_full(value)
+        elif isinstance(value, dict):
+            value = {
+                key: remove_html_full(entry) if isinstance(entry, str) else entry
+                for key, entry in value.items()
+            }
+    if new_column in TRAD_MAP:
         value = langs.get_trads(value, trad=trad)
     elif column == "appearance":
         if (
@@ -438,6 +452,10 @@ def get_attr_if_exists(strategy, node, column, map_array):
             elif isinstance(value, (TriccOperation, TriccStatic, TriccReference)):
                 expression = strategy.get_tricc_operation_expression(value)
                 return expression
+            elif isinstance(value, TriccNodeBaseModel):
+                # Bare field references (e.g. after coalesce simplification) must become
+                # XPath, not get_name() debug strings (breaks pyxform setvalue value=).
+                return strategy.get_tricc_operation_operand(value)
             elif value is not None:
                 return str(value) if not isinstance(value, dict) else value
             else:
@@ -449,16 +467,18 @@ def get_attr_if_exists(strategy, node, column, map_array):
             return ""
     elif hasattr(node, column) and getattr(node, column) is not None:
         value = getattr(node, column)
+        if isinstance(value, TriccNodeBaseModel):
+            return strategy.get_tricc_operation_operand(value)
         return str(value) if not isinstance(value, dict) else value
     else:
         return ""
 
 
-def get_more_info_select(strategy, base_name, relevance):
+def get_more_info_select(strategy, base_name, relevance, counter):
     values = []
     for column in SURVEY_MAP:
         if column == "type":
-            values.append("select_one more_info")
+            values.append("select_one more_info"+"_"+str(counter))
         elif column == "label":
             values.append(strategy.get_empty_label())
         elif column == "name":
@@ -489,13 +509,13 @@ def get_more_info_message(strategy, base_name, message):
     return values
 
 
-def get_more_info_choice(strategy, title=None):
+def get_more_info_choice(strategy, counter,title=None):
     if title is None:
         title = "More information"
     values = []
     for column in CHOICE_MAP:
         if column == "list_name":
-            values.append("more_info")
+            values.append("more_info"+"_"+str(counter))
         elif column == "value":
             values.append("1")
         elif column.startswith("label"):
@@ -510,10 +530,12 @@ def get_more_info_choice(strategy, title=None):
 
 def inject_more_info(strategy, base_name, relevance, message, df_survey, df_choice):
     title, stripped_message = extract_help_title(message)
-    df_survey.loc[len(df_survey)] = get_more_info_select(strategy, base_name, relevance)
+    counter = len(df_choice[(df_choice["list_name"].str.startswith("more_info"))])
+    df_survey.loc[len(df_survey)] = get_more_info_select(strategy, base_name, relevance, counter)
     df_survey.loc[len(df_survey)] = get_more_info_message(strategy, base_name, stripped_message)
-    if len(df_choice[(df_choice["list_name"] == "more_info")]) == 0:
-        df_choice.loc[len(df_choice)] = get_more_info_choice(strategy, title)
+    #I think this was here because previously we had only one general message for this type of questions right? like "more info"
+    ##if len(df_choice[(df_choice["list_name"] == "more_info")]) == 0:
+    df_choice.loc[len(df_choice)] = get_more_info_choice(strategy,counter, title)
 
 
 def generate_xls_form_export(
@@ -618,7 +640,7 @@ def generate_xls_form_export(
                     strategy,
                     base_name,
                     get_xfrom_trad(strategy, node, "relevance", SURVEY_MAP),
-                    node.help,
+                node.help,
                     df_survey,
                     df_choice
                 )
