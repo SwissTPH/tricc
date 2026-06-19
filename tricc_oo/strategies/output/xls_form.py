@@ -784,13 +784,13 @@ class XLSFormStrategy(BaseOutPutStrategy):
         return f"abs({ref_expressions[0]})"
 
     def tricc_operation_min(self, ref_expressions, original_references=None):
-        return f"min({ref_expressions[0]})"
+        return f"min({', '.join(map(str, ref_expressions))})"
 
     def tricc_operation_max(self, ref_expressions, original_references=None):
-        return f"max({ref_expressions[0]})"
+        return f"max({', '.join(map(str, ref_expressions))})"
 
     def tricc_operation_sum(self, ref_expressions, original_references=None):
-        return f"sum({ref_expressions[0]})"
+        return f"sum({', '.join(map(str, ref_expressions))})"
 
     def tricc_operation_concatenate(self, ref_expressions, original_references=None):
         return f"concat({','.join(map(str, ref_expressions))})"
