@@ -54,6 +54,12 @@ TYPE_MAP = {
         "mandatory_attributes": ["label", "name"],
         "model": TriccNodeNote,
     },
+    TriccNodeType.trigger: {
+        "objects": ["UserObject", "object"],
+        "attributes": ["relevance", "priority", "concept_type"],
+        "mandatory_attributes": ["label", "name"],
+        "model": TriccNodeNote,
+    },
     TriccNodeType.hint: {
         "objects": ["UserObject", "object"],
         "attributes": [],
