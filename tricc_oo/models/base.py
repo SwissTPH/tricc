@@ -495,6 +495,7 @@ class TriccOperation(BaseModel):
             ],
         ]
     ] = []
+    origin: Optional["TriccOperation"] = None
 
     def __str__(self):
         str_ref = map(str, self.reference)
@@ -510,8 +511,17 @@ class TriccOperation(BaseModel):
     def __eq__(self, other):
         return self.__str__() == str(other)
 
-    def __init__(self, operator, reference=[]):
-        super().__init__(operator=operator, reference=reference)
+    def __init__(self, operator, reference=None, **kwargs):
+        if reference is None:
+            reference = []
+        # _bypass_origin prevents auto update_origin during internal cleaned construction
+        bypass = kwargs.pop("_bypass_origin", False)
+        provided_origin = kwargs.pop("origin", None)
+        super().__init__(operator=operator, reference=reference, **kwargs)
+        if provided_origin is not None:
+            self.origin = provided_origin
+        elif not bypass:
+            self.update_origin()
 
     def get_datatype(self):
         if self.operator in RETURNS_BOOLEAN:
@@ -622,6 +632,32 @@ class TriccOperation(BaseModel):
 
     def copy(self, keep_node=False):
         return self.__copy__(keep_node)
+
+    def update_origin(self):
+        """Populate (or refresh) self.origin with the cleaned, reference-only version
+        (no TriccNode* instances). Node references are replaced by TriccReference(name)
+        via copy(keep_node=False). Call explicitly after mutating .reference.
+
+        The origin (and its nested operations) is used as a stable signature key
+        (typically via repr()) for calculate inheritance grouping.
+        """
+        # Build cleaned list directly (avoid public .copy() to prevent recursion
+        # through __copy__ -> type(self)(...) -> __init__ -> update_origin).
+        reference = [
+            (
+                e.copy()
+                if isinstance(e, (TriccReference, TriccOperation))
+                else (TriccReference(e.name) if hasattr(e, "name") else e)
+            )
+            for e in (self.reference or [])
+        ]
+        # Construct the cleaned op with bypass so it does not immediately re-enter update
+        new_instance = type(self)(self.operator, reference, _bypass_origin=True)
+        # For the cleaned origin itself, its .origin can safely be itself (or None).
+        # Setting it makes recursive .origin walks terminate and reprs stable.
+        new_instance.origin = new_instance
+        self.origin = new_instance
+        return self.origin
 
 
 # function that make multipat  and

@@ -14,7 +14,7 @@
       "program": "tests/build.py",
       "args": [
         "-i",
-        "https://drive.usercontent.google.com/download?id=1BRXudvhlhFM_gcHErCBxGUReOqYWcvKM",
+        "https://drive.google.com/file/d/1BRXudvhlhFM_gcHErCBxGUReOqYWcvKM/view",
         "-l",
         "d",
         "-o",
@@ -23,7 +23,7 @@
         "-O",
         "OpenMRSStrategy",
         "-D",
-        "/Users/delcpa/Downloads/"
+         "../tests/output/"
       ],
       "console": "integratedTerminal",
       "justMyCode": true,
@@ -121,12 +121,12 @@
         "-l",
         "d",
         "-o",
-        "/mnt/data/Development/tricc-mage/output",
+         "../tests/output/",
         "-t",
         "-O",
         "XLSFormCDSSStrategy",
         "-D",
-        "/mnt/data/Development/tricc-mage/output"
+         "../tests/output/"
       ],
       "console": "integratedTerminal",
       "justMyCode": true,
@@ -145,12 +145,12 @@
         "-l",
         "d",
         "-o",
-        "/mnt/data/Development/tricc-mage/output",
+         "../tests/output/",
         "-t",
         "-O",
         "XLSFormCHTStrategy",
         "-D",
-        "/mnt/data/Development/tricc-mage/output"
+         "../tests/output/"
       ],
       "console": "integratedTerminal",
       "justMyCode": true,
@@ -174,7 +174,7 @@
         "-O",
         "XLSFormCHTStrategy",
         "-D",
-        "/Users/delcpa/Downloads/"
+         "../tests/output/"
       ],
       "console": "integratedTerminal",
       "justMyCode": true,
@@ -199,7 +199,7 @@
         "-O",
         "OpenMRSStrategy",
         "-D",
-        "/Users/delcpa/Downloads/"
+         "../tests/output/"
       ],
       "console": "integratedTerminal",
       "justMyCode": true,
@@ -222,7 +222,7 @@
         "-O",
         "DHIS2Strategy",
         "-D",
-        "/Users/delcpa/Downloads/"
+         "../tests/output/"
       ],
       "console": "integratedTerminal",
       "justMyCode": true,
@@ -245,7 +245,7 @@
         "-O",
         "FHIRStrategy",
         "-D",
-        "/Users/delcpa/Downloads/"
+         "../tests/output/"
       ],
       "console": "integratedTerminal",
       "justMyCode": true,
@@ -268,7 +268,7 @@
         "-O",
         "FHIRStrategy",
         "-D",
-        "/Users/delcpa/Downloads/"
+         "../tests/output/"
       ],
       "console": "integratedTerminal",
       "justMyCode": true,

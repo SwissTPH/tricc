@@ -237,6 +237,29 @@ def list_google_drive_folder_files(folder_id, drawio_only=True):
         return []
 
 
+def list_local_sibling_files(filepath, valid_exts=(".drawio",)):
+    """List input files from the parent directory of a local file."""
+    parent_dir = os.path.dirname(os.path.abspath(filepath))
+    if not parent_dir or not os.path.isdir(parent_dir):
+        return []
+
+    sibling_files = []
+    for filename in os.listdir(parent_dir):
+        if filename.lower().endswith(valid_exts):
+            sibling_files.append(os.path.join(parent_dir, filename))
+    return sorted(sibling_files)
+
+
+def add_unique_files(files, new_paths):
+    """Append file paths that are not already in files (by resolved absolute path)."""
+    seen = {os.path.abspath(f) for f in files}
+    for path in new_paths:
+        abs_path = os.path.abspath(path)
+        if abs_path not in seen:
+            files.append(path)
+            seen.add(abs_path)
+
+
 def list_google_drive_sibling_files(file_id):
     """List files from the first parent folder of a Google Drive file."""
     try:
@@ -369,7 +392,7 @@ if __name__ == "__main__":
     trad = False
     download_dir = None
     input_strategy = "DrawioStrategy"
-    ##output_strategy = "XLSFormCHTStrategy"
+    #output_strategy = "XLSFormCHTStrategy"
     output_strategy = "XLSFormCDSSStrategy"
     try:
         opts, args = getopt.getopt(sys.argv[1:], "hti:o:s:I:O:l:d:D:", ["input=", "output=", "help", "trads"])
@@ -418,6 +441,13 @@ if __name__ == "__main__":
     else:
         setup_logger("default", debug_file_path, logging.INFO)
     file_content = []
+    #TODO: add project config to consider the options threshold for the multiple choice questions 
+    project_config={
+        "title": "My project",
+        "description": "",
+        "lang_code": "en",
+        "options_threshold": 30,
+    }
     files = []
     downloaded_files = []  # Track downloaded files for cleanup
 
@@ -501,7 +531,14 @@ if __name__ == "__main__":
                     if f.lower().endswith(valid_exts):
                         files.append(os.path.join(current_input, f))
             elif os.path.isfile(current_input) and current_input.lower().endswith(valid_exts):
-                files.append(current_input)
+                sibling_files = list_local_sibling_files(current_input, valid_exts=valid_exts)
+                if len(sibling_files) > 1:
+                    logger.info(
+                        f"Found {len(sibling_files)} file(s) in parent folder; loading all."
+                    )
+                    add_unique_files(files, sibling_files)
+                else:
+                    add_unique_files(files, [current_input])
             else:
                 logger.warning(f"Skipping invalid input (unknown extension): {current_input}")
 

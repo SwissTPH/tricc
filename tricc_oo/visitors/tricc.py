@@ -2,6 +2,7 @@ import re
 import logging
 import requests
 import base64
+from collections import defaultdict
 
 from tricc_oo.models.base import get_repeat
 from tricc_oo.converters.utils import generate_id
@@ -104,6 +105,55 @@ def version_filter(name, repeat=None):
     return _matches
 
 
+def _get_defining_expression_op(expr):
+    """Peel off inheritance/merge wrappers (COALESCE, GET_INHERITED_VALUE) to reach
+    the original local/definition expression op for a calculate node.
+    This ensures versions that share the same *formula* (before any inheritance merge)
+    get the same origin signature even after wrappers have been applied.
+    """
+    if not isinstance(expr, TriccOperation):
+        return expr
+    wrappers = {TriccOperator.COALESCE, TriccOperator.GET_INHERITED_VALUE}
+    current = expr
+    guard = 0
+    while (
+        isinstance(current, TriccOperation)
+        and current.operator in wrappers
+        and current.reference
+        and guard < 8
+    ):
+        guard += 1
+        first = current.reference[0] if isinstance(current.reference, (list, tuple)) else None
+        if isinstance(first, TriccOperation):
+            current = first
+        else:
+            break
+    return current
+
+
+def group_prev_versions_by_origin_signature(prev_versions):
+    """Group previous versions (same name + repeat) by the origin signature
+    (cleaned reference-only repr) of their *defining* expression.
+
+    Elements in each list bucket will later contribute via
+    TriccOperation(GET_INHERITED_VALUE, bucket_list).
+
+    The resulting per-bucket GET ops are then fed to the existing
+    datatype-aware merge_expressions so that "values of the dict" still
+    follow the old boolean/number/etc merge rules.
+    """
+    groups = defaultdict(list)
+    for pv in (prev_versions or []):
+        expr = getattr(pv, "expression", None) or getattr(pv, "expression_reference", None)
+        base = _get_defining_expression_op(expr) if expr is not None else None
+        if isinstance(base, TriccOperation):
+            sig = repr(getattr(base, "origin", base))
+        else:
+            sig = "__raw__:" + str(getattr(pv, "name", getattr(pv, "id", id(pv))))
+        groups[sig].append(pv)
+    return dict(groups)
+
+
 def get_last_version(name, processed_nodes, _list=None, repeat=None):
     max_version = None
     if isinstance(_list, dict):
@@ -198,13 +248,30 @@ def get_version_inheritance(node, all_prev_versions, processed_nodes):
                     set_prev_next_node(pv, node)
             else:
                 expression = node.expression or node.expression_reference or getattr(node, "relevance", None)
-                # Merge with ALL previous versions, not just the last one
-                if all_prev_versions and expression:
-                    expression = merge_expressions(expression, *all_prev_versions)
-                elif len(all_prev_versions) == 1:
-                    expression = all_prev_versions[0]
-                elif all_prev_versions:
-                    expression = merge_expressions(*all_prev_versions)
+                # NEW calculate inheritance approach:
+                # Group prev versions (same repeat) by the origin signature of their defining expression.
+                # Contribute each group via GET_INHERITED_VALUE( list_of_same_sig_nodes ).
+                # Then feed those group values into the *existing* datatype merge logic.
+                if all_prev_versions and isinstance(expression, TriccOperation):
+                    groups = group_prev_versions_by_origin_signature(all_prev_versions)
+                    contribs = [
+                        TriccOperation(TriccOperator.GET_INHERITED_VALUE, plist)
+                        for plist in groups.values() if plist
+                    ]
+                    if contribs:
+                        if len(contribs) == 1:
+                            expression = merge_expressions(expression, contribs[0])
+                        else:
+                            expression = merge_expressions(expression, contribs[0], *contribs[1:])
+                    # else: no change, expression stays as local
+                else:
+                    # Original path for relevance, Ends, or non-op expressions
+                    if all_prev_versions and expression:
+                        expression = merge_expressions(expression, *all_prev_versions)
+                    elif len(all_prev_versions) == 1:
+                        expression = all_prev_versions[0]
+                    elif all_prev_versions:
+                        expression = merge_expressions(*all_prev_versions)
                 if node.expression:
                     node.expression = expression
                 elif node.expression_reference:
