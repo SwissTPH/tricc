@@ -270,6 +270,80 @@ def merge_expressions(expression, last_version, *argv):
         return TriccOperation(TriccOperator.COALESCE, [expression] + priors)
         
 
+def _strip_version_suffixes(name):
+    """Remove instance/version/repeat export suffixes so references compare by base concept."""
+    if not isinstance(name, str):
+        return name
+    from tricc_oo.converters.tricc_to_xls_form import (
+        VERSION_SEPARATOR,
+        INSTANCE_SEPARATOR,
+        REPEAT_SEPARATOR,
+    )
+
+    for sep in (INSTANCE_SEPARATOR, VERSION_SEPARATOR, REPEAT_SEPARATOR):
+        idx = name.find(sep)
+        if idx != -1:
+            name = name[:idx]
+    return name
+
+
+def canonical_expression_signature(expr):
+    """Instance/version/repeat-agnostic structural signature of an *authored* expression.
+
+    Two versions of the same concept that share this signature were authored
+    identically (the same calculation drawn again in another instance/version).
+    That signals an **independent re-capture**, not inheritance, so their values
+    must not be folded into a cross-version sum/coalesce. When the author instead
+    intends inheritance they reference the prior concept explicitly, producing a
+    different signature.
+
+    References are normalised to their base concept name (suffixes stripped) so
+    the same calculation across instances collapses to one signature.
+    """
+    if expr is None:
+        return "None"
+    if isinstance(expr, TriccOperation):
+        inner = ",".join(canonical_expression_signature(r) for r in expr.reference)
+        return f"{expr.operator}({inner})"
+    if isinstance(expr, (list, tuple, OrderedSet)):
+        return "[" + ",".join(canonical_expression_signature(r) for r in expr) + "]"
+    if isinstance(expr, TriccReference):
+        return "ref:" + str(_strip_version_suffixes(expr.value))
+    if issubclass(expr.__class__, TriccNodeBaseModel):
+        return "node:" + str(_strip_version_suffixes(getattr(expr, "name", None) or ""))
+    if isinstance(expr, TriccStatic):
+        value = expr.value
+        if issubclass(value.__class__, TriccNodeBaseModel):
+            return "node:" + str(_strip_version_suffixes(getattr(value, "name", None) or ""))
+        return "static:" + str(value)
+    return "raw:" + str(expr)
+
+
+def filter_inheriting_versions(node, all_prev_versions):
+    """Drop prior versions that are identical *authored* re-captures of ``node``.
+
+    Only calculate-style nodes (those carrying an authored ``expression``) are
+    gated. Input/question nodes have no authored expression and keep their
+    existing versioning/skip behaviour untouched.
+    """
+    authored = getattr(node, "expression", None) or getattr(node, "expression_reference", None)
+    if authored is None:
+        return list(all_prev_versions)
+    node_signature = canonical_expression_signature(authored)
+    inheriting = []
+    for prev in all_prev_versions:
+        prev_authored = getattr(prev, "expression", None) or getattr(prev, "expression_reference", None)
+        if prev_authored is not None and canonical_expression_signature(prev_authored) == node_signature:
+            logger.debug(
+                "Skipping cross-version accumulation for %s: prior version %s has identical authored expression",
+                node.get_name(),
+                prev.get_name(),
+            )
+            continue
+        inheriting.append(prev)
+    return inheriting
+
+
 def load_calculate(
     node, processed_nodes, stashed_nodes, calculates, used_calculates, warn=False, process=None, **kwargs
 ):
@@ -302,8 +376,14 @@ def load_calculate(
             # Exclude the current node itself
             all_prev_versions = [v for v in all_prev_versions if v != node]
 
-            if all_prev_versions:
-                get_version_inheritance(node, all_prev_versions, processed_nodes)
+            # Only inherit from prior versions the author genuinely built upon.
+            # Identical authored expressions across versions are independent
+            # re-captures (e.g. the same calculation shown at each occurrence) and
+            # must not be folded into a running sum/coalesce.
+            inheriting_prev_versions = filter_inheriting_versions(node, all_prev_versions)
+
+            if inheriting_prev_versions:
+                get_version_inheritance(node, inheriting_prev_versions, processed_nodes)
 
             if isinstance(node, TriccNodePopulate):
                 from tricc_oo.converters.fhir.populate_helper import resolve_populate_reference
@@ -341,11 +421,11 @@ def load_calculate(
                         if issubclass(r.__class__, (TriccNodeDisplayCalculateBase)):
                             add_used_calculate(node, r, calculates, used_calculates, processed_nodes)
             # add skip logic for display node ()
-            if all_prev_versions and hasattr(node, "relevance"):
+            if inheriting_prev_versions and hasattr(node, "relevance"):
                 # search for same node in completly differnt activity
                 from tricc_oo.converters.fhir.populate_helper import populate_participates_in_skip
 
-                skip_prev_versions = [l for l in all_prev_versions if populate_participates_in_skip(l)]
+                skip_prev_versions = [l for l in inheriting_prev_versions if populate_participates_in_skip(l)]
                 last_expressions_other_activity = [
                     (and_join([has_node_data_operation(l),TriccOperation(TriccOperator.ISTRUE,[l.activity.root])])) for l in skip_prev_versions if (
                         node.is_sequence_defined and
