@@ -1017,7 +1017,7 @@ def process_operation_reference(
         # Try to find the referenced node
         from tricc_oo.models.base import get_repeat
 
-        ref_repeat = get_repeat(node)
+        ref_repeat = None  # TODO: manage repeat in scv get_repeat(node)
         candidates_in_activity = [
             n for n in node.activity.nodes.values()
             if n.name == clean_ref
