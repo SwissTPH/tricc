@@ -611,27 +611,32 @@ class TriccOperation(BaseModel):
                 self.replace_node(reference.select, new_node.select)
         return reference
 
-    def __copy__(self, keep_node=False):
+    def __copy__(self, keep_node=False, **kwargs):
         # Create a new instance
         if keep_node:
             reference = [e for e in self.reference]
         else:
             reference = [
                 (
-                    e.copy()
-                    if isinstance(e, (TriccReference, TriccOperation))
-                    else (TriccReference(e.name) if hasattr(e, "name") else e)
+                    e.copy(**kwargs)
+                    if isinstance(e, TriccOperation)
+                    else (
+                        e.copy() if isinstance(e, (TriccReference, TriccOperation)) 
+                        else (
+                            TriccReference(e.name) if hasattr(e, "name") else e
+                        )
+                    )
                 )
                 for e in self.reference
             ]
 
-        new_instance = type(self)(self.operator, reference)
+        new_instance = type(self)(self.operator, reference, **kwargs)
         # Copy attributes (shallow copy for mutable attributes)
 
         return new_instance
 
-    def copy(self, keep_node=False):
-        return self.__copy__(keep_node)
+    def copy(self, keep_node=False, **kwargs):
+        return self.__copy__(keep_node, **kwargs)
 
     def update_origin(self):
         """Populate (or refresh) self.origin with the cleaned, reference-only version
@@ -645,9 +650,14 @@ class TriccOperation(BaseModel):
         # through __copy__ -> type(self)(...) -> __init__ -> update_origin).
         reference = [
             (
-                e.copy()
-                if isinstance(e, (TriccReference, TriccOperation))
-                else (TriccReference(e.name) if hasattr(e, "name") else e)
+                e.copy(_bypass_origin=True)
+                if isinstance(e,  TriccOperation)
+                else (
+                    e.copy() if isinstance(e, TriccReference) 
+                    else (
+                        TriccReference(e.name) if hasattr(e, "name") else e
+                    )
+                )
             )
             for e in (self.reference or [])
         ]

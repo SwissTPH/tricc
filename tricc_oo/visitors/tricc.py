@@ -131,7 +131,7 @@ def _get_defining_expression_op(expr):
     return current
 
 
-def group_prev_versions_by_origin_signature(prev_versions):
+def group_prev_versions_by_origin_signature(name, expression, prev_versions):
     """Group previous versions (same name + repeat) by the origin signature
     (cleaned reference-only repr) of their *defining* expression.
 
@@ -142,16 +142,20 @@ def group_prev_versions_by_origin_signature(prev_versions):
     datatype-aware merge_expressions so that "values of the dict" still
     follow the old boolean/number/etc merge rules.
     """
+    expression_sig = hash(repr(expression.origin if expression.origin else name))
+    sibling = []
     groups = defaultdict(list)
     for pv in (prev_versions or []):
         expr = getattr(pv, "expression", None) or getattr(pv, "expression_reference", None)
-        base = _get_defining_expression_op(expr) if expr is not None else None
-        if isinstance(base, TriccOperation):
-            sig = repr(getattr(base, "origin", base))
+        if expr:
+            sig = hash(repr(expr.origin))
         else:
-            sig = "__raw__:" + str(getattr(pv, "name", getattr(pv, "id", id(pv))))
-        groups[sig].append(pv)
-    return dict(groups)
+            sig = hash(repr(expr.origin) if expr.origin else name)
+        if sig == expression_sig:
+            sibling.append(pv)
+        else:
+            groups[sig].append(pv)
+    return list(sibling), dict(groups)
 
 
 def get_last_version(name, processed_nodes, _list=None, repeat=None):
@@ -253,16 +257,17 @@ def get_version_inheritance(node, all_prev_versions, processed_nodes):
                 # Contribute each group via GET_INHERITED_VALUE( list_of_same_sig_nodes ).
                 # Then feed those group values into the *existing* datatype merge logic.
                 if all_prev_versions and isinstance(expression, TriccOperation):
-                    groups = group_prev_versions_by_origin_signature(all_prev_versions)
+                    siblings, groups = group_prev_versions_by_origin_signature(node.name, expression, all_prev_versions)
                     contribs = [
                         TriccOperation(TriccOperator.GET_INHERITED_VALUE, plist)
                         for plist in groups.values() if plist
                     ]
+                    main_expression = TriccOperation(TriccOperator.GET_INHERITED_VALUE, [expression, *siblings])
                     if contribs:
                         if len(contribs) == 1:
-                            expression = merge_expressions(expression, contribs[0])
+                            expression = merge_expressions(main_expression, contribs[0])
                         else:
-                            expression = merge_expressions(expression, contribs[0], *contribs[1:])
+                            expression = merge_expressions(main_expression, contribs[0], *contribs[1:])
                     # else: no change, expression stays as local
                 else:
                     # Original path for relevance, Ends, or non-op expressions
@@ -1724,74 +1729,351 @@ def get_prev_node_by_name(processed_nodes, name, node):
 MIN_LOOP_COUNT = 10
 
 
+def iter_node_dependencies(node):
+    """Yield (dependency, etype) for prev_nodes and expression/reference deps.
+
+    etype is ``prev`` for graph predecessors and ``ref`` for expression/reference
+    dependencies.  Collects from get_references() plus expression_reference /
+    reference / relevance / trigger / applicability so empty ``reference=[]``
+    does not hide expression_reference refs (same sources that block processing).
+    """
+    seen = set()
+
+    def _dep_key(d):
+        if isinstance(d, TriccReference):
+            return ("ref", d.value)
+        if d is None:
+            return None
+        return ("id", getattr(d, "id", None) or id(d))
+
+    def _emit(d, etype):
+        if d is None:
+            return
+        if isinstance(d, TriccNodeSelectOption):
+            d = getattr(d, "select", d)
+        key = (_dep_key(d), etype)
+        if key in seen or key[0] is None:
+            return
+        seen.add(key)
+        yield d, etype
+
+    if hasattr(node, "prev_nodes") and node.prev_nodes:
+        for p in node.prev_nodes:
+            yield from _emit(p, "prev")
+
+    # get_references() can return [] when reference is an empty list even if
+    # expression_reference still holds TriccReference objects — also scan attrs.
+    ref_sources = []
+    if hasattr(node, "get_references"):
+        try:
+            ref_sources.append(node.get_references())
+        except Exception:
+            pass
+    for attr in ("expression_reference", "reference", "relevance", "trigger", "applicability"):
+        val = getattr(node, attr, None)
+        if val is None:
+            continue
+        if hasattr(val, "get_references"):
+            try:
+                ref_sources.append(val.get_references())
+            except Exception:
+                pass
+        elif isinstance(val, list):
+            ref_sources.append(val)
+        elif isinstance(val, TriccReference):
+            ref_sources.append([val])
+
+    for source in ref_sources:
+        if not source:
+            continue
+        for r in source:
+            if isinstance(r, TriccReference) or issubclass(r.__class__, TriccNodeBaseModel):
+                yield from _emit(r, "ref")
+            elif hasattr(r, "get_references"):
+                try:
+                    nested = r.get_references() or []
+                except Exception:
+                    nested = []
+                for nr in nested:
+                    yield from _emit(nr, "ref")
+
+
+def generate_stashed_loop_mermaid(stashed_nodes, waited, looped, processed_nodes):
+    """Generate Mermaid flowchart for stashed loop diagnostics.
+
+    - Stashed nodes: orange
+    - Processed dependants (part of processed graph): green
+    - Unresolved TriccReference nodes: red
+    - Other unresolved dependants (unprocessed): gray
+    Includes stashed nodes and direct links (prev_nodes + expression references)
+    between them and to processed / unprocessed / reference dependants.
+
+    TriccReference dependencies are resolved by name to stashed, processed, or
+    known activity nodes so edges are not incorrectly drawn as red stubs when the
+    real target exists.
+    """
+    node_defs = {}  # nid -> label
+    edge_set = set()  # (from_nid, to_nid, etype)
+    class_map = {}  # nid -> 'stashed'|'processed'|'reference'|'other'
+
+    # Build name -> nodes index from stashed/processed and their activities so
+    # expression refs can resolve to unprocessed graph nodes (gray), not only
+    # red TriccReference stubs.
+    name_index = {}
+
+    def _index_node(n):
+        if n is None or isinstance(n, TriccReference):
+            return
+        name = getattr(n, "name", None)
+        if name:
+            name_index.setdefault(name, [])
+            if n not in name_index[name]:
+                name_index[name].append(n)
+        activity = getattr(n, "activity", None)
+        nodes_map = getattr(activity, "nodes", None) if activity is not None else None
+        if nodes_map:
+            for an in nodes_map.values():
+                aname = getattr(an, "name", None)
+                if aname:
+                    name_index.setdefault(aname, [])
+                    if an not in name_index[aname]:
+                        name_index[aname].append(an)
+
+    for n in list(stashed_nodes) + list(processed_nodes):
+        _index_node(n)
+
+    def get_node_id(n):
+        if isinstance(n, TriccReference):
+            base = f"ref_{n.value}"
+        else:
+            base = getattr(n, "id", None) or getattr(n, "name", None) or str(n)[:40]
+        safe = re.sub(r"[^a-zA-Z0-9_]", "_", str(base))
+        if not safe:
+            safe = "node_unknown"
+        if safe and safe[0].isdigit():
+            safe = "n_" + safe
+        return safe
+
+    def get_label(n):
+        if isinstance(n, TriccReference):
+            return f"Reference<br/>{_safe_mermaid_text(n.value)}"
+        try:
+            nm = n.get_name()
+        except Exception:
+            nm = str(n)[:40]
+        cls = n.__class__.__name__
+        return f"{cls}<br/>{_safe_mermaid_text(nm)}"
+
+    def _safe_mermaid_text(text, max_len=50):
+        text = str(text).replace('"', "'").replace("\n", " ").replace("`", "'")
+        if len(text) > max_len:
+            text = text[: max_len - 3] + "..."
+        return text
+
+    def resolve_dep(d):
+        """Map TriccReference / select-option wrappers to real graph nodes when known."""
+        if d is None:
+            return None
+        if isinstance(d, TriccNodeSelectOption):
+            d = getattr(d, "select", d)
+        if isinstance(d, TriccReference):
+            # Prefer clean name when option syntax name[label] is used
+            ref_name = d.value
+            if isinstance(ref_name, str) and ref_name.endswith("]") and "[" in ref_name:
+                ref_name = ref_name.split("[", 1)[0]
+            candidates = name_index.get(ref_name) or name_index.get(d.value) or []
+            # Preference: stashed > processed > other (unprocessed)
+            for pool in (stashed_nodes, processed_nodes):
+                for n in candidates:
+                    if n in pool:
+                        return n
+                for n in pool:
+                    if getattr(n, "name", None) in (ref_name, d.value):
+                        return n
+            if candidates:
+                return candidates[0]
+            return d
+        return d
+
+    def classify(n):
+        if isinstance(n, TriccReference):
+            return "reference"
+        if n in stashed_nodes:
+            return "stashed"
+        if n in processed_nodes:
+            return "processed"
+        return "other"
+
+    def add_node(n, force_class=None):
+        if n is None:
+            return None
+        n = resolve_dep(n)
+        if n is None:
+            return None
+        nid = get_node_id(n)
+        if nid not in node_defs:
+            node_defs[nid] = get_label(n)
+            _index_node(n)
+        preferred = ("stashed", "processed")
+        weaker = ("reference", "other")
+        if force_class:
+            existing = class_map.get(nid)
+            if existing in preferred and force_class in weaker:
+                pass
+            else:
+                class_map[nid] = force_class
+        elif nid not in class_map:
+            class_map[nid] = classify(n)
+        return nid
+
+    def add_edge(src, dst, etype=""):
+        sid = add_node(src)
+        did = add_node(dst)
+        if sid and did and sid != did:
+            key = (sid, did, etype)
+            if key not in edge_set:
+                edge_set.add(key)
+
+    # Index parents by str(n) so waited/looped keys can be re-linked as edges
+    str_to_node = {}
+    for n in list(stashed_nodes) + list(processed_nodes):
+        str_to_node[str(n)] = n
+
+    # Collect direct dependencies for every stashed node
+    for sn in list(stashed_nodes):
+        add_node(sn, force_class="stashed")
+        for dep, etype in iter_node_dependencies(sn):
+            add_edge(sn, resolve_dep(dep), etype)
+
+    # Waited/looped: always draw parent → dependency edges (not orphan nodes)
+    for container, etype in ((looped, "loop"), (waited, "wait")):
+        if not container:
+            continue
+        for parent_key, deplist in container.items():
+            parent = str_to_node.get(parent_key)
+            if parent is None:
+                for sn in stashed_nodes:
+                    if str(sn) == parent_key:
+                        parent = sn
+                        break
+            for d in deplist or []:
+                resolved = resolve_dep(d)
+                edge_type = etype
+                if isinstance(d, TriccReference) or isinstance(resolved, TriccReference):
+                    edge_type = "ref"
+                elif resolved in stashed_nodes:
+                    edge_type = "loop" if etype == "loop" else "wait"
+                if parent is not None:
+                    add_edge(parent, resolved, edge_type)
+                else:
+                    # Still surface the dependency even if parent key is unknown
+                    if isinstance(resolved, TriccReference):
+                        add_node(resolved, force_class="reference")
+                    elif resolved in stashed_nodes:
+                        add_node(resolved, force_class="stashed")
+                    elif resolved in processed_nodes:
+                        add_node(resolved, force_class="processed")
+                    else:
+                        add_node(resolved)
+
+    # Build mermaid source
+    lines = ["flowchart TD"]
+    for nid, label in node_defs.items():
+        lines.append(f'    {nid}["{label}"]')
+
+    for sid, did, etype in edge_set:
+        if etype:
+            lines.append(f"    {sid} -->|{etype}| {did}")
+        else:
+            lines.append(f"    {sid} --> {did}")
+
+    # Class definitions
+    lines.append("    classDef stashed fill:#ffa500,stroke:#333,color:#000")
+    lines.append("    classDef processed fill:#90EE90,stroke:#333,color:#000")
+    lines.append("    classDef reference fill:#ff6666,stroke:#333,color:#fff")
+    lines.append("    classDef other fill:#cccccc,stroke:#333,color:#000")
+
+    grouped = {"stashed": [], "processed": [], "reference": [], "other": []}
+    for nid, cls in class_map.items():
+        if cls in grouped:
+            grouped[cls].append(nid)
+
+    for cls_name, ids in grouped.items():
+        if ids:
+            lines.append(f"    class {','.join(ids)} {cls_name}")
+
+    return "\n".join(lines)
+
+
 def check_stashed_loop(stashed_nodes, prev_stashed_nodes, processed_nodes, len_prev_processed_nodes, loop_count):
 
-    if len(stashed_nodes) == len(prev_stashed_nodes):
-        # to avoid checking the details
-        if loop_count <= 0:
-            if loop_count < -MIN_LOOP_COUNT:
-                loop_count = MIN_LOOP_COUNT + 1
-            else:
-                loop_count -= 1
-        if loop_count > MIN_LOOP_COUNT:
-            if set(stashed_nodes) == set(prev_stashed_nodes) and len(processed_nodes) == len_prev_processed_nodes:
-                loop_count += 1
-                if loop_count > max(MIN_LOOP_COUNT, 11 * len(prev_stashed_nodes) + 1):
-                    logger.critical("Stashed node list was unchanged: loop likely or unresolved dependence")
-                    waited, looped = get_all_dependant(stashed_nodes, stashed_nodes, processed_nodes)
-                    logger.debug(f"{len(looped)} nodes waiting stashed nodes")
-                    logger.info("unresolved reference")
-                    for es_node in [n for n in stashed_nodes if isinstance(n, TriccReference)]:
-                        logger.info(
-                            "Stashed node {}:{}|{} {}".format(
-                                es_node.activity.get_name() if hasattr(es_node, "activity") else "",
-                                es_node.activity.instance if hasattr(es_node, "activity") else "",
-                                es_node.__class__,
-                                es_node.get_name(),
-                            )
-                        )
-                    for es_node in [
-                        node for node_list in looped.values() for node in node_list if isinstance(node, TriccReference)
-                    ]:
-                        logger.info(
-                            "looped node {}:{}|{} {}".format(
-                                es_node.activity.get_name() if hasattr(es_node, "activity") else "",
-                                es_node.activity.instance if hasattr(es_node, "activity") else "",
-                                es_node.__class__,
-                                es_node.get_name(),
-                            )
-                        )
-                    for es_node in [
-                        node for node_list in waited.values() for node in node_list if isinstance(node, TriccReference)
-                    ]:
-                        logger.info(
-                            "waited node {}:{}|{} {}".format(
-                                es_node.activity.get_name() if hasattr(es_node, "activity") else "",
-                                es_node.activity.instance if hasattr(es_node, "activity") else "",
-                                es_node.__class__,
-                                es_node.get_name(),
-                            )
-                        )
-                    logger.info("looped nodes")
-                    for dep_list in looped:
-                        for d in looped[dep_list]:
-                            if str(d) in looped:
-                                logger.critical("[{}] depends on [{}]".format(dep_list, str(d)))
-                            else:
-                                logger.error("[{}] depends on [{}]".format(dep_list, str(d)))
-                        if dep_list in waited:
-                            for d in waited[dep_list]:
-                                logger.warning("[{}] depends on [{}]".format(dep_list, str(d)))
-                    logger.info("waited nodes")
-                    for dep_list in waited:
-                        if dep_list not in looped:
-                            for d in waited[dep_list]:
-                                logger.warning("[{}] depends on [{}]".format(dep_list, d.get_name()))
+    if (
+        len(stashed_nodes) == len(prev_stashed_nodes)
+        and set(stashed_nodes) == set(prev_stashed_nodes)
+        and len(processed_nodes) == len_prev_processed_nodes
+    ):
+        loop_count += 1
+        if loop_count > max(MIN_LOOP_COUNT, 11 * len(prev_stashed_nodes) + 1):
+            logger.critical("Stashed node list was unchanged: loop likely or unresolved dependence")
+            waited, looped = get_all_dependant(stashed_nodes, stashed_nodes, processed_nodes)
+            logger.debug(f"{len(looped)} nodes waiting stashed nodes")
+            logger.info("unresolved reference")
+            for es_node in [n for n in stashed_nodes if isinstance(n, TriccReference)]:
+                logger.info(
+                    "Stashed node {}:{}|{} {}".format(
+                        es_node.activity.get_name() if hasattr(es_node, "activity") else "",
+                        es_node.activity.instance if hasattr(es_node, "activity") else "",
+                        es_node.__class__,
+                        es_node.get_name(),
+                    )
+                )
+            for es_node in [
+                node for node_list in looped.values() for node in node_list if isinstance(node, TriccReference)
+            ]:
+                logger.info(
+                    "looped node {}:{}|{} {}".format(
+                        es_node.activity.get_name() if hasattr(es_node, "activity") else "",
+                        es_node.activity.instance if hasattr(es_node, "activity") else "",
+                        es_node.__class__,
+                        es_node.get_name(),
+                    )
+                )
+            for es_node in [
+                node for node_list in waited.values() for node in node_list if isinstance(node, TriccReference)
+            ]:
+                logger.info(
+                    "waited node {}:{}|{} {}".format(
+                        es_node.activity.get_name() if hasattr(es_node, "activity") else "",
+                        es_node.activity.instance if hasattr(es_node, "activity") else "",
+                        es_node.__class__,
+                        es_node.get_name(),
+                    )
+                )
+            logger.info("looped nodes")
+            for dep_list in looped:
+                for d in looped[dep_list]:
+                    if str(d) in looped:
+                        logger.critical("[{}] depends on [{}]".format(dep_list, str(d)))
+                    else:
+                        logger.error("[{}] depends on [{}]".format(dep_list, str(d)))
+                if dep_list in waited:
+                    for d in waited[dep_list]:
+                        logger.warning("[{}] depends on [{}]".format(dep_list, str(d)))
+            logger.info("waited nodes")
+            for dep_list in waited:
+                if dep_list not in looped:
+                    for d in waited[dep_list]:
+                        logger.warning("[{}] depends on [{}]".format(dep_list, d.get_name()))
 
-                    if len(stashed_nodes) == len(prev_stashed_nodes):
-                        exit(1)
-            else:
-                loop_count = 0
+            # Generate and log Mermaid diagram of the stashed situation
+            try:
+                mermaid_diagram = generate_stashed_loop_mermaid(stashed_nodes, waited, looped, processed_nodes)
+                logger.info("=== STASHED LOOP MERMAID DIAGRAM (copy to https://mermaid.live) ===\n" + mermaid_diagram)
+            except Exception as ex:
+                logger.warning(f"Failed to generate stashed loop mermaid: {ex}")
+
+            if len(stashed_nodes) == len(prev_stashed_nodes):
+                exit(1)
     else:
         loop_count = 0
     return loop_count
@@ -1818,14 +2100,10 @@ def get_all_dependant(loop, stashed_nodes, processed_nodes, depth=0, waited=None
         cur_path = path.copy()
         cur_path.append(n)
         dependant = OrderedSet()
-        if hasattr(n, "prev_nodes") and n.prev_nodes:
-            dependant = dependant | n.prev_nodes
-        if hasattr(n, "get_references"):
-            dependant = dependant | (n.get_references() or OrderedSet())
-        if not isinstance(dependant, list):
-            pass
+        for d, _etype in iter_node_dependencies(n):
+            dependant.add(d)
         for d in dependant:
-            if d in path:
+            if d in path[:-1]:
                 logger.warning(
                     f"loop {str(d)} already in path {'::'.join(map(str, path))}  "
                 )
@@ -1833,18 +2111,30 @@ def get_all_dependant(loop, stashed_nodes, processed_nodes, depth=0, waited=None
                 d = d.select
 
             if isinstance(d, TriccReference):
-                if not any(n.name == d.value for n in processed_nodes):
-                    if not any(n.name == d.value for n in stashed_nodes):
+                ref_name = d.value
+                if isinstance(ref_name, str) and ref_name.endswith("]") and "[" in ref_name:
+                    ref_name = ref_name.split("[", 1)[0]
+                match_stashed = next(
+                    (sn for sn in stashed_nodes if getattr(sn, "name", None) in (d.value, ref_name)),
+                    None,
+                )
+                match_processed = next(
+                    (pn for pn in processed_nodes if getattr(pn, "name", None) in (d.value, ref_name)),
+                    None,
+                )
+                if match_processed is None:
+                    if match_stashed is None:
                         waited = add_to_tree(waited, n, d)
                     else:
-                        looped = add_to_tree(looped, n, d)
+                        # Store the real stashed node so diagnostics (mermaid/logs) link correctly
+                        looped = add_to_tree(looped, n, match_stashed)
 
             elif d not in processed_nodes:
                 if d in stashed_nodes:
                     looped = add_to_tree(looped, n, d)
                 else:
                     waited = add_to_tree(waited, n, d)
-            all_dependant = all_dependant.union(dependant)
+            all_dependant.add(d)
     if depth < MAX_DRILL:
         waited, looped = get_all_dependant(
             all_dependant, stashed_nodes, processed_nodes, depth + 1, waited, looped, path=cur_path
@@ -2025,6 +2315,7 @@ def replace_next_node(prev_node, next_node, old_node):
 
 
 # Priority constants
+POPULATE_PRIORITY = 1000
 SAME_GROUP_PRIORITY = 70
 PARENT_GROUP_PRIORITY = 60
 ACTIVE_ACTIVITY_PRIORITY = 50
@@ -2043,6 +2334,8 @@ def reorder_node_list(node_list, group, processed_nodes, priority_map = None):
     if not group.id in priority_map:
         priority_map[group.id] = {}
     def get_priority(node):
+        if isinstance(node, TriccNodePopulate):
+            return POPULATE_PRIORITY
         explicit_priority = getattr(node, "priority", None) or 0
         if node.id in priority_map[group.id]:
             return priority_map[group.id][node.id]
@@ -2052,7 +2345,7 @@ def reorder_node_list(node_list, group, processed_nodes, priority_map = None):
             and not node.prev_nodes) or
             isinstance(node, (TriccNodeMainStart, TriccNodeActivityStart))
         ):    
-            return get_priority(node.activity)
+            return get_priority(node.activity)           
         if isinstance(node, (TriccNodeSelectOption)):
             return get_priority(node.select)
 
