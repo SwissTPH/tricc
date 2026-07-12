@@ -1018,6 +1018,10 @@ def process_operation_reference(
         from tricc_oo.models.base import get_repeat
 
         ref_repeat = None  # TODO: manage repeat in scv get_repeat(node)
+        if operation.operator == TriccOperator.GET_HISTORY_VALUE:
+            ref_repeat = 0
+        elif operation.operator == TriccOperator.GET_REPEATED_VALUE:
+            ref_repeat = int(operation.reference[1])
         candidates_in_activity = [
             n for n in node.activity.nodes.values()
             if n.name == clean_ref

@@ -412,7 +412,10 @@ class TriccOperator(StrEnum):
     MAX = "max"
     SUM = "sum"
     FORMAT_DATE = "format_date"
-
+    # repeat TODO
+    GET_REPEATED_VALUE = "ge_repeated_value"
+    GET_NUMBER_OF_REPEAT = "get_number_of_repeat"
+    GET_HISTORY_VALUE = "get_history_value"
 
 
 
@@ -457,11 +460,22 @@ RETURNS_NUMBER = [
     TriccOperator.CAST_NUMBER,
     TriccOperator.CAST_INTEGER,
     TriccOperator.CAST_DECIMAL,
+    TriccOperator.GET_NUMBER_OF_REPEAT
 ]
 
 RETURNS_DATE = [TriccOperator.CAST_DATE]
 
-RETURNS_STRING = [TriccOperator.DIAGNOSIS_LIST]
+RETURNS_LIST = [TriccOperator.DIAGNOSIS_LIST]
+
+RETURNS_STRING = [
+    TriccOperator.CONCATENATE
+]
+
+RETURNS_CONCEPT = [
+    TriccOperator.GET_HISTORY_VALUE,
+    TriccOperator.GET_REPEATED_VALUE,
+    TriccOperator.GET_INHERITED_VALUE
+]
 
 OPERATION_LIST = {
     ">=": TriccOperator.MORE_OR_EQUAL,
@@ -532,8 +546,10 @@ class TriccOperation(BaseModel):
             return "date"
         elif self.operator in RETURNS_STRING:
             return "string"
-        elif self.operator == TriccOperator.CONCATENATE:
-            return "string"
+        elif self.operator in RETURNS_LIST:
+            return "list"
+        elif self.operator in RETURNS_CONCEPT:
+            return self.get_reference_datatype(self.reference[0])
         elif self.operator == TriccOperator.PARENTHESIS:
             return self.get_reference_datatype(self.reference)
         elif self.operator == TriccOperator.IF:
