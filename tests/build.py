@@ -103,7 +103,7 @@ LEVELS = {
 
 
 def print_help():
-    print("-i / --input draw.io filepath (MANDATORY) or directory containing drawio files, or Google Drive URL")
+    print("-i / --input file path, folder path, or Google Drive file/folder URL (MANDATORY; comma-separated allowed)")
     print("-o / --output xls file ")
     print("-d form_id ")
     print("-s L4 system/strategy (odk, cht, cc)")
@@ -237,17 +237,17 @@ def list_google_drive_folder_files(folder_id, drawio_only=True):
         return []
 
 
-def list_local_sibling_files(filepath, valid_exts=(".drawio",)):
-    """List input files from the parent directory of a local file."""
-    parent_dir = os.path.dirname(os.path.abspath(filepath))
-    if not parent_dir or not os.path.isdir(parent_dir):
+def list_local_folder_files(folder_path, valid_exts=(".drawio",)):
+    """List input files from a local folder."""
+    folder_path = os.path.abspath(folder_path)
+    if not folder_path or not os.path.isdir(folder_path):
         return []
 
-    sibling_files = []
-    for filename in os.listdir(parent_dir):
+    folder_files = []
+    for filename in os.listdir(folder_path):
         if filename.lower().endswith(valid_exts):
-            sibling_files.append(os.path.join(parent_dir, filename))
-    return sorted(sibling_files)
+            folder_files.append(os.path.join(folder_path, filename))
+    return sorted(folder_files)
 
 
 def add_unique_files(files, new_paths):
@@ -258,40 +258,6 @@ def add_unique_files(files, new_paths):
         if abs_path not in seen:
             files.append(path)
             seen.add(abs_path)
-
-
-def list_google_drive_sibling_files(file_id):
-    """List files from the first parent folder of a Google Drive file."""
-    try:
-        service = get_drive_service()
-        if service is None:
-            return []
-
-        metadata = service.files().get(
-            fileId=file_id,
-            fields="id,name,parents,mimeType,shortcutDetails/targetId",
-            supportsAllDrives=True,
-        ).execute()
-        effective_file_id = file_id
-        if metadata.get("mimeType") == "application/vnd.google-apps.shortcut":
-            effective_file_id = metadata.get("shortcutDetails", {}).get("targetId", file_id)
-            metadata = service.files().get(
-                fileId=effective_file_id,
-                fields="id,name,parents,mimeType",
-                supportsAllDrives=True,
-            ).execute()
-
-        parents = metadata.get("parents", [])
-        if not parents:
-            logger.warning(f"No parent folder found for file {effective_file_id}")
-            return []
-
-        sibling_files = list_google_drive_folder_files(parents[0], drawio_only=True)
-        logger.info(f"Parent folder has {len(sibling_files)} .drawio file(s) visible to the service account.")
-        return sibling_files or []
-    except Exception as exc:
-        logger.warning(f"Could not list sibling files for {file_id}: {exc}")
-        return []
 
 
 def download_google_drive_file(file_id, temp_dir, original_url=None):
@@ -483,42 +449,20 @@ if __name__ == "__main__":
                     logger.warning(f"Failed to download file from folder: {file_name} ({file_id})")
 
         elif is_google_drive_url(current_input):
-            # Handle Google Drive URL
-            logger.info(f"Detected Google Drive URL: {current_input}")
+            # Handle Google Drive file URL (single file only; use a folder URL for multiple files)
+            logger.info(f"Detected Google Drive file URL: {current_input}")
             file_id = extract_google_drive_file_id(current_input)
             if file_id:
                 logger.info(f"Extracted file ID: {file_id}")
-                sibling_files = list_google_drive_sibling_files(file_id)
-                if sibling_files:
-                    logger.info(f"Found {len(sibling_files)} .drawio file(s) in parent folder; downloading all.")
-                    downloaded_count = 0
-                    for drive_file in sibling_files:
-                        sibling_id = drive_file.get("id")
-                        sibling_name = drive_file.get("name", sibling_id)
-                        if not sibling_id:
-                            continue
-                        local_path = download_google_drive_file(sibling_id, tempfile.gettempdir(), current_input)
-                        if local_path:
-                            downloaded_files.append(local_path)
-                            files.append(local_path)
-                            downloaded_count += 1
-                            logger.info(f"Downloaded sibling file: {sibling_name}")
-                        else:
-                            logger.warning(f"Failed to download sibling file: {sibling_name} ({sibling_id})")
-                    if downloaded_count == 0:
-                        logger.error("Could not download any files from the parent folder.")
-                        sys.exit(1)
+                temp_dir = tempfile.gettempdir()
+                local_path = download_google_drive_file(file_id, temp_dir, current_input)
+                if local_path:
+                    downloaded_files.append(local_path)
+                    add_unique_files(files, [local_path])
+                    logger.info(f"Successfully processed Google Drive file: {local_path}")
                 else:
-                    # Fallback to single file download (public files or no folder metadata access)
-                    temp_dir = tempfile.gettempdir()
-                    local_path = download_google_drive_file(file_id, temp_dir, current_input)
-                    if local_path:
-                        downloaded_files.append(local_path)
-                        files.append(local_path)
-                        logger.info(f"Successfully processed Google Drive file: {local_path}")
-                    else:
-                        logger.error(f"Failed to download Google Drive file: {current_input}")
-                        sys.exit(1)  # Exit on download failure as requested
+                    logger.error(f"Failed to download Google Drive file: {current_input}")
+                    sys.exit(1)
             else:
                 logger.error(f"Could not extract file ID from Google Drive URL: {current_input}")
                 sys.exit(1)
@@ -527,18 +471,14 @@ if __name__ == "__main__":
             # Accept common formats used by input strategies (.drawio, .yaml/.yml for testing, etc.)
             valid_exts = (".drawio", ".yaml", ".yml")
             if os.path.isdir(current_input):
-                for f in os.listdir(current_input):
-                    if f.lower().endswith(valid_exts):
-                        files.append(os.path.join(current_input, f))
-            elif os.path.isfile(current_input) and current_input.lower().endswith(valid_exts):
-                sibling_files = list_local_sibling_files(current_input, valid_exts=valid_exts)
-                if len(sibling_files) > 1:
-                    logger.info(
-                        f"Found {len(sibling_files)} file(s) in parent folder; loading all."
-                    )
-                    add_unique_files(files, sibling_files)
+                folder_files = list_local_folder_files(current_input, valid_exts=valid_exts)
+                if not folder_files:
+                    logger.warning(f"No matching files found in folder: {current_input}")
                 else:
-                    add_unique_files(files, [current_input])
+                    logger.info(f"Found {len(folder_files)} file(s) in folder.")
+                    add_unique_files(files, folder_files)
+            elif os.path.isfile(current_input) and current_input.lower().endswith(valid_exts):
+                add_unique_files(files, [current_input])
             else:
                 logger.warning(f"Skipping invalid input (unknown extension): {current_input}")
 
