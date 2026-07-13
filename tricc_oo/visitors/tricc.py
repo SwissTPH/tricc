@@ -180,8 +180,7 @@ def get_last_version(name, processed_nodes, _list=None, repeat=None):
     if not max_version:
         already_processed = [
             p_node for p_node in _list
-            if hasattr(p_node, "name") and p_node.name == name
-            and (repeat is None or version_filter(name, repeat)(p_node))
+            if version_filter(name, repeat)(p_node)
         ]
         if already_processed:
             max_version = sorted(already_processed, key=lambda x: x.path_len, reverse=False)[0]
@@ -1027,7 +1026,6 @@ def process_operation_reference(
             if n.name == clean_ref
             and n != node
             and not isinstance(n, TriccNodeSelectOption)
-            and get_repeat(n) == ref_repeat
         ]
 
         if candidates_in_activity:
