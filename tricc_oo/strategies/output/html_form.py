@@ -117,9 +117,10 @@ class HTMLStrategy(BaseOutPutStrategy):
         if not os.path.exists(self.output_path):
             os.makedirs(self.output_path)
 
+        js_body = "\n    ".join(self.js_statements)
         js_function = f"""
 function updateForm() {{
-    {"\n    ".join(self.js_statements)}
+    {js_body}
 }}
 window.onload = updateForm;
         """

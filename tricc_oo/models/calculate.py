@@ -180,7 +180,7 @@ class TriccNodeDiagnosis(TriccNodeDisplayCalculateBase):
         super().__init__(**data)
 
         # rename rhombus
-        self.name = f"anchor.{data["name"]}"
+        self.name = f"anchor.{data['name']}"
 
 
 class TriccNodeExclusive(TriccNodeFakeCalculateBase):
