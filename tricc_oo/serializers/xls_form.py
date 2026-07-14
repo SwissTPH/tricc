@@ -5,8 +5,7 @@ import hashlib
 from tricc_oo.converters.tricc_to_xls_form import (
     get_export_name, BOOLEAN_MAP,
 )
-
-
+from tricc_oo.visitors.text_injection import serialize_injection_for_js_text
 from tricc_oo.models.lang import SingletonLangClass
 from tricc_oo.converters.utils import clean_name, remove_html, remove_html_full, generate_id
 from tricc_oo.models.base import (
@@ -334,6 +333,20 @@ def get_xfrom_trad(strategy, node, column, mapping, clean_html=False):
         and node.expression.get_datatype() in ("number", "boolean")
     ):
         value = f"number({value})" if str(value) not in ["0", "1"] else value
+    # ODK/CHT display columns: CONCATENATE injection → "text ${export} text" (not concat())
+    if new_column in TRAD_MAP and isinstance(
+        value, (TriccOperation, TriccReference, TriccStatic)
+    ):
+        value = serialize_injection_for_js_text(value, get_export_name)
+    elif new_column in TRAD_MAP and isinstance(value, dict):
+        value = {
+            k: (
+                serialize_injection_for_js_text(v, get_export_name)
+                if isinstance(v, (TriccOperation, TriccReference, TriccStatic))
+                else v
+            )
+            for k, v in value.items()
+        }
     if clean_html and isinstance(value, str):
         value = remove_html(value)
     if new_column == "hint":
@@ -450,12 +463,26 @@ def get_attr_if_exists(strategy, node, column, map_array):
                 return BOOLEAN_MAP[str(value)]
 
             elif isinstance(value, (TriccOperation, TriccStatic, TriccReference)):
+                # Display text (label/hint/help/messages): ODK ${export} form, not concat()
+                if column in TRAD_MAP:
+                    return serialize_injection_for_js_text(value, get_export_name)
                 expression = strategy.get_tricc_operation_expression(value)
                 return expression
+            elif isinstance(value, TriccNodeBaseModel) and column in TRAD_MAP:
+                return serialize_injection_for_js_text(value, get_export_name)
             elif isinstance(value, TriccNodeBaseModel):
                 # Bare field references (e.g. after coalesce simplification) must become
                 # XPath, not get_name() debug strings (breaks pyxform setvalue value=).
                 return strategy.get_tricc_operation_operand(value)
+            elif isinstance(value, dict) and column in TRAD_MAP:
+                return {
+                    k: (
+                        serialize_injection_for_js_text(v, get_export_name)
+                        if isinstance(v, (TriccOperation, TriccStatic, TriccReference, TriccNodeBaseModel))
+                        else v
+                    )
+                    for k, v in value.items()
+                }
             elif value is not None:
                 return str(value) if not isinstance(value, dict) else value
             else:
@@ -467,6 +494,10 @@ def get_attr_if_exists(strategy, node, column, map_array):
             return ""
     elif hasattr(node, column) and getattr(node, column) is not None:
         value = getattr(node, column)
+        if column in TRAD_MAP and isinstance(
+            value, (TriccOperation, TriccStatic, TriccReference, TriccNodeBaseModel)
+        ):
+            return serialize_injection_for_js_text(value, get_export_name)
         if isinstance(value, TriccNodeBaseModel):
             return strategy.get_tricc_operation_operand(value)
         return str(value) if not isinstance(value, dict) else value

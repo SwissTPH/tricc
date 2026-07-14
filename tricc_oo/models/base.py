@@ -197,9 +197,10 @@ class TriccGroup(TriccBaseModel):
 
         if name:
             result = result + "|" + name
-        if label:
-            result = result + "|" + (next(iter(self.label.values())) if isinstance(self.label, Dict) else self.label)
-        if len(name) < 50:
+        label_str = label_text_for_name(label)
+        if label_str:
+            result = result + "|" + label_str
+        if name and len(name) < 50:
             return result
         else:
             return result[:50]
@@ -218,13 +219,63 @@ def get_repeat(node) -> int:
     return int(value)
 
 
+# Display text after input load may be plain str, multi-lang dict, or injection op
+DisplayText = Union[
+    str,
+    Dict[str, Union[str, "TriccOperation"]],
+    "TriccOperation",
+]
+
+
+def label_text_for_name(label) -> Optional[str]:
+    """Extract a short human label fragment for get_name / logging.
+
+    - plain str: as-is
+    - multi-lang dict: first locale value (recursively)
+    - CONCATENATE: first plain string / TriccStatic segment only
+    - TriccReference, node refs, or concat without a static segment: skip (None)
+    """
+    if label is None:
+        return None
+    if isinstance(label, str):
+        return label if label else None
+    if isinstance(label, dict):
+        if not label:
+            return None
+        return label_text_for_name(next(iter(label.values())))
+
+    cls_name = type(label).__name__
+    # Bare reference / node is not useful in super()/log ids
+    if cls_name == "TriccReference":
+        return None
+    if cls_name == "TriccStatic":
+        return label_text_for_name(getattr(label, "value", None))
+    if cls_name == "TriccOperation":
+        op = getattr(label, "operator", None)
+        if str(op) == "concatenate" or op == TriccOperator.CONCATENATE:
+            for part in getattr(label, "reference", None) or []:
+                if type(part).__name__ == "TriccReference":
+                    continue
+                if type(part).__name__ == "TriccStatic":
+                    text = label_text_for_name(getattr(part, "value", None))
+                    if text:
+                        return text
+                    continue
+                if isinstance(part, str) and part:
+                    return part
+                # skip resolved nodes / nested ops
+            return None
+        return None
+    return None
+
+
 class TriccNodeBaseModel(TriccBaseModel):
     path_len: int = 0
     group: Optional[Union[TriccGroup, FwTriccNodeBaseModel]] = None
     name: Optional[str] = None
     repeat: Optional[int] = None
     export_name: Optional[str] = None
-    label: Optional[Union[str, Dict[str, str]]] = None
+    label: Optional[DisplayText] = None
     next_nodes: OrderedSet[TriccNodeBaseModel] = OrderedSet()
     prev_nodes: OrderedSet[TriccNodeBaseModel] = OrderedSet()
     expression: Optional[Union[Expression, TriccOperation, TriccStatic]] = None  # will be generated based on the input
@@ -247,9 +298,10 @@ class TriccNodeBaseModel(TriccBaseModel):
         label = getattr(self, "label", None)
 
         if name:
-            result += f"|{name}|{self.instance}|{self.version}" 
-        if label:
-            result += "|" + (next(iter(self.label.values())) if isinstance(self.label, Dict) else self.label)
+            result += f"|{name}|{self.instance}|{self.version}"
+        label_str = label_text_for_name(label)
+        if label_str:
+            result += "|" + label_str
         if len(result) < 80:
             return result
         else:
@@ -412,7 +464,7 @@ class TriccOperator(StrEnum):
     MAX = "max"
     SUM = "sum"
     FORMAT_DATE = "format_date"
-    # repeat TODO
+        # repeat TODO
     GET_REPEATED_VALUE = "ge_repeated_value"
     GET_NUMBER_OF_REPEAT = "get_number_of_repeat"
     GET_HISTORY_VALUE = "get_history_value"

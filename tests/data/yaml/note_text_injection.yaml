@@ -1,0 +1,32 @@
+# Note label with ${REF} injection (TriccNodeDisplayModel only).
+
+id: note_injection
+title: Note text injection
+process: main
+
+nodes:
+  - id: start
+    type: start
+    label: "Start"
+
+  - id: age
+    type: integer
+    name: age
+    label: "Age"
+
+  - id: note_age
+    type: note
+    name: note_age
+    label: "Patient is ${age} years old"
+
+  - id: end
+    type: end
+    label: "End"
+
+edges:
+  - source: start
+    target: age
+  - source: age
+    target: note_age
+  - source: note_age
+    target: end

@@ -14,7 +14,13 @@ This page documents TRICC modeling elements and their meaning based on:
 
 ## Question/input elements
 
-- `note`: informational text shown to users.
+- `note`: informational text shown to users. Display fields (`label`, `hint`,
+  `help`, `constraint_message`, `required_message`) on **display models only**
+  may embed ODK/JS-style value injection with `${field_name}` (e.g.
+  `Patient is ${age} years`). Parsed at input load into concatenate operations,
+  resolved during processing, re-exported as `${export_name}` for ODK/CHT and as
+  concatenate expressions for FHIR. Not applied to calculates or rhombus.
+  See `feature/display-text-injection.md`.
 - `select_one`: single-choice question.
 - `select_multiple`: multiple-choice question.
 - `select_yesno`: yes/no convenience selection. In FHIR output this typically becomes a native `boolean` item type (preferred over `choice` for simple yes/no questions).
@@ -46,6 +52,9 @@ This page documents TRICC modeling elements and their meaning based on:
 ## Navigation/linking elements
 
 - `goto`: jump to another page/activity.
+  - `instance` (default `1`): nested activity instance number; `0` auto-unique nested instance;
+    **`-1` injects the target activity as a snippet** into the caller (inline nodes; no nested
+    activity / wait). See `feature/goto-snippet-injection.md`.
 - `link_in`, `link_out`: explicit cross-flow links.
 - `bridge`: bridge/helper connector.
 

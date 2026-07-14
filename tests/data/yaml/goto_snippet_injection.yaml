@@ -1,0 +1,82 @@
+# Goto snippet injection (instance=-1)
+# Parent main flow injects module activity inline.
+
+id: parent_main
+title: "Parent Main"
+process: main
+
+nodes:
+  - id: start
+    type: start
+    label: "Start"
+    name: start_parent
+
+  - id: note_before
+    type: note
+    name: note_before
+    label: "Before module"
+
+  - id: goto_mod
+    type: goto
+    name: goto_mod
+    label: "Inject module"
+    link: module_activity
+    instance: -1
+
+  - id: note_after
+    type: note
+    name: note_after
+    label: "After module"
+
+  - id: end
+    type: end
+    label: "End"
+    name: end_parent
+
+edges:
+  - source: start
+    target: note_before
+  - source: note_before
+    target: goto_mod
+  - source: goto_mod
+    target: note_after
+  - source: note_after
+    target: end
+
+---
+# Module activity to be injected as snippet
+
+id: module_activity
+title: "Module Activity"
+process: module
+
+nodes:
+  - id: mod_start
+    type: activity_start
+    label: "Module start"
+    name: mod_start
+
+  - id: mod_age
+    type: integer
+    name: mod_age
+    label: "Age from module"
+    required: true
+
+  - id: mod_calc
+    type: calculate
+    name: mod_is_adult
+    label: "Is adult (module)"
+    calculate: "mod_age >= 18"
+
+  - id: mod_end
+    type: end
+    label: "Module end"
+    name: mod_end
+
+edges:
+  - source: mod_start
+    target: mod_age
+  - source: mod_age
+    target: mod_calc
+  - source: mod_calc
+    target: mod_end

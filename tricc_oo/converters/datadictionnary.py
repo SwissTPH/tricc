@@ -3,6 +3,7 @@ from fhir.resources.codesystem import (
     CodeSystemConcept,
     CodeSystemConceptProperty,
 )
+from tricc_oo.visitors.text_injection import serialize_injection_for_js_text
 
 from fhir.resources.valueset import ValueSet
 import logging
@@ -87,8 +88,8 @@ def check_and_add_concept(code_system: CodeSystem, code: str, display: str, attr
             new_concept = concept
     if not new_concept:
         # Add the new concept if it does not exist
-        concept_id = str(uuid.uuid5(UUID_NAMESPACE, display))
-        new_concept = CodeSystemConcept.construct(code=code, display=display, id=concept_id)
+        concept_id = str(uuid.uuid5(UUID_NAMESPACE,(code)))
+        new_concept = CodeSystemConcept.construct(code=code, display=serialize_injection_for_js_text(display), id=concept_id)
         if not hasattr(code_system, "concept"):
             code_system.concept = []
         code_system.concept.append(new_concept)

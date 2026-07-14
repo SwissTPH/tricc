@@ -8,7 +8,7 @@ from tricc_oo.converters.utils import get_rand_name
 from tricc_oo.models.base import (
     TriccNodeBaseModel, Expression, TriccOperation,
     TriccStatic, TriccReference, TriccNodeType, TriccGroup, triccName,
-    TriccEdge, b64, triccId
+    TriccEdge, b64, triccId, DisplayText,
 )
 
 import logging
@@ -291,8 +291,8 @@ class TriccNodeActivity(TriccNodeBaseModel):
 class TriccNodeDisplayModel(TriccNodeBaseModel):
     name: str
     image: Optional[b64] = None
-    hint: Optional[Union[str, TriccNodeBaseModel]] = None
-    help: Optional[Union[str, TriccNodeBaseModel]] = None
+    hint: Optional[Union[DisplayText, TriccNodeBaseModel]] = None
+    help: Optional[Union[DisplayText, TriccNodeBaseModel]] = None
     group: Optional[Union[TriccGroup, TriccNodeActivity]] = None
     relevance: Optional[Union[Expression, TriccOperation]] = None
     default: Optional[Union[Expression, TriccOperation, TriccReference, TriccStatic]] = None
@@ -311,7 +311,8 @@ class TriccNodeNote(TriccNodeDisplayModel):
 
 class TriccNodeInputModel(TriccNodeDisplayModel):
     required: Optional[Union[Expression, TriccOperation, TriccStatic]] = "1"
-    constraint_message: Optional[Union[str, Dict[str, str]]] = None
+    constraint_message: Optional[DisplayText] = None
+    required_message: Optional[DisplayText] = None
     constraint: Optional[Expression] = None
     save: Optional[str] = None  # contribute to another calculate
     is_sequence_defined: bool = True
@@ -349,6 +350,7 @@ class TriccNodeGoTo(TriccNodeBaseModel):
     tricc_type: TriccNodeType = TriccNodeType.goto
     link: Union[TriccNodeActivity, triccId]
     datatype: str = "n/a"
+    #  n > 0: named nested activity instance; 0: auto-unique instance; -1: snippet inject into caller
     instance: int = 1
 
     # no need ot copy
@@ -362,7 +364,7 @@ class TriccNodeGoTo(TriccNodeBaseModel):
 
 class TriccNodeSelectOption(TriccNodeDisplayModel):
     tricc_type: TriccNodeType = TriccNodeType.select_option
-    label: Union[str, Dict[str, str]]
+    label: DisplayText
     save: Optional[str] = None
     select: TriccNodeInputModel
     list_name: str

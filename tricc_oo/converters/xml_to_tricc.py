@@ -50,8 +50,9 @@ from tricc_oo.models.tricc import (
     TriccNodeSelectYesNo,
     TriccNodeNote,
     TriccNodeLinkOut,
+    TriccNodeDisplayModel,
 )
-
+from tricc_oo.visitors.text_injection import apply_display_text_injections
 
 from tricc_oo.models.ocl import get_data_type
 from tricc_oo.converters.drawio_type_map import TYPE_MAP
@@ -506,6 +507,9 @@ def get_nodes(diagram, activity):
                 node.path = activity.root
             # add the edge between trhombus and its path
         elif isinstance(node, TriccNodeGoTo):
+            # instance == -1: snippet inject at link time — keep prev→goto→next edges as-is
+            if getattr(node, "instance", 1) == -1:
+                continue
             # find if the node has next nodes, if yes, add a bridge + Rhoimbus
             path = inject_bridge_path(node, {**nodes, **new_nodes})
             if path:
@@ -601,8 +605,6 @@ def set_additional_attributes(attribute_names, elm, node):
                 attribute = [attribute]
             elif attributename in ["priority", "instance", "repeat"]:
                 attribute = int(attribute)
-                if attributename == "repeat" and attribute < 0:
-                    logger.warning(f"Invalid repeat={attribute} on node; must be non-negative")
             elif attributename == "relevance":
                 attribute = remove_html(attribute.strip())
             else:
@@ -881,12 +883,17 @@ def load_expressions(node):
         node.default = parse_expression("", node.default)
     if getattr(node, "reference", None):
         if isinstance(node, TriccNodeRhombus):
-            node.label = remove_html(node.label)
+            # Rhombus is not TriccNodeDisplayModel — no ${REF} injection; clean for CQL only
+            node.label = remove_html(node.label) if isinstance(node.label, str) else node.label
             node.expression_reference = parse_expression(node.label, node.reference)
         else:
             node.expression_reference = parse_expression("", node.reference)
 
         node.reference = node.expression_reference.get_references()
+
+    # Display-model only: clean full string then extract ${REF} → CONCATENATE (input load only)
+    if isinstance(node, TriccNodeDisplayModel):
+        apply_display_text_injections(node, clean_fn=remove_html)
 
 
 def parse_expression(label=None, expression=None):

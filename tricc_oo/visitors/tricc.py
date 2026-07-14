@@ -3,6 +3,7 @@ import logging
 import requests
 import base64
 from collections import defaultdict
+from tricc_oo.visitors.text_injection import TEXT_INJECTION_FIELDS
 
 from tricc_oo.models.base import get_repeat
 from tricc_oo.converters.utils import generate_id
@@ -148,7 +149,8 @@ def group_prev_versions_by_origin_signature(name, expression, prev_versions):
     for pv in (prev_versions or []):
         expr = getattr(pv, "expression", None) or getattr(pv, "expression_reference", None)
         if expr:
-            sig = hash(repr(expr.origin))
+            
+            sig = hash(repr(getattr(expr, "origin", expr)))
         else:
             sig = hash(repr(expr.origin) if expr.origin else name)
         if sig == expression_sig:
@@ -236,10 +238,11 @@ def get_version_inheritance(node, all_prev_versions, processed_nodes):
     # Updated to merge ALL previous versions, not just the last one
     # This ensures inheritance works even when intermediate activities weren't triggered
 
-    if isinstance(node, TriccNodePopulate) and node.context == "history":
+    if (isinstance(node, TriccNodePopulate) and node.context == "history"):
         node.last = True
         return
-
+    if (getattr(node, 'repeat', None) or 1) < 1:
+        return
     if not issubclass(node.__class__, (TriccNodeInputModel)):
         node.last = True
         if issubclass(node.__class__, (TriccNodeDisplayCalculateBase, TriccNodeEnd)) and node.name is not None:
@@ -971,6 +974,57 @@ def process_reference(
             return False
         elif modified_expression and replace_reference:
             node.applicability = modified_expression
+
+    # Display-model only: resolve ${REF} injection ops already parsed at input load
+    if isinstance(node, TriccNodeDisplayModel):
+
+        for field in TEXT_INJECTION_FIELDS:
+            if not hasattr(node, field):
+                continue
+            value = getattr(node, field, None)
+            if value is None:
+                continue
+            if isinstance(value, dict):
+                new_dict = {}
+                changed = False
+                for locale, entry in value.items():
+                    if isinstance(entry, (TriccOperation)):
+                        modified = process_operation_reference(
+                            entry,
+                            node,
+                            processed_nodes=processed_nodes,
+                            calculates=calculates,
+                            used_calculates=used_calculates,
+                            replace_reference=replace_reference,
+                            warn=warn,
+                            codesystems=codesystems,
+                        )
+                        if modified is False:
+                            return False
+                        if modified and replace_reference:
+                            new_dict[locale] = modified
+                            changed = True
+                        else:
+                            new_dict[locale] = entry
+                    else:
+                        new_dict[locale] = entry
+                if changed and replace_reference:
+                    setattr(node, field, new_dict)
+            elif isinstance(value, (TriccOperation)):
+                modified_expression = process_operation_reference(
+                    value,
+                    node,
+                    processed_nodes=processed_nodes,
+                    calculates=calculates,
+                    used_calculates=used_calculates,
+                    replace_reference=replace_reference,
+                    warn=warn,
+                    codesystems=codesystems,
+                )
+                if modified_expression is False:
+                    return False
+                elif modified_expression and replace_reference:
+                    setattr(node, field, modified_expression)
     return True
 
 
@@ -2295,6 +2349,501 @@ def replace_node(old, new, page=None):
             edge.target = new.id
 
 
+def _swap_node_references(old_node, new_node):
+    """Rewrite prev/next object references from old_node to new_node (same id safe)."""
+    for nxt in list(getattr(old_node, "next_nodes", None) or []):
+        if hasattr(nxt, "prev_nodes") and old_node in nxt.prev_nodes:
+            nxt.prev_nodes.remove(old_node)
+            nxt.prev_nodes.add(new_node)
+        if hasattr(nxt, "path") and getattr(nxt, "path", None) is old_node:
+            nxt.path = new_node
+    for prev in list(getattr(old_node, "prev_nodes", None) or []):
+        if hasattr(prev, "next_nodes") and old_node in prev.next_nodes:
+            prev.next_nodes.remove(old_node)
+            prev.next_nodes.add(new_node)
+        if hasattr(prev, "path") and getattr(prev, "path", None) is old_node:
+            prev.path = new_node
+    new_node.prev_nodes = set(getattr(old_node, "prev_nodes", None) or set())
+    new_node.next_nodes = set(getattr(old_node, "next_nodes", None) or set())
+    old_node.prev_nodes = set()
+    old_node.next_nodes = set()
+
+
+def convert_structural_node_to_bridge(node, activity, label_prefix="snippet"):
+    """
+    Replace an activity start/end (or other structural node) with a TriccNodeBridge.
+
+    Keeps the same id so existing edges remain valid.
+    """
+    if isinstance(node, TriccNodeBridge):
+        return node
+
+    bridge = TriccNodeBridge(
+        id=node.id,
+        group=getattr(node, "group", activity),
+        activity=activity,
+        label=f"{label_prefix}: {node.get_name()}",
+        name=getattr(node, "name", None) or f"path_{node.id}",
+        path_len=getattr(node, "path_len", 0) or 0,
+        instance=getattr(node, "instance", 0) or 0,
+        base_instance=getattr(node, "base_instance", None),
+    )
+    priority = getattr(node, "priority", None)
+    if priority is not None:
+        bridge.priority = priority
+
+    _swap_node_references(node, bridge)
+
+    if node.id in activity.nodes:
+        del activity.nodes[node.id]
+    activity.nodes[bridge.id] = bridge
+
+    if getattr(activity, "root", None) is node or getattr(activity, "root", None) and activity.root.id == node.id:
+        activity.root = bridge
+
+    if node in getattr(activity, "calculates", []):
+        activity.calculates.remove(node)
+
+    return bridge
+
+
+def _snippet_end_nodes(activity):
+    """
+    All terminal nodes of a cloned module that must not land on the parent activity.
+
+    Union of get_end_nodes() and every end/activity_end in activity.nodes (get_end_nodes
+    alone can miss TriccNodeEnd when root is activity_start).
+    """
+    ends = list(activity.get_end_nodes())
+    seen = {e.id for e in ends}
+    for n in activity.nodes.values():
+        if isinstance(n, (TriccNodeEnd, TriccNodeActivityEnd)) and n.id not in seen:
+            ends.append(n)
+            seen.add(n.id)
+    return ends
+
+
+def _resolve_activity_node(activity, node_or_id):
+    """Resolve a node object or id to a node living in activity.nodes."""
+    if node_or_id is None:
+        return None
+    if issubclass(getattr(node_or_id, "__class__", object), TriccBaseModel) and getattr(node_or_id, "id", None) in activity.nodes:
+        # Prefer the object stored on the activity (same id, current instance graph)
+        return activity.nodes.get(node_or_id.id, node_or_id)
+    nid = getattr(node_or_id, "id", node_or_id)
+    return activity.nodes.get(nid)
+
+
+def sync_prev_next_from_edges(activity, node_ids=None):
+    """
+    Rebuild prev_nodes/next_nodes from activity.edges.
+
+    After snippet inject, edges are the source of truth; object-level prev/next can be
+    stale (especially when the parent page is itself an activity instance).
+    If node_ids is set, only those nodes and their edge-neighbors are rebuilt.
+    """
+    if node_ids is not None:
+        node_ids = set(node_ids)
+        affected_ids = set(node_ids)
+        for edge in activity.edges:
+            sid = getattr(edge.source, "id", edge.source)
+            tid = getattr(edge.target, "id", edge.target)
+            if sid in node_ids or tid in node_ids:
+                affected_ids.add(sid)
+                affected_ids.add(tid)
+    else:
+        affected_ids = set(activity.nodes.keys())
+
+    for nid in affected_ids:
+        n = activity.nodes.get(nid)
+        if n is None:
+            continue
+        if hasattr(n, "prev_nodes"):
+            n.prev_nodes = OrderedSet()
+        if hasattr(n, "next_nodes"):
+            n.next_nodes = OrderedSet()
+
+    for edge in activity.edges:
+        sid = getattr(edge.source, "id", edge.source)
+        tid = getattr(edge.target, "id", edge.target)
+        if sid not in affected_ids and tid not in affected_ids:
+            continue
+        src = activity.nodes.get(sid)
+        tgt = activity.nodes.get(tid)
+        if src is None or tgt is None:
+            continue
+        if hasattr(src, "next_nodes") and tgt not in src.next_nodes:
+            src.next_nodes.add(tgt)
+        if hasattr(tgt, "prev_nodes") and src not in tgt.prev_nodes:
+            tgt.prev_nodes.add(src)
+
+
+def replace_snippet_ends_with_bridge(activity):
+    """
+    Replace all end / activity_end nodes of a snippet clone with one exit bridge.
+
+    The bridge takes over every end's prev_nodes (and incoming edges). All end nodes
+    are removed so they cannot mark the parent activity as "processed" later
+    (see walktrhough_tricc_node_processed_stached end-node handling).
+
+    Returns the exit TriccNodeBridge, or None if the activity has no ends.
+    """
+    ends = _snippet_end_nodes(activity)
+    if not ends:
+        logger.warning(f"Snippet activity {activity.get_name()} has no end nodes")
+        return None
+
+    end_ids = {e.id for e in ends}
+    # Union of predecessors that feed any end
+    prev_nodes = set()
+    for end in ends:
+        for prev in list(getattr(end, "prev_nodes", None) or set()):
+            prev_nodes.add(prev)
+        # Also collect from edges (prev_nodes may be incomplete at clone time)
+        for edge in activity.edges:
+            if edge.target == end.id or edge.target == end:
+                src_id = getattr(edge.source, "id", edge.source)
+                src = activity.nodes.get(src_id)
+                if src is not None and not isinstance(src, (TriccNodeEnd, TriccNodeActivityEnd)):
+                    prev_nodes.add(src)
+
+    # Include activity.instance so two injects of the same module never share an exit id
+    # (processed_nodes is id-equality based across the whole form).
+    bridge_id = generate_id(
+        f"snippet_exit{activity.id}{getattr(activity, 'instance', 0)}{''.join(sorted(end_ids))}"
+    )
+    exit_bridge = TriccNodeBridge(
+        id=bridge_id,
+        group=getattr(activity, "group", activity) or activity,
+        activity=activity,
+        label=f"snippet_exit: {activity.get_name()}",
+        name=f"path_{bridge_id}",
+        path_len=max((getattr(e, "path_len", 0) or 0) for e in ends) if ends else 0,
+        instance=getattr(activity, "instance", 0) or 0,
+    )
+    exit_bridge.prev_nodes = set()
+    exit_bridge.next_nodes = set()
+    activity.nodes[exit_bridge.id] = exit_bridge
+
+    # Rewire predecessors → exit bridge; drop edges that touched ends
+    new_edges = []
+    seen_prev_edge = set()
+    for edge in list(activity.edges):
+        src_id = getattr(edge.source, "id", edge.source)
+        tgt_id = getattr(edge.target, "id", edge.target)
+        if tgt_id in end_ids:
+            # Incoming to an end → point at the exit bridge (dedupe)
+            key = (src_id, exit_bridge.id)
+            if key not in seen_prev_edge:
+                edge.target = exit_bridge.id
+                new_edges.append(edge)
+                seen_prev_edge.add(key)
+            continue
+        if src_id in end_ids:
+            # Outgoing from an end (unusual) → re-source from exit bridge
+            edge.source = exit_bridge.id
+            new_edges.append(edge)
+            continue
+        new_edges.append(edge)
+    activity.edges = new_edges
+
+    # Object-level prev/next: detach ends, attach bridge
+    for prev in prev_nodes:
+        if hasattr(prev, "next_nodes"):
+            for end in ends:
+                if end in prev.next_nodes:
+                    prev.next_nodes.remove(end)
+            prev.next_nodes.add(exit_bridge)
+        if hasattr(prev, "path"):
+            for end in ends:
+                if getattr(prev, "path", None) is end:
+                    prev.path = exit_bridge
+        exit_bridge.prev_nodes.add(prev)
+
+    for end in ends:
+        for nxt in list(getattr(end, "next_nodes", None) or set()):
+            if hasattr(nxt, "prev_nodes") and end in nxt.prev_nodes:
+                nxt.prev_nodes.remove(end)
+                nxt.prev_nodes.add(exit_bridge)
+            exit_bridge.next_nodes.add(nxt)
+        end.prev_nodes = set()
+        end.next_nodes = set()
+        if end.id in activity.nodes:
+            del activity.nodes[end.id]
+        if end in getattr(activity, "calculates", []):
+            activity.calculates.remove(end)
+
+    return exit_bridge
+
+
+def _unregister_activity_instance(base_activity, clone):
+    """Avoid polluting the shared instances map used by positive instance gotos."""
+    base = base_activity.base_instance or base_activity
+    if hasattr(base, "instances") and clone.instance in base.instances:
+        if base.instances[clone.instance] is clone:
+            del base.instances[clone.instance]
+
+
+def _reparent_snippet_node(node, parent_activity, clone_activity):
+    node.activity = parent_activity
+    group = getattr(node, "group", None)
+    if group is None or group is clone_activity or getattr(group, "id", None) == clone_activity.id:
+        node.group = parent_activity
+    elif hasattr(group, "activity"):
+        group.activity = parent_activity
+
+
+def import_activity_nodes_into_parent(clone, parent):
+    """Move cloned activity nodes/edges/calculates/groups into the parent activity.
+
+    Returns the set of imported node ids (for prev/next rebuild).
+    """
+    imported_ids = set()
+    for node in list(clone.nodes.values()):
+        # Never lift terminal ends into the parent (breaks activity-processed detection)
+        if isinstance(node, (TriccNodeEnd, TriccNodeActivityEnd)):
+            logger.warning(
+                f"Skipping residual end {node.get_name()} during snippet import into {parent.get_name()}"
+            )
+            continue
+        _reparent_snippet_node(node, parent, clone)
+        # options / nested select options
+        if isinstance(node, TriccNodeSelect) and getattr(node, "options", None):
+            for opt in node.options.values():
+                _reparent_snippet_node(opt, parent, clone)
+                parent.nodes[opt.id] = opt
+                imported_ids.add(opt.id)
+        parent.nodes[node.id] = node
+        imported_ids.add(node.id)
+
+    for edge in list(clone.edges):
+        parent.edges.append(edge)
+
+    for calc in list(clone.calculates):
+        if isinstance(calc, (TriccNodeEnd, TriccNodeActivityEnd)):
+            continue
+        _reparent_snippet_node(calc, parent, clone)
+        if calc.id not in parent.nodes:
+            parent.nodes[calc.id] = calc
+            imported_ids.add(calc.id)
+        if calc not in parent.calculates:
+            parent.calculates.append(calc)
+
+    for group in list(clone.groups.values()):
+        if hasattr(group, "activity"):
+            group.activity = parent
+        if getattr(group, "group", None) is clone or getattr(group, "group", None) is None:
+            group.group = parent
+        parent.groups[group.id] = group
+
+    return imported_ids
+
+
+# Monotonic counter so every snippet inject gets distinct make_instance IDs even when
+# several gotos share the same caller.instance and the same module template.
+_snippet_inject_seq = 0
+
+
+def clone_activity_for_snippet(goto, target_activity):
+    """
+    Clone a target activity for snippet injection (unique IDs, not registered for reuse).
+
+    Caller should run linking_nodes on the clone before inject_activity_as_snippet,
+    because make_instance resets prev_nodes/next_nodes.
+
+    Instance numbers must be unique per inject. Node ids are generate_id(base_id + instance);
+    if two injects reuse the same number, processed_nodes (keyed by id equality) treats the
+    second exit bridge as already processed and never stashes that activity's end — the
+    outer wait on the caller activity then hangs forever.
+    """
+    global _snippet_inject_seq
+    from tricc_oo.converters.xml_to_tricc import apply_goto_repeat_to_activity
+
+    if not isinstance(target_activity, TriccNodeActivity):
+        logger.critical(
+            f"goto snippet {goto.get_name()} link is not an activity: {goto.link}"
+        )
+        exit(1)
+
+    # Resolve the template page (not a prior instance of the module)
+    template = target_activity.base_instance or target_activity
+    _snippet_inject_seq += 1
+    caller_inst = getattr(getattr(goto, "activity", None), "instance", 0) or 0
+    # High band + caller instance + goto id entropy + monotonic seq → unique node ids
+    goto_key = abs(hash(str(getattr(goto, "id", "")) + str(getattr(goto, "name", "")))) % 10000
+    snippet_nb = 900000 + (int(caller_inst) * 100000) + (goto_key * 10) + (_snippet_inject_seq % 10)
+    # Ensure not colliding with any live or previously used instance slot
+    used = set(getattr(template, "instances", {}) or {})
+    # Also reserve numbers that may still be referenced after unregister
+    while snippet_nb in used:
+        snippet_nb += 1
+        used.add(snippet_nb)
+
+    clone = template.make_instance(snippet_nb)
+    _unregister_activity_instance(template, clone)
+    apply_goto_repeat_to_activity(goto, clone)
+    return clone
+
+
+def inject_activity_as_snippet(goto, parent_page, clone):
+    """
+    Inline an already-cloned (and preferably already-linked) activity into parent_page
+    in place of a goto (instance == -1).
+
+    Returns the entry TriccNodeBridge that should replace the goto as the link target.
+    """
+    if not isinstance(clone, TriccNodeActivity):
+        logger.critical(
+            f"goto snippet {goto.get_name()}: expected cloned activity, got {type(clone)}"
+        )
+        exit(1)
+
+    if not isinstance(clone.root, (TriccNodeActivityStart, TriccNodeBridge, TriccNodeMainStart)):
+        logger.warning(
+            f"Snippet clone {clone.get_name()} root type is {type(clone.root)}; "
+            "expected activity_start"
+        )
+
+    # Ends first (while root is still activity_start so end detection stays reliable),
+    # then convert start → entry bridge.
+    exit_bridge = replace_snippet_ends_with_bridge(clone)
+    entry = convert_structural_node_to_bridge(clone.root, clone, label_prefix="snippet_entry")
+    if exit_bridge is None:
+        # No ends: still import content; exit wiring only if goto has successors
+        exit_bridge = entry
+
+    # Safety: never import residual end/activity_end nodes into the parent
+    for nid, n in list(clone.nodes.items()):
+        if isinstance(n, (TriccNodeEnd, TriccNodeActivityEnd)):
+            logger.warning(
+                f"Removing residual end node {n.get_name()} from snippet before import into {parent_page.get_name()}"
+            )
+            del clone.nodes[nid]
+    clone.calculates = [
+        c for c in getattr(clone, "calculates", []) or []
+        if not isinstance(c, (TriccNodeEnd, TriccNodeActivityEnd))
+    ]
+
+    imported_ids = import_activity_nodes_into_parent(clone, parent_page)
+    imported_ids.add(entry.id)
+    imported_ids.add(exit_bridge.id)
+
+    # Capture boundary neighbors BEFORE mutating goto / edges.
+    # Walkthrough only follows next_nodes (not edges); exit→successors must be set
+    # or activity_end never reaches stashed_nodes and waits on the caller activity stall.
+    goto_id = goto.id
+    predecessors = []
+    successors = []
+    seen_prev = set()
+    seen_next = set()
+
+    for edge in list(parent_page.edges):
+        src_id = getattr(edge.source, "id", edge.source)
+        tgt_id = getattr(edge.target, "id", edge.target)
+        if tgt_id == goto_id or edge.target == goto:
+            prev = _resolve_activity_node(parent_page, edge.source)
+            if prev is not None and prev.id not in seen_prev:
+                predecessors.append(prev)
+                seen_prev.add(prev.id)
+        if src_id == goto_id or edge.source == goto:
+            nxt = _resolve_activity_node(parent_page, edge.target)
+            if nxt is not None and nxt.id not in seen_next:
+                successors.append(nxt)
+                seen_next.add(nxt.id)
+
+    for prev in list(getattr(goto, "prev_nodes", None) or set()):
+        prev = _resolve_activity_node(parent_page, prev) or prev
+        pid = getattr(prev, "id", None)
+        if pid and pid not in seen_prev:
+            predecessors.append(prev)
+            seen_prev.add(pid)
+
+    for nxt in list(getattr(goto, "next_nodes", None) or set()):
+        nxt = _resolve_activity_node(parent_page, nxt) or nxt
+        nid = getattr(nxt, "id", None)
+        if nid and nid not in seen_next:
+            successors.append(nxt)
+            seen_next.add(nid)
+
+    # Also catch nodes that still list the goto in prev_nodes (edge may already be gone)
+    for n in list(parent_page.nodes.values()):
+        if n is goto:
+            continue
+        if hasattr(n, "prev_nodes") and goto in n.prev_nodes:
+            if n.id not in seen_next:
+                successors.append(n)
+                seen_next.add(n.id)
+        if hasattr(n, "next_nodes") and goto in n.next_nodes:
+            if n.id not in seen_prev:
+                predecessors.append(n)
+                seen_prev.add(n.id)
+
+    # Rewire parent edges that touched the goto
+    for edge in list(parent_page.edges):
+        if edge.target == goto_id or edge.target == goto:
+            edge.target = entry.id
+        if edge.source == goto_id or edge.source == goto:
+            edge.source = exit_bridge.id
+
+    # Ensure an edge exists for every boundary link (set_prev_next_node is edge-aware)
+    for prev in predecessors:
+        set_prev_next_node(prev, entry, replaced_node=goto, activity=parent_page)
+    for nxt in successors:
+        set_prev_next_node(exit_bridge, nxt, replaced_node=goto, activity=parent_page)
+
+    if not successors:
+        logger.warning(
+            "snippet inject for {} into {}: exit bridge has no successors "
+            "(activity_end / post-goto nodes may never enter stashed_nodes)".format(
+                goto.get_name(), parent_page.get_name()
+            )
+        )
+
+    goto.prev_nodes = OrderedSet()
+    goto.next_nodes = OrderedSet()
+
+    if goto_id in parent_page.nodes:
+        del parent_page.nodes[goto_id]
+    elif goto in parent_page.nodes.values():
+        for k, v in list(parent_page.nodes.items()):
+            if v is goto:
+                del parent_page.nodes[k]
+                break
+
+    if goto in getattr(parent_page, "calculates", []):
+        parent_page.calculates.remove(goto)
+
+    # Rebuild imported subgraph from edges, then force exit→successor / prev→entry
+    # (sync can miss links that only lived on prev/next without an edge).
+    sync_prev_next_from_edges(parent_page, imported_ids)
+    for prev in predecessors:
+        prev = _resolve_activity_node(parent_page, prev) or prev
+        set_prev_next_node(prev, entry, activity=parent_page)
+    for nxt in successors:
+        nxt = _resolve_activity_node(parent_page, nxt) or nxt
+        set_prev_next_node(exit_bridge, nxt, activity=parent_page)
+
+    if not exit_bridge.next_nodes and successors:
+        # Last resort: object-level only (should not happen if set_prev_next_node worked)
+        for nxt in successors:
+            nxt = _resolve_activity_node(parent_page, nxt) or nxt
+            if hasattr(exit_bridge, "next_nodes"):
+                exit_bridge.next_nodes.add(nxt)
+            if hasattr(nxt, "prev_nodes"):
+                nxt.prev_nodes.add(exit_bridge)
+
+    logger.debug(
+        "injected activity {} as snippet into {} (entry={}, exit={}, successors={})".format(
+            clone.get_name(),
+            parent_page.get_name(),
+            entry.get_name(),
+            exit_bridge.get_name(),
+            len(successors),
+        )
+    )
+    return entry
+
+
 def replace_prev_next_node(prev_node, next_node, old_node, force=False):
     replace_prev_node(prev_node, next_node, old_node)
     replace_next_node(prev_node, next_node, old_node)
@@ -2337,6 +2886,8 @@ def reorder_node_list(node_list, group, processed_nodes, priority_map = None):
         priority_map[group.id] = {}
     def get_priority(node):
         if isinstance(node, TriccNodePopulate):
+            return POPULATE_PRIORITY
+        if (getattr(node, "repeat", None) or 1) < 1:
             return POPULATE_PRIORITY
         explicit_priority = getattr(node, "priority", None) or 0
         if node.id in priority_map[group.id]:
