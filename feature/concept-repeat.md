@@ -3,11 +3,11 @@
 | Field | Value |
 |-------|-------|
 | **Status** | Implemented |
-| **Branch target** | `feature/repeat` |
+| **Branch target** | `feature/repeat` (core); evolutions on `feature/adv_merge_calc` |
+| **Related** | `feature/advanced-merge-calc.md`, `feature/populate-context.md` |
 | **Authoring surface** | draw.io attributes + YAML fixtures for tests |
 
-Valid status values: `Draft` → `Approved` → `Implemented` → `Superseded`.  
-Implementation must not start until status is **`Approved`** (see `AGENTS.md`).
+Valid status values: `Draft` → `Approved` → `Implemented` → `Superseded`.
 
 ---
 
@@ -67,11 +67,25 @@ Does **not** apply to:
 
 For those pre-encounter sources, authors may set **`repeat=0`** on the node to **force in-form collection** even when a value already exists in the patient record.
 
-### 3.3 What repeat does *not* do
+### 3.3 Local-only slot (`repeat=-1`)
 
-- **No inheritance across repeats.** A value captured at `repeat=1` is not merged into logic at `repeat=2`.
+Authors may set **`repeat=-1`** for a **local-only** capture of a concept:
+
+| Behaviour | Detail |
+|-----------|--------|
+| Addressable | Expressions can still reference the node by `name` |
+| No inheritance in | The node does **not** receive values from prior same-name versions |
+| No inheritance out | The node does **not** contribute its value to other nodes’ multi-version merges (`GET_INHERITED_VALUE`) |
+| Export name | No `_Rr_` suffix (same base as default `repeat=1`); uniqueness via `_Vv_n` in a shared export pool with `repeat <= 1` |
+
+Use when an activity needs a temporary or private copy of a concept that must not participate in encounter-wide value inheritance. See also `feature/advanced-merge-calc.md`.
+
+### 3.4 What repeat does *not* do
+
+- **No inheritance across positive repeats.** A value captured at `repeat=1` is not merged into logic at `repeat=2`.
 - **No change to the concept code.** The FHIR/clinical `name` stays the same; only the capture slot differs.
 - **Not the same as activity `instance`.** `instance` runs the whole activity tab again (e.g. a second wound in a repeat group). `repeat` is about multiple values for one concept within the encounter.
+- **`repeat=-1` is not a “history” index** — history look-ups use populate `context=history` / `GetHistoryValue` (see `feature/populate-context.md`).
 
 ## 4. Examples
 
@@ -99,7 +113,15 @@ activity_start  repeat=2
   integer  name=height   (no repeat) → effective repeat=2
 ```
 
-### 4.4 Existing diagrams (backward compatibility)
+### 4.4 Local-only weight (no inheritance)
+
+```text
+Activity A:  integer  name=weight  repeat=1     → 3.2 kg (encounter slot)
+Activity B:  integer  name=weight  repeat=-1    → asked again; does not inherit 3.2
+                                              → later nodes do not coalesce B into slot 1
+```
+
+### 4.5 Existing diagrams (backward compatibility)
 
 Diagrams **without** `repeat` behave exactly as today. Omitted `repeat` is treated as **`repeat=1`**, which matches current single-capture semantics.
 
@@ -107,38 +129,42 @@ Diagrams **without** `repeat` behave exactly as today. Omitted `repeat` is treat
 
 ### 5.1 Default concept references
 
-When authoring CQL or calculate expressions, a plain concept reference (e.g. `temperature`) resolves to the **latest captured version** for the default slot (`repeat=1`), preserving today’s behaviour.
+When authoring calculate expressions, a plain concept reference (e.g. `temperature`) resolves within the matching **repeat slot**. Multi-version display fields in the same slot may be wrapped in `GET_INHERITED_VALUE` so any filled instance is used (see `feature/advanced-merge-calc.md`).
 
 ### 5.2 Repeat-aware Helper functions (FHIR / OpenSRP)
 
-Three new Helper functions are planned (exact names to align with FHIR CQL conventions):
+Implemented Helper functions (see `repeat_helper.py`, `populate_helper.py`, and `feature/populate-context.md`):
 
 | Function | Purpose |
 |----------|---------|
-| `GetRepeated(code, repeat)` | Value for a specific repeat slot |
+| `GetRepeated` / `GetRepeatedValue` | Resource / scalar for a specific within-form repeat slot |
 | `GetNumberOfRepeat(code)` | How many repeat slots have been captured for this concept |
-| `GetHistoryValue(code, period, reverseOrderPosition, repeatIndex)` | Nth most recent capture in window (`period` null = entire chart; see `feature/populate-context.md`) |
+| `GetHistory` / `GetHistoryValue` | Chart history (resource / scalar); supersedes former `GetLast` / `GetLastValue` |
 
-On FHIR export, repeat index is stored as an **extension on the Observation** (and related resources) so downstream systems can distinguish multiple readings of the same code.
+On FHIR export, non-default repeat index is stored as a **Questionnaire item extension** and StructureMap/Observation hints so downstream systems can distinguish multiple readings of the same code.
 
 ## 6. Benefits
 
 - **Faithful guidelines** — protocols with repeated measurements map directly to the diagram.
 - **Cleaner data dictionary** — one concept code, multiple timed captures.
 - **Predictable UX** — authors control when to re-ask vs skip, per slot.
+- **Local isolation** — `repeat=-1` for private copies without global inheritance.
 - **Safe migration** — existing projects need no changes.
 
-## 7. Limitations and open decisions
+## 7. Limitations and resolved decisions
 
-- Whether `repeat` applies to **diagnosis / proposed_diagnosis** nodes is not yet decided.
-- Cross-activity behaviour: same `name` + same `repeat` in two activities will skip on the second (encounter-wide), matching current versioning — **proposed: keep this**.
-- Final FHIR extension URL and Helper naming to be confirmed during implementation.
+| Topic | Decision |
+|-------|----------|
+| Cross-activity same `(name, repeat)` | Skip on second capture (encounter-wide) — **kept** |
+| FHIR extension URL | `https://fhir.tricc.io/StructureDefinition/questionnaire-concept-repeat` |
+| History helpers | `GetHistoryValue` (not `GetLast`) — see populate-context |
+| `repeat` on diagnosis / proposed_diagnosis | Still open; not required for core capture path |
 
 ---
 
 # Part II — Technical Specification
 
-*Audience: TRICC developers and contributors. Do not implement until Part I is **Approved**.*
+*Audience: TRICC developers and contributors. Status: **Implemented** (core + `repeat=-1` + FHIR helpers).*
 
 ## 8. Formal semantics
 
@@ -152,7 +178,9 @@ On FHIR export, repeat index is stored as an **extension on the Observation** (a
 - Stored on **TRICC nodes**, not on `CodeSystem.concept`.
 - **Default:** `None` or omitted → **`1`** (`get_repeat(node) == 1`).
 - **Special:** `repeat=0` — force in-form capture for `input` / populate-style nodes when pre-encounter data exists.
-- **Versioning key:** `(name, repeat)` replaces `name` alone for `version_filter`, skip logic, and inheritance.
+- **Special:** `repeat=-1` — local-only: versioning/export peers with `repeat <= 1`, but **excluded** from value inheritance sources and receivers (`_filter_inheritable_versions`, early return in `get_version_inheritance`).
+- **Versioning key:** `(name, repeat)` for `version_filter`, skip logic, and inheritance scoping.
+- **Export pool key:** `(name, repeat)` when `repeat > 1`; else `(name, "<=1")` so default and `-1` share `_Vv_` renumbering without `_Rr_`.
 
 ### 8.2 Activity propagation
 
@@ -170,8 +198,8 @@ Implementation point: `xml_to_tricc.py` → `propagate_activity_repeat(activity)
 | Attribute | Where | Purpose | Export suffix |
 |-----------|-------|---------|---------------|
 | `instance` | `activity_start`, `goto`, `TriccNodeActivity` | Multiple runs of an activity tab | `_Ii_<n>` |
-| `version` | Assigned at processing | Revisit of same `(name, repeat)` | `_Vv_<n>` |
-| `repeat` | Node or `activity_start` | Multiple capture slots per concept | `_Rr_<n>` when `n != 1` |
+| `version` | Assigned at processing | Revisit of same export base | `_Vv_<n>` |
+| `repeat` | Node or `activity_start` | Multiple capture slots per concept | `_Rr_<n>` only when `n > 1` |
 
 ### 8.4 Core helper
 
@@ -192,16 +220,19 @@ Extend the Helper library (`fhir_form.py` template / `FHIRcore.md`):
 define function GetRepeated(code String, repeatIndex Integer):
   -- Observation with matching code and repeat extension = repeatIndex
 
+define function GetRepeatedValue(code String, repeatIndex Integer):
+  -- Scalar value for slot
+
 define function GetNumberOfRepeat(code String):
   -- Count of distinct repeat slots captured for code
 
 define function GetHistoryValue(code String, period String, reverseOrderPosition Integer, repeatIndex Integer):
-  -- Nth most recent Observation for code (supersedes GetLast; see populate-context spec)
+  -- Nth most recent Observation for code (see feature/populate-context.md; replaces GetLast)
 ```
 
-- Persist repeat index via **Observation extension** on export.
-- Plain `GetObservation(code)` continues to return the latest value for `repeat=1` (backward compatible).
-- Questionnaire `linkId`: disambiguate slots, e.g. `weight__Rr_2` when `repeat != 1`.
+- Questionnaire item extension for non-default repeat (URL in §7).
+- Plain observation accessors continue to return the latest value for `repeat=1` (backward compatible).
+- Export / `linkId` disambiguation uses `_Rr_<n>` when `repeat > 1`.
 
 ---
 
@@ -221,20 +252,20 @@ flowchart LR
 
 | Function | Required change |
 |----------|-----------------|
-| `version_filter(name)` | Match `name` **and** `get_repeat(item) == get_repeat(node)` |
-| `get_versions`, `get_last_version`, `set_last_version_false` | Use updated filter |
-| `get_next_version` | Max version within `(name, repeat)` |
-| `load_calculate` skip block (~L311–340) | `all_prev_versions` only same `repeat` |
-| `get_version_inheritance` | Input set pre-filtered by repeat |
+| `version_filter(name, repeat)` | Match `name` **and** optional `get_repeat(item) == repeat` (includes `-1`) |
+| `get_versions`, `get_last_version` | Scoped by `(name, repeat)` |
+| `set_last_version_false` | Export-name peers: `repeat > 1` isolated; `repeat <= 1` (incl. `-1`) share pool |
+| `load_calculate` skip / inheritance | `all_prev_versions` only same `repeat`; then `get_version_inheritance` |
+| `get_version_inheritance` | Skip receiver when `repeat=-1`; drop prior `-1` from operands; multi-version merge (see advanced-merge-calc) |
 | `export_proposed_diags` / `export_diags` | Dedup by `(name, repeat)` if applicable |
 
 ### 9.2 Export names (`tricc_oo/converters/tricc_to_xls_form.py`)
 
-Add `REPEAT_SEPARATOR = "_Rr_"`.
+`REPEAT_SEPARATOR = "_Rr_"`.
 
 Suffix order when multiple apply: `name + _Rr_<repeat> + _Vv_<version>` (+ `_Ii_<instance>` for activity instances).
 
-Apply suffix only when `get_repeat(node) != 1`.
+Apply `_Rr_` suffix **only when `get_repeat(node) > 1`** (not for `0` or `-1`).
 
 ---
 
@@ -317,35 +348,37 @@ Apply suffix only when `get_repeat(node) != 1`.
 
 ## 12. Test acceptance criteria
 
-- [ ] Diagrams without `repeat` pass all existing inheritance tests unchanged.
-- [ ] Same `name`, `repeat=1` then `repeat=2`: both inputs active (no cross-repeat skip).
-- [ ] Same `name`, same `repeat`: second input skipped (matches current versioning).
-- [ ] Activity `repeat=3` forces `repeat=3` on all in-scope descendants.
-- [ ] `input` / populate nodes excluded from activity propagation; `repeat=0` forces capture.
-- [ ] `get_export_name`: no `_Rr_` suffix when `repeat=1`; suffix when `repeat>=2`.
-- [ ] FHIR: two repeat slots → two Questionnaire items; Observation carries repeat extension.
-- [ ] No COALESCE / expression merge across different `repeat` values for the same `name`.
-- [ ] `GetRepeated`, `GetNumberOfRepeat`, `GetHistoryValue` covered by CQL tests.
+- [x] Diagrams without `repeat` pass all existing inheritance tests unchanged.
+- [x] Same `name`, `repeat=1` then `repeat=2`: both inputs active (no cross-repeat skip).
+- [x] Same `name`, same `repeat`: second input gets skip relevance (matches current versioning).
+- [x] Activity `repeat=3` forces `repeat=3` on all in-scope descendants.
+- [x] `get_export_name`: no `_Rr_` when `repeat<=1` (incl. `0`, `-1`); suffix when `repeat>=2`.
+- [x] No COALESCE / expression merge across different `repeat` values for the same `name`.
+- [x] `repeat=-1` resolvable by reference; excluded from inheritance source/receiver.
+- [x] Export pool renumbers `repeat=-1` with default slot peers for unique `_Vv_` names.
+- [x] FHIR: repeat Helper CQL + Questionnaire extension (`tests/test_fhir_repeat.py`).
+- [ ] Full activity propagation exclusion matrix for `input` / populate + `repeat=0` force-capture (partial; see populate-context tests).
+- [ ] Scratchpad stencil attribute coverage for all capture types (optional tooling follow-up).
 
 ---
 
 ## 13. Implementation phases
 
-| Phase | Scope | Deliverable |
-|-------|-------|-------------|
-| **1** | Models + parse + activity propagation | Round-trip attributes; propagation tests |
-| **2** | Visitor versioning / skip logic | YAML regression fixtures |
-| **3** | XLSForm / CHT / CDSS export names | `build.py` smoke tests |
-| **4** | FHIR Helper + Questionnaire + extension | CQL / SDC tests per `FHIRcore.md` |
-| **5** | Docs + scratchpad stencils | Author-facing docs; status → `Implemented` |
+| Phase | Scope | Status |
+|-------|-------|--------|
+| **1** | Models + parse + activity propagation | Done |
+| **2** | Visitor versioning / skip logic + `repeat=-1` | Done |
+| **3** | XLSForm / CHT export names | Done |
+| **4** | FHIR Helper + Questionnaire extension | Done (core) |
+| **5** | Docs + advanced merge interaction | Done (this branch) |
 
 ---
 
 ## 14. References (current codebase)
 
-- Version filter / inheritance: `tricc_oo/visitors/tricc.py` — `version_filter`, `get_version_inheritance`, `load_calculate`
-- Skip relevance: `has_node_data_operation` (~L380), block ~L311–340
-- Export names: `tricc_oo/converters/tricc_to_xls_form.py` — `VERSION_SEPARATOR`, `INSTANCE_SEPARATOR`
+- Version filter / inheritance: `tricc_oo/visitors/tricc.py` — `version_filter`, `get_version_inheritance`, `set_last_version_false`, `load_calculate`, `_filter_inheritable_versions`
+- Multi-version merge: `feature/advanced-merge-calc.md`
+- Export names: `tricc_oo/converters/tricc_to_xls_form.py` — `REPEAT_SEPARATOR`, `VERSION_SEPARATOR`, `INSTANCE_SEPARATOR`
 - Attribute map: `tricc_oo/converters/drawio_type_map.py`
-- Inheritance fixtures: `tests/data/yaml/inheritance_versioning_basic.yaml`
+- Tests: `tests/test_concept_repeat.py`, `tests/test_fhir_repeat.py`, `tests/data/yaml/concept_repeat_activity_inherit.yaml`
 - Test matrix: `docs/testing/transformation-test-coverage.md`

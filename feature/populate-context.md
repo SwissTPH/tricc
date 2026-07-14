@@ -4,11 +4,10 @@
 |-------|-------|
 | **Status** | Implemented |
 | **Branch target** | `develop` |
-| **Related** | `feature/concept-repeat.md` |
+| **Related** | `feature/concept-repeat.md`, `feature/advanced-merge-calc.md` |
 | **Authoring surface** | draw.io attributes + YAML fixtures |
 
-Valid status values: `Draft` → `Approved` → `Implemented` → `Superseded`.  
-Implementation must not start until status is **`Approved`** (see `AGENTS.md`).
+Valid status values: `Draft` → `Approved` → `Implemented` → `Superseded`.
 
 ---
 

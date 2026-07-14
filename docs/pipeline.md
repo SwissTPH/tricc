@@ -39,7 +39,29 @@ This allows draft pages to stay in the model without entering full downstream ge
 - `link_out` to `link_in` resolution
 - loop warnings and edge validation
 
-## 6) Output strategy execution
+Display text with `${field}` tokens is converted to concatenate operations at **input load**
+for display models only (see `feature/display-text-injection.md`).
+
+## 6) Calculate load, versioning, and inheritance
+
+Core walk in `tricc_oo/visitors/tricc.py` (`load_calculate` and related):
+
+1. **`set_last_version_false`** — renumbers export-name peers so ODK field names stay unique
+   (`_Vv_n`; `_Rr_n` only when `repeat > 1`). Peers with `repeat <= 1` (including `-1`) share one pool.
+2. **`get_versions` / `version_filter`** — prior nodes for the same `(name, repeat)`.
+3. **`get_version_inheritance`** — merges **all** prior versions into the current node’s
+   expression / relevance / save calculate (advanced merge; see `feature/advanced-merge-calc.md`):
+   - `GET_INHERITED_VALUE` for multi-version display/calculate values
+   - datatype-aware `merge_expressions` (boolean OR, numeric coalesce/plus, …)
+   - origin-signature grouping when calculate formulas differ
+   - `repeat=-1` excluded as source and receiver of value inheritance
+   - `populate` with `context=history` skips value inheritance
+4. **Relevance / skip** — same-slot prior captures can suppress re-asking; different `repeat` slots do not.
+5. **`process_reference` / `process_operation_reference`** — resolve refs; for value expressions,
+   multi-version display models expand to `GET_INHERITED_VALUE` (newer-first). Relevance keeps a
+   single last-version ref.
+
+## 7) Output strategy execution
 
 After project graph creation, selected output strategy runs (`-O`).
 
@@ -59,3 +81,5 @@ Built-in output strategies (registered in `tricc_oo/strategies/__init__.py`):
 
 Lookup by name: `get_output_strategy("XLSFormCHTHFStrategy")` or pass the class directly in tests.
 List registered names: `list_output_strategies()` from `tricc_oo.strategies.registry`.
+
+`GET_INHERITED_VALUE` serializes as **`coalesce(...)`** in XLSForm/CHT strategies.

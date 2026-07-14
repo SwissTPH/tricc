@@ -65,18 +65,24 @@ This is the most important area for regression testing.
 
 ### 2.3 Inheritance & Versioning (Critical for Clinical Safety)
 
-| Method / Function                  | Location                  | Responsibility | Recommended Test Cases |
-|------------------------------------|---------------------------|----------------|------------------------|
-| `set_last_version_false`           | `visitors/tricc.py:148`   | Marks older versions of a node as `last=False` and assigns increasing `version` | **Must-have dedicated test** |
-| `get_version_inheritance`          | `visitors/tricc.py:161`   | Merges applicability/relevance/calculate from all previous versions of a node | **High priority** |
-| `get_versions` / `version_filter`  | `visitors/tricc.py`       | Finds prior versions scoped by `(name, repeat)` | `test_concept_repeat.py`, inheritance YAML fixtures |
+| Method / Function                  | Location                  | Responsibility | Test coverage |
+|------------------------------------|---------------------------|----------------|---------------|
+| `set_last_version_false`           | `visitors/tricc.py`       | Marks export-name peers `last=False` and assigns unique `version` (`repeat<=1` share pool) | `test_concept_repeat.py` |
+| `get_version_inheritance`          | `visitors/tricc.py`       | Merges **all** previous versions (not only last); `GET_INHERITED_VALUE` + origin grouping | inheritance YAML, `test_display_reference_inheritance.py`, `test_concept_repeat.py` |
+| `merge_expressions`                | `visitors/tricc.py`       | Datatype-aware combine (boolean OR, numeric coalesce/plus, …) | inheritance YAML |
+| `get_versions` / `version_filter`  | `visitors/tricc.py`       | Prior versions scoped by `(name, repeat)` | `test_concept_repeat.py` |
+| `_filter_inheritable_versions`     | `visitors/tricc.py`       | Drops `repeat=-1` from inheritance operands | `test_concept_repeat.py` |
 | `get_repeat` / `propagate_activity_repeat` | `models/base.py`, `xml_to_tricc.py` | Concept repeat slot resolution and activity propagation | `test_concept_repeat.py`, `concept_repeat_activity_inherit.yaml` |
-| `is_factor_edge_label` / `process_factor_edge` / `get_factor_terms` | `xml_to_tricc.py`, `visitors/tricc.py` | Rhombus/select factor edges → `TriccNodeFactor` (if path then factor else 0) | `test_rhombus_factor_edge.py`, clinical scoring draw.io |
-| `get_last_version`                 | `visitors/tricc.py:96`    | Finds the most recent prior version | Same |
-| `get_max_version`                  | `visitors/tricc.py:76`    | Internal max version helper | Covered by above |
+| `process_operation_reference` (`inherit_display_versions`) | `visitors/tricc.py` | Multi-version DisplayModel → `GET_INHERITED_VALUE` in value expressions only | `test_display_reference_inheritance.py` |
+| `is_factor_edge_label` / `process_factor_edge` / `get_factor_terms` | `xml_to_tricc.py`, `visitors/tricc.py` | Rhombus/select factor edges → `TriccNodeFactor` | `test_rhombus_factor_edge.py` |
+| `get_last_version`                 | `visitors/tricc.py`       | Most recent prior version | Same as version_filter |
+| Display text injection             | `visitors/text_injection.py` | `${ref}` → CONCATENATE on DisplayModel fields | `test_text_injection.py`, `note_text_injection.yaml` |
+| Goto snippet injection             | `visitors/tricc.py`, drawio/yaml | `goto.instance=-1` inlines activity | `test_goto_snippet.py` |
 
 **Recommended test approach**:
 Create YAML fixtures that deliberately create name collisions across activities (e.g. two different "is_adult" calculates or two "final_diagnosis" nodes). This is extremely hard to do reliably with draw.io.
+
+Feature specs: `feature/advanced-merge-calc.md`, `feature/concept-repeat.md`.
 
 ---
 
@@ -116,29 +122,35 @@ These are usually exercised indirectly by the higher-level methods above.
 
 ---
 
-## 3. Current Test Assets (as of 2026-06)
+## 3. Current Test Assets (as of 2026-07)
 
 ### YAML Fixtures (under `tests/data/yaml/`)
 - `basic_flow_with_calc.yaml` — Foundational calculate + simple flow
 - `select_with_options.yaml` — Option wiring + select nodes
 - `minimal_decision.yaml` — Rhombus + reference expression + conditional edges
+- `inheritance_versioning_basic.yaml` — basic name collision + versioning
+- `inheritance_relevance_merge.yaml` — relevance + expression merging across versions + rhombus using the inherited name
+- `concept_repeat_activity_inherit.yaml` — activity-level `repeat` propagation
+- `note_text_injection.yaml` — `${ref}` display text injection
+- `goto_snippet_injection.yaml` / `goto_snippet_double_inject.yaml` / `goto_instance_nested.yaml` — goto snippet vs nested instance
+- `populate_patient.yaml` / `populate_encounter.yaml` / `populate_history.yaml` — populate contexts
 
 **Gap**: We currently lack dedicated fixtures for:
 - Multi-process + diagnosis ordering
 - Complex count/add/rhombus expression trees
 - Applicability at activity level
-
-**Now covered** (as of 2026-06):
-- `inheritance_versioning_basic.yaml` — basic name collision + versioning
-- `inheritance_relevance_merge.yaml` — relevance + expression merging across versions + rhombus using the inherited name
-- `concept_repeat_activity_inherit.yaml` — activity-level `repeat` propagation
+- End-to-end multi-activity inheritance when intermediate activities are skipped (unit coverage exists; YAML E2E optional)
 
 ### Existing Python Tests
-- `tests/test_concept_repeat.py` — Concept repeat versioning, skip logic, activity propagation, export suffixes
+- `tests/test_concept_repeat.py` — Concept repeat versioning, skip logic, activity propagation, export suffixes, `repeat=-1`
+- `tests/test_display_reference_inheritance.py` — multi-version DisplayModel → `GET_INHERITED_VALUE`
+- `tests/test_text_injection.py` — display `${ref}` parse / ODK serialize
+- `tests/test_goto_snippet.py` — goto `instance=-1` snippet injection
+- `tests/test_populate_context.py` — populate context behaviour
 - `tests/test_fhir_repeat.py` — FHIR repeat extensions and Helper CQL accessors
 - `tests/test_rhombus_factor_edge.py` — Integer (+/-) factor labels on rhombus out-edges
+- `tests/test_stashed_loop_mermaid.py` — stashed-node loop diagnostics
 - `tests/test_strategies/test_opensrp_strategy.py` — OpenSRP / FHIR pipeline (FSH, PlanDefinition, smoke build)
-- Limited deep coverage of `visitors/tricc.py` beyond the fixtures above
 
 ---
 

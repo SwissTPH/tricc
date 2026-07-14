@@ -99,8 +99,11 @@ integer `repeat` on a capture node or on `activity_start`.
 - Omitted `repeat` behaves as **`repeat=1`** (backward compatible with existing diagrams).
 - Same `name` + same `repeat` in a later activity is skipped if already captured (encounter-wide).
 - **No cross-repeat inheritance** — a value at `repeat=1` is not merged into logic at `repeat=2`.
-- Export suffix when `repeat != 1`: `_Rr_<n>` (alongside existing `_Vv_<n>` version and `_Ii_<n>` instance suffixes).
+- Export suffix **`_Rr_<n>` only when `repeat > 1`** (alongside `_Vv_<n>` version and `_Ii_<n>` instance suffixes). Values `0` and `-1` do not get `_Rr_`.
 - `repeat=0` on `input` / pre-filled nodes forces in-form collection even when pre-encounter data exists.
+- **`repeat=-1` (local-only):** node stays referenceable by name, but does **not** inherit prior values and does **not** feed other nodes’ multi-version coalesce. Shares the export base with default `repeat=1`; uniqueness uses `_Vv_n` peer renumbering.
+
+**Same-name value merge:** when several versions of a concept exist in one slot, calculates and expression refs may merge **all** prior versions (`GET_INHERITED_VALUE` → ODK `coalesce`). See `feature/advanced-merge-calc.md`.
 
 **FHIR / OpenSRP:** non-default repeat slots emit Questionnaire item extensions and
 repeat-aware Helper CQL (`GetRepeatedValue`, `GetNumberOfRepeat`, `GetHistoryValue`). See

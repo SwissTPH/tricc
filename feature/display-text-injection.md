@@ -4,7 +4,7 @@
 |-------|-------|
 | **Status** | Implemented |
 | **Branch target** | `feature/adv_merge_calc` / `develop` |
-| **Related** | ODK/CHT label injection; FHIR CONCATENATE export |
+| **Related** | ODK/CHT label injection; FHIR CONCATENATE export; multi-version refs via `feature/advanced-merge-calc.md` |
 | **Authoring surface** | draw.io attributes + YAML fixtures |
 
 Valid status values: `Draft` → `Approved` → `Implemented` → `Superseded`.

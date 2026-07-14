@@ -4,7 +4,7 @@
 |-------|-------|
 | **Status** | Implemented |
 | **Branch target** | `feature/adv_merge_calc` / `develop` |
-| **Related** | Activity `goto`, multi-instance activities, bridge/wait scaffolding |
+| **Related** | Activity `goto`, multi-instance activities, bridge/wait scaffolding; same-name versioning after multi-inject (`feature/advanced-merge-calc.md`, `feature/concept-repeat.md`) |
 | **Authoring surface** | draw.io `instance` attribute on `goto`; YAML `instance: -1` |
 
 Valid status values: `Draft` → `Approved` → `Implemented` → `Superseded`.
