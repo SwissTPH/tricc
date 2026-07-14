@@ -32,10 +32,14 @@ logger = logging.getLogger("default")
 
 
 def _concept_export_base_name(node, replace_dots=True):
-    """Build the concept base name, including repeat suffix when repeat != 1."""
+    """Build the concept base name, including repeat suffix when repeat > 1.
+
+    repeat < 1 (history / non-repeated slots) and the default repeat=1 are not
+    serialised into the export name.
+    """
     name = node.name
     repeat = get_repeat(node)
-    if repeat != 1:
+    if repeat is not None and repeat > 1:
         name = name + REPEAT_SEPARATOR + str(repeat)
     return clean_name(name, replace_dots=replace_dots)
 

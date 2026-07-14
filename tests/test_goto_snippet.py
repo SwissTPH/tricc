@@ -160,6 +160,48 @@ class TestGotoSnippetInjection(unittest.TestCase):
         self.assertTrue(found_on_nested, "mod_age should be on nested activity instance")
         self.assertNotIn("mod_age", parent_names)
 
+    def test_double_snippet_inject_unique_versions_and_export_names(self):
+        """Two injects of the same module must not produce duplicate export names."""
+        from collections import Counter
+        from tricc_oo.converters.tricc_to_xls_form import get_export_name
+
+        project = _load_yaml("goto_snippet_double_inject.yaml")
+        parent = project.start_pages.get("main")
+        self.assertIsNotNone(parent)
+
+        weights = [
+            n for n in parent.nodes.values() if getattr(n, "name", None) == "weight"
+        ]
+        self.assertEqual(len(weights), 2, "expected two weight captures from two injects")
+        versions = sorted(w.version for w in weights)
+        self.assertEqual(versions, [1, 2])
+
+        export_names = []
+        for w in weights:
+            w.export_name = None
+            export_names.append(get_export_name(w))
+        self.assertEqual(len(set(export_names)), 2, export_names)
+
+        # Calculates that reference weight must also resolve (no stash deadlock)
+        flags = [
+            n for n in parent.nodes.values() if getattr(n, "name", None) == "bmi_flag"
+        ]
+        self.assertEqual(len(flags), 2)
+        flag_exports = []
+        for f in flags:
+            f.export_name = None
+            flag_exports.append(get_export_name(f))
+        self.assertEqual(len(set(flag_exports)), 2, flag_exports)
+
+        # No duplicate export names among named parent nodes
+        all_exports = []
+        for n in parent.nodes.values():
+            if getattr(n, "name", None) and hasattr(n, "export_name"):
+                n.export_name = None
+                all_exports.append(get_export_name(n))
+        dupes = {k: v for k, v in Counter(all_exports).items() if v > 1}
+        self.assertEqual(dupes, {}, f"duplicate export names after double snippet inject: {dupes}")
+
 
 if __name__ == "__main__":
     unittest.main()

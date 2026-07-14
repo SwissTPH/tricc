@@ -2,13 +2,20 @@
 
 import unittest
 
-from tricc_oo.models.base import get_repeat, TriccOperation
+from tricc_oo.models.base import get_repeat, TriccOperation, TriccOperator
 from tricc_oo.models.tricc import TriccNodeInteger, TriccNodeActivity
 from tricc_oo.models.calculate import TriccNodeActivityStart
 from tricc_oo.models.ordered_set import OrderedSet
 from tricc_oo.converters.tricc_to_xls_form import get_export_name, REPEAT_SEPARATOR
 from tricc_oo.converters.xml_to_tricc import propagate_activity_repeat
-from tricc_oo.visitors.tricc import get_versions, version_filter, load_calculate, set_prev_next_node
+from tricc_oo.visitors.tricc import (
+    get_versions,
+    get_last_version,
+    version_filter,
+    load_calculate,
+    set_prev_next_node,
+    get_version_inheritance,
+)
 
 from tests.helpers import load_yaml_project
 
@@ -64,12 +71,102 @@ class TestVersionFilterRepeat(unittest.TestCase):
         self.assertTrue(filt(a))
         self.assertTrue(filt(b))
 
+    def test_repeat_minus_one_is_resolvable_by_reference(self):
+        """repeat=-1 must remain findable (references must not break)."""
+        normal = self._node("weight", 1)
+        local = self._node("weight", -1)
+        self.assertTrue(version_filter("weight", -1)(local))
+        self.assertTrue(version_filter("weight")(local))  # unrestricted includes it
+        self.assertEqual(get_versions("weight", [normal, local], repeat=-1), [local])
+        processed = OrderedSet()
+        processed.add(normal)
+        processed.add(local)
+        self.assertEqual(get_last_version("weight", processed, repeat=-1), local)
+
+    def test_set_last_version_renumbers_peers_for_unique_export_names(self):
+        """Linking a new same-name node renumbers all prior peers for unique names."""
+        from tricc_oo.visitors.tricc import set_last_version_false
+        from tricc_oo.converters.tricc_to_xls_form import get_export_name
+
+        a = TriccNodeInteger(id="a", name="weight", label="A", repeat=-1, path_len=1)
+        b = TriccNodeInteger(id="b", name="weight", label="B", repeat=-1, path_len=2)
+        c = TriccNodeInteger(id="c", name="weight", label="C", repeat=-1, path_len=3)
+        processed = OrderedSet()
+        processed.add(a)
+        set_last_version_false(b, processed)
+        processed.add(b)
+        set_last_version_false(c, processed)
+        self.assertEqual(a.version, 1)
+        self.assertEqual(b.version, 2)
+        self.assertEqual(c.version, 3)
+        self.assertIs(a.last, False)
+        self.assertIs(b.last, False)
+        names = {get_export_name(n) for n in (a, b, c)}
+        self.assertEqual(len(names), 3, names)
+
+    def test_set_last_version_export_pool_merges_minus_one_and_default(self):
+        """repeat=-1 and repeat=1 share export base → shared version renumbering."""
+        from tricc_oo.visitors.tricc import set_last_version_false
+        from tricc_oo.converters.tricc_to_xls_form import get_export_name
+
+        local = TriccNodeInteger(id="local", name="weight", label="Local", repeat=-1, path_len=1)
+        first = TriccNodeInteger(id="w1", name="weight", label="W1", repeat=1, path_len=2)
+        second = TriccNodeInteger(id="w2", name="weight", label="W2", repeat=1, path_len=3)
+        processed = OrderedSet()
+        processed.add(local)
+        processed.add(first)
+        set_last_version_false(second, processed)
+        self.assertIs(local.last, False)
+        self.assertIs(first.last, False)
+        # Three peers in the same export pool (no _Rr_ for either slot)
+        self.assertEqual({local.version, first.version, second.version}, {1, 2, 3})
+        exports = set()
+        for n in (local, first, second):
+            n.export_name = None
+            exports.add(get_export_name(n))
+        self.assertEqual(len(exports), 3, exports)
+
+
+class TestVersionInheritanceRepeatMinusOne(unittest.TestCase):
+    def test_get_version_inheritance_skips_repeat_minus_one_receiver(self):
+        """A node with repeat=-1 does not get GET_INHERITED_VALUE expression."""
+        prev = TriccNodeInteger(id="w1", name="weight", label="W1", repeat=1)
+        node = TriccNodeInteger(id="w_local", name="weight", label="Local", repeat=-1)
+        before = getattr(node, "expression", None)
+        get_version_inheritance(node, [prev], OrderedSet())
+        expr = getattr(node, "expression", None)
+        self.assertEqual(expr, before)
+        self.assertFalse(
+            isinstance(expr, TriccOperation)
+            and expr.operator == TriccOperator.GET_INHERITED_VALUE
+        )
+
+    def test_repeat_minus_one_not_in_inheritance_operands(self):
+        """Prior repeat=-1 must not appear in GET_INHERITED_VALUE for normal slots."""
+        from tricc_oo.visitors.tricc import _filter_inheritable_versions
+
+        local = TriccNodeInteger(id="w_local", name="weight", label="Local", repeat=-1)
+        first = TriccNodeInteger(id="w1", name="weight", label="W1", repeat=1)
+        filtered = _filter_inheritable_versions([local, first])
+        self.assertEqual(filtered, [first])
+
 
 class TestExportNameRepeat(unittest.TestCase):
     def test_no_suffix_for_default_repeat(self):
         node = TriccNodeInteger(id="e1", name="weight", label="Weight")
         node.gen_name()
         self.assertEqual(get_export_name(node), "weight")
+
+    def test_no_suffix_for_repeat_less_than_one(self):
+        """repeat < 1 (e.g. history) must not appear in export names."""
+        for repeat in (0, -1):
+            node = TriccNodeInteger(
+                id=f"e0_{repeat}", name="weight", label="Weight", repeat=repeat
+            )
+            node.gen_name()
+            export = get_export_name(node)
+            self.assertEqual(export, "weight", f"repeat={repeat}")
+            self.assertNotIn(REPEAT_SEPARATOR, export)
 
     def test_suffix_for_repeat_two(self):
         node = TriccNodeInteger(id="e2", name="weight", label="Weight", repeat=2)

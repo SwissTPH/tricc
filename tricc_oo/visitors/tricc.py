@@ -90,6 +90,11 @@ def get_versions(name, iterable, repeat=None):
 
 
 def version_filter(name, repeat=None):
+    """Match nodes by name (+ optional repeat slot) for versioning / reference lookup.
+
+    Does not special-case ``repeat=-1``: those nodes stay resolvable by reference.
+    Value inheritance excludes ``-1`` separately when building GET_INHERITED_VALUE.
+    """
     from tricc_oo.models.base import get_repeat as _get_repeat
 
     def _matches(item):
@@ -215,21 +220,104 @@ def get_node_expressions(node, processed_nodes, process=None):
     return expression
 
 
+def _filter_inheritable_versions(versions):
+    """Drop repeat=-1 nodes from value-inheritance operand lists.
+
+    Those nodes remain addressable for references / version numbering, but must
+    not contribute to GET_INHERITED_VALUE / coalesce inheritance.
+    """
+    return [v for v in (versions or []) if get_repeat(v) != -1]
+
+
+def _export_version_bucket_key(name, repeat):
+    """Group key for nodes that share an export base name.
+
+    ``get_export_name`` only serialises ``_Rr_<n>`` when ``repeat > 1``.
+    Therefore ``repeat <= 1`` (including ``-1`` and default ``1``) share one
+    export base and must share one version number space to avoid
+    ``name_Vv_1`` collisions across slots.
+    """
+    if repeat is not None and int(repeat) > 1:
+        return (name, int(repeat))
+    return (name, "<=1")
+
+
+def export_version_filter(name, node_repeat):
+    """Match nodes that share the same export base name as (name, node_repeat)."""
+
+    def _matches(item):
+        if isinstance(item, TriccNodeSelectOption):
+            return False
+        if isinstance(item, TriccNodeEnd):
+            if name != item.get_reference():
+                return False
+            # Ends participate in the default export pool
+            return _export_version_bucket_key(name, node_repeat if node_repeat is not None else 1)[1] == "<=1"
+        if not hasattr(item, "name") or item.name != name:
+            return False
+        return _export_version_bucket_key(name, get_repeat(item)) == _export_version_bucket_key(
+            name, node_repeat if node_repeat is not None else 1
+        )
+
+    return _matches
+
+
+def get_export_version_peers(name, node_repeat, iterable, exclude=None):
+    """Return nodes that would collide in export name without unique versions."""
+    filt = export_version_filter(name, node_repeat)
+    return [n for n in iterable if n is not exclude and filt(n)]
+
+
 def set_last_version_false(node, processed_nodes):
+    """Mark prior export-name peers as not-last and assign unique versions.
+
+    Peers are nodes that share the same export base (same name; same ``repeat``
+    when ``repeat > 1``, else all ``repeat <= 1`` including ``-1``). This keeps
+    ODK survey names unique when ``_Rr_`` is omitted for low/negative repeats.
+    """
     if isinstance(node, (TriccNodeSelectOption)):
         return
     from tricc_oo.models.base import get_repeat
 
     node_name = node.name if not isinstance(node, TriccNodeEnd) else node.get_reference()
     node_repeat = None if isinstance(node, TriccNodeEnd) else get_repeat(node)
-    last_version = processed_nodes.find_prev(node, version_filter(node_name, node_repeat))
+
+    if isinstance(processed_nodes, OrderedSet):
+        last_version = processed_nodes.find_prev(node, export_version_filter(node_name, node_repeat))
+    else:
+        peers_all = get_export_version_peers(node_name, node_repeat, processed_nodes, exclude=node)
+        last_version = None
+        if peers_all:
+            last_version = sorted(
+                peers_all,
+                key=lambda n: (
+                    getattr(n, "path_len", 0) or 0,
+                    getattr(n, "version", 0) or 0,
+                    str(getattr(n, "id", "")),
+                ),
+            )[-1]
+
     if last_version and getattr(node, "process", "") != "pause":
-        # 0-100 for manually specified instance.  100-200 for auto instance
-        node.version = get_next_version(
-            node.name, processed_nodes, last_version.version, 0, repeat=node_repeat
+        peers = get_export_version_peers(node_name, node_repeat, processed_nodes, exclude=node)
+        # Stable order: path then existing version then id
+        peers_ordered = sorted(
+            peers,
+            key=lambda n: (
+                getattr(n, "path_len", 0) or 0,
+                getattr(n, "version", 0) or 0,
+                str(getattr(n, "id", "")),
+            ),
         )
-        last_version.last = False
-        node.path_len = max(node.path_len, last_version.path_len + 1)
+        for i, prev in enumerate(peers_ordered, start=1):
+            prev.last = False
+            prev.version = i
+            # Invalidate cached export name so _Vv_ suffix is recomputed
+            if hasattr(prev, "export_name"):
+                prev.export_name = None
+        node.version = len(peers_ordered) + 1
+        if hasattr(node, "export_name"):
+            node.export_name = None
+        node.path_len = max(node.path_len or 0, (last_version.path_len or 0) + 1)
     return last_version
 
 
@@ -241,7 +329,13 @@ def get_version_inheritance(node, all_prev_versions, processed_nodes):
     if (isinstance(node, TriccNodePopulate) and node.context == "history"):
         node.last = True
         return
-    if (getattr(node, 'repeat', None) or 1) < 1:
+    # repeat=-1: local-only capture — versioning still runs via set_last_version_false,
+    # but this node does not inherit values from prior versions.
+    if get_repeat(node) == -1:
+        return
+    # Prior repeat=-1 nodes are never inheritance sources
+    all_prev_versions = _filter_inheritable_versions(all_prev_versions)
+    if not all_prev_versions:
         return
     if not issubclass(node.__class__, (TriccNodeInputModel)):
         node.last = True
@@ -250,7 +344,7 @@ def get_version_inheritance(node, all_prev_versions, processed_nodes):
             # and add its link it to next one".format(last_used_calc.get_name()))
             if node.prev_nodes:
                 # Set prev_next_node only with the immediate last version
-                for pv in  all_prev_versions:
+                for pv in all_prev_versions:
                     set_prev_next_node(pv, node)
             else:
                 expression = node.expression or node.expression_reference or getattr(node, "relevance", None)
@@ -831,6 +925,7 @@ def process_reference(
             replace_reference=replace_reference,
             warn=warn,
             codesystems=codesystems,
+            inherit_display_versions=True,
         )
         if modified_expression is False:
             return False
@@ -856,6 +951,7 @@ def process_reference(
                 replace_reference=replace_reference,
                 warn=warn,
                 codesystems=codesystems,
+                inherit_display_versions=True,
             )
             if modified_expression is False:
                 return False
@@ -873,6 +969,7 @@ def process_reference(
                 replace_reference=replace_reference,
                 warn=warn,
                 codesystems=codesystems,
+                inherit_display_versions=True,
             )
             if modified_expression is False:
                 return False
@@ -890,6 +987,7 @@ def process_reference(
             replace_reference=replace_reference,
             warn=warn,
             codesystems=codesystems,
+            inherit_display_versions=False,
         )
         if modified_expression is False:
             return False
@@ -906,6 +1004,7 @@ def process_reference(
             replace_reference=replace_reference,
             warn=warn,
             codesystems=codesystems,
+            inherit_display_versions=False,
         )
         if modified_expression is False:
             return False
@@ -920,7 +1019,8 @@ def process_reference(
             used_calculates=used_calculates,
             replace_reference=replace_reference,
             warn=warn,
-            codesystems=codesystems
+            codesystems=codesystems,
+            inherit_display_versions=False,
         )
         if modified_expression is False:
             return False
@@ -937,6 +1037,7 @@ def process_reference(
             replace_reference=replace_reference,
             warn=warn,
             codesystems=codesystems,
+            inherit_display_versions=False,
         )
         if modified_expression is False:
             return False
@@ -953,6 +1054,7 @@ def process_reference(
             replace_reference=replace_reference,
             warn=warn,
             codesystems=codesystems,
+            inherit_display_versions=True,
         )
         if modified_expression is False:
             return False
@@ -969,6 +1071,7 @@ def process_reference(
             replace_reference=replace_reference,
             warn=warn,
             codesystems=codesystems,
+            inherit_display_versions=False,
         )
         if modified_expression is False:
             return False
@@ -1036,10 +1139,17 @@ def process_operation_reference(
     used_calculates=None,
     replace_reference=False,
     warn=False,
-    codesystems=None
+    codesystems=None,
+    inherit_display_versions=False,
 ):
     """
     Process references inside an operation expression.
+
+    Args:
+        inherit_display_versions: When True (expression / expression_reference only),
+            multi-version TriccNodeDisplayModel refs become GET_INHERITED_VALUE of all
+            versions. Must stay False for relevance and other non-value fields.
+
     Returns:
         - modified_operation (or None if no replacement occurred)
         - False if processing should be deferred (unresolved references)
@@ -1075,17 +1185,31 @@ def process_operation_reference(
             ref_repeat = 0
         elif operation.operator == TriccOperator.GET_REPEATED_VALUE:
             ref_repeat = int(operation.reference[1])
+        # Same-name nodes in the activity (common after snippet inject of a module
+        # multiple times). Do NOT require every candidate to be processed — later
+        # injects are not yet processed when earlier calculates resolve, and that
+        # deadlocks load_calculate / blocks set_last_version_false.
         candidates_in_activity = [
             n for n in node.activity.nodes.values()
-            if n.name == clean_ref
+            if getattr(n, "name", None) == clean_ref
             and n != node
             and not isinstance(n, TriccNodeSelectOption)
+            and (ref_repeat is None or get_repeat(n) == ref_repeat)
         ]
+        processed_candidates = [n for n in candidates_in_activity if n in processed_nodes]
 
         if candidates_in_activity:
-            if any(n not in processed_nodes for n in candidates_in_activity):
-                return False  # defer — not all versions processed yet
-            target_node = candidates_in_activity[0]  # assuming name uniqueness
+            if not processed_candidates:
+                return False  # nothing ready yet for this name
+            # Prefer the most advanced processed version (path then version)
+            target_node = sorted(
+                processed_candidates,
+                key=lambda n: (
+                    getattr(n, "path_len", 0) or 0,
+                    getattr(n, "version", 0) or 0,
+                    str(getattr(n, "id", "")),
+                ),
+            )[-1]
         else:
             target_node = get_last_version(
                 name=clean_ref, processed_nodes=processed_nodes, repeat=ref_repeat
@@ -1118,25 +1242,75 @@ def process_operation_reference(
 
         # Replace node reference in expression if requested
         if replace_reference:
-            if not issubclass(
-                target_node.__class__,
-                (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase, TriccNodeInput, TriccNodePopulate)
+            replacement = target_node
+            # Expression / expression_reference only: multi-version display fields
+            # need GET_INHERITED_VALUE so ODK coalesce picks whichever instance was
+            # filled. Relevance and other fields must keep a single last version.
+            if inherit_display_versions:
+                last_version = get_last_version(
+                    name=clean_ref, processed_nodes=processed_nodes, repeat=ref_repeat
+                ) or target_node
+                if (
+                    issubclass(last_version.__class__, TriccNodeDisplayModel)
+                    and not isinstance(last_version, TriccNodeSelectOption)
+                    and get_repeat(last_version) != -1
+                ):
+                    # repeat=-1 stays referenceable as a single node, but is never
+                    # merged into GET_INHERITED_VALUE multi-version coalesce.
+                    all_versions = [
+                        n
+                        for n in get_versions(clean_ref, processed_nodes, ref_repeat)
+                        if issubclass(n.__class__, TriccNodeDisplayModel)
+                        and not isinstance(n, TriccNodeSelectOption)
+                        and get_repeat(n) != -1
+                    ]
+                    if not all_versions:
+                        all_versions = [last_version]
+                    if len(all_versions) > 1:
+                        # coalesce is left-to-right: prefer newer versions first
+                        ordered = sorted(
+                            all_versions,
+                            key=lambda n: (
+                                getattr(n, "path_len", 0) or 0,
+                                getattr(n, "version", 0) or 0,
+                            ),
+                            reverse=True,
+                        )
+                        replacement = TriccOperation(
+                            TriccOperator.GET_INHERITED_VALUE, ordered
+                        )
+                    else:
+                        replacement = all_versions[0]
+            if (
+                replacement is target_node
+                and not issubclass(
+                    target_node.__class__,
+                    (
+                        TriccNodeDisplayModel,
+                        TriccNodeDisplayCalculateBase,
+                        TriccNodeInput,
+                        TriccNodePopulate,
+                    ),
+                )
             ):
-                target_node = get_node_expression(target_node, processed_nodes, is_prev=True)
+                replacement = get_node_expression(target_node, processed_nodes, is_prev=True)
 
             if modified_op is None:
                 modified_op = operation.copy(keep_node=True)
 
             if isinstance(operation, TriccOperation):
-                modified_op.replace_node(TriccReference(clean_ref), target_node)
+                modified_op.replace_node(TriccReference(clean_ref), replacement)
             elif operation == TriccReference(clean_ref):
-                modified_op = target_node
+                modified_op = replacement
+
+            target_node = replacement
 
         # Update path length
         path_len = getattr(target_node, "path_len", 0)
         if isinstance(target_node, TriccOperation):
-            path_len = max(getattr(n, "path_len", 0) for n in target_node.get_references())
-        node.path_len = max(node.path_len, path_len)
+            refs = target_node.get_references() or []
+            path_len = max((getattr(n, "path_len", 0) or 0) for n in refs) if refs else 0
+        node.path_len = max(node.path_len, path_len or 0)
 
     # ───────────────────────────────────────────────
     # 2. Check real node references (already objects)
@@ -2685,6 +2859,47 @@ def clone_activity_for_snippet(goto, target_activity):
     return clone
 
 
+def sync_slot_versions_on_activity(activity, focus_names=None):
+    """Renumber ``version`` / ``last`` for each export-name bucket on an activity.
+
+    Used after snippet inject so cloned same-name nodes (and any pre-existing peers
+    already on the parent) get unique export versions immediately, not only later
+    when ``load_calculate`` walks the graph.
+
+    Buckets follow export base rules: ``repeat > 1`` is isolated by repeat;
+    ``repeat <= 1`` (incl. ``-1``) share one version space per name.
+    """
+    buckets = defaultdict(list)
+    pool = list(getattr(activity, "nodes", {}).values())
+    pool.extend(getattr(activity, "calculates", []) or [])
+    for n in pool:
+        if isinstance(n, (TriccNodeSelectOption, TriccNodeEnd, TriccNodeActivityEnd)):
+            continue
+        name = getattr(n, "name", None)
+        if not name:
+            continue
+        if focus_names is not None and name not in focus_names:
+            continue
+        buckets[_export_version_bucket_key(name, get_repeat(n))].append(n)
+
+    for _key, peers in buckets.items():
+        if len(peers) < 2:
+            continue
+        ordered = sorted(
+            peers,
+            key=lambda n: (
+                getattr(n, "path_len", 0) or 0,
+                getattr(n, "instance", 0) or 0,
+                str(getattr(n, "id", "")),
+            ),
+        )
+        for i, peer in enumerate(ordered, start=1):
+            peer.version = i
+            peer.last = i == len(ordered)
+            if hasattr(peer, "export_name"):
+                peer.export_name = None
+
+
 def inject_activity_as_snippet(goto, parent_page, clone):
     """
     Inline an already-cloned (and preferably already-linked) activity into parent_page
@@ -2831,6 +3046,20 @@ def inject_activity_as_snippet(goto, parent_page, clone):
                 exit_bridge.next_nodes.add(nxt)
             if hasattr(nxt, "prev_nodes"):
                 nxt.prev_nodes.add(exit_bridge)
+
+    # After inlining, same concept names may already exist on the parent (from the
+    # caller graph or a previous inject). Renumber versions for those slots so
+    # export names stay unique even before load_calculate.
+    imported_names = set()
+    for nid in imported_ids:
+        n = parent_page.nodes.get(nid)
+        if n is not None and getattr(n, "name", None):
+            imported_names.add(n.name)
+    for calc in getattr(parent_page, "calculates", []) or []:
+        if getattr(calc, "name", None) and calc.id in imported_ids:
+            imported_names.add(calc.name)
+    if imported_names:
+        sync_slot_versions_on_activity(parent_page, imported_names)
 
     logger.debug(
         "injected activity {} as snippet into {} (entry={}, exit={}, successors={})".format(
