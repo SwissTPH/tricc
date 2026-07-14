@@ -1,0 +1,81 @@
+# Two snippet injects of the same module — same concept names must get unique versions.
+
+id: parent_main
+title: "Parent Main Double Snippet"
+process: main
+
+nodes:
+  - id: start
+    type: start
+    label: "Start"
+    name: start_parent
+
+  - id: goto_a
+    type: goto
+    name: goto_a
+    label: "Inject module A"
+    link: module_activity
+    instance: -1
+
+  - id: mid
+    type: note
+    name: mid_note
+    label: "Between injects"
+
+  - id: goto_b
+    type: goto
+    name: goto_b
+    label: "Inject module B"
+    link: module_activity
+    instance: -1
+
+  - id: end
+    type: end
+    label: "End"
+    name: end_parent
+
+edges:
+  - source: start
+    target: goto_a
+  - source: goto_a
+    target: mid
+  - source: mid
+    target: goto_b
+  - source: goto_b
+    target: end
+
+---
+id: module_activity
+title: "Module Activity"
+process: module
+
+nodes:
+  - id: mod_start
+    type: activity_start
+    label: "Module start"
+    name: mod_start
+
+  - id: weight
+    type: integer
+    name: weight
+    label: "Weight from module"
+    required: true
+
+  - id: calc
+    type: calculate
+    name: bmi_flag
+    label: "Has weight"
+    calculate: "weight > 0"
+
+  - id: mod_end
+    type: end
+    label: "Module end"
+    name: mod_end
+
+edges:
+  - source: mod_start
+    target: weight
+  - source: weight
+    target: calc
+  - source: calc
+    target: mod_end
