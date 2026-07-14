@@ -29,6 +29,7 @@ dependencies = [
     "ocldev",
     "pyxform",
     "Sympy"
+    "PyYAML"
 ]
 keywords = ["xlsform", "drawio", "authoring"]
 
