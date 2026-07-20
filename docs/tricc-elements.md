@@ -42,6 +42,11 @@ This page documents TRICC modeling elements and their meaning based on:
 - `calculate`: computed value.
 - `add`: arithmetic compute helper.
 - `count`: option/count compute helper.
+- Anthropometric operators (CDSS / XLSForm): `Zscore(table, sex, x, y)` and
+  `Izscore(table, sex, x, z)` resolve LMS params from choice secondary instances
+  filtered by `sex` + `y_min`/`y_max`. Phase 1 table: `wfa` (weight-for-age).
+  Only tables referenced by the form are injected into the choices sheet.
+  See `feature/cdss-zscore.md`.
 - `rhombus`: decision/condition gate using `reference` and labeled out-edges.
 - `factor`: sequence scoring node (non-display calculate). Created from numeric edge
   labels; stores the factor in `reference`, uses `path` for the branch condition.

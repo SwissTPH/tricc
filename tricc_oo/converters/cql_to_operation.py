@@ -29,8 +29,8 @@ FUNCTION_MAP = {
     "AgeInDays": TriccOperator.AGE_DAY,
     "Coalesce": TriccOperator.COALESCE,
     "Concatenate": TriccOperator.CONCATENATE,
-    "Izscore": TriccOperator.IZSCORE,
-    "Zscore": TriccOperator.ZSCORE,
+    "iZScore": TriccOperator.IZSCORE,
+    "ZScore": TriccOperator.ZSCORE,
     "Round": TriccOperator.ROUND,
     "Integer": TriccOperator.CAST_INTEGER,
     "DrugDosage": TriccOperator.DRUG_DOSAGE,
@@ -408,7 +408,7 @@ def transform_cql_to_operation(cql_input, context=None):
     stream = CommonTokenStream(lexer)
     parser = cqlParser(stream)
 
-    # Remove default error listeners and add custom listener
+    # Remove default error listeners and add cus    tom listener
     parser.removeErrorListeners()
     lexer.removeErrorListeners()
     error_listener = CQLErrorListener(context)

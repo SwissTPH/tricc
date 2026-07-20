@@ -679,8 +679,8 @@ class XLSFormStrategy(BaseOutPutStrategy):
 
     def tricc_operation_zscore(self, ref_expressions, original_references=None):
         y, ll, m, s = self.get_zscore_params(ref_expressions)
-        #  return ((Math.pow((y / m), l) - 1) / (s * l));
-        return f"(pow({y} div ({m}), {ll}) -1) div (({s}) div ({ll}))"
+        # WHO anthrobase: ((y / m)^l - 1) / (s * l)
+        return f"((pow(({y}) div ({m}), {ll}) - 1) div (({s}) * ({ll})))"
 
     def tricc_operation_datetime_to_decimal(self, ref_expressions, original_references=None):
         return f"decimal-date-time({ref_expressions[0]})"
@@ -690,17 +690,26 @@ class XLSFormStrategy(BaseOutPutStrategy):
 
     def tricc_operation_izscore(self, ref_expressions, original_references=None):
         z, ll, m, s = self.get_zscore_params(ref_expressions)
-        #  return  (m * (z*s*l-1)^(1/l));
-        return f"pow({m} * ({z} * {s} * {ll} -1), 1 div {ll})"
+        # WHO anthrobase: m * (z * s * l + 1)^(1/l)
+        return f"(({m}) * pow(({z}) * ({s}) * ({ll}) + 1, 1 div ({ll})))"
 
     def get_zscore_params(self, ref_expressions):
+        """Resolve LMS params via secondary instance filter on sex + y_min/y_max.
+
+        Args order: table, sex, x (independent axis), yz (measured Y or target Z).
+        """
         table = ref_expressions[0]
-        sex = clean_name(ref_expressions[1])
-        x = clean_name(ref_expressions[2])
-        yz = clean_name(ref_expressions[3])
-        ll = f"number(instance({table})/root/item[sex={sex} and x_max>" + x + " and x_min<=" + x + "]/l)"
-        m = f"number(instance({table})/root/item[sex={sex} and x_max>" + x + " and x_min<=" + x + "]/m)"
-        s = f"number(instance({table})/root/item[sex={sex} and x_max>" + x + " and x_min<=" + x + "]/s)"
+        sex = self.clean_coalesce(ref_expressions[1])
+        x = self.clean_coalesce(ref_expressions[2])
+        yz = self.clean_coalesce(ref_expressions[3])
+        item = (
+            f"instance({table})/root/item["
+            f"sex={sex} and y_min<={x} and y_max>{x}"
+            f"]"
+        )
+        ll = f"number({item}/l)"
+        m = f"number({item}/m)"
+        s = f"number({item}/s)"
         return yz, ll, m, s
 
     def get_tricc_operation_operand(self, r, coalesce_fallback="''"):

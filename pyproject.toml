@@ -40,5 +40,8 @@ Issues = "https://github.com/SwissTPH/tricc/issues"
 [tool.setuptools.packages.find]
 exclude = ["locales"]
 
+[tool.setuptools.package-data]
+"tricc_oo.data.anthro" = ["*.json"]
+
 [project.scripts]
 tricc = "tricc_oo.cli:main"
