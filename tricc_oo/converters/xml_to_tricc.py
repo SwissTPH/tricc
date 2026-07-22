@@ -132,7 +132,10 @@ def get_experimentalactivity_details(diagram, activity, project, media_path):
     return nodes
 
 def propagate_activity_repeat(activity):
-    """Apply activity_start.repeat to in-scope descendant nodes (overrides node-level repeat)."""
+    """Apply activity_start.repeat to in-scope descendant nodes (overrides node-level repeat).
+
+    Exception: ``repeat=-1`` (local-only) is never overwritten
+    """
     root = activity.root
     if not isinstance(root, TriccNodeActivityStart):
         return
@@ -156,9 +159,16 @@ def propagate_activity_repeat(activity):
         if not in_scope:
             continue
         node_repeat = getattr(node, "repeat", None)
+        if node_repeat is not None and int(node_repeat) == -1:
+            logger.debug(
+                f"Preserving local-only repeat=-1 on {node.get_name()} "
+                f"(activity repeat={activity_repeat} not applied; activity={activity.get_name()})"
+            )
+            continue
         if node_repeat is not None and int(node_repeat) != activity_repeat:
             logger.debug(
-                f"Activity repeat={activity_repeat} overrides node repeat={node_repeat} on {node.get_name()}"
+                f"Activity repeat={activity_repeat} overrides node repeat={node_repeat} "
+                f"on {node.get_name()} (activity={activity.get_name()})"
             )
         node.repeat = activity_repeat
 
