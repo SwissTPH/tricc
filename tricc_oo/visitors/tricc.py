@@ -509,7 +509,11 @@ def load_calculate(
                         if issubclass(r.__class__, (TriccNodeDisplayCalculateBase)):
                             add_used_calculate(node, r, calculates, used_calculates, processed_nodes)
             # add skip logic for display node ()
-            if all_prev_versions and hasattr(node, "relevance"):
+            # repeat=-1 is "local-only": each occurrence stands on its own and must not
+            # be skip-suppressed because another repeat=-1 occurrence of the same
+            # concept was already captured elsewhere (see docs/tricc-elements.md,
+            # "Concept repeat").
+            if all_prev_versions and hasattr(node, "relevance") and get_repeat(node) != -1:
                 # search for same node in completly differnt activity
                 from tricc_oo.converters.fhir.populate_helper import populate_participates_in_skip
 
@@ -1470,7 +1474,6 @@ def walktrhough_tricc_node_processed_stached(
     loop_count=0,
     **kwargs,
 ):
-    ended_activity = False
     # logger.debug("walkthrough::{}::{}".format(callback.__name__, node.get_name()))
     priority_map = kwargs.get('priority_map', {})
     path_len = max(node.activity.path_len, *[0, *[getattr(n, "path_len", 0) + 1 for n in node.activity.prev_nodes]]) + 1
@@ -1506,13 +1509,32 @@ def walktrhough_tricc_node_processed_stached(
             end_nodes = node.activity.get_end_nodes()
             if all([e in processed_nodes for e in end_nodes]):
                 processed_nodes.add(node.activity)
-                ended_activity = True
                 if warn:
                     logger.debug(
                         "{}::{}: processed ({})".format(
                             callback.__name__, node.activity.get_name(), len(processed_nodes)
                         )
                     )
+                # the activity is fully processed: schedule whatever comes directly after it
+                # (nodes wired as next_nodes of the TriccNodeActivity itself, e.g. when a repeated
+                # instance has no bridge/wait in between) - the activity is never revisited on its
+                # own once it defers to its root, so this is the only place this can happen.
+                for next_node in node.activity.next_nodes:
+                    if next_node not in stashed_nodes:
+                        if recursive:
+                            walktrhough_tricc_node_processed_stached(
+                                next_node,
+                                callback,
+                                processed_nodes,
+                                stashed_nodes,
+                                path_len,
+                                recursive,
+                                warn=warn,
+                                node_path=node_path.copy(),
+                                **kwargs,
+                            )
+                        else:
+                            stashed_nodes.insert_at_top(next_node)
         elif node in stashed_nodes:
             stashed_nodes.remove(node)
             # logger.debug("{}::{}: unstashed ({})".format(callback.__name__, node.get_name(), len(stashed_nodes)))
@@ -1596,24 +1618,6 @@ def walktrhough_tricc_node_processed_stached(
                     elif node.root not in stashed_nodes:
                         stashed_nodes.insert_at_top(node.root)
                     return
-            elif ended_activity:
-                for next_node in node.next_nodes:
-                    if next_node not in stashed_nodes:
-                        # stashed_nodes.insert(0,next_node)
-                        if recursive:
-                            walktrhough_tricc_node_processed_stached(
-                                next_node,
-                                callback,
-                                processed_nodes,
-                                stashed_nodes,
-                                path_len,
-                                recursive,
-                                warn=warn,
-                                node_path=node_path.copy(),
-                                **kwargs,
-                            )
-                        else:
-                            stashed_nodes.insert_at_top(next_node)
 
         elif hasattr(node, "next_nodes") and len(node.next_nodes) > 0 and not isinstance(node, TriccNodeActivity):
             if recursive:
@@ -3584,7 +3588,7 @@ def get_prev_node_expression(node, activity, processed_nodes, get_overall_exp=Fa
         expression_inputs = clean_or_list(expression_inputs)
     else:
         expression_inputs = []
-    prev_activities = {node.activity.id: []}
+    prev_activities = {getattr(node.activity, "id", None): []}
     # sorting prev_nodes per activity
    
     for prev_node in node.prev_nodes:
@@ -4266,5 +4270,3 @@ def get_process(node) -> str | None:
         if result is not None:
             return result
     return None
-
-    
