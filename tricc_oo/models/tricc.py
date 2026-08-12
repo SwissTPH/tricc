@@ -183,9 +183,9 @@ class TriccNodeActivity(TriccNodeBaseModel):
     def update_groups_group(self, group):
         for instance_group in self.groups.values():
             if instance_group.group == group:
-                instance_group.group == instance_group
+                instance_group.group = instance_group
             elif instance_group.group == self.base_instance:
-                instance_group.group == self
+                instance_group.group = self
 
     def update_groups(self, group):
         # create new group
@@ -193,7 +193,7 @@ class TriccNodeActivity(TriccNodeBaseModel):
         # update the group in all activity
         for node in list(self.nodes.values()):
             if node.group == group:
-                node.group == instance_group
+                node.group = instance_group
         self.groups[instance_group.id] = instance_group
 
     def update_nodes(self, node_origin):
