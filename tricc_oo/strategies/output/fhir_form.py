@@ -75,7 +75,6 @@ from tricc_oo.models.calculate import TriccNodeDisplayCalculateBase, TriccNodeIn
 from tricc_oo.strategies.output.base_output_strategy import BaseOutPutStrategy
 from tricc_oo.strategies.registry import register_output_strategy
 from tricc_oo.visitors.tricc import get_process
-
 logger = logging.getLogger("default")
 
 # ---------------------------------------------------------------------------
@@ -306,9 +305,14 @@ class FHIRStrategy(BaseOutPutStrategy):
             if opt_names & yesno_markers or opt_codes & yesno_markers:
                 fhir_type = "boolean"
 
+        label = getattr(node, 'label', None) or getattr(node, 'text', None) or ''
+        # FIXME, does not work like this
+        if isinstance(label, TriccOperation):
+            # Display injection (CONCATENATE) or multi-lang: render via op expression / first locale
+            label = self.get_tricc_operation_expression(label)
         item = {
             "linkId": get_export_name(node),
-            "text": getattr(node, 'label', '') or getattr(node, 'text', ''),
+            "text": label,
             "type": fhir_type,
         }
 

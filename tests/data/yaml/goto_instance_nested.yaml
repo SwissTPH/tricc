@@ -1,0 +1,71 @@
+# Control: goto with instance=1 creates a nested activity instance
+
+id: parent_nested
+title: "Parent Nested"
+process: main
+
+nodes:
+  - id: start
+    type: start
+    label: "Start"
+    name: start_parent
+
+  - id: note_before
+    type: note
+    name: note_before
+    label: "Before module"
+
+  - id: goto_mod
+    type: goto
+    name: goto_mod
+    label: "Call module"
+    link: module_nested
+    instance: 1
+
+  - id: note_after
+    type: note
+    name: note_after
+    label: "After module"
+
+  - id: end
+    type: end
+    label: "End"
+    name: end_parent
+
+edges:
+  - source: start
+    target: note_before
+  - source: note_before
+    target: goto_mod
+  - source: goto_mod
+    target: note_after
+  - source: note_after
+    target: end
+
+---
+id: module_nested
+title: "Module Nested"
+process: module
+
+nodes:
+  - id: mod_start
+    type: activity_start
+    label: "Module start"
+    name: mod_start
+
+  - id: mod_age
+    type: integer
+    name: mod_age
+    label: "Age from module"
+    required: true
+
+  - id: mod_end
+    type: end
+    label: "Module end"
+    name: mod_end
+
+edges:
+  - source: mod_start
+    target: mod_age
+  - source: mod_age
+    target: mod_end

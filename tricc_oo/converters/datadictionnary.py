@@ -3,6 +3,7 @@ from fhir.resources.codesystem import (
     CodeSystemConcept,
     CodeSystemConceptProperty,
 )
+from tricc_oo.visitors.text_injection import serialize_injection_for_js_text
 
 from fhir.resources.valueset import ValueSet
 import logging
@@ -70,25 +71,28 @@ def check_and_add_concept(code_system: CodeSystem, code: str, display: str, attr
         code_system (CodeSystem): The CodeSystem to check and update.
         code (str): The code of the concept to add.
         display (str): The display of the concept to add.
+            May also be a parsed injection (TriccOperation / TriccReference);
+            it is serialized to JS/ODK text before storage and comparison.
 
     Raises:
         ValueError: If a concept with the same code exists but has a different display.
     """
+    display_text = serialize_injection_for_js_text(display)
     new_concept = None
     # Check if the concept already exists
     for concept in code_system.concept or []:
         if concept.code == code:
-
-            if concept.display.lower() != display.lower():
+            existing_display = concept.display or ""
+            if existing_display.lower() != display_text.lower():
                 logger.warning(
                     f"""Code {code} already exists with a different display:
-                    Concept:{concept.display}\n Current:{display}"""
+                    Concept:{existing_display}\n Current:{display_text}"""
                 )
             new_concept = concept
     if not new_concept:
         # Add the new concept if it does not exist
-        concept_id = str(uuid.uuid5(UUID_NAMESPACE, display))
-        new_concept = CodeSystemConcept.construct(code=code, display=display, id=concept_id)
+        concept_id = str(uuid.uuid5(UUID_NAMESPACE,(code)))
+        new_concept = CodeSystemConcept.construct(code=code, display=display_text, id=concept_id)
         if not hasattr(code_system, "concept"):
             code_system.concept = []
         code_system.concept.append(new_concept)

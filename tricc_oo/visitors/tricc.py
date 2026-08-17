@@ -2,6 +2,8 @@ import re
 import logging
 import requests
 import base64
+from collections import defaultdict
+from tricc_oo.visitors.text_injection import TEXT_INJECTION_FIELDS
 
 from tricc_oo.models.base import get_repeat
 from tricc_oo.converters.utils import generate_id
@@ -88,6 +90,11 @@ def get_versions(name, iterable, repeat=None):
 
 
 def version_filter(name, repeat=None):
+    """Match nodes by name (+ optional repeat slot) for versioning / reference lookup.
+
+    Does not special-case ``repeat=-1``: those nodes stay resolvable by reference.
+    Value inheritance excludes ``-1`` separately when building GET_INHERITED_VALUE.
+    """
     from tricc_oo.models.base import get_repeat as _get_repeat
 
     def _matches(item):
@@ -102,6 +109,60 @@ def version_filter(name, repeat=None):
         return True
 
     return _matches
+
+
+def _get_defining_expression_op(expr):
+    """Peel off inheritance/merge wrappers (COALESCE, GET_INHERITED_VALUE) to reach
+    the original local/definition expression op for a calculate node.
+    This ensures versions that share the same *formula* (before any inheritance merge)
+    get the same origin signature even after wrappers have been applied.
+    """
+    if not isinstance(expr, TriccOperation):
+        return expr
+    wrappers = {TriccOperator.COALESCE, TriccOperator.GET_INHERITED_VALUE}
+    current = expr
+    guard = 0
+    while (
+        isinstance(current, TriccOperation)
+        and current.operator in wrappers
+        and current.reference
+        and guard < 8
+    ):
+        guard += 1
+        first = current.reference[0] if isinstance(current.reference, (list, tuple)) else None
+        if isinstance(first, TriccOperation):
+            current = first
+        else:
+            break
+    return current
+
+
+def group_prev_versions_by_origin_signature(name, expression, prev_versions):
+    """Group previous versions (same name + repeat) by the origin signature
+    (cleaned reference-only repr) of their *defining* expression.
+
+    Elements in each list bucket will later contribute via
+    TriccOperation(GET_INHERITED_VALUE, bucket_list).
+
+    The resulting per-bucket GET ops are then fed to the existing
+    datatype-aware merge_expressions so that "values of the dict" still
+    follow the old boolean/number/etc merge rules.
+    """
+    expression_sig = hash(repr(expression.origin if expression.origin else name))
+    sibling = []
+    groups = defaultdict(list)
+    for pv in (prev_versions or []):
+        expr = getattr(pv, "expression", None) or getattr(pv, "expression_reference", None)
+        if expr:
+            
+            sig = hash(repr(getattr(expr, "origin", expr)))
+        else:
+            sig = hash(repr(expr.origin) if expr.origin else name)
+        if sig == expression_sig:
+            sibling.append(pv)
+        else:
+            groups[sig].append(pv)
+    return list(sibling), dict(groups)
 
 
 def get_last_version(name, processed_nodes, _list=None, repeat=None):
@@ -126,8 +187,7 @@ def get_last_version(name, processed_nodes, _list=None, repeat=None):
     if not max_version:
         already_processed = [
             p_node for p_node in _list
-            if hasattr(p_node, "name") and p_node.name == name
-            and (repeat is None or version_filter(name, repeat)(p_node))
+            if version_filter(name, repeat)(p_node)
         ]
         if already_processed:
             max_version = sorted(already_processed, key=lambda x: x.path_len, reverse=False)[0]
@@ -160,21 +220,104 @@ def get_node_expressions(node, processed_nodes, process=None):
     return expression
 
 
+def _filter_inheritable_versions(versions):
+    """Drop repeat=-1 nodes from value-inheritance operand lists.
+
+    Those nodes remain addressable for references / version numbering, but must
+    not contribute to GET_INHERITED_VALUE / coalesce inheritance.
+    """
+    return [v for v in (versions or []) if get_repeat(v) != -1]
+
+
+def _export_version_bucket_key(name, repeat):
+    """Group key for nodes that share an export base name.
+
+    ``get_export_name`` only serialises ``_Rr_<n>`` when ``repeat > 1``.
+    Therefore ``repeat <= 1`` (including ``-1`` and default ``1``) share one
+    export base and must share one version number space to avoid
+    ``name_Vv_1`` collisions across slots.
+    """
+    if repeat is not None and int(repeat) > 1:
+        return (name, int(repeat))
+    return (name, "<=1")
+
+
+def export_version_filter(name, node_repeat):
+    """Match nodes that share the same export base name as (name, node_repeat)."""
+
+    def _matches(item):
+        if isinstance(item, TriccNodeSelectOption):
+            return False
+        if isinstance(item, TriccNodeEnd):
+            if name != item.get_reference():
+                return False
+            # Ends participate in the default export pool
+            return _export_version_bucket_key(name, node_repeat if node_repeat is not None else 1)[1] == "<=1"
+        if not hasattr(item, "name") or item.name != name:
+            return False
+        return _export_version_bucket_key(name, get_repeat(item)) == _export_version_bucket_key(
+            name, node_repeat if node_repeat is not None else 1
+        )
+
+    return _matches
+
+
+def get_export_version_peers(name, node_repeat, iterable, exclude=None):
+    """Return nodes that would collide in export name without unique versions."""
+    filt = export_version_filter(name, node_repeat)
+    return [n for n in iterable if n is not exclude and filt(n)]
+
+
 def set_last_version_false(node, processed_nodes):
+    """Mark prior export-name peers as not-last and assign unique versions.
+
+    Peers are nodes that share the same export base (same name; same ``repeat``
+    when ``repeat > 1``, else all ``repeat <= 1`` including ``-1``). This keeps
+    ODK survey names unique when ``_Rr_`` is omitted for low/negative repeats.
+    """
     if isinstance(node, (TriccNodeSelectOption)):
         return
     from tricc_oo.models.base import get_repeat
 
     node_name = node.name if not isinstance(node, TriccNodeEnd) else node.get_reference()
     node_repeat = None if isinstance(node, TriccNodeEnd) else get_repeat(node)
-    last_version = processed_nodes.find_prev(node, version_filter(node_name, node_repeat))
+
+    if isinstance(processed_nodes, OrderedSet):
+        last_version = processed_nodes.find_prev(node, export_version_filter(node_name, node_repeat))
+    else:
+        peers_all = get_export_version_peers(node_name, node_repeat, processed_nodes, exclude=node)
+        last_version = None
+        if peers_all:
+            last_version = sorted(
+                peers_all,
+                key=lambda n: (
+                    getattr(n, "path_len", 0) or 0,
+                    getattr(n, "version", 0) or 0,
+                    str(getattr(n, "id", "")),
+                ),
+            )[-1]
+
     if last_version and getattr(node, "process", "") != "pause":
-        # 0-100 for manually specified instance.  100-200 for auto instance
-        node.version = get_next_version(
-            node.name, processed_nodes, last_version.version, 0, repeat=node_repeat
+        peers = get_export_version_peers(node_name, node_repeat, processed_nodes, exclude=node)
+        # Stable order: path then existing version then id
+        peers_ordered = sorted(
+            peers,
+            key=lambda n: (
+                getattr(n, "path_len", 0) or 0,
+                getattr(n, "version", 0) or 0,
+                str(getattr(n, "id", "")),
+            ),
         )
-        last_version.last = False
-        node.path_len = max(node.path_len, last_version.path_len + 1)
+        for i, prev in enumerate(peers_ordered, start=1):
+            prev.last = False
+            prev.version = i
+            # Invalidate cached export name so _Vv_ suffix is recomputed
+            if hasattr(prev, "export_name"):
+                prev.export_name = None
+        node.version = len(peers_ordered) + 1
+        if hasattr(node, "export_name"):
+            node.export_name = None
+        node.path_len = max(node.path_len or 0, (last_version.path_len or 0) + 1)
     return last_version
 
 
@@ -183,10 +326,17 @@ def get_version_inheritance(node, all_prev_versions, processed_nodes):
     # Updated to merge ALL previous versions, not just the last one
     # This ensures inheritance works even when intermediate activities weren't triggered
 
-    if isinstance(node, TriccNodePopulate) and node.context == "history":
+    if (isinstance(node, TriccNodePopulate) and node.context == "history"):
         node.last = True
         return
-
+    # repeat=-1: local-only capture — versioning still runs via set_last_version_false,
+    # but this node does not inherit values from prior versions.
+    if get_repeat(node) == -1:
+        return
+    # Prior repeat=-1 nodes are never inheritance sources
+    all_prev_versions = _filter_inheritable_versions(all_prev_versions)
+    if not all_prev_versions:
+        return
     if not issubclass(node.__class__, (TriccNodeInputModel)):
         node.last = True
         if issubclass(node.__class__, (TriccNodeDisplayCalculateBase, TriccNodeEnd)) and node.name is not None:
@@ -194,17 +344,35 @@ def get_version_inheritance(node, all_prev_versions, processed_nodes):
             # and add its link it to next one".format(last_used_calc.get_name()))
             if node.prev_nodes:
                 # Set prev_next_node only with the immediate last version
-                for pv in  all_prev_versions:
+                for pv in all_prev_versions:
                     set_prev_next_node(pv, node)
             else:
                 expression = node.expression or node.expression_reference or getattr(node, "relevance", None)
-                # Merge with ALL previous versions, not just the last one
-                if all_prev_versions and expression:
-                    expression = merge_expressions(expression, *all_prev_versions)
-                elif len(all_prev_versions) == 1:
-                    expression = all_prev_versions[0]
-                elif all_prev_versions:
-                    expression = merge_expressions(*all_prev_versions)
+                # NEW calculate inheritance approach:
+                # Group prev versions (same repeat) by the origin signature of their defining expression.
+                # Contribute each group via GET_INHERITED_VALUE( list_of_same_sig_nodes ).
+                # Then feed those group values into the *existing* datatype merge logic.
+                if all_prev_versions and isinstance(expression, TriccOperation):
+                    siblings, groups = group_prev_versions_by_origin_signature(node.name, expression, all_prev_versions)
+                    contribs = [
+                        TriccOperation(TriccOperator.GET_INHERITED_VALUE, plist)
+                        for plist in groups.values() if plist
+                    ]
+                    main_expression = TriccOperation(TriccOperator.GET_INHERITED_VALUE, [expression, *siblings])
+                    if contribs:
+                        if len(contribs) == 1:
+                            expression = merge_expressions(main_expression, contribs[0])
+                        else:
+                            expression = merge_expressions(main_expression, contribs[0], *contribs[1:])
+                    # else: no change, expression stays as local
+                else:
+                    # Original path for relevance, Ends, or non-op expressions
+                    if all_prev_versions and expression:
+                        expression = merge_expressions(expression, *all_prev_versions)
+                    elif len(all_prev_versions) == 1:
+                        expression = all_prev_versions[0]
+                    elif all_prev_versions:
+                        expression = merge_expressions(*all_prev_versions)
                 if node.expression:
                     node.expression = expression
                 elif node.expression_reference:
@@ -341,7 +509,11 @@ def load_calculate(
                         if issubclass(r.__class__, (TriccNodeDisplayCalculateBase)):
                             add_used_calculate(node, r, calculates, used_calculates, processed_nodes)
             # add skip logic for display node ()
-            if all_prev_versions and hasattr(node, "relevance"):
+            # repeat=-1 is "local-only": each occurrence stands on its own and must not
+            # be skip-suppressed because another repeat=-1 occurrence of the same
+            # concept was already captured elsewhere (see docs/tricc-elements.md,
+            # "Concept repeat").
+            if all_prev_versions and hasattr(node, "relevance") and get_repeat(node) != -1:
                 # search for same node in completly differnt activity
                 from tricc_oo.converters.fhir.populate_helper import populate_participates_in_skip
 
@@ -757,6 +929,7 @@ def process_reference(
             replace_reference=replace_reference,
             warn=warn,
             codesystems=codesystems,
+            inherit_display_versions=True,
         )
         if modified_expression is False:
             return False
@@ -782,6 +955,7 @@ def process_reference(
                 replace_reference=replace_reference,
                 warn=warn,
                 codesystems=codesystems,
+                inherit_display_versions=True,
             )
             if modified_expression is False:
                 return False
@@ -799,6 +973,7 @@ def process_reference(
                 replace_reference=replace_reference,
                 warn=warn,
                 codesystems=codesystems,
+                inherit_display_versions=True,
             )
             if modified_expression is False:
                 return False
@@ -816,6 +991,7 @@ def process_reference(
             replace_reference=replace_reference,
             warn=warn,
             codesystems=codesystems,
+            inherit_display_versions=False,
         )
         if modified_expression is False:
             return False
@@ -832,6 +1008,7 @@ def process_reference(
             replace_reference=replace_reference,
             warn=warn,
             codesystems=codesystems,
+            inherit_display_versions=False,
         )
         if modified_expression is False:
             return False
@@ -846,7 +1023,8 @@ def process_reference(
             used_calculates=used_calculates,
             replace_reference=replace_reference,
             warn=warn,
-            codesystems=codesystems
+            codesystems=codesystems,
+            inherit_display_versions=False,
         )
         if modified_expression is False:
             return False
@@ -863,6 +1041,7 @@ def process_reference(
             replace_reference=replace_reference,
             warn=warn,
             codesystems=codesystems,
+            inherit_display_versions=False,
         )
         if modified_expression is False:
             return False
@@ -879,6 +1058,7 @@ def process_reference(
             replace_reference=replace_reference,
             warn=warn,
             codesystems=codesystems,
+            inherit_display_versions=True,
         )
         if modified_expression is False:
             return False
@@ -895,11 +1075,63 @@ def process_reference(
             replace_reference=replace_reference,
             warn=warn,
             codesystems=codesystems,
+            inherit_display_versions=False,
         )
         if modified_expression is False:
             return False
         elif modified_expression and replace_reference:
             node.applicability = modified_expression
+
+    # Display-model only: resolve ${REF} injection ops already parsed at input load
+    if isinstance(node, TriccNodeDisplayModel):
+
+        for field in TEXT_INJECTION_FIELDS:
+            if not hasattr(node, field):
+                continue
+            value = getattr(node, field, None)
+            if value is None:
+                continue
+            if isinstance(value, dict):
+                new_dict = {}
+                changed = False
+                for locale, entry in value.items():
+                    if isinstance(entry, (TriccOperation)):
+                        modified = process_operation_reference(
+                            entry,
+                            node,
+                            processed_nodes=processed_nodes,
+                            calculates=calculates,
+                            used_calculates=used_calculates,
+                            replace_reference=replace_reference,
+                            warn=warn,
+                            codesystems=codesystems,
+                        )
+                        if modified is False:
+                            return False
+                        if modified and replace_reference:
+                            new_dict[locale] = modified
+                            changed = True
+                        else:
+                            new_dict[locale] = entry
+                    else:
+                        new_dict[locale] = entry
+                if changed and replace_reference:
+                    setattr(node, field, new_dict)
+            elif isinstance(value, (TriccOperation)):
+                modified_expression = process_operation_reference(
+                    value,
+                    node,
+                    processed_nodes=processed_nodes,
+                    calculates=calculates,
+                    used_calculates=used_calculates,
+                    replace_reference=replace_reference,
+                    warn=warn,
+                    codesystems=codesystems,
+                )
+                if modified_expression is False:
+                    return False
+                elif modified_expression and replace_reference:
+                    setattr(node, field, modified_expression)
     return True
 
 
@@ -911,10 +1143,17 @@ def process_operation_reference(
     used_calculates=None,
     replace_reference=False,
     warn=False,
-    codesystems=None
+    codesystems=None,
+    inherit_display_versions=False,
 ):
     """
     Process references inside an operation expression.
+
+    Args:
+        inherit_display_versions: When True (expression / expression_reference only),
+            multi-version TriccNodeDisplayModel refs become GET_INHERITED_VALUE of all
+            versions. Must stay False for relevance and other non-value fields.
+
     Returns:
         - modified_operation (or None if no replacement occurred)
         - False if processing should be deferred (unresolved references)
@@ -945,19 +1184,36 @@ def process_operation_reference(
         # Try to find the referenced node
         from tricc_oo.models.base import get_repeat
 
-        ref_repeat = get_repeat(node)
+        ref_repeat = None  # TODO: manage repeat in scv get_repeat(node)
+        if operation.operator == TriccOperator.GET_HISTORY_VALUE:
+            ref_repeat = 0
+        elif operation.operator == TriccOperator.GET_REPEATED_VALUE:
+            ref_repeat = int(operation.reference[1])
+        # Same-name nodes in the activity (common after snippet inject of a module
+        # multiple times). Do NOT require every candidate to be processed — later
+        # injects are not yet processed when earlier calculates resolve, and that
+        # deadlocks load_calculate / blocks set_last_version_false.
         candidates_in_activity = [
             n for n in node.activity.nodes.values()
-            if n.name == clean_ref
+            if getattr(n, "name", None) == clean_ref
             and n != node
             and not isinstance(n, TriccNodeSelectOption)
-            and get_repeat(n) == ref_repeat
+            and (ref_repeat is None or get_repeat(n) == ref_repeat)
         ]
+        processed_candidates = [n for n in candidates_in_activity if n in processed_nodes]
 
         if candidates_in_activity:
-            if any(n not in processed_nodes for n in candidates_in_activity):
-                return False  # defer — not all versions processed yet
-            target_node = candidates_in_activity[0]  # assuming name uniqueness
+            if not processed_candidates:
+                return False  # nothing ready yet for this name
+            # Prefer the most advanced processed version (path then version)
+            target_node = sorted(
+                processed_candidates,
+                key=lambda n: (
+                    getattr(n, "path_len", 0) or 0,
+                    getattr(n, "version", 0) or 0,
+                    str(getattr(n, "id", "")),
+                ),
+            )[-1]
         else:
             target_node = get_last_version(
                 name=clean_ref, processed_nodes=processed_nodes, repeat=ref_repeat
@@ -990,25 +1246,75 @@ def process_operation_reference(
 
         # Replace node reference in expression if requested
         if replace_reference:
-            if not issubclass(
-                target_node.__class__,
-                (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase, TriccNodeInput, TriccNodePopulate)
+            replacement = target_node
+            # Expression / expression_reference only: multi-version display fields
+            # need GET_INHERITED_VALUE so ODK coalesce picks whichever instance was
+            # filled. Relevance and other fields must keep a single last version.
+            if inherit_display_versions:
+                last_version = get_last_version(
+                    name=clean_ref, processed_nodes=processed_nodes, repeat=ref_repeat
+                ) or target_node
+                if (
+                    issubclass(last_version.__class__, TriccNodeDisplayModel)
+                    and not isinstance(last_version, TriccNodeSelectOption)
+                    and get_repeat(last_version) != -1
+                ):
+                    # repeat=-1 stays referenceable as a single node, but is never
+                    # merged into GET_INHERITED_VALUE multi-version coalesce.
+                    all_versions = [
+                        n
+                        for n in get_versions(clean_ref, processed_nodes, ref_repeat)
+                        if issubclass(n.__class__, TriccNodeDisplayModel)
+                        and not isinstance(n, TriccNodeSelectOption)
+                        and get_repeat(n) != -1
+                    ]
+                    if not all_versions:
+                        all_versions = [last_version]
+                    if len(all_versions) > 1:
+                        # coalesce is left-to-right: prefer newer versions first
+                        ordered = sorted(
+                            all_versions,
+                            key=lambda n: (
+                                getattr(n, "path_len", 0) or 0,
+                                getattr(n, "version", 0) or 0,
+                            ),
+                            reverse=True,
+                        )
+                        replacement = TriccOperation(
+                            TriccOperator.GET_INHERITED_VALUE, ordered
+                        )
+                    else:
+                        replacement = all_versions[0]
+            if (
+                replacement is target_node
+                and not issubclass(
+                    target_node.__class__,
+                    (
+                        TriccNodeDisplayModel,
+                        TriccNodeDisplayCalculateBase,
+                        TriccNodeInput,
+                        TriccNodePopulate,
+                    ),
+                )
             ):
-                target_node = get_node_expression(target_node, processed_nodes, is_prev=True)
+                replacement = get_node_expression(target_node, processed_nodes, is_prev=True)
 
             if modified_op is None:
                 modified_op = operation.copy(keep_node=True)
 
             if isinstance(operation, TriccOperation):
-                modified_op.replace_node(TriccReference(clean_ref), target_node)
+                modified_op.replace_node(TriccReference(clean_ref), replacement)
             elif operation == TriccReference(clean_ref):
-                modified_op = target_node
+                modified_op = replacement
+
+            target_node = replacement
 
         # Update path length
         path_len = getattr(target_node, "path_len", 0)
         if isinstance(target_node, TriccOperation):
-            path_len = max(getattr(n, "path_len", 0) for n in target_node.get_references())
-        node.path_len = max(node.path_len, path_len)
+            refs = target_node.get_references() or []
+            path_len = max((getattr(n, "path_len", 0) or 0) for n in refs) if refs else 0
+        node.path_len = max(node.path_len, path_len or 0)
 
     # ───────────────────────────────────────────────
     # 2. Check real node references (already objects)
@@ -1168,7 +1474,6 @@ def walktrhough_tricc_node_processed_stached(
     loop_count=0,
     **kwargs,
 ):
-    ended_activity = False
     # logger.debug("walkthrough::{}::{}".format(callback.__name__, node.get_name()))
     priority_map = kwargs.get('priority_map', {})
     path_len = max(node.activity.path_len, *[0, *[getattr(n, "path_len", 0) + 1 for n in node.activity.prev_nodes]]) + 1
@@ -1204,13 +1509,32 @@ def walktrhough_tricc_node_processed_stached(
             end_nodes = node.activity.get_end_nodes()
             if all([e in processed_nodes for e in end_nodes]):
                 processed_nodes.add(node.activity)
-                ended_activity = True
                 if warn:
                     logger.debug(
                         "{}::{}: processed ({})".format(
                             callback.__name__, node.activity.get_name(), len(processed_nodes)
                         )
                     )
+                # the activity is fully processed: schedule whatever comes directly after it
+                # (nodes wired as next_nodes of the TriccNodeActivity itself, e.g. when a repeated
+                # instance has no bridge/wait in between) - the activity is never revisited on its
+                # own once it defers to its root, so this is the only place this can happen.
+                for next_node in node.activity.next_nodes:
+                    if next_node not in stashed_nodes:
+                        if recursive:
+                            walktrhough_tricc_node_processed_stached(
+                                next_node,
+                                callback,
+                                processed_nodes,
+                                stashed_nodes,
+                                path_len,
+                                recursive,
+                                warn=warn,
+                                node_path=node_path.copy(),
+                                **kwargs,
+                            )
+                        else:
+                            stashed_nodes.insert_at_top(next_node)
         elif node in stashed_nodes:
             stashed_nodes.remove(node)
             # logger.debug("{}::{}: unstashed ({})".format(callback.__name__, node.get_name(), len(stashed_nodes)))
@@ -1294,24 +1618,6 @@ def walktrhough_tricc_node_processed_stached(
                     elif node.root not in stashed_nodes:
                         stashed_nodes.insert_at_top(node.root)
                     return
-            elif ended_activity:
-                for next_node in node.next_nodes:
-                    if next_node not in stashed_nodes:
-                        # stashed_nodes.insert(0,next_node)
-                        if recursive:
-                            walktrhough_tricc_node_processed_stached(
-                                next_node,
-                                callback,
-                                processed_nodes,
-                                stashed_nodes,
-                                path_len,
-                                recursive,
-                                warn=warn,
-                                node_path=node_path.copy(),
-                                **kwargs,
-                            )
-                        else:
-                            stashed_nodes.insert_at_top(next_node)
 
         elif hasattr(node, "next_nodes") and len(node.next_nodes) > 0 and not isinstance(node, TriccNodeActivity):
             if recursive:
@@ -1657,74 +1963,351 @@ def get_prev_node_by_name(processed_nodes, name, node):
 MIN_LOOP_COUNT = 10
 
 
+def iter_node_dependencies(node):
+    """Yield (dependency, etype) for prev_nodes and expression/reference deps.
+
+    etype is ``prev`` for graph predecessors and ``ref`` for expression/reference
+    dependencies.  Collects from get_references() plus expression_reference /
+    reference / relevance / trigger / applicability so empty ``reference=[]``
+    does not hide expression_reference refs (same sources that block processing).
+    """
+    seen = set()
+
+    def _dep_key(d):
+        if isinstance(d, TriccReference):
+            return ("ref", d.value)
+        if d is None:
+            return None
+        return ("id", getattr(d, "id", None) or id(d))
+
+    def _emit(d, etype):
+        if d is None:
+            return
+        if isinstance(d, TriccNodeSelectOption):
+            d = getattr(d, "select", d)
+        key = (_dep_key(d), etype)
+        if key in seen or key[0] is None:
+            return
+        seen.add(key)
+        yield d, etype
+
+    if hasattr(node, "prev_nodes") and node.prev_nodes:
+        for p in node.prev_nodes:
+            yield from _emit(p, "prev")
+
+    # get_references() can return [] when reference is an empty list even if
+    # expression_reference still holds TriccReference objects — also scan attrs.
+    ref_sources = []
+    if hasattr(node, "get_references"):
+        try:
+            ref_sources.append(node.get_references())
+        except Exception:
+            pass
+    for attr in ("expression_reference", "reference", "relevance", "trigger", "applicability"):
+        val = getattr(node, attr, None)
+        if val is None:
+            continue
+        if hasattr(val, "get_references"):
+            try:
+                ref_sources.append(val.get_references())
+            except Exception:
+                pass
+        elif isinstance(val, list):
+            ref_sources.append(val)
+        elif isinstance(val, TriccReference):
+            ref_sources.append([val])
+
+    for source in ref_sources:
+        if not source:
+            continue
+        for r in source:
+            if isinstance(r, TriccReference) or issubclass(r.__class__, TriccNodeBaseModel):
+                yield from _emit(r, "ref")
+            elif hasattr(r, "get_references"):
+                try:
+                    nested = r.get_references() or []
+                except Exception:
+                    nested = []
+                for nr in nested:
+                    yield from _emit(nr, "ref")
+
+
+def generate_stashed_loop_mermaid(stashed_nodes, waited, looped, processed_nodes):
+    """Generate Mermaid flowchart for stashed loop diagnostics.
+
+    - Stashed nodes: orange
+    - Processed dependants (part of processed graph): green
+    - Unresolved TriccReference nodes: red
+    - Other unresolved dependants (unprocessed): gray
+    Includes stashed nodes and direct links (prev_nodes + expression references)
+    between them and to processed / unprocessed / reference dependants.
+
+    TriccReference dependencies are resolved by name to stashed, processed, or
+    known activity nodes so edges are not incorrectly drawn as red stubs when the
+    real target exists.
+    """
+    node_defs = {}  # nid -> label
+    edge_set = set()  # (from_nid, to_nid, etype)
+    class_map = {}  # nid -> 'stashed'|'processed'|'reference'|'other'
+
+    # Build name -> nodes index from stashed/processed and their activities so
+    # expression refs can resolve to unprocessed graph nodes (gray), not only
+    # red TriccReference stubs.
+    name_index = {}
+
+    def _index_node(n):
+        if n is None or isinstance(n, TriccReference):
+            return
+        name = getattr(n, "name", None)
+        if name:
+            name_index.setdefault(name, [])
+            if n not in name_index[name]:
+                name_index[name].append(n)
+        activity = getattr(n, "activity", None)
+        nodes_map = getattr(activity, "nodes", None) if activity is not None else None
+        if nodes_map:
+            for an in nodes_map.values():
+                aname = getattr(an, "name", None)
+                if aname:
+                    name_index.setdefault(aname, [])
+                    if an not in name_index[aname]:
+                        name_index[aname].append(an)
+
+    for n in list(stashed_nodes) + list(processed_nodes):
+        _index_node(n)
+
+    def get_node_id(n):
+        if isinstance(n, TriccReference):
+            base = f"ref_{n.value}"
+        else:
+            base = getattr(n, "id", None) or getattr(n, "name", None) or str(n)[:40]
+        safe = re.sub(r"[^a-zA-Z0-9_]", "_", str(base))
+        if not safe:
+            safe = "node_unknown"
+        if safe and safe[0].isdigit():
+            safe = "n_" + safe
+        return safe
+
+    def get_label(n):
+        if isinstance(n, TriccReference):
+            return f"Reference<br/>{_safe_mermaid_text(n.value)}"
+        try:
+            nm = n.get_name()
+        except Exception:
+            nm = str(n)[:40]
+        cls = n.__class__.__name__
+        return f"{cls}<br/>{_safe_mermaid_text(nm)}"
+
+    def _safe_mermaid_text(text, max_len=50):
+        text = str(text).replace('"', "'").replace("\n", " ").replace("`", "'")
+        if len(text) > max_len:
+            text = text[: max_len - 3] + "..."
+        return text
+
+    def resolve_dep(d):
+        """Map TriccReference / select-option wrappers to real graph nodes when known."""
+        if d is None:
+            return None
+        if isinstance(d, TriccNodeSelectOption):
+            d = getattr(d, "select", d)
+        if isinstance(d, TriccReference):
+            # Prefer clean name when option syntax name[label] is used
+            ref_name = d.value
+            if isinstance(ref_name, str) and ref_name.endswith("]") and "[" in ref_name:
+                ref_name = ref_name.split("[", 1)[0]
+            candidates = name_index.get(ref_name) or name_index.get(d.value) or []
+            # Preference: stashed > processed > other (unprocessed)
+            for pool in (stashed_nodes, processed_nodes):
+                for n in candidates:
+                    if n in pool:
+                        return n
+                for n in pool:
+                    if getattr(n, "name", None) in (ref_name, d.value):
+                        return n
+            if candidates:
+                return candidates[0]
+            return d
+        return d
+
+    def classify(n):
+        if isinstance(n, TriccReference):
+            return "reference"
+        if n in stashed_nodes:
+            return "stashed"
+        if n in processed_nodes:
+            return "processed"
+        return "other"
+
+    def add_node(n, force_class=None):
+        if n is None:
+            return None
+        n = resolve_dep(n)
+        if n is None:
+            return None
+        nid = get_node_id(n)
+        if nid not in node_defs:
+            node_defs[nid] = get_label(n)
+            _index_node(n)
+        preferred = ("stashed", "processed")
+        weaker = ("reference", "other")
+        if force_class:
+            existing = class_map.get(nid)
+            if existing in preferred and force_class in weaker:
+                pass
+            else:
+                class_map[nid] = force_class
+        elif nid not in class_map:
+            class_map[nid] = classify(n)
+        return nid
+
+    def add_edge(src, dst, etype=""):
+        sid = add_node(src)
+        did = add_node(dst)
+        if sid and did and sid != did:
+            key = (sid, did, etype)
+            if key not in edge_set:
+                edge_set.add(key)
+
+    # Index parents by str(n) so waited/looped keys can be re-linked as edges
+    str_to_node = {}
+    for n in list(stashed_nodes) + list(processed_nodes):
+        str_to_node[str(n)] = n
+
+    # Collect direct dependencies for every stashed node
+    for sn in list(stashed_nodes):
+        add_node(sn, force_class="stashed")
+        for dep, etype in iter_node_dependencies(sn):
+            add_edge(sn, resolve_dep(dep), etype)
+
+    # Waited/looped: always draw parent → dependency edges (not orphan nodes)
+    for container, etype in ((looped, "loop"), (waited, "wait")):
+        if not container:
+            continue
+        for parent_key, deplist in container.items():
+            parent = str_to_node.get(parent_key)
+            if parent is None:
+                for sn in stashed_nodes:
+                    if str(sn) == parent_key:
+                        parent = sn
+                        break
+            for d in deplist or []:
+                resolved = resolve_dep(d)
+                edge_type = etype
+                if isinstance(d, TriccReference) or isinstance(resolved, TriccReference):
+                    edge_type = "ref"
+                elif resolved in stashed_nodes:
+                    edge_type = "loop" if etype == "loop" else "wait"
+                if parent is not None:
+                    add_edge(parent, resolved, edge_type)
+                else:
+                    # Still surface the dependency even if parent key is unknown
+                    if isinstance(resolved, TriccReference):
+                        add_node(resolved, force_class="reference")
+                    elif resolved in stashed_nodes:
+                        add_node(resolved, force_class="stashed")
+                    elif resolved in processed_nodes:
+                        add_node(resolved, force_class="processed")
+                    else:
+                        add_node(resolved)
+
+    # Build mermaid source
+    lines = ["flowchart TD"]
+    for nid, label in node_defs.items():
+        lines.append(f'    {nid}["{label}"]')
+
+    for sid, did, etype in edge_set:
+        if etype:
+            lines.append(f"    {sid} -->|{etype}| {did}")
+        else:
+            lines.append(f"    {sid} --> {did}")
+
+    # Class definitions
+    lines.append("    classDef stashed fill:#ffa500,stroke:#333,color:#000")
+    lines.append("    classDef processed fill:#90EE90,stroke:#333,color:#000")
+    lines.append("    classDef reference fill:#ff6666,stroke:#333,color:#fff")
+    lines.append("    classDef other fill:#cccccc,stroke:#333,color:#000")
+
+    grouped = {"stashed": [], "processed": [], "reference": [], "other": []}
+    for nid, cls in class_map.items():
+        if cls in grouped:
+            grouped[cls].append(nid)
+
+    for cls_name, ids in grouped.items():
+        if ids:
+            lines.append(f"    class {','.join(ids)} {cls_name}")
+
+    return "\n".join(lines)
+
+
 def check_stashed_loop(stashed_nodes, prev_stashed_nodes, processed_nodes, len_prev_processed_nodes, loop_count):
 
-    if len(stashed_nodes) == len(prev_stashed_nodes):
-        # to avoid checking the details
-        if loop_count <= 0:
-            if loop_count < -MIN_LOOP_COUNT:
-                loop_count = MIN_LOOP_COUNT + 1
-            else:
-                loop_count -= 1
-        if loop_count > MIN_LOOP_COUNT:
-            if set(stashed_nodes) == set(prev_stashed_nodes) and len(processed_nodes) == len_prev_processed_nodes:
-                loop_count += 1
-                if loop_count > max(MIN_LOOP_COUNT, 11 * len(prev_stashed_nodes) + 1):
-                    logger.critical("Stashed node list was unchanged: loop likely or unresolved dependence")
-                    waited, looped = get_all_dependant(stashed_nodes, stashed_nodes, processed_nodes)
-                    logger.debug(f"{len(looped)} nodes waiting stashed nodes")
-                    logger.info("unresolved reference")
-                    for es_node in [n for n in stashed_nodes if isinstance(n, TriccReference)]:
-                        logger.info(
-                            "Stashed node {}:{}|{} {}".format(
-                                es_node.activity.get_name() if hasattr(es_node, "activity") else "",
-                                es_node.activity.instance if hasattr(es_node, "activity") else "",
-                                es_node.__class__,
-                                es_node.get_name(),
-                            )
-                        )
-                    for es_node in [
-                        node for node_list in looped.values() for node in node_list if isinstance(node, TriccReference)
-                    ]:
-                        logger.info(
-                            "looped node {}:{}|{} {}".format(
-                                es_node.activity.get_name() if hasattr(es_node, "activity") else "",
-                                es_node.activity.instance if hasattr(es_node, "activity") else "",
-                                es_node.__class__,
-                                es_node.get_name(),
-                            )
-                        )
-                    for es_node in [
-                        node for node_list in waited.values() for node in node_list if isinstance(node, TriccReference)
-                    ]:
-                        logger.info(
-                            "waited node {}:{}|{} {}".format(
-                                es_node.activity.get_name() if hasattr(es_node, "activity") else "",
-                                es_node.activity.instance if hasattr(es_node, "activity") else "",
-                                es_node.__class__,
-                                es_node.get_name(),
-                            )
-                        )
-                    logger.info("looped nodes")
-                    for dep_list in looped:
-                        for d in looped[dep_list]:
-                            if str(d) in looped:
-                                logger.critical("[{}] depends on [{}]".format(dep_list, str(d)))
-                            else:
-                                logger.error("[{}] depends on [{}]".format(dep_list, str(d)))
-                        if dep_list in waited:
-                            for d in waited[dep_list]:
-                                logger.warning("[{}] depends on [{}]".format(dep_list, str(d)))
-                    logger.info("waited nodes")
-                    for dep_list in waited:
-                        if dep_list not in looped:
-                            for d in waited[dep_list]:
-                                logger.warning("[{}] depends on [{}]".format(dep_list, d.get_name()))
+    if (
+        len(stashed_nodes) == len(prev_stashed_nodes)
+        and set(stashed_nodes) == set(prev_stashed_nodes)
+        and len(processed_nodes) == len_prev_processed_nodes
+    ):
+        loop_count += 1
+        if loop_count > max(MIN_LOOP_COUNT, 11 * len(prev_stashed_nodes) + 1):
+            logger.critical("Stashed node list was unchanged: loop likely or unresolved dependence")
+            waited, looped = get_all_dependant(stashed_nodes, stashed_nodes, processed_nodes)
+            logger.debug(f"{len(looped)} nodes waiting stashed nodes")
+            logger.info("unresolved reference")
+            for es_node in [n for n in stashed_nodes if isinstance(n, TriccReference)]:
+                logger.info(
+                    "Stashed node {}:{}|{} {}".format(
+                        es_node.activity.get_name() if hasattr(es_node, "activity") else "",
+                        es_node.activity.instance if hasattr(es_node, "activity") else "",
+                        es_node.__class__,
+                        es_node.get_name(),
+                    )
+                )
+            for es_node in [
+                node for node_list in looped.values() for node in node_list if isinstance(node, TriccReference)
+            ]:
+                logger.info(
+                    "looped node {}:{}|{} {}".format(
+                        es_node.activity.get_name() if hasattr(es_node, "activity") else "",
+                        es_node.activity.instance if hasattr(es_node, "activity") else "",
+                        es_node.__class__,
+                        es_node.get_name(),
+                    )
+                )
+            for es_node in [
+                node for node_list in waited.values() for node in node_list if isinstance(node, TriccReference)
+            ]:
+                logger.info(
+                    "waited node {}:{}|{} {}".format(
+                        es_node.activity.get_name() if hasattr(es_node, "activity") else "",
+                        es_node.activity.instance if hasattr(es_node, "activity") else "",
+                        es_node.__class__,
+                        es_node.get_name(),
+                    )
+                )
+            logger.info("looped nodes")
+            for dep_list in looped:
+                for d in looped[dep_list]:
+                    if str(d) in looped:
+                        logger.critical("[{}] depends on [{}]".format(dep_list, str(d)))
+                    else:
+                        logger.error("[{}] depends on [{}]".format(dep_list, str(d)))
+                if dep_list in waited:
+                    for d in waited[dep_list]:
+                        logger.warning("[{}] depends on [{}]".format(dep_list, str(d)))
+            logger.info("waited nodes")
+            for dep_list in waited:
+                if dep_list not in looped:
+                    for d in waited[dep_list]:
+                        logger.warning("[{}] depends on [{}]".format(dep_list, d.get_name()))
 
-                    if len(stashed_nodes) == len(prev_stashed_nodes):
-                        exit(1)
-            else:
-                loop_count = 0
+            # Generate and log Mermaid diagram of the stashed situation
+            try:
+                mermaid_diagram = generate_stashed_loop_mermaid(stashed_nodes, waited, looped, processed_nodes)
+                logger.info("=== STASHED LOOP MERMAID DIAGRAM (copy to https://mermaid.live) ===\n" + mermaid_diagram)
+            except Exception as ex:
+                logger.warning(f"Failed to generate stashed loop mermaid: {ex}")
+
+            if len(stashed_nodes) == len(prev_stashed_nodes):
+                exit(1)
     else:
         loop_count = 0
     return loop_count
@@ -1751,14 +2334,10 @@ def get_all_dependant(loop, stashed_nodes, processed_nodes, depth=0, waited=None
         cur_path = path.copy()
         cur_path.append(n)
         dependant = OrderedSet()
-        if hasattr(n, "prev_nodes") and n.prev_nodes:
-            dependant = dependant | n.prev_nodes
-        if hasattr(n, "get_references"):
-            dependant = dependant | (n.get_references() or OrderedSet())
-        if not isinstance(dependant, list):
-            pass
+        for d, _etype in iter_node_dependencies(n):
+            dependant.add(d)
         for d in dependant:
-            if d in path:
+            if d in path[:-1]:
                 logger.warning(
                     f"loop {str(d)} already in path {'::'.join(map(str, path))}  "
                 )
@@ -1766,18 +2345,30 @@ def get_all_dependant(loop, stashed_nodes, processed_nodes, depth=0, waited=None
                 d = d.select
 
             if isinstance(d, TriccReference):
-                if not any(n.name == d.value for n in processed_nodes):
-                    if not any(n.name == d.value for n in stashed_nodes):
+                ref_name = d.value
+                if isinstance(ref_name, str) and ref_name.endswith("]") and "[" in ref_name:
+                    ref_name = ref_name.split("[", 1)[0]
+                match_stashed = next(
+                    (sn for sn in stashed_nodes if getattr(sn, "name", None) in (d.value, ref_name)),
+                    None,
+                )
+                match_processed = next(
+                    (pn for pn in processed_nodes if getattr(pn, "name", None) in (d.value, ref_name)),
+                    None,
+                )
+                if match_processed is None:
+                    if match_stashed is None:
                         waited = add_to_tree(waited, n, d)
                     else:
-                        looped = add_to_tree(looped, n, d)
+                        # Store the real stashed node so diagnostics (mermaid/logs) link correctly
+                        looped = add_to_tree(looped, n, match_stashed)
 
             elif d not in processed_nodes:
                 if d in stashed_nodes:
                     looped = add_to_tree(looped, n, d)
                 else:
                     waited = add_to_tree(waited, n, d)
-            all_dependant = all_dependant.union(dependant)
+            all_dependant.add(d)
     if depth < MAX_DRILL:
         waited, looped = get_all_dependant(
             all_dependant, stashed_nodes, processed_nodes, depth + 1, waited, looped, path=cur_path
@@ -1936,6 +2527,556 @@ def replace_node(old, new, page=None):
             edge.target = new.id
 
 
+def _swap_node_references(old_node, new_node):
+    """Rewrite prev/next object references from old_node to new_node (same id safe)."""
+    for nxt in list(getattr(old_node, "next_nodes", None) or []):
+        if hasattr(nxt, "prev_nodes") and old_node in nxt.prev_nodes:
+            nxt.prev_nodes.remove(old_node)
+            nxt.prev_nodes.add(new_node)
+        if hasattr(nxt, "path") and getattr(nxt, "path", None) is old_node:
+            nxt.path = new_node
+    for prev in list(getattr(old_node, "prev_nodes", None) or []):
+        if hasattr(prev, "next_nodes") and old_node in prev.next_nodes:
+            prev.next_nodes.remove(old_node)
+            prev.next_nodes.add(new_node)
+        if hasattr(prev, "path") and getattr(prev, "path", None) is old_node:
+            prev.path = new_node
+    new_node.prev_nodes = set(getattr(old_node, "prev_nodes", None) or set())
+    new_node.next_nodes = set(getattr(old_node, "next_nodes", None) or set())
+    old_node.prev_nodes = set()
+    old_node.next_nodes = set()
+
+
+def convert_structural_node_to_bridge(node, activity, label_prefix="snippet"):
+    """
+    Replace an activity start/end (or other structural node) with a TriccNodeBridge.
+
+    Keeps the same id so existing edges remain valid.
+    """
+    if isinstance(node, TriccNodeBridge):
+        return node
+
+    bridge = TriccNodeBridge(
+        id=node.id,
+        group=getattr(node, "group", activity),
+        activity=activity,
+        label=f"{label_prefix}: {node.get_name()}",
+        name=getattr(node, "name", None) or f"path_{node.id}",
+        path_len=getattr(node, "path_len", 0) or 0,
+        instance=getattr(node, "instance", 0) or 0,
+        base_instance=getattr(node, "base_instance", None),
+    )
+    priority = getattr(node, "priority", None)
+    if priority is not None:
+        bridge.priority = priority
+
+    _swap_node_references(node, bridge)
+
+    if node.id in activity.nodes:
+        del activity.nodes[node.id]
+    activity.nodes[bridge.id] = bridge
+
+    if getattr(activity, "root", None) is node or getattr(activity, "root", None) and activity.root.id == node.id:
+        activity.root = bridge
+
+    if node in getattr(activity, "calculates", []):
+        activity.calculates.remove(node)
+
+    return bridge
+
+
+def _snippet_end_nodes(activity):
+    """
+    All terminal nodes of a cloned module that must not land on the parent activity.
+
+    Union of get_end_nodes() and every end/activity_end in activity.nodes (get_end_nodes
+    alone can miss TriccNodeEnd when root is activity_start).
+    """
+    ends = list(activity.get_end_nodes())
+    seen = {e.id for e in ends}
+    for n in activity.nodes.values():
+        if isinstance(n, (TriccNodeEnd, TriccNodeActivityEnd)) and n.id not in seen:
+            ends.append(n)
+            seen.add(n.id)
+    return ends
+
+
+def _resolve_activity_node(activity, node_or_id):
+    """Resolve a node object or id to a node living in activity.nodes."""
+    if node_or_id is None:
+        return None
+    if issubclass(getattr(node_or_id, "__class__", object), TriccBaseModel) and getattr(node_or_id, "id", None) in activity.nodes:
+        # Prefer the object stored on the activity (same id, current instance graph)
+        return activity.nodes.get(node_or_id.id, node_or_id)
+    nid = getattr(node_or_id, "id", node_or_id)
+    return activity.nodes.get(nid)
+
+
+def sync_prev_next_from_edges(activity, node_ids=None):
+    """
+    Rebuild prev_nodes/next_nodes from activity.edges.
+
+    After snippet inject, edges are the source of truth; object-level prev/next can be
+    stale (especially when the parent page is itself an activity instance).
+    If node_ids is set, only those nodes and their edge-neighbors are rebuilt.
+    """
+    if node_ids is not None:
+        node_ids = set(node_ids)
+        affected_ids = set(node_ids)
+        for edge in activity.edges:
+            sid = getattr(edge.source, "id", edge.source)
+            tid = getattr(edge.target, "id", edge.target)
+            if sid in node_ids or tid in node_ids:
+                affected_ids.add(sid)
+                affected_ids.add(tid)
+    else:
+        affected_ids = set(activity.nodes.keys())
+
+    for nid in affected_ids:
+        n = activity.nodes.get(nid)
+        if n is None:
+            continue
+        if hasattr(n, "prev_nodes"):
+            n.prev_nodes = OrderedSet()
+        if hasattr(n, "next_nodes"):
+            n.next_nodes = OrderedSet()
+
+    for edge in activity.edges:
+        sid = getattr(edge.source, "id", edge.source)
+        tid = getattr(edge.target, "id", edge.target)
+        if sid not in affected_ids and tid not in affected_ids:
+            continue
+        src = activity.nodes.get(sid)
+        tgt = activity.nodes.get(tid)
+        if src is None or tgt is None:
+            continue
+        if hasattr(src, "next_nodes") and tgt not in src.next_nodes:
+            src.next_nodes.add(tgt)
+        if hasattr(tgt, "prev_nodes") and src not in tgt.prev_nodes:
+            tgt.prev_nodes.add(src)
+
+
+def replace_snippet_ends_with_bridge(activity):
+    """
+    Replace all end / activity_end nodes of a snippet clone with one exit bridge.
+
+    The bridge takes over every end's prev_nodes (and incoming edges). All end nodes
+    are removed so they cannot mark the parent activity as "processed" later
+    (see walktrhough_tricc_node_processed_stached end-node handling).
+
+    Returns the exit TriccNodeBridge, or None if the activity has no ends.
+    """
+    ends = _snippet_end_nodes(activity)
+    if not ends:
+        logger.warning(f"Snippet activity {activity.get_name()} has no end nodes")
+        return None
+
+    end_ids = {e.id for e in ends}
+    # Union of predecessors that feed any end
+    prev_nodes = set()
+    for end in ends:
+        for prev in list(getattr(end, "prev_nodes", None) or set()):
+            prev_nodes.add(prev)
+        # Also collect from edges (prev_nodes may be incomplete at clone time)
+        for edge in activity.edges:
+            if edge.target == end.id or edge.target == end:
+                src_id = getattr(edge.source, "id", edge.source)
+                src = activity.nodes.get(src_id)
+                if src is not None and not isinstance(src, (TriccNodeEnd, TriccNodeActivityEnd)):
+                    prev_nodes.add(src)
+
+    # Include activity.instance so two injects of the same module never share an exit id
+    # (processed_nodes is id-equality based across the whole form).
+    bridge_id = generate_id(
+        f"snippet_exit{activity.id}{getattr(activity, 'instance', 0)}{''.join(sorted(end_ids))}"
+    )
+    exit_bridge = TriccNodeBridge(
+        id=bridge_id,
+        group=getattr(activity, "group", activity) or activity,
+        activity=activity,
+        label=f"snippet_exit: {activity.get_name()}",
+        name=f"path_{bridge_id}",
+        path_len=max((getattr(e, "path_len", 0) or 0) for e in ends) if ends else 0,
+        instance=getattr(activity, "instance", 0) or 0,
+    )
+    exit_bridge.prev_nodes = set()
+    exit_bridge.next_nodes = set()
+    activity.nodes[exit_bridge.id] = exit_bridge
+
+    # Rewire predecessors → exit bridge; drop edges that touched ends
+    new_edges = []
+    seen_prev_edge = set()
+    for edge in list(activity.edges):
+        src_id = getattr(edge.source, "id", edge.source)
+        tgt_id = getattr(edge.target, "id", edge.target)
+        if tgt_id in end_ids:
+            # Incoming to an end → point at the exit bridge (dedupe)
+            key = (src_id, exit_bridge.id)
+            if key not in seen_prev_edge:
+                edge.target = exit_bridge.id
+                new_edges.append(edge)
+                seen_prev_edge.add(key)
+            continue
+        if src_id in end_ids:
+            # Outgoing from an end (unusual) → re-source from exit bridge
+            edge.source = exit_bridge.id
+            new_edges.append(edge)
+            continue
+        new_edges.append(edge)
+    activity.edges = new_edges
+
+    # Object-level prev/next: detach ends, attach bridge
+    for prev in prev_nodes:
+        if hasattr(prev, "next_nodes"):
+            for end in ends:
+                if end in prev.next_nodes:
+                    prev.next_nodes.remove(end)
+            prev.next_nodes.add(exit_bridge)
+        if hasattr(prev, "path"):
+            for end in ends:
+                if getattr(prev, "path", None) is end:
+                    prev.path = exit_bridge
+        exit_bridge.prev_nodes.add(prev)
+
+    for end in ends:
+        for nxt in list(getattr(end, "next_nodes", None) or set()):
+            if hasattr(nxt, "prev_nodes") and end in nxt.prev_nodes:
+                nxt.prev_nodes.remove(end)
+                nxt.prev_nodes.add(exit_bridge)
+            exit_bridge.next_nodes.add(nxt)
+        end.prev_nodes = set()
+        end.next_nodes = set()
+        if end.id in activity.nodes:
+            del activity.nodes[end.id]
+        if end in getattr(activity, "calculates", []):
+            activity.calculates.remove(end)
+
+    return exit_bridge
+
+
+def _unregister_activity_instance(base_activity, clone):
+    """Avoid polluting the shared instances map used by positive instance gotos."""
+    base = base_activity.base_instance or base_activity
+    if hasattr(base, "instances") and clone.instance in base.instances:
+        if base.instances[clone.instance] is clone:
+            del base.instances[clone.instance]
+
+
+def _reparent_snippet_node(node, parent_activity, clone_activity):
+    node.activity = parent_activity
+    group = getattr(node, "group", None)
+    if group is None or group is clone_activity or getattr(group, "id", None) == clone_activity.id:
+        node.group = parent_activity
+    elif hasattr(group, "activity"):
+        group.activity = parent_activity
+
+
+def import_activity_nodes_into_parent(clone, parent):
+    """Move cloned activity nodes/edges/calculates/groups into the parent activity.
+
+    Returns the set of imported node ids (for prev/next rebuild).
+    """
+    imported_ids = set()
+    for node in list(clone.nodes.values()):
+        # Never lift terminal ends into the parent (breaks activity-processed detection)
+        if isinstance(node, (TriccNodeEnd, TriccNodeActivityEnd)):
+            logger.warning(
+                f"Skipping residual end {node.get_name()} during snippet import into {parent.get_name()}"
+            )
+            continue
+        _reparent_snippet_node(node, parent, clone)
+        # options / nested select options
+        if isinstance(node, TriccNodeSelect) and getattr(node, "options", None):
+            for opt in node.options.values():
+                _reparent_snippet_node(opt, parent, clone)
+                parent.nodes[opt.id] = opt
+                imported_ids.add(opt.id)
+        parent.nodes[node.id] = node
+        imported_ids.add(node.id)
+
+    for edge in list(clone.edges):
+        parent.edges.append(edge)
+
+    for calc in list(clone.calculates):
+        if isinstance(calc, (TriccNodeEnd, TriccNodeActivityEnd)):
+            continue
+        _reparent_snippet_node(calc, parent, clone)
+        if calc.id not in parent.nodes:
+            parent.nodes[calc.id] = calc
+            imported_ids.add(calc.id)
+        if calc not in parent.calculates:
+            parent.calculates.append(calc)
+
+    for group in list(clone.groups.values()):
+        if hasattr(group, "activity"):
+            group.activity = parent
+        if getattr(group, "group", None) is clone or getattr(group, "group", None) is None:
+            group.group = parent
+        parent.groups[group.id] = group
+
+    return imported_ids
+
+
+# Monotonic counter so every snippet inject gets distinct make_instance IDs even when
+# several gotos share the same caller.instance and the same module template.
+_snippet_inject_seq = 0
+
+
+def clone_activity_for_snippet(goto, target_activity):
+    """
+    Clone a target activity for snippet injection (unique IDs, not registered for reuse).
+
+    Caller should run linking_nodes on the clone before inject_activity_as_snippet,
+    because make_instance resets prev_nodes/next_nodes.
+
+    Instance numbers must be unique per inject. Node ids are generate_id(base_id + instance);
+    if two injects reuse the same number, processed_nodes (keyed by id equality) treats the
+    second exit bridge as already processed and never stashes that activity's end — the
+    outer wait on the caller activity then hangs forever.
+    """
+    global _snippet_inject_seq
+    from tricc_oo.converters.xml_to_tricc import apply_goto_repeat_to_activity
+
+    if not isinstance(target_activity, TriccNodeActivity):
+        logger.critical(
+            f"goto snippet {goto.get_name()} link is not an activity: {goto.link}"
+        )
+        exit(1)
+
+    # Resolve the template page (not a prior instance of the module)
+    template = target_activity.base_instance or target_activity
+    _snippet_inject_seq += 1
+    caller_inst = getattr(getattr(goto, "activity", None), "instance", 0) or 0
+    # High band + caller instance + goto id entropy + monotonic seq → unique node ids
+    goto_key = abs(hash(str(getattr(goto, "id", "")) + str(getattr(goto, "name", "")))) % 10000
+    snippet_nb = 900000 + (int(caller_inst) * 100000) + (goto_key * 10) + (_snippet_inject_seq % 10)
+    # Ensure not colliding with any live or previously used instance slot
+    used = set(getattr(template, "instances", {}) or {})
+    # Also reserve numbers that may still be referenced after unregister
+    while snippet_nb in used:
+        snippet_nb += 1
+        used.add(snippet_nb)
+
+    clone = template.make_instance(snippet_nb)
+    _unregister_activity_instance(template, clone)
+    apply_goto_repeat_to_activity(goto, clone)
+    return clone
+
+
+def sync_slot_versions_on_activity(activity, focus_names=None):
+    """Renumber ``version`` / ``last`` for each export-name bucket on an activity.
+
+    Used after snippet inject so cloned same-name nodes (and any pre-existing peers
+    already on the parent) get unique export versions immediately, not only later
+    when ``load_calculate`` walks the graph.
+
+    Buckets follow export base rules: ``repeat > 1`` is isolated by repeat;
+    ``repeat <= 1`` (incl. ``-1``) share one version space per name.
+    """
+    buckets = defaultdict(list)
+    pool = list(getattr(activity, "nodes", {}).values())
+    pool.extend(getattr(activity, "calculates", []) or [])
+    for n in pool:
+        if isinstance(n, (TriccNodeSelectOption, TriccNodeEnd, TriccNodeActivityEnd)):
+            continue
+        name = getattr(n, "name", None)
+        if not name:
+            continue
+        if focus_names is not None and name not in focus_names:
+            continue
+        buckets[_export_version_bucket_key(name, get_repeat(n))].append(n)
+
+    for _key, peers in buckets.items():
+        if len(peers) < 2:
+            continue
+        ordered = sorted(
+            peers,
+            key=lambda n: (
+                getattr(n, "path_len", 0) or 0,
+                getattr(n, "instance", 0) or 0,
+                str(getattr(n, "id", "")),
+            ),
+        )
+        for i, peer in enumerate(ordered, start=1):
+            peer.version = i
+            peer.last = i == len(ordered)
+            if hasattr(peer, "export_name"):
+                peer.export_name = None
+
+
+def inject_activity_as_snippet(goto, parent_page, clone):
+    """
+    Inline an already-cloned (and preferably already-linked) activity into parent_page
+    in place of a goto (instance == -1).
+
+    Returns the entry TriccNodeBridge that should replace the goto as the link target.
+    """
+    if not isinstance(clone, TriccNodeActivity):
+        logger.critical(
+            f"goto snippet {goto.get_name()}: expected cloned activity, got {type(clone)}"
+        )
+        exit(1)
+
+    if not isinstance(clone.root, (TriccNodeActivityStart, TriccNodeBridge, TriccNodeMainStart)):
+        logger.warning(
+            f"Snippet clone {clone.get_name()} root type is {type(clone.root)}; "
+            "expected activity_start"
+        )
+
+    # Ends first (while root is still activity_start so end detection stays reliable),
+    # then convert start → entry bridge.
+    exit_bridge = replace_snippet_ends_with_bridge(clone)
+    entry = convert_structural_node_to_bridge(clone.root, clone, label_prefix="snippet_entry")
+    if exit_bridge is None:
+        # No ends: still import content; exit wiring only if goto has successors
+        exit_bridge = entry
+
+    # Safety: never import residual end/activity_end nodes into the parent
+    for nid, n in list(clone.nodes.items()):
+        if isinstance(n, (TriccNodeEnd, TriccNodeActivityEnd)):
+            logger.warning(
+                f"Removing residual end node {n.get_name()} from snippet before import into {parent_page.get_name()}"
+            )
+            del clone.nodes[nid]
+    clone.calculates = [
+        c for c in getattr(clone, "calculates", []) or []
+        if not isinstance(c, (TriccNodeEnd, TriccNodeActivityEnd))
+    ]
+
+    imported_ids = import_activity_nodes_into_parent(clone, parent_page)
+    imported_ids.add(entry.id)
+    imported_ids.add(exit_bridge.id)
+
+    # Capture boundary neighbors BEFORE mutating goto / edges.
+    # Walkthrough only follows next_nodes (not edges); exit→successors must be set
+    # or activity_end never reaches stashed_nodes and waits on the caller activity stall.
+    goto_id = goto.id
+    predecessors = []
+    successors = []
+    seen_prev = set()
+    seen_next = set()
+
+    for edge in list(parent_page.edges):
+        src_id = getattr(edge.source, "id", edge.source)
+        tgt_id = getattr(edge.target, "id", edge.target)
+        if tgt_id == goto_id or edge.target == goto:
+            prev = _resolve_activity_node(parent_page, edge.source)
+            if prev is not None and prev.id not in seen_prev:
+                predecessors.append(prev)
+                seen_prev.add(prev.id)
+        if src_id == goto_id or edge.source == goto:
+            nxt = _resolve_activity_node(parent_page, edge.target)
+            if nxt is not None and nxt.id not in seen_next:
+                successors.append(nxt)
+                seen_next.add(nxt.id)
+
+    for prev in list(getattr(goto, "prev_nodes", None) or set()):
+        prev = _resolve_activity_node(parent_page, prev) or prev
+        pid = getattr(prev, "id", None)
+        if pid and pid not in seen_prev:
+            predecessors.append(prev)
+            seen_prev.add(pid)
+
+    for nxt in list(getattr(goto, "next_nodes", None) or set()):
+        nxt = _resolve_activity_node(parent_page, nxt) or nxt
+        nid = getattr(nxt, "id", None)
+        if nid and nid not in seen_next:
+            successors.append(nxt)
+            seen_next.add(nid)
+
+    # Also catch nodes that still list the goto in prev_nodes (edge may already be gone)
+    for n in list(parent_page.nodes.values()):
+        if n is goto:
+            continue
+        if hasattr(n, "prev_nodes") and goto in n.prev_nodes:
+            if n.id not in seen_next:
+                successors.append(n)
+                seen_next.add(n.id)
+        if hasattr(n, "next_nodes") and goto in n.next_nodes:
+            if n.id not in seen_prev:
+                predecessors.append(n)
+                seen_prev.add(n.id)
+
+    # Rewire parent edges that touched the goto
+    for edge in list(parent_page.edges):
+        if edge.target == goto_id or edge.target == goto:
+            edge.target = entry.id
+        if edge.source == goto_id or edge.source == goto:
+            edge.source = exit_bridge.id
+
+    # Ensure an edge exists for every boundary link (set_prev_next_node is edge-aware)
+    for prev in predecessors:
+        set_prev_next_node(prev, entry, replaced_node=goto, activity=parent_page)
+    for nxt in successors:
+        set_prev_next_node(exit_bridge, nxt, replaced_node=goto, activity=parent_page)
+
+    if not successors:
+        logger.warning(
+            "snippet inject for {} into {}: exit bridge has no successors "
+            "(activity_end / post-goto nodes may never enter stashed_nodes)".format(
+                goto.get_name(), parent_page.get_name()
+            )
+        )
+
+    goto.prev_nodes = OrderedSet()
+    goto.next_nodes = OrderedSet()
+
+    if goto_id in parent_page.nodes:
+        del parent_page.nodes[goto_id]
+    elif goto in parent_page.nodes.values():
+        for k, v in list(parent_page.nodes.items()):
+            if v is goto:
+                del parent_page.nodes[k]
+                break
+
+    if goto in getattr(parent_page, "calculates", []):
+        parent_page.calculates.remove(goto)
+
+    # Rebuild imported subgraph from edges, then force exit→successor / prev→entry
+    # (sync can miss links that only lived on prev/next without an edge).
+    sync_prev_next_from_edges(parent_page, imported_ids)
+    for prev in predecessors:
+        prev = _resolve_activity_node(parent_page, prev) or prev
+        set_prev_next_node(prev, entry, activity=parent_page)
+    for nxt in successors:
+        nxt = _resolve_activity_node(parent_page, nxt) or nxt
+        set_prev_next_node(exit_bridge, nxt, activity=parent_page)
+
+    if not exit_bridge.next_nodes and successors:
+        # Last resort: object-level only (should not happen if set_prev_next_node worked)
+        for nxt in successors:
+            nxt = _resolve_activity_node(parent_page, nxt) or nxt
+            if hasattr(exit_bridge, "next_nodes"):
+                exit_bridge.next_nodes.add(nxt)
+            if hasattr(nxt, "prev_nodes"):
+                nxt.prev_nodes.add(exit_bridge)
+
+    # After inlining, same concept names may already exist on the parent (from the
+    # caller graph or a previous inject). Renumber versions for those slots so
+    # export names stay unique even before load_calculate.
+    imported_names = set()
+    for nid in imported_ids:
+        n = parent_page.nodes.get(nid)
+        if n is not None and getattr(n, "name", None):
+            imported_names.add(n.name)
+    for calc in getattr(parent_page, "calculates", []) or []:
+        if getattr(calc, "name", None) and calc.id in imported_ids:
+            imported_names.add(calc.name)
+    if imported_names:
+        sync_slot_versions_on_activity(parent_page, imported_names)
+
+    logger.debug(
+        "injected activity {} as snippet into {} (entry={}, exit={}, successors={})".format(
+            clone.get_name(),
+            parent_page.get_name(),
+            entry.get_name(),
+            exit_bridge.get_name(),
+            len(successors),
+        )
+    )
+    return entry
+
+
 def replace_prev_next_node(prev_node, next_node, old_node, force=False):
     replace_prev_node(prev_node, next_node, old_node)
     replace_next_node(prev_node, next_node, old_node)
@@ -1958,6 +3099,7 @@ def replace_next_node(prev_node, next_node, old_node):
 
 
 # Priority constants
+POPULATE_PRIORITY = 1000
 SAME_GROUP_PRIORITY = 70
 PARENT_GROUP_PRIORITY = 60
 ACTIVE_ACTIVITY_PRIORITY = 50
@@ -1976,6 +3118,10 @@ def reorder_node_list(node_list, group, processed_nodes, priority_map = None):
     if not group.id in priority_map:
         priority_map[group.id] = {}
     def get_priority(node):
+        if isinstance(node, TriccNodePopulate):
+            return POPULATE_PRIORITY
+        if (getattr(node, "repeat", None) or 1) < 1:
+            return POPULATE_PRIORITY
         explicit_priority = getattr(node, "priority", None) or 0
         if node.id in priority_map[group.id]:
             return priority_map[group.id][node.id]
@@ -1985,7 +3131,7 @@ def reorder_node_list(node_list, group, processed_nodes, priority_map = None):
             and not node.prev_nodes) or
             isinstance(node, (TriccNodeMainStart, TriccNodeActivityStart))
         ):    
-            return get_priority(node.activity)
+            return get_priority(node.activity)           
         if isinstance(node, (TriccNodeSelectOption)):
             return get_priority(node.select)
 
@@ -2442,7 +3588,7 @@ def get_prev_node_expression(node, activity, processed_nodes, get_overall_exp=Fa
         expression_inputs = clean_or_list(expression_inputs)
     else:
         expression_inputs = []
-    prev_activities = {node.activity.id: []}
+    prev_activities = {getattr(node.activity, "id", None): []}
     # sorting prev_nodes per activity
    
     for prev_node in node.prev_nodes:
@@ -3124,5 +4270,3 @@ def get_process(node) -> str | None:
         if result is not None:
             return result
     return None
-
-    

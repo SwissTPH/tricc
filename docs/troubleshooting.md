@@ -78,6 +78,46 @@ Supported rhombus out-edge labels:
 Fix:
 
 - Relabel the edge in draw.io using one of the patterns above.
+
+## Question re-asked or never re-asked unexpectedly
+
+Symptoms:
+
+- Same concept appears twice when you expected skip, or is skipped when you expected a second capture.
+
+Checks:
+
+- **Same `name` + same `repeat` (default `1`)** — second capture is normally skipped / inherits (encounter-wide).
+- **Different `repeat` values** (e.g. `1` then `2`) — both can show; no cross-slot merge.
+- **`repeat=-1`** — local-only: asked without inheriting prior values; does not feed global coalesce.
+- See [Concept repeat](./tricc-elements.md#concept-repeat) and `feature/advanced-merge-calc.md`.
+
+## Duplicate ODK field names / export collisions
+
+Symptoms:
+
+- XLSForm validation complains about duplicate survey names; or calculated fields overwrite each other.
+
+Checks:
+
+- Multiple nodes with the same export base need unique `_Vv_n` (TRICC renumbers peers in
+  `set_last_version_false`). Nodes with `repeat > 1` also get `_Rr_n`.
+- `repeat=-1` and default `repeat=1` share the same export base pool — versions should still renumber.
+- After diagram edits, re-run conversion; do not hand-edit export names in intermediate models.
+
+## `${field}` shows as literal text in form
+
+Symptoms:
+
+- Note/label shows `${age}` instead of the value, or tokens never parse.
+
+Checks:
+
+- Injection applies only to **display** fields (`label`, `hint`, `help`, messages) on
+  display models — not to calculate/rhombus labels.
+- Token must be a bare field name (`${age}`), not an expression (`${age + 1}`).
+- ODK/CHT rewrites to `${export_name}` after processing; FHIR uses concatenate expressions.
+- See `feature/display-text-injection.md`.
 - For scoring flows (rhombus → `count`), use a signed integer on the true branch
   instead of leaving the edge unlabeled with a non-standard text label.
 

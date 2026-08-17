@@ -143,6 +143,7 @@ class cqlToXlsFormVisitor(cqlVisitor):
         args = ctx.paramList()
         if args:
             op.reference += [self.visit(arg) for arg in args.expression() if arg]
+        op.update_origin()
 
         return op
 
@@ -152,6 +153,7 @@ class cqlToXlsFormVisitor(cqlVisitor):
             args = [self.visit(arg) for arg in ctx.expression() if arg]
         op = TriccOperation(operator)
         op.reference = [*args]
+        op.update_origin()
 
     def visitParenthesizedTerm(self, ctx):
         return TriccOperation(TriccOperator.PARENTHESIS, [self.visitChildren(ctx)])
@@ -363,6 +365,7 @@ class cqlToXlsFormVisitor(cqlVisitor):
             c = self.visit(child)
             if c is not None:
                 op.append(c)
+        op.update_origin()
         return op
 
     def visitCaseExpressionItem(self, ctx):

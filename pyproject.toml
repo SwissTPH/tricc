@@ -28,7 +28,8 @@ dependencies = [
     "beautifulsoup4",
     "ocldev",
     "pyxform",
-    "Sympy"
+    "Sympy",
+    "PyYAML"
 ]
 keywords = ["xlsform", "drawio", "authoring"]
 

@@ -14,7 +14,13 @@ This page documents TRICC modeling elements and their meaning based on:
 
 ## Question/input elements
 
-- `note`: informational text shown to users.
+- `note`: informational text shown to users. Display fields (`label`, `hint`,
+  `help`, `constraint_message`, `required_message`) on **display models only**
+  may embed ODK/JS-style value injection with `${field_name}` (e.g.
+  `Patient is ${age} years`). Parsed at input load into concatenate operations,
+  resolved during processing, re-exported as `${export_name}` for ODK/CHT and as
+  concatenate expressions for FHIR. Not applied to calculates or rhombus.
+  See `feature/display-text-injection.md`.
 - `select_one`: single-choice question.
 - `select_multiple`: multiple-choice question.
 - `select_yesno`: yes/no convenience selection. In FHIR output this typically becomes a native `boolean` item type (preferred over `choice` for simple yes/no questions).
@@ -46,6 +52,9 @@ This page documents TRICC modeling elements and their meaning based on:
 ## Navigation/linking elements
 
 - `goto`: jump to another page/activity.
+  - `instance` (default `1`): nested activity instance number; `0` auto-unique nested instance;
+    **`-1` injects the target activity as a snippet** into the caller (inline nodes; no nested
+    activity / wait). See `feature/goto-snippet-injection.md`.
 - `link_in`, `link_out`: explicit cross-flow links.
 - `bridge`: bridge/helper connector.
 
@@ -90,8 +99,11 @@ integer `repeat` on a capture node or on `activity_start`.
 - Omitted `repeat` behaves as **`repeat=1`** (backward compatible with existing diagrams).
 - Same `name` + same `repeat` in a later activity is skipped if already captured (encounter-wide).
 - **No cross-repeat inheritance** — a value at `repeat=1` is not merged into logic at `repeat=2`.
-- Export suffix when `repeat != 1`: `_Rr_<n>` (alongside existing `_Vv_<n>` version and `_Ii_<n>` instance suffixes).
+- Export suffix **`_Rr_<n>` only when `repeat > 1`** (alongside `_Vv_<n>` version and `_Ii_<n>` instance suffixes). Values `0` and `-1` do not get `_Rr_`.
 - `repeat=0` on `input` / pre-filled nodes forces in-form collection even when pre-encounter data exists.
+- **`repeat=-1` (local-only):** node stays referenceable by name, but does **not** inherit prior values and does **not** feed other nodes’ multi-version coalesce. Shares the export base with default `repeat=1`; uniqueness uses `_Vv_n` peer renumbering.
+
+**Same-name value merge:** when several versions of a concept exist in one slot, calculates and expression refs may merge **all** prior versions (`GET_INHERITED_VALUE` → ODK `coalesce`). See `feature/advanced-merge-calc.md`.
 
 **FHIR / OpenSRP:** non-default repeat slots emit Questionnaire item extensions and
 repeat-aware Helper CQL (`GetRepeatedValue`, `GetNumberOfRepeat`, `GetHistoryValue`). See

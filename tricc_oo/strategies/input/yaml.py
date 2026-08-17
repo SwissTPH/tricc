@@ -41,6 +41,7 @@ from tricc_oo.models.tricc import (
     TriccNodeInteger,
     TriccNodeDecimal,
     TriccNodeText,
+    TriccNodeGoTo,
 )
 from tricc_oo.models.base import TriccNodeType
 
@@ -193,6 +194,11 @@ NODE_TYPE_MAP: Dict[str, Dict[str, Any]] = {
         "attrs": ["label", "name", "context", "period", "repeat", "data_type", "concept_type"],
         "tricc_type": TriccNodeType.populate,
     },
+    "goto": {
+        "model": TriccNodeGoTo,
+        "attrs": ["label", "name", "link", "instance", "repeat"],
+        "tricc_type": TriccNodeType.goto,
+    },
 }
 
 # Map YAML type strings to TriccNodeType (for nodes where the map above does not list it)
@@ -201,6 +207,7 @@ YAML_TYPE_TO_TRICC_TYPE = {
     "activity_start": TriccNodeType.activity_start,
     "activity_end": TriccNodeType.activity_end,
     "end": TriccNodeType.end,
+    "goto": TriccNodeType.goto,
     "note": TriccNodeType.note,
     "integer": TriccNodeType.integer,
     "decimal": TriccNodeType.decimal,
@@ -463,6 +470,18 @@ class YamlStrategy(BaseInputStrategy):
                     setattr(node, field, parsed)
                 except Exception:
                     pass
+
+        # Display-model only: ${REF} injection (load_expressions also does this;
+        # re-apply if node was built without going through load_expressions fully)
+        from tricc_oo.models.tricc import TriccNodeDisplayModel
+        from tricc_oo.visitors.text_injection import apply_display_text_injections
+        from tricc_oo.converters.utils import remove_html
+
+        if isinstance(node, TriccNodeDisplayModel):
+            try:
+                apply_display_text_injections(node, clean_fn=remove_html)
+            except Exception:
+                pass
 
     def _wire_prev_next(self, nodes: Dict[str, Any], edges: List[TriccEdge]) -> None:
         """Establish prev_nodes / next_nodes relationships."""

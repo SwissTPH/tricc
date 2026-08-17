@@ -67,4 +67,15 @@ TRICC implements this through start/process orchestration, activity diagrams, an
   true branch when feeding a `count` score node.
 - **Concept repeat** (`repeat` on nodes or `activity_start`) models multiple timed
   captures of the same concept without duplicating concept codes — see
-  [TRICC Elements](./tricc-elements.md#concept-repeat).
+  [TRICC Elements](./tricc-elements.md#concept-repeat). Use `repeat=-1` for a
+  local-only capture that does not join encounter-wide value inheritance.
+- **Same-name merge:** when a concept is captured in several activities at the same
+  repeat slot, later calculations coalesce **all** prior versions so optional
+  intermediate activities can be skipped safely (`feature/advanced-merge-calc.md`).
+- **Goto snippet:** `goto` with `instance=-1` injects another activity’s content
+  inline into the caller (no nested wait). Default/positive `instance` remains a
+  nested activity run (`feature/goto-snippet-injection.md`).
+- **Display text injection:** notes and question labels may embed `${field_name}`
+  so runtime forms show live values (`feature/display-text-injection.md`).
+- **Populate:** non-display nodes preload patient / facility / encounter / history
+  data via `context` (+ optional `period`) — `feature/populate-context.md`.

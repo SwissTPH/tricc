@@ -197,9 +197,10 @@ class TriccGroup(TriccBaseModel):
 
         if name:
             result = result + "|" + name
-        if label:
-            result = result + "|" + (next(iter(self.label.values())) if isinstance(self.label, Dict) else self.label)
-        if len(name) < 50:
+        label_str = label_text_for_name(label)
+        if label_str:
+            result = result + "|" + label_str
+        if name and len(name) < 50:
             return result
         else:
             return result[:50]
@@ -218,13 +219,63 @@ def get_repeat(node) -> int:
     return int(value)
 
 
+# Display text after input load may be plain str, multi-lang dict, or injection op
+DisplayText = Union[
+    str,
+    Dict[str, Union[str, "TriccOperation"]],
+    "TriccOperation",
+]
+
+
+def label_text_for_name(label) -> Optional[str]:
+    """Extract a short human label fragment for get_name / logging.
+
+    - plain str: as-is
+    - multi-lang dict: first locale value (recursively)
+    - CONCATENATE: first plain string / TriccStatic segment only
+    - TriccReference, node refs, or concat without a static segment: skip (None)
+    """
+    if label is None:
+        return None
+    if isinstance(label, str):
+        return label if label else None
+    if isinstance(label, dict):
+        if not label:
+            return None
+        return label_text_for_name(next(iter(label.values())))
+
+    cls_name = type(label).__name__
+    # Bare reference / node is not useful in super()/log ids
+    if cls_name == "TriccReference":
+        return None
+    if cls_name == "TriccStatic":
+        return label_text_for_name(getattr(label, "value", None))
+    if cls_name == "TriccOperation":
+        op = getattr(label, "operator", None)
+        if str(op) == "concatenate" or op == TriccOperator.CONCATENATE:
+            for part in getattr(label, "reference", None) or []:
+                if type(part).__name__ == "TriccReference":
+                    continue
+                if type(part).__name__ == "TriccStatic":
+                    text = label_text_for_name(getattr(part, "value", None))
+                    if text:
+                        return text
+                    continue
+                if isinstance(part, str) and part:
+                    return part
+                # skip resolved nodes / nested ops
+            return None
+        return None
+    return None
+
+
 class TriccNodeBaseModel(TriccBaseModel):
     path_len: int = 0
     group: Optional[Union[TriccGroup, FwTriccNodeBaseModel]] = None
     name: Optional[str] = None
     repeat: Optional[int] = None
     export_name: Optional[str] = None
-    label: Optional[Union[str, Dict[str, str]]] = None
+    label: Optional[DisplayText] = None
     next_nodes: OrderedSet[TriccNodeBaseModel] = OrderedSet()
     prev_nodes: OrderedSet[TriccNodeBaseModel] = OrderedSet()
     expression: Optional[Union[Expression, TriccOperation, TriccStatic]] = None  # will be generated based on the input
@@ -247,9 +298,10 @@ class TriccNodeBaseModel(TriccBaseModel):
         label = getattr(self, "label", None)
 
         if name:
-            result += f"|{name}|{self.instance}|{self.version}" 
-        if label:
-            result += "|" + (next(iter(self.label.values())) if isinstance(self.label, Dict) else self.label)
+            result += f"|{name}|{self.instance}|{self.version}"
+        label_str = label_text_for_name(label)
+        if label_str:
+            result += "|" + label_str
         if len(result) < 80:
             return result
         else:
@@ -412,7 +464,10 @@ class TriccOperator(StrEnum):
     MAX = "max"
     SUM = "sum"
     FORMAT_DATE = "format_date"
-
+        # repeat TODO
+    GET_REPEATED_VALUE = "ge_repeated_value"
+    GET_NUMBER_OF_REPEAT = "get_number_of_repeat"
+    GET_HISTORY_VALUE = "get_history_value"
 
 
 
@@ -457,11 +512,22 @@ RETURNS_NUMBER = [
     TriccOperator.CAST_NUMBER,
     TriccOperator.CAST_INTEGER,
     TriccOperator.CAST_DECIMAL,
+    TriccOperator.GET_NUMBER_OF_REPEAT
 ]
 
 RETURNS_DATE = [TriccOperator.CAST_DATE]
 
-RETURNS_STRING = [TriccOperator.DIAGNOSIS_LIST]
+RETURNS_LIST = [TriccOperator.DIAGNOSIS_LIST]
+
+RETURNS_STRING = [
+    TriccOperator.CONCATENATE
+]
+
+RETURNS_CONCEPT = [
+    TriccOperator.GET_HISTORY_VALUE,
+    TriccOperator.GET_REPEATED_VALUE,
+    TriccOperator.GET_INHERITED_VALUE
+]
 
 OPERATION_LIST = {
     ">=": TriccOperator.MORE_OR_EQUAL,
@@ -495,6 +561,7 @@ class TriccOperation(BaseModel):
             ],
         ]
     ] = []
+    origin: Optional["TriccOperation"] = None
 
     def __str__(self):
         str_ref = map(str, self.reference)
@@ -510,8 +577,17 @@ class TriccOperation(BaseModel):
     def __eq__(self, other):
         return self.__str__() == str(other)
 
-    def __init__(self, operator, reference=[]):
-        super().__init__(operator=operator, reference=reference)
+    def __init__(self, operator, reference=None, **kwargs):
+        if reference is None:
+            reference = []
+        # _bypass_origin prevents auto update_origin during internal cleaned construction
+        bypass = kwargs.pop("_bypass_origin", False)
+        provided_origin = kwargs.pop("origin", None)
+        super().__init__(operator=operator, reference=reference, **kwargs)
+        if provided_origin is not None:
+            self.origin = provided_origin
+        elif not bypass:
+            self.update_origin()
 
     def get_datatype(self):
         if self.operator in RETURNS_BOOLEAN:
@@ -522,8 +598,10 @@ class TriccOperation(BaseModel):
             return "date"
         elif self.operator in RETURNS_STRING:
             return "string"
-        elif self.operator == TriccOperator.CONCATENATE:
-            return "string"
+        elif self.operator in RETURNS_LIST:
+            return "list"
+        elif self.operator in RETURNS_CONCEPT:
+            return self.get_reference_datatype(self.reference[0])
         elif self.operator == TriccOperator.PARENTHESIS:
             return self.get_reference_datatype(self.reference)
         elif self.operator == TriccOperator.IF:
@@ -601,27 +679,63 @@ class TriccOperation(BaseModel):
                 self.replace_node(reference.select, new_node.select)
         return reference
 
-    def __copy__(self, keep_node=False):
+    def __copy__(self, keep_node=False, **kwargs):
         # Create a new instance
         if keep_node:
             reference = [e for e in self.reference]
         else:
             reference = [
                 (
-                    e.copy()
-                    if isinstance(e, (TriccReference, TriccOperation))
-                    else (TriccReference(e.name) if hasattr(e, "name") else e)
+                    e.copy(**kwargs)
+                    if isinstance(e, TriccOperation)
+                    else (
+                        e.copy() if isinstance(e, (TriccReference, TriccOperation)) 
+                        else (
+                            TriccReference(e.name) if hasattr(e, "name") else e
+                        )
+                    )
                 )
                 for e in self.reference
             ]
 
-        new_instance = type(self)(self.operator, reference)
+        new_instance = type(self)(self.operator, reference, **kwargs)
         # Copy attributes (shallow copy for mutable attributes)
 
         return new_instance
 
-    def copy(self, keep_node=False):
-        return self.__copy__(keep_node)
+    def copy(self, keep_node=False, **kwargs):
+        return self.__copy__(keep_node, **kwargs)
+
+    def update_origin(self):
+        """Populate (or refresh) self.origin with the cleaned, reference-only version
+        (no TriccNode* instances). Node references are replaced by TriccReference(name)
+        via copy(keep_node=False). Call explicitly after mutating .reference.
+
+        The origin (and its nested operations) is used as a stable signature key
+        (typically via repr()) for calculate inheritance grouping.
+        """
+        # Build cleaned list directly (avoid public .copy() to prevent recursion
+        # through __copy__ -> type(self)(...) -> __init__ -> update_origin).
+        reference = [
+            (
+                e.copy(_bypass_origin=True)
+                if isinstance(e,  TriccOperation)
+                else (
+                    e.copy() if isinstance(e, TriccReference) 
+                    else (
+                        TriccReference(e.name) if hasattr(e, "name") else e
+                    )
+                )
+            )
+            for e in (self.reference or [])
+        ]
+        # Construct the cleaned op with bypass so it does not immediately re-enter update
+        new_instance = type(self)(self.operator, reference, _bypass_origin=True)
+        # For the cleaned origin itself, its .origin can safely be itself (or None).
+        # Setting it makes recursive .origin walks terminate and reprs stable.
+        new_instance.origin = new_instance
+        self.origin = new_instance
+        return self.origin
 
 
 # function that make multipat  and

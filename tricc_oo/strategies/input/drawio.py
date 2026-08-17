@@ -7,6 +7,8 @@ from tricc_oo.visitors.tricc import (
     set_prev_next_node,
     replace_node,
     stashed_node_func,
+    clone_activity_for_snippet,
+    inject_activity_as_snippet,
 )
 from tricc_oo.visitors.utils import PROCESSES
 
@@ -228,6 +230,42 @@ class DrawioStrategy(BaseInputStrategy):
         # find the page
         if node.link in pages:
             next_page = pages[node.link]
+
+            # instance == -1: inline target activity as a snippet (no nested activity / wait)
+            if getattr(node, "instance", 1) == -1:
+                # Clone then link the snippet graph (make_instance clears prev/next;
+                # nested gotos / edges inside the module need the same walk as a normal page).
+                #
+                # Use a *local* processed set for the clone walk. Sharing the caller's
+                # processed_nodes marks snippet nodes as done so the parent walk skips
+                # them after inject — then edges exist but prev_nodes stay empty/stale
+                # (especially when the caller page is itself an activity instance).
+                clone = clone_activity_for_snippet(node, next_page)
+                logger.debug(
+                    "linking snippet page {0} before inject into {1} from {2}".format(
+                        next_page.label, page.label, node.get_name()
+                    )
+                )
+                snippet_processed = OrderedSet()
+                self.linking_nodes(clone.root, clone, pages, snippet_processed, list(current_path))
+                for c in clone.calculates:
+                    if len(getattr(c, "prev_nodes", []) or []) == 0:
+                        self.linking_nodes(
+                            c,
+                            clone,
+                            pages,
+                            snippet_processed,
+                            list(current_path),
+                        )
+                entry = inject_activity_as_snippet(node, page, clone)
+                logger.debug(
+                    "injected page {0} as snippet into {1} from {2}".format(
+                        next_page.label, page.label, node.get_name()
+                    )
+                )
+                # Caller continues linking from entry on the parent page (full re-walk)
+                return entry
+
             # walk thought the next page
             if node.instance == 0 or next_page.root.instance == 0:
                 next_page = next_page.make_instance(

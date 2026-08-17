@@ -36,7 +36,7 @@ FUNCTION_MAP = {
     "selected": None,
     "selected-at": None,
     "count-selected": None,
-    "jr:choice-name": None,
+    "jr:choice-name": GetChoiceName,
     # math / casting
     "int": "Integer",
     "number": "ToDecimal",
