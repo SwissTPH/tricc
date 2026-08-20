@@ -140,6 +140,51 @@ class TestCql(unittest.TestCase):
         )
         self.assertEqual(str(dg_operation), str(dg_expected))
 
+    def test_normalize_space(self):
+        cql = 'Length(NormalizeSpace("t_cc_current_female")) > 0'
+        op = transform_cql_to_operation(cql)
+        expected = TriccOperation(
+            operator=TriccOperator.MORE,
+            reference=[
+                TriccOperation(
+                    operator=TriccOperator.LENGTH,
+                    reference=[
+                        TriccOperation(
+                            operator=TriccOperator.NORMALIZE_SPACE,
+                            reference=[TriccReference("t_cc_current_female")],
+                        )
+                    ],
+                ),
+                TriccStatic(value=0),
+            ],
+        )
+        self.assertEqual(str(op), str(expected))
+
+        from tricc_oo.strategies.output.xls_form import XLSFormStrategy
+
+        xpath = XLSFormStrategy.__new__(XLSFormStrategy).get_tricc_operation_expression(op)
+        self.assertIn("normalize-space(", xpath)
+        self.assertIn("string-length(", xpath)
+
+    def test_matches(self):
+        cql = "Matches($this, '^[A-Z][0-9]{4}-[0-9]{4}-[0-9]{2}-[0-9]{4}$')"
+        op = transform_cql_to_operation(cql)
+        expected = TriccOperation(
+            operator=TriccOperator.MATCHES,
+            reference=[
+                TriccReference("$this"),
+                TriccStatic(value="^[A-Z][0-9]{4}-[0-9]{4}-[0-9]{2}-[0-9]{4}$"),
+            ],
+        )
+        self.assertEqual(str(op), str(expected))
+
+        from tricc_oo.strategies.output.xls_form import XLSFormStrategy
+
+        xpath = XLSFormStrategy.__new__(XLSFormStrategy).get_tricc_operation_expression(op)
+        self.assertTrue(xpath.startswith("regex("))
+        self.assertIn(".", xpath)
+        self.assertIn("'^[A-Z][0-9]{4}-[0-9]{4}-[0-9]{2}-[0-9]{4}$'", xpath)
+
 
 if __name__ == "__main__":
     unittest.main()
