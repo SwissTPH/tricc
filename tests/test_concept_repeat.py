@@ -227,6 +227,15 @@ class TestLoadCalculateRepeatSkip(unittest.TestCase):
         self.assertNotIsInstance(second.relevance, TriccOperation)
         self.assertEqual(get_versions("weight", processed, repeat=2), [second])
 
+    def test_repeat_minus_one_no_skip_relevance(self):
+        """repeat=-1 is local-only: a second occurrence of the same concept must not
+        be skip-suppressed because an earlier repeat=-1 occurrence was captured -
+        unlike repeat=1/2/... slots, which do dedupe (test_same_repeat_gets_skip_relevance)."""
+        first = TriccNodeInteger(id="w1c", name="weight", label="W1", repeat=-1)
+        second = TriccNodeInteger(id="w2c", name="weight", label="W2", repeat=-1)
+        second, _ = self._run_chain(first, second)
+        self.assertNotIsInstance(second.relevance, TriccOperation)
+
 
 class TestConceptRepeatYamlIntegration(unittest.TestCase):
     def test_activity_repeat_propagation_from_yaml(self):

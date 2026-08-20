@@ -1,0 +1,123 @@
+# Repro: two independent callers (Act B, Act C) each inject module_a as an
+# instance=-1 snippet. module_a captures node_d with repeat=-1 ("local-only" - see
+# docs/tricc-elements.md, "Concept repeat"). Both node_d clones end up in the same
+# top-level flow (snippet injection inlines the module's nodes into the caller).
+#
+# Since repeat=-1 is local-only, node_d's SECOND occurrence (from Act C's inject)
+# must NOT be skip-suppressed just because the FIRST occurrence (from Act B's
+# inject) was already captured - unlike the default repeat=1 slot, where a second
+# same-name capture is dedup-suppressed encounter-wide.
+
+id: parent_main
+title: "Parent Main"
+process: main
+
+nodes:
+  - id: start
+    type: start
+    label: "Start"
+    name: start_parent
+
+  - id: trigger_b
+    type: select_yesno
+    name: trigger_b
+    label: "Enter via caller B?"
+    required: true
+    options:
+      - id: opt_b_yes
+        name: "yes"
+        label: "Yes"
+      - id: opt_b_no
+        name: "no"
+        label: "No"
+
+  - id: trigger_c
+    type: select_yesno
+    name: trigger_c
+    label: "Enter via caller C?"
+    required: true
+    options:
+      - id: opt_c_yes
+        name: "yes"
+        label: "Yes"
+      - id: opt_c_no
+        name: "no"
+        label: "No"
+
+  - id: node_gate_b
+    type: note
+    name: node_gate_b
+    label: "Caller B"
+    relevance: "trigger_b = true"
+
+  - id: goto_a1
+    type: goto
+    name: goto_a1
+    label: "Act B calls module A"
+    link: module_a
+    instance: -1
+
+  - id: node_gate_c
+    type: note
+    name: node_gate_c
+    label: "Caller C"
+    relevance: "trigger_c = true"
+
+  - id: goto_a2
+    type: goto
+    name: goto_a2
+    label: "Act C calls module A"
+    link: module_a
+    instance: -1
+
+  - id: end
+    type: end
+    label: "End"
+    name: end_parent
+
+edges:
+  - source: start
+    target: trigger_b
+  - source: trigger_b
+    target: trigger_c
+  - source: trigger_c
+    target: node_gate_b
+  - source: node_gate_b
+    target: goto_a1
+  - source: goto_a1
+    target: end
+  - source: trigger_c
+    target: node_gate_c
+  - source: node_gate_c
+    target: goto_a2
+  - source: goto_a2
+    target: end
+
+---
+id: module_a
+title: "Module A"
+process: module
+
+nodes:
+  - id: a_start
+    type: activity_start
+    label: "Module A start"
+    name: a_start
+
+  - id: node_d
+    type: integer
+    name: node_d
+    label: "Node D (local-only capture)"
+    required: true
+    repeat: -1
+
+  - id: a_end
+    type: end
+    label: "Module A end"
+    name: a_end
+
+edges:
+  - source: a_start
+    target: node_d
+  - source: node_d
+    target: a_end

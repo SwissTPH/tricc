@@ -54,9 +54,38 @@ class TestRepeatHelper(unittest.TestCase):
         block = cql_helper_repeat_block()
         self.assertIn("GetRepeated", block)
         self.assertIn("GetNumberOfRepeat", block)
-        self.assertIn("GetHistoryValue", block)
+        self.assertIn("GetHistoryObservationValue", block)
         self.assertNotIn("GetLast", block)
         self.assertIn(TRICC_OBSERVATION_REPEAT_EXT, block)
+
+    def test_cql_helper_block_encounter_scoped(self):
+        block = cql_helper_repeat_block()
+        self.assertIn("encounterid", block)
+        self.assertIn("O.encounter.reference = 'Encounter/' + encounterid", block)
+
+    def test_cql_helper_block_contains_condition_family(self):
+        block = cql_helper_repeat_block()
+        for fn in (
+            "GetConditions",
+            "GetCondition",
+            "GetConditionValue",
+            "GetHistoryCondition",
+            "GetHistoryConditionValue",
+            "HasConfirmedCondition",
+            "HasProvisionalCondition",
+            "HasRefutedCondition",
+            "ConditionVerificationCode",
+        ):
+            self.assertIn(f"define function {fn}", block)
+
+    def test_fml_repeat_extension_rule_is_executable(self):
+        from tricc_oo.converters.fhir.repeat_helper import fml_repeat_extension_rule
+
+        rule = fml_repeat_extension_rule("weight_Rr_2", "Observation", 2)
+        self.assertFalse(any(line.strip().startswith("//") for line in rule.splitlines()))
+        self.assertIn("Observation.extension", rule)
+        self.assertIn(TRICC_OBSERVATION_REPEAT_EXT, rule)
+        self.assertIn("ext.value = 2", rule)
 
 
 class TestFHIRStrategyRepeatCQL(unittest.TestCase):
@@ -69,8 +98,9 @@ class TestFHIRStrategyRepeatCQL(unittest.TestCase):
         )
         self.assertIn("define function GetRepeated", helper)
         self.assertIn("define function GetNumberOfRepeat", helper)
-        self.assertIn("define function GetHistoryValue", helper)
+        self.assertIn("define function GetHistoryObservationValue", helper)
         self.assertIn("define function GetPatientValue", helper)
+        self.assertIn("parameter encounterid String default null", helper)
         self.assertNotIn("define function GetLast", helper)
         self.assertIn("define function GetObservations", helper)
         self.assertEqual(helper.count("define function GetObservation(code String)"), 1)

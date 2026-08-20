@@ -1,0 +1,103 @@
+# Repro: two different call sites invoke the same module as instance=1 and instance=2.
+# The second call site has a node (after_b2) following the call. That node must remain
+# reachable/relevant even though the instance=2 copy of the module is skip-suppressed
+# because instance=1 was already shown.
+
+id: parent_main
+title: "Parent Main"
+process: main
+
+nodes:
+  - id: start
+    type: start
+    label: "Start"
+    name: start_parent
+
+  - id: choice
+    type: select_yesno
+    name: choice
+    label: "Take path A or C?"
+    required: true
+    options:
+      - id: opt_yes
+        name: "yes"
+        label: "Yes"
+      - id: opt_no
+        name: "no"
+        label: "No"
+
+  - id: rhombus_choice
+    type: rhombus
+    label: "Path?"
+    reference: "choice = true"
+
+  - id: goto_b1
+    type: goto
+    name: goto_b1
+    label: "Call module (instance 1)"
+    link: module_b
+    instance: 1
+
+  - id: goto_b2
+    type: goto
+    name: goto_b2
+    label: "Call module (instance 2)"
+    link: module_b
+    instance: 2
+
+  - id: after_b2
+    type: integer
+    name: after_b2
+    label: "Node D after second call"
+    required: true
+
+  - id: end
+    type: end
+    label: "End"
+    name: end_parent
+
+edges:
+  - source: start
+    target: choice
+  - source: choice
+    target: rhombus_choice
+  - source: rhombus_choice
+    target: goto_b1
+    value: "yes"
+  - source: goto_b1
+    target: end
+  - source: rhombus_choice
+    target: goto_b2
+    value: "no"
+  - source: goto_b2
+    target: after_b2
+  - source: after_b2
+    target: end
+
+---
+id: module_b
+title: "Module B"
+process: module
+
+nodes:
+  - id: mod_start
+    type: activity_start
+    label: "Module start"
+    name: mod_start
+
+  - id: mod_age
+    type: integer
+    name: mod_age
+    label: "Age from module"
+    required: true
+
+  - id: mod_end
+    type: end
+    label: "Module end"
+    name: mod_end
+
+edges:
+  - source: mod_start
+    target: mod_age
+  - source: mod_age
+    target: mod_end

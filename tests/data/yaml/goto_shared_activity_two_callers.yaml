@@ -1,0 +1,137 @@
+# Repro: two independent callers invoke the *same* nested activity instance
+# (module_c, instance=1 from both call sites -> a single shared TriccNodeActivity
+# object, per TriccNodeActivity.make_instance's instance cache).
+#
+# node_c follows the call made by node_b (gated by trigger_a); node_f follows the
+# call made by node_e (gated by trigger_d). The Wait node injected before/after each
+# goto call must keep node_c's continuation tied to trigger_a and node_f's tied to
+# trigger_d - NOT to "module_c finished", which either trigger alone would satisfy.
+
+id: parent_main
+title: "Parent Main"
+process: main
+
+nodes:
+  - id: start
+    type: start
+    label: "Start"
+    name: start_parent
+
+  - id: trigger_a
+    type: select_yesno
+    name: trigger_a
+    label: "Enter via caller A?"
+    required: true
+    options:
+      - id: opt_a_yes
+        name: "yes"
+        label: "Yes"
+      - id: opt_a_no
+        name: "no"
+        label: "No"
+
+  - id: trigger_d
+    type: select_yesno
+    name: trigger_d
+    label: "Enter via caller D?"
+    required: true
+    options:
+      - id: opt_d_yes
+        name: "yes"
+        label: "Yes"
+      - id: opt_d_no
+        name: "no"
+        label: "No"
+
+  - id: node_b
+    type: note
+    name: node_b
+    label: "Node B (caller A)"
+    relevance: "trigger_a = true"
+
+  - id: goto_c1
+    type: goto
+    name: goto_c1
+    label: "Act A calls module C"
+    link: module_c
+    instance: 1
+
+  - id: node_c
+    type: integer
+    name: node_c
+    label: "Node C (after Act A's call)"
+    required: true
+
+  - id: node_e
+    type: note
+    name: node_e
+    label: "Node E (caller D)"
+    relevance: "trigger_d = true"
+
+  - id: goto_c2
+    type: goto
+    name: goto_c2
+    label: "Act D calls module C"
+    link: module_c
+    instance: 1
+
+  - id: node_f
+    type: integer
+    name: node_f
+    label: "Node F (after Act D's call)"
+    required: true
+
+  - id: end
+    type: end
+    label: "End"
+    name: end_parent
+
+edges:
+  - source: start
+    target: trigger_a
+  - source: trigger_a
+    target: trigger_d
+  - source: trigger_d
+    target: node_b
+  - source: node_b
+    target: goto_c1
+  - source: goto_c1
+    target: node_c
+  - source: node_c
+    target: end
+  - source: trigger_d
+    target: node_e
+  - source: node_e
+    target: goto_c2
+  - source: goto_c2
+    target: node_f
+  - source: node_f
+    target: end
+
+---
+id: module_c
+title: "Module C"
+process: module
+
+nodes:
+  - id: mc_start
+    type: activity_start
+    label: "Module C start"
+    name: mc_start
+
+  - id: mc_val
+    type: integer
+    name: mc_val
+    label: "Value captured in module C"
+    required: true
+
+  - id: mc_end
+    type: end
+    label: "Module C end"
+    name: mc_end
+
+edges:
+  - source: mc_start
+    target: mc_val
+  - source: mc_val
+    target: mc_end

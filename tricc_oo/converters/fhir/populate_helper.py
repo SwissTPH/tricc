@@ -124,7 +124,8 @@ def resolve_populate_reference(node: "TriccNodePopulate", qualified: bool = Fals
     if ctx == HISTORY_CONTEXT:
         period = node.period or DEFAULT_HISTORY_PERIOD
         return (
-            f"{prefix}GetHistoryValue('{code}', {_cql_string_literal(period)}, 1, {repeat_arg})"
+            f"{prefix}GetHistoryObservationValue("
+            f"'{code}', {_cql_string_literal(period)}, 1, {repeat_arg})"
         )
     return f"{prefix}GetPatientValue('{code}')"
 

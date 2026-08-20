@@ -23,7 +23,7 @@ This page documents TRICC modeling elements and their meaning based on:
   See `feature/display-text-injection.md`.
 - `select_one`: single-choice question.
 - `select_multiple`: multiple-choice question.
-- `select_yesno`: yes/no convenience selection. In FHIR output this typically becomes a native `boolean` item type (preferred over `choice` for simple yes/no questions).
+- `select_yesno`: yes/no convenience selection. In FHIR output this typically becomes a native `boolean` item type (preferred over `choice` for simple yes/no questions). OpenSRP export also attaches `questionnaire-choiceOrientation` = `horizontal` on visible boolean/yes-no items so Yes/No render side by side; hidden booleans (calculates, diagnoses, waits) do not.
 - `integer`, `decimal`, `text`, `date`: typed user inputs.
 - `input`: generic input node used in conversion workflows.
 - `populate`: pre-loaded data node (non-display calculate). Attributes: `context`
@@ -51,7 +51,13 @@ This page documents TRICC modeling elements and their meaning based on:
 - `factor`: sequence scoring node (non-display calculate). Created from numeric edge
   labels; stores the factor in `reference`, uses `path` for the branch condition.
   Expression semantics: **if path then factor else 0** (feeds `count` / `add` nodes).
-- `wait`: synchronization gate based on references.
+- `wait`: synchronization gate based on references. Injected automatically before/after a
+  `goto` that has outgoing edges (`inject_bridge_path` / `get_activity_wait` in
+  `xml_to_tricc.py::get_nodes`) so the node placed after the call derives its relevance from
+  the caller's own entry bridge (`Wait.path`), never from the called activity's own
+  completion. This is what keeps two different callers of the same (or same-instance) nested
+  activity from leaking relevance into each other's continuation — see the `goto` `instance`
+  note above and [Troubleshooting — Node after a repeated activity call](./troubleshooting.md#node-after-a-repeated-activity-call-never-appears).
 - `exclusive`: exclusivity helper.
 
 ## Navigation/linking elements
@@ -60,6 +66,12 @@ This page documents TRICC modeling elements and their meaning based on:
   - `instance` (default `1`): nested activity instance number; `0` auto-unique nested instance;
     **`-1` injects the target activity as a snippet** into the caller (inline nodes; no nested
     activity / wait). See `feature/goto-snippet-injection.md`.
+  - When two different `goto`s target the **same** `instance` number of the same activity
+    (e.g. two callers both call `link: shared_module, instance: 1`), they resolve to the
+    **identical shared `TriccNodeActivity` object** — see `TriccNodeActivity.make_instance`'s
+    `self.instances` cache. Any node the caller places right after that `goto` must keep its
+    relevance tied to *that specific caller*, not to "the shared activity was entered by
+    anyone" — see the `wait` entry below.
 - `link_in`, `link_out`: explicit cross-flow links.
 - `bridge`: bridge/helper connector.
 
@@ -106,7 +118,7 @@ integer `repeat` on a capture node or on `activity_start`.
 - **No cross-repeat inheritance** — a value at `repeat=1` is not merged into logic at `repeat=2`.
 - Export suffix **`_Rr_<n>` only when `repeat > 1`** (alongside `_Vv_<n>` version and `_Ii_<n>` instance suffixes). Values `0` and `-1` do not get `_Rr_`.
 - `repeat=0` on `input` / pre-filled nodes forces in-form collection even when pre-encounter data exists.
-- **`repeat=-1` (local-only):** node stays referenceable by name, but does **not** inherit prior values and does **not** feed other nodes’ multi-version coalesce. Shares the export base with default `repeat=1`; uniqueness uses `_Vv_n` peer renumbering.
+- **`repeat=-1` (local-only):** node stays referenceable by name, but does **not** inherit prior values, does **not** feed other nodes’ multi-version coalesce, and is **not** skip-suppressed against other `repeat=-1` occurrences of the same concept (each capture is fully independent — e.g. two different callers each injecting the same snippet activity both get their own, unsuppressed capture). Shares the export base with default `repeat=1`; uniqueness uses `_Vv_n` peer renumbering.
 
 **Same-name value merge:** when several versions of a concept exist in one slot, calculates and expression refs may merge **all** prior versions (`GET_INHERITED_VALUE` → ODK `coalesce`). See `feature/advanced-merge-calc.md`.
 

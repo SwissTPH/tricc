@@ -1,8 +1,15 @@
 # TRICC Project - Cline Rules
 
+This file (`AGENTS.md`) is the source of truth for coding standards, domain reference, and workflow
+in this repository — including for Claude Code (`CLAUDE.md` just points here).
+
 ## Project Overview
 
-TRICC (Transformable Rule-based Interactive Clinical Calculator) is a Python library that converts Clinical Decision Support System (CDSS) Level 2 specifications into Level 3 implementations. It processes visual flowcharts created in draw.io and converts them into various output formats like XLSForm, CHT, OpenMRS, FHIR, and HTML.
+TRICC (Transformable Rule-based Interactive Clinical Calculator) converts clinical decision-support
+flowcharts (authored visually in draw.io) into runnable digital forms: XLSForm/ODK, CHT, OpenMRS,
+DHIS2, FHIR SDC (Questionnaire + CQL), and OpenSRP/FHIR-Core bundles. It processes visual flowcharts
+created in draw.io and converts them into various output formats. Core library under `tricc_oo/`,
+installed as the `tricc` console script (`tricc_oo/cli.py`, entry point in `pyproject.toml`).
 
 ## Key Technologies
 
@@ -23,10 +30,106 @@ tricc_oo/
 ├── strategies/      # Input/output strategy implementations
 ├── tools/           # Draw.io templates and utilities
 └── visitors/        # Graph traversal and processing
-feature/             # Feature specs (business + technical); Draft → Approved gate
+feature/             # Feature specs (new capabilities); Draft → Approved gate
+fix/                 # Issue analysis + fix approach (bugs / export correctness); same gate
 tests/               # Test suite and build scripts
 docs/                # MkDocs documentation
 ```
+
+## Commands
+
+```bash
+# activate the project venv first (dependencies + registered strategies must match this env)
+source .venv/bin/activate
+
+# run the full test suite (pytest, ~138 tests)
+python -m pytest tests/
+
+# run a single test file / test / method
+python -m pytest tests/test_cdss_zscore.py
+python -m pytest tests/test_strategies/test_opensrp_strategy.py -v
+python -m pytest tests/test_strategies/test_opensrp_strategy.py::TestFhirIds::test_underscore_replaced -v
+
+# lint (max line length 120, see .flake8)
+flake8 tricc_oo
+
+# run a conversion directly (the dev entry point; more actively used than the `tricc` script)
+python tests/build.py -i tests/data/demo.drawio -o tests/output/
+python tests/build.py -i tests/data/demo.drawio -o tests/output/ -O XLSFormCHTStrategy
+python tests/build.py -i tests/data/demo.drawio -o tests/output/ -O FHIRStrategy -l d   # -l d = debug logging
+
+# YAML fixtures are the preferred input for exercising transformation logic in tests
+# (git-friendly, no draw.io XML needed) — see tricc_oo/strategies/input/yaml.py
+python tests/build.py -i tests/data/yaml/my_test_case.yaml -o out/ -I YamlStrategy
+```
+
+`tests/build.py` supports Google Drive URLs as input (`-i https://drive.google.com/...`), downloading
+to a temp dir first; restricted files need service-account credentials at `auth/google.json`. See
+`.vscode/launch.json` for the full matrix of real-world example inputs/strategies used during
+debugging, and `docs/cli-and-inputs.md` for all flags.
+
+## Architecture
+
+The pipeline runs in distinct stages — understanding *which stage* a bug lives in is usually the
+fastest way to navigate this codebase (full detail in `docs/pipeline.md`):
+
+1. **Input collection** — `tests/build.py` resolves CLI args/URLs into raw file content strings.
+2. **XML parsing** — `tricc_oo/parsers/xml.py` (`read_drawio`) parses draw.io's `mxfile` XML via `lxml`.
+   (`YamlStrategy` bypasses this for test fixtures.)
+3. **Page/activity creation** — `tricc_oo/converters/xml_to_tricc.py` (`create_activity`) builds
+   activity objects from nodes/edges, interprets edge labels (yes/no, factors, conditions), and
+   enriches nodes with hints/help/media.
+4. **Graph linking** — `DrawioStrategy.linking_nodes` wires next/prev pointers, resolves `goto`
+   traversal (including repeated-activity instances), and connects `link_out`→`link_in`.
+5. **Calculate load, versioning, inheritance** — the core transformation engine, in
+   `tricc_oo/visitors/tricc.py`, orchestrated by `load_calculate` (~4200 lines; this is the file
+   you'll spend the most time in for logic bugs). Handles export-name versioning
+   (`set_last_version_false`), multi-version inheritance merging (`get_version_inheritance`,
+   `GET_INHERITED_VALUE`), and relevance/skip propagation. See
+   `docs/testing/transformation-test-coverage.md` for a method-by-method map to test cases.
+6. **Output strategy execution** — the selected strategy (`-O`) serializes the processed graph.
+
+### Strategy pattern + registry
+
+Input and output formats are pluggable strategies registered declaratively:
+
+```python
+from tricc_oo.strategies.registry import register_input_strategy, register_output_strategy, get_output_strategy
+
+@register_output_strategy("MyStrategy")
+class MyStrategy(BaseOutputStrategy):
+    ...
+
+get_output_strategy("MyStrategy")   # by name
+get_output_strategy(MyStrategy)     # or pass the class directly (handy in tests)
+```
+
+Built-in strategies are eagerly imported in `tricc_oo/strategies/__init__.py` so their decorators
+run at import time — a strategy name reported as "unknown" at runtime usually means its module isn't
+imported there. Output strategies form an inheritance chain worth knowing:
+`XLSFormStrategy` → `XLSFormCDSSStrategy` → `XLSFormCHTStrategy` → `XLSFormCHTHFStrategy`, and
+separately `FHIRStrategy` → `OpenSRPStrategy`. `tricc_oo/strategies/output/base_output_strategy.py`
+and `input/base_input_strategy.py` define the contracts new strategies must implement.
+
+### Data model
+
+- `tricc_oo/models/base.py` — `TriccNodeBaseModel` and the `TriccNodeType` enum (all node kinds:
+  flow anchors, questions, inputs, calculate/logic, navigation, diagnosis).
+- `tricc_oo/models/calculate.py` / `models/tricc.py` — `TriccOperation` + `TriccOperator` (the
+  expression system) and `TriccProject`/activity/page containers.
+- Pydantic models throughout; graph nodes are connected via edges with optional labels, processed in
+  topological order where possible.
+
+### FHIR / CQL specifics
+
+When touching `FHIRStrategy` or `OpenSRPStrategy` (`tricc_oo/converters/fhir/`,
+`tricc_oo/strategies/output/fhir_form.py`, `opensrp.py`): route resource access through a single
+Helper CQL library keyed by concept, keep per-segment libraries thin, and use unqualified `define`
+names in Questionnaire expressions — never raw QuestionnaireResponse item paths in CQL.
+In-form FHIRPath uses `%resource.repeat(item).where(linkId=...)` and, for choice answers,
+`.answer.valueCoding.code`. Full architecture in `docs/desing/FHIRcore.md`; user-facing
+export guide in `docs/open-srp-export.md`. See the "FHIR CQL / Library Generation" section
+below for the detailed rules.
 
 ## Coding Standards
 
@@ -91,7 +194,8 @@ New capabilities follow a **two-step gate** before code changes land:
 
 ### Step 1 — Feature specification (`feature/`)
 
-1. Create `feature/<feature-name>.md` (or update an existing spec).
+1. Create `feature/<YYYYMMDD>-<feature-name>.md` (or update an existing spec) — see
+   "Feature file naming" below for why the date is required.
 2. Structure the document in **two parts**:
    - **Part I — Business description** — for clinical authors, guideline developers, and implementers evaluating workflows. Plain language, examples, benefits, limitations. No file paths or function names unless unavoidable.
    - **Part II — Technical specification** — for developers: formal semantics, pipeline, code checklist, tests, acceptance criteria, implementation phases.
@@ -108,6 +212,47 @@ New capabilities follow a **two-step gate** before code changes land:
 **Status values:** `Draft` → `Approved` → `Implemented` → `Superseded`
 
 Example specs live under `feature/` (e.g. `feature/concept-repeat.md`).
+
+### Feature file naming (dating for chronological order)
+
+Feature filenames **should embed a `YYYYMMDD` date**: `feature/YYYYMMDD-<feature-name>.md`
+(e.g. `feature/20260811-careplan-orchestration.md`). Specs are often drafted or revised in
+parallel across branches before merge, and git commit timestamps alone don't reliably show
+"which spec supersedes which" when just browsing the `feature/` directory or comparing
+branches — a filename date makes relative recency visible at a glance, without git archaeology.
+
+- Use the date of the **most recent substantive edit**, not the original creation date.
+- **Rename the file** (`git mv`) each time the spec is substantively revised, bumping the date
+  prefix to the revision date. Do this on every substantive update **until the spec reaches
+  `Implemented` or `Superseded`** — at that point the content (and filename) is frozen; stop
+  renaming.
+- When renaming, update any cross-references to the old filename in other `feature/*.md`
+  files' "Related" rows.
+- A different mechanism than a filename date is acceptable, provided it still (a) makes
+  relative recency visible without comparing branches or digging through git log, and (b)
+  doesn't rely on a shared/centralized index or counter file that every branch would need to
+  edit — that generates merge conflicts and defeats the purpose.
+
+## Fix / issue analysis workflow (`fix/`)
+
+Use `fix/` when the work is **correcting existing behaviour** (wrong FHIRPath, broken
+export, regression), not adding a capability. The gate and file shape match `feature/`:
+
+1. Create `fix/<YYYYMMDD>-<issue-name>.md` (same dating / rename rules as feature files).
+2. Structure the document in **two parts**:
+   - **Part I — Issue analysis** — symptoms, who is affected, expected vs actual, what is
+     out of scope (author content vs exporter bugs). Plain language first.
+   - **Part II — Fix approach** — root cause, formal emission/semantics rules, code
+     checklist, tests, acceptance criteria.
+3. Set the status table to **`Draft`**. Do not implement until the spec is approved.
+4. After approval → **`Approved`**, implement, then **`Implemented`**.
+
+**Status values:** `Draft` → `Approved` → `Implemented` → `Superseded`
+
+Do **not** put new-capability specs in `fix/`, and do **not** use `feature/` for
+issue-analysis write-ups. Cross-link the other folder only from the Related row.
+
+Example: `fix/20260813-fhirpath-choice-answers.md`.
 
 ## Documentation Requirements
 
@@ -160,11 +305,16 @@ Example specs live under `feature/` (e.g. `feature/concept-repeat.md`).
 5. Document operator behavior and return types
 
 ### FHIR CQL / Library Generation (FHIRStrategy)
-- Use a **Helper** library for all FHIR resource access (Observations, Conditions, etc.) keyed by concept name/code.
+- `calculatedExpression` is **FHIRPath-only** (openSRP/FHIR-Core does not evaluate CQL through it) — never emit a CQL identifier there. `initialExpression` is the **only** extension allowed to carry CQL (`text/cql-identifier` / `text/cql`), evaluated once at `$populate`.
+- `generate_calculate()` routes each calculate node by whether at least one of its references is itself an item in the *same* Questionnaire (reachable via `%resource.repeat(item).where(linkId=...)`): if so, emit a live `calculatedExpression` in FHIRPath; otherwise the value depends on data outside the form (e.g. observation history) and must be computed once via CQL `initialExpression` instead.
+- In-form FHIRPath **must** walk nested groups with `%resource.repeat(item).where(linkId=...)` — never a top-level-only `%resource.item.where(...)`.
+- Select-option `relevance` is emitted as SDC `answerOptionsToggleExpression` on the parent choice item (`fix/20260813-option-relevance-toggle.md`), not as a hidden Questionnaire item.
+- Choice / open-choice answers are `valueCoding`. Membership tests (`SELECTED` / `CONTAINS`) emit `…answer.where(value.code = '<code>').exists()`. Scalar comparisons on primitives keep `.answer.value`. See `fix/20260817-choice-membership-and-group-relevance.md`.
+- Use a **Helper** library for all FHIR resource access (Observations, Conditions, etc.) keyed by concept name/code — only reachable from the CQL/`initialExpression` path, never from FHIRPath.
 - Keep per-process/segment libraries **thin** — they should mostly contain named `define` statements that delegate to the Helper.
-- In Questionnaire `calculatedExpression` / `initialExpression`, use **simple define names only** (e.g. `"Calc_bmi"`). Do not qualify with library name.
+- In `initialExpression`, use **simple define names only** (e.g. `"Calc_bmi"`). Do not qualify with library name.
 - The Questionnaire declares its library/libraries at the top level (via `library` element or SDC `cqlInputResources` extension).
-- Avoid embedding raw questionnaire answer paths (`%resource.item.where(...)`) in CQL. Route data access through the Helper using concept identifiers.
+- Avoid embedding raw questionnaire answer paths (`%resource.repeat(item).where(...)`) in CQL. Route data access through the Helper using concept identifiers. (FHIRPath expressions, by contrast, use `%resource.repeat(item).where(...)` directly — that's the whole point of using FHIRPath for in-form calculations.)
 - Follow patterns from pyfhirsdc and WHO SMART CQL examples (thin form libs + rich base/helper libs).
 - When adding new CQL helpers or changing the template, update `docs/desing/FHIRcore.md` and `docs/open-srp-export.md`.
 

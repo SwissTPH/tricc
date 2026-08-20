@@ -89,8 +89,42 @@ Checks:
 
 - **Same `name` + same `repeat` (default `1`)** — second capture is normally skipped / inherits (encounter-wide).
 - **Different `repeat` values** (e.g. `1` then `2`) — both can show; no cross-slot merge.
-- **`repeat=-1`** — local-only: asked without inheriting prior values; does not feed global coalesce.
+- **`repeat=-1`** — local-only: asked without inheriting prior values; does not feed global
+  coalesce; **and is never skip-suppressed against another `repeat=-1` occurrence of the same
+  concept** — two different callers each capturing the same `repeat=-1` node (e.g. via two
+  separate `instance=-1` snippet injects of the same module) both get their own, independent
+  capture. Only same `repeat` value **≥ 0** dedupes encounter-wide.
 - See [Concept repeat](./tricc-elements.md#concept-repeat) and `feature/advanced-merge-calc.md`.
+
+## Node after a repeated activity call never appears
+
+Symptoms:
+
+- Activity `B` is called twice (as two different instances, or as the same shared instance
+  from two different callers) and a node placed right after the *second* call is silently
+  missing from the export — not just hidden by relevance, but never emitted at all.
+
+Cause:
+
+- A `TriccNodeActivity`'s own `next_nodes` were previously never scheduled once its content
+  finished processing (`walktrhough_tricc_node_processed_stached` in `visitors/tricc.py` had an
+  unreachable branch for this). Fixed: the activity now schedules its own `next_nodes` the
+  moment its `end`/`activity_end` is processed.
+- This only matters when a node is wired as a **direct** `next_nodes` of the activity object
+  itself. Diagrams authored in draw.io don't normally hit this: a `goto` with outgoing edges
+  gets a `wait` node inserted (see [`wait`](./tricc-elements.md#logic-and-computation-elements))
+  so the continuation is scheduled independently of the called activity's own completion — this
+  also keeps two different callers of the same shared activity instance from leaking relevance
+  into each other's continuation (see the `goto` `instance` note in
+  [Navigation/linking elements](./tricc-elements.md#navigationlinking-elements)).
+
+Checks:
+
+- If the node after the call is missing entirely: confirm you're on a version with the
+  `walktrhough_tricc_node_processed_stached` fix above.
+- If the node appears but its relevance references the *other* caller's condition (or the
+  called activity's own completion instead of the calling branch): the `wait`/bridge scaffolding
+  may be missing for that call site — re-check the `goto`'s outgoing edges in the diagram.
 
 ## Duplicate ODK field names / export collisions
 

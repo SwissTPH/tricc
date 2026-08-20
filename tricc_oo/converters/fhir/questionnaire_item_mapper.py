@@ -36,9 +36,13 @@ FHIR_TYPE_QUANTITY = "quantity"
 # SDC extension URLs (openSRP profile)
 # ---------------------------------------------------------------------------
 SDC_EXT_ENABLE_WHEN_EXPR = "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-enableWhenExpression"
+SDC_EXT_ANSWER_OPTIONS_TOGGLE = (
+    "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-answerOptionsToggleExpression"
+)
 SDC_EXT_INITIAL_EXPR = "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression"
 SDC_EXT_CALCULATED_EXPR = "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-calculatedExpression"
 SDC_EXT_ITEM_MEDIA = "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-itemMedia"
+SDC_EXT_ITEM_ANSWER_MEDIA = "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-itemAnswerMedia"
 SDC_EXT_HIDDEN = "http://hl7.org/fhir/StructureDefinition/questionnaire-hidden"
 SDC_EXT_CHOICE_ORIENTATION = "http://hl7.org/fhir/StructureDefinition/questionnaire-choiceOrientation"
 SDC_EXT_ITEM_CONTROL = "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl"
@@ -74,16 +78,18 @@ NODE_TYPE_TO_FHIR: Dict[str, Tuple[str, bool, bool]] = {
     # Navigation / structural (not rendered as items)
     TriccNodeType.start:            (FHIR_TYPE_GROUP,    False, True),
     TriccNodeType.activity_start:   (FHIR_TYPE_GROUP,    False, True),
-    TriccNodeType.activity_end:     (FHIR_TYPE_GROUP,    False, True),
-    TriccNodeType.end:              (FHIR_TYPE_GROUP,    False, True),
+    TriccNodeType.activity_end:     (None,    False, True),
+    TriccNodeType.end:              (None,    False, True),
     TriccNodeType.rhombus:          (FHIR_TYPE_BOOLEAN,  False, True),
     TriccNodeType.factor:           (FHIR_TYPE_DECIMAL,  False, True),
     TriccNodeType.populate:         (FHIR_TYPE_STRING,   False, True),
     TriccNodeType.bridge:           (FHIR_TYPE_BOOLEAN,  False, True),
     TriccNodeType.wait:             (FHIR_TYPE_BOOLEAN,  False, True),
-    TriccNodeType.goto:             (FHIR_TYPE_GROUP,    False, True),
-    TriccNodeType.link_in:          (FHIR_TYPE_GROUP,    False, True),
-    TriccNodeType.link_out:         (FHIR_TYPE_GROUP,    False, True),
+    TriccNodeType.goto:             (None,    False, True),
+    TriccNodeType.link_in:          (None, False, True),
+    TriccNodeType.link_out:         (None,    False, True),
+    TriccNodeType.activity:         (FHIR_TYPE_GROUP, False, False),
+    TriccNodeType.exclusive:         (None, False, False),
 }
 
 # Node types that should be skipped entirely (not added to Questionnaire)
@@ -98,6 +104,67 @@ SKIP_NODE_TYPES = {
     TriccNodeType.remote_reference,
     TriccNodeType.operation,
 }
+
+# SDC forbids Questionnaire.item.initial and sdc-questionnaire-initialExpression on
+# these types (http://build.fhir.org/ig/HL7/sdc/expressions.html#initialExpression).
+# openSRP FHIR Data Capture throws IllegalStateException at $populate if they appear.
+FHIR_TYPES_WITHOUT_INITIAL = frozenset({FHIR_TYPE_DISPLAY, FHIR_TYPE_GROUP})
+
+
+def item_allows_initial(item: Optional[dict]) -> bool:
+    """Return True if SDC allows ``initial`` / ``initialExpression`` on this item.
+
+    Args:
+        item: A Questionnaire.item dict (may be None).
+
+    Returns:
+        False for ``group`` and ``display`` items (and when ``item`` is missing).
+    """
+    if not item:
+        return False
+    return item.get("type") not in FHIR_TYPES_WITHOUT_INITIAL
+
+
+def strip_illegal_initials(items: Optional[list]) -> int:
+    """Remove ``initial`` and ``initialExpression`` from group/display items.
+
+    Walks ``items`` (and nested ``item`` children) in place. Used as a last-line
+    export sanitizer so a future attachment path cannot ship a Questionnaire
+    that openSRP refuses to render.
+
+    Args:
+        items: Questionnaire.item list (may be None).
+
+    Returns:
+        Number of items that had an illegal initial / initialExpression removed.
+    """
+    stripped = 0
+    for item in items or []:
+        if not item_allows_initial(item):
+            had_initial = bool(item.pop("initial", None))
+            kept = []
+            removed_ext = False
+            for ext in item.get("extension") or []:
+                if ext.get("url") == SDC_EXT_INITIAL_EXPR:
+                    removed_ext = True
+                    continue
+                kept.append(ext)
+            if removed_ext:
+                if kept:
+                    item["extension"] = kept
+                else:
+                    item.pop("extension", None)
+            if had_initial or removed_ext:
+                stripped += 1
+                logger.warning(
+                    "Removed illegal initial/initialExpression from %s item '%s' "
+                    "(SDC forbids them on group/display; openSRP $populate crashes)",
+                    item.get("type"),
+                    item.get("linkId"),
+                )
+        stripped += strip_illegal_initials(item.get("item"))
+    return stripped
+
 
 # Node types that produce hidden calculate items (populated via CQL calculatedExpression)
 CALCULATE_NODE_TYPES = {
@@ -214,6 +281,108 @@ def build_hidden_extension() -> dict:
     return {"url": SDC_EXT_HIDDEN, "valueBoolean": True}
 
 
+def build_choice_orientation_extension(orientation: str = "horizontal") -> dict:
+    """Build a questionnaire-choiceOrientation extension dict.
+
+    Rendering hint for yes/no (boolean) and choice lists. OpenSRP uses
+    ``horizontal`` on visible boolean items so Yes/No sit side by side.
+    See ``feature/20260819-boolean-choice-orientation.md``.
+
+    Args:
+        orientation: FHIR ChoiceOrientation code (``horizontal`` or ``vertical``).
+
+    Returns:
+        FHIR extension dict.
+    """
+    return {"url": SDC_EXT_CHOICE_ORIENTATION, "valueCode": orientation}
+
+
+# Extension aliases for MIME subtypes that don't match the file extension
+_IMAGE_EXT_TO_SUBTYPE = {"jpg": "jpeg", "svg": "svg+xml"}
+
+
+def image_content_type(file_name: Optional[str]) -> Optional[str]:
+    """Derive an ``image/<subtype>`` content type from an image file name.
+
+    The extension was originally taken verbatim from the draw.io embedded
+    ``image=data:image/<subtype>,<payload>`` style fragment (see
+    ``add_image_from_style`` in ``converters/xml_to_tricc.py``), so it already
+    is a valid IANA image subtype in the vast majority of cases; this only
+    normalizes the handful of aliases (``jpg`` → ``jpeg``, ``svg`` → ``svg+xml``).
+
+    Args:
+        file_name: Image file name, e.g. ``"3f9a1c...c2.png"``.
+
+    Returns:
+        A content type string such as ``"image/png"``, or ``None`` if
+        ``file_name`` has no extension.
+    """
+    if not file_name or "." not in file_name:
+        return None
+    ext = file_name.rsplit(".", 1)[-1].lower()
+    if not ext:
+        return None
+    return f"image/{_IMAGE_EXT_TO_SUBTYPE.get(ext, ext)}"
+
+
+def _image_attachment(binary_id: str, content_type: str) -> dict:
+    """Build an Attachment that references a shared Binary, without inline bytes.
+
+    The same picture can appear on several questionnaires. Bytes live once on
+    the package ``Binary/{id}``; the Questionnaire only keeps ``contentType``
+    and a relative ``Binary/{id}`` URL. openSRP rewrites that URL to an
+    absolute FHIR URL at render time. ``itemAnswerMedia`` is inlined from the
+    local Binary by the app, because the SDK never follows a URL there.
+
+    Args:
+        binary_id: The id of the matching Binary resource.
+        content_type: The image content type (e.g. ``"image/png"``).
+
+    Returns:
+        FHIR Attachment dict.
+    """
+    return {
+        "contentType": content_type,
+        "url": f"Binary/{binary_id}",
+    }
+
+
+def build_item_media_extension(binary_id: str, content_type: str) -> dict:
+    """Build an SDC itemMedia extension referencing a Binary resource.
+
+    Illustrates the *question* itself (attaches to a Questionnaire.item).
+
+    Args:
+        binary_id: The id of the Binary resource holding the image bytes.
+        content_type: The image content type (e.g. ``"image/png"``).
+
+    Returns:
+        FHIR extension dict.
+    """
+    return {
+        "url": SDC_EXT_ITEM_MEDIA,
+        "valueAttachment": _image_attachment(binary_id, content_type),
+    }
+
+
+def build_item_answer_media_extension(binary_id: str, content_type: str) -> dict:
+    """Build an SDC itemAnswerMedia extension referencing a Binary resource.
+
+    Illustrates a single *answer option* (attaches to an answerOption entry).
+
+    Args:
+        binary_id: The id of the Binary resource holding the image bytes.
+        content_type: The image content type (e.g. ``"image/png"``).
+
+    Returns:
+        FHIR extension dict.
+    """
+    return {
+        "url": SDC_EXT_ITEM_ANSWER_MEDIA,
+        "valueAttachment": _image_attachment(binary_id, content_type),
+    }
+
+
 def build_enable_when_expression(fhirpath_expr: str) -> dict:
     """Build an SDC enableWhenExpression extension dict.
 
@@ -229,6 +398,37 @@ def build_enable_when_expression(fhirpath_expr: str) -> dict:
             "language": "text/fhirpath",
             "expression": fhirpath_expr,
         },
+    }
+
+
+def build_answer_options_toggle_expression(option_codings, fhirpath_expr: str) -> dict:
+    """Build an SDC answerOptionsToggleExpression extension dict.
+
+    When ``fhirpath_expr`` evaluates to true the listed options are enabled;
+    otherwise they are disabled. Unlisted options stay enabled (SDC default).
+
+    Args:
+        option_codings: One ``valueCoding`` dict, or a list of them.
+        fhirpath_expr: FHIRPath boolean expression.
+
+    Returns:
+        FHIR extension dict attached to the parent Questionnaire item.
+    """
+    if isinstance(option_codings, dict):
+        option_codings = [option_codings]
+    option_exts = [{"url": "option", "valueCoding": coding} for coding in option_codings]
+    return {
+        "url": SDC_EXT_ANSWER_OPTIONS_TOGGLE,
+        "extension": option_exts
+        + [
+            {
+                "url": "expression",
+                "valueExpression": {
+                    "language": "text/fhirpath",
+                    "expression": fhirpath_expr,
+                },
+            }
+        ],
     }
 
 
@@ -275,22 +475,26 @@ def build_initial_expression_cql(cql_expr: str) -> dict:
     }
 
 
-def build_calculated_expression(cql_expr: str, library_name: Optional[str] = None) -> dict:
-    """Build an SDC calculatedExpression extension dict (CQL-based).
+def build_calculated_expression_fhirpath(fhirpath_expr: str) -> dict:
+    """Build an SDC calculatedExpression extension dict (FHIRPath-based).
+
+    calculatedExpression must be FHIRPath, not CQL — only initialExpression
+    supports a CQL identifier reference (``text/cql-identifier``). A
+    calculation whose references live outside the current Questionnaire
+    (e.g. observation history reachable only through the CQL Helper library)
+    should be computed once via initialExpression instead of forced in here.
 
     Args:
-        cql_expr: CQL expression string.
-        library_name: Optional CQL library name for qualified reference.
+        fhirpath_expr: FHIRPath expression string.
 
     Returns:
         FHIR extension dict.
     """
-    expr = f"{library_name}.{cql_expr}" if library_name else cql_expr
     return {
         "url": SDC_EXT_CALCULATED_EXPR,
         "valueExpression": {
-            "language": "text/cql-identifier",
-            "expression": expr,
+            "language": "text/fhirpath",
+            "expression": fhirpath_expr,
         },
     }
 
