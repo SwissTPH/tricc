@@ -1,11 +1,9 @@
 import logging
-from tricc_oo.models.tricc import TriccNodeActivity
-from tricc_oo.models.calculate import TriccNodeInput, TriccNodePopulate
 import re
-from typing import List
+from typing import List, Set
 
 from tricc_oo.models.tricc import TriccNodeActivity
-from tricc_oo.models.calculate import TriccNodeInput
+from tricc_oo.models.calculate import TriccNodeInput, TriccNodePopulate
 from tricc_oo.models.base import (
     TriccOperation,
     TriccOperator,
@@ -13,6 +11,8 @@ from tricc_oo.models.base import (
     TriccStatic,
 )
 from tricc_oo.converters.tricc_to_xls_form import get_export_name
+from tricc_oo.data.anthro import get_choice_rows, is_supported_table, normalize_table_id
+from tricc_oo.serializers.xls_form import CHOICE_MAP
 from tricc_oo.strategies.output.xls_form import XLSFormStrategy
 from tricc_oo.strategies.registry import register_output_strategy
 from tricc_oo.models.lang import SingletonLangClass
@@ -42,15 +42,105 @@ def _comma_join_survey_trigger_refs(*chunks: str) -> str:
 @register_output_strategy("XLSFormCDSSStrategy")
 class XLSFormCDSSStrategy(XLSFormStrategy):
 
+    def __init__(self, project, output_path):
+        self._used_zscore_tables: Set[str] = set()
+        super().__init__(project, output_path)
+
+    def do_clean(self, **kwargs):
+        super().do_clean(**kwargs)
+        self._used_zscore_tables = set()
+
     def process_export(self, start_pages, **kwargs):
         self.activity_export(start_pages[self.processes[0]], **kwargs)
-        # self.add_tab_breaks_choice()
-        # self.add_wfx_choice()
+
+    def export(self, start_pages, version):
+        # Inject only LMS tables actually referenced by Zscore/Izscore.
+        self.inject_used_zscore_tables()
+        return super().export(start_pages, version)
 
     def generate_export(self, node, **kwargs):
         # Coalesce($this, …) becomes coalesce(${…},'') plus triggers (CDSS only).
         self._extract_this_coalesce_trigger(node)
         return super().generate_export(node, **kwargs)
+
+    def _register_zscore_table(self, table_expr) -> str:
+        """Record a zscore table id; return normalized id. Raises if unsupported."""
+        tid = normalize_table_id(table_expr)
+        if not tid:
+            raise ValueError("Zscore/Izscore requires a non-empty table id (e.g. 'wfa')")
+        if not is_supported_table(tid):
+            raise ValueError(
+                f"Unknown zscore table '{tid}'. Supported: wfa "
+                f"(more XForY tables can be registered later)"
+            )
+        self._used_zscore_tables.add(tid)
+        return tid
+
+    def tricc_operation_zscore(self, ref_expressions, original_references=None):
+        if not ref_expressions or len(ref_expressions) < 4:
+            raise ValueError("Zscore(table, sex, x, y) requires 4 arguments")
+        self._register_zscore_table(ref_expressions[0])
+        return super().tricc_operation_zscore(ref_expressions, original_references)
+
+    def tricc_operation_izscore(self, ref_expressions, original_references=None):
+        if not ref_expressions or len(ref_expressions) < 4:
+            raise ValueError("Izscore(table, sex, x, z) requires 4 arguments")
+        self._register_zscore_table(ref_expressions[0])
+        return super().tricc_operation_izscore(ref_expressions, original_references)
+
+    def inject_used_zscore_tables(self):
+        """Append LMS choice rows for tables referenced during expression emission."""
+        if not self._used_zscore_tables:
+            return
+        empty_label = langs.get_trads("", force_dict=True)
+        for tid in sorted(self._used_zscore_tables):
+            # Skip if already injected (idempotent re-export)
+            if (
+                len(self.df_choice)
+                and "list_name" in self.df_choice.columns
+                and (self.df_choice["list_name"] == tid).any()
+            ):
+                continue
+            try:
+                rows = get_choice_rows(tid)
+            except ValueError as exc:
+                logger.error(str(exc))
+                raise
+            for row in rows:
+                values = []
+                for column in CHOICE_MAP:
+                    if column == "list_name":
+                        values.append(tid)
+                    elif column == "value":
+                        values.append(row["value"])
+                    elif column.startswith("label"):
+                        # Empty label — secondary instance only, not shown to user
+                        arr = column.split("::")
+                        trad = arr[1] if len(arr) == 2 else None
+                        if trad and trad in empty_label:
+                            values.append(empty_label[trad])
+                        else:
+                            values.append(next(iter(empty_label.values()), ""))
+                    elif column == "sex":
+                        values.append(row["sex"])
+                    elif column == "y_min":
+                        values.append(row["y_min"])
+                    elif column == "y_max":
+                        values.append(row["y_max"])
+                    elif column == "l":
+                        values.append(row["l"])
+                    elif column == "s":
+                        values.append(row["s"])
+                    elif column == "m":
+                        values.append(row["m"])
+                    else:
+                        values.append("")
+                self.df_choice.loc[len(self.df_choice)] = values
+            logger.info(
+                "Injected %s LMS rows for zscore table '%s' into choices",
+                len(rows),
+                tid,
+            )
 
     @staticmethod
     def _is_this_marker(value):
@@ -146,116 +236,6 @@ class XLSFormCDSSStrategy(XLSFormStrategy):
     def tricc_operation_age_year(self, ref_expressions):
         dob_node_name = ref_expressions[0].value if ref_expressions else "birthday"
         return f"int((today()-date(${{{dob_node_name}}})) div 365.25)"
-
-    def add_wfx_choice(self):
-        empty = langs.get_trads("", force_dict=True)
-        new_rows = [
-            [
-                "wfl",
-                "y45_0",
-                *list(empty.values()),
-                *list(empty.values()),
-                "f",
-                0,
-                110,
-                -0.3833,
-                0.09029,
-                2.4607,
-            ],
-            [
-                "wfa",
-                "y45_1",
-                *list(empty.values()),
-                *list(empty.values()),
-                "f",
-                0,
-                18500,
-                -0.3833,
-                0.0903,
-                2.4777,
-            ],
-            [
-                "wfh",
-                "y45_2",
-                *list(empty.values()),
-                *list(empty.values()),
-                "f",
-                0,
-                125,
-                -0.3833,
-                0.0903,
-                2.4947,
-            ],
-        ]
-
-        for row in new_rows:
-            self.df_choice.loc[len(self.df_choice)] = row
-
-        label = langs.get_trads("hidden", force_dict=True)
-        empty = langs.get_trads("", force_dict=True)
-        self.df_survey.loc[len(self.df_survey)] = [
-            "select_one wfl",
-            "wfl",
-            *list(label.values()),
-            *list(empty.values()),  # hint
-            *list(empty.values()),  # help
-            "",  # default
-            "",  # 'appearance', clean_name
-            "",  # 'constraint',
-            *list(empty.values()),  # 'constraint_message'
-            "0",  # 'relevance'
-            "",  # 'disabled'
-            "1",  # 'required'
-            *list(empty.values()),  # 'required message'
-            "",  # 'read only'
-            "",  # 'expression'
-            "",
-            "",  # 'repeat_count'
-            "",  # 'image'
-            "",
-        ]
-        self.df_survey.loc[len(self.df_survey)] = [
-            "select_one wfa",
-            "wfa",
-            *list(label.values()),
-            *list(empty.values()),  # hint
-            *list(empty.values()),  # help
-            "",  # default
-            "",  # 'appearance', clean_name
-            "",  # 'constraint',
-            *list(empty.values()),  # 'constraint_message'
-            "0",  # 'relevance'
-            "",  # 'disabled'
-            "1",  # 'required'
-            *list(empty.values()),  # 'required message'
-            "",  # 'read only'
-            "",  # 'expression'
-            "",
-            "",  # 'repeat_count'
-            "",  # 'image'
-            "",
-        ]
-        self.df_survey.loc[len(self.df_survey)] = [
-            "select_one wfh",
-            "wfh",
-            *list(label.values()),
-            *list(empty.values()),  # hint
-            *list(empty.values()),  # help
-            "",  # default
-            "",  # 'appearance', clean_name
-            "",  # 'constraint',
-            *list(empty.values()),  # 'constraint_message'
-            "0",  # 'relevance'
-            "",  # 'disabled'
-            "1",  # 'required'
-            *list(empty.values()),  # 'required message'
-            "",  # 'read only'
-            "",  # 'expression'
-            "",
-            "",  # 'repeat_count'
-            "",  # 'image'
-            "",
-        ]
 
     def add_tab_breaks_choice(self):
         label = langs.get_trads("hidden", force_dict=True)

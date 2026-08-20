@@ -99,7 +99,8 @@ Make the Questionnaire output correct and use the code that already exists in th
 
 5. **Media, hints, choice orientation, itemControl, etc.**
    - Use the display_type → extension logic from the mapper.
-   - Handle image nodes → `itemMedia` extension + Binary references (ties into Phase 4).
+   - ~~Handle image nodes → `itemMedia` extension + Binary references (ties into Phase 4).~~
+     Done — see `fix/20260814-questionnaire-item-media.md`.
 
 **Dependencies**: Phase 0.  
 **Success**: On DEMO (and combacal/etat), the generated Questionnaire is nested where appropriate, uses correct item types + repeats + extensions, passes basic FHIR SDC validation, and the mapper code is actually exercised (not dead).
@@ -159,8 +160,11 @@ Drive export by `concept_type` (the whole point of the `concept_mapper`).
 Close the gap to a usable fhircore package.
 
 1. **Implement Binary handling** (images from the drawio + the config Binary)
-   - Populate `self.binaries` during graph walk.
-   - `generate_binary_config` already exists in OpenSRP — wire it.
+   - ~~Populate `self.binaries` during graph walk.~~ Done for drawio question/answer
+     illustration images — see `fix/20260814-questionnaire-item-media.md`
+     (`FHIRStrategy._register_image_binary`, `OpenSRPStrategy._write_image_binaries`).
+   - `generate_binary_config` already exists in OpenSRP — wire it. (unrelated: this is the
+     separate whole-config-package Binary, not per-image Binaries.)
 
 2. **Complete export writers in both strategies**
    - Create the documented subdirectories (`questionnaire/`, `library/`, `structure-map/`, `ValueSet/`, `binary/`, `fsh/`).

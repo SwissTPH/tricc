@@ -60,7 +60,7 @@ class TestPopulateReferences(unittest.TestCase):
         normalize_populate_node(node)
         self.assertEqual(
             resolve_populate_reference(node, qualified=True),
-            "Helper.GetHistoryValue('bp', 'P14D', 1, null)",
+            "Helper.GetHistoryObservationValue('bp', 'P14D', 1, null)",
         )
 
     def test_encounter_reference_qualified(self):
@@ -126,7 +126,7 @@ class TestPopulateYamlFixtures(unittest.TestCase):
 class TestPopulateCqlHelpers(unittest.TestCase):
     def test_repeat_block_uses_get_history_not_get_last(self):
         block = cql_helper_repeat_block()
-        self.assertIn("GetHistoryValue", block)
+        self.assertIn("GetHistoryObservationValue", block)
         self.assertNotIn("GetLast", block)
 
     def test_populate_block_has_context_accessors(self):

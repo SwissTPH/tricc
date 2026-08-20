@@ -60,23 +60,56 @@ def get_observation_cql_accessor_for_node(node) -> str:
     return get_observation_cql_accessor(code, get_repeat(node))
 
 
-def fml_repeat_extension_rule(link_id: str, repeat: int) -> str:
-    """FML comment/rule fragment documenting repeat index for StructureMap authors."""
+def fml_repeat_extension_rule(link_id: str, content_type: str, repeat: int) -> str:
+    """Executable FML rule that stamps the repeat-index extension onto the target resource.
+
+    Without this, ``ObservationRepeatIndex``/``GetRepeated*``/``GetNumberOfRepeat`` (the CQL
+    read side) have nothing to match against — extracted Observations would carry no
+    repeat-slot marker at all. Appended after the field-mapping rule for *link_id* in the
+    same ``map`` block (see ``FHIRStrategy.generate_export``).
+    """
     return (
-        f"  // {link_id}: set Observation.extension "
-        f"({TRICC_OBSERVATION_REPEAT_EXT}) = {repeat}\n"
+        f"  {link_id} -> {content_type}.extension as ext then {{\n"
+        f"    ext.url = '{TRICC_OBSERVATION_REPEAT_EXT}';\n"
+        f"    ext.value = {int(repeat)};\n"
+        f'  }} "{link_id}_repeat_ext";\n'
+    )
+
+
+def fml_repeat_extension_on_target(target_var: str, repeat: int, rule_name: str) -> str:
+    """FML fragment that stamps the repeat-index extension inside an Observation group.
+
+    Used by the QuestionnaireResponse → Bundle extraction StructureMap (nested
+    ``create('Observation') as obs`` block).
+    """
+    return (
+        f"      src -> {target_var}.extension as ext then {{\n"
+        f"        src -> ext.url = '{TRICC_OBSERVATION_REPEAT_EXT}' \"url\";\n"
+        f"        src -> ext.valueInteger = {int(repeat)} \"slot\";\n"
+        f'      }} "{rule_name}_repeat";\n'
     )
 
 
 def cql_helper_repeat_block(fhir_version: str = "4.0.1") -> str:
-    """CQL definitions for repeat-aware Observation access (included in Helper library)."""
+    """CQL definitions for repeat-aware Observation/Condition access (Helper library).
+
+    ``GetObservation*``/``GetCondition*`` are scoped to the **current encounter**
+    (``encounterid`` parameter, populated by the client at ``$populate`` time — null on
+    a visit's first process, which is expected: nothing has been recorded yet this
+    encounter). ``GetHistoryObservation*``/``GetHistoryCondition*`` are the deliberate
+    any-time/"outside the encounter" lookback, unscoped by ``encounterid``, used by the
+    ``history`` populate context. See feature/20260812-intervention-order-and-dedup.md.
+    """
     return f"""\
-// ── Repeat index helpers ─────────────────────────────────────────────────────
+// ── Repeat / current-encounter helpers ────────────────────────────────────────
 // Extension URL: {TRICC_OBSERVATION_REPEAT_EXT}
 
 define function GetObservations(code String):
-  [Observation: Code code from "http://snomed.info/sct"] O
-    where O.status in {{'final', 'amended', 'corrected'}}
+  if encounterid is null then {{}} as List<Observation>
+  else
+    [Observation: Code code from "http://snomed.info/sct"] O
+      where O.status in {{'final', 'amended', 'corrected'}}
+        and O.encounter.reference = 'Encounter/' + encounterid
 
 define function ObservationRepeatIndex(O Observation):
   singleton from (
@@ -111,7 +144,7 @@ define function GetNumberOfRepeat(code String):
     )
   )
 
-define function GetHistory(
+define function GetHistoryObservation(
   code String,
   period String,
   reverseOrderPosition Integer,
@@ -119,8 +152,9 @@ define function GetHistory(
 ):
   First(
     (
-      GetObservations(code) O
-        where (
+      [Observation: Code code from "http://snomed.info/sct"] O
+        where O.status in {{'final', 'amended', 'corrected'}}
+        and (
           repeatIndex is null
           or ObservationRepeatIndex(O) = repeatIndex
           or (repeatIndex = 1 and ObservationRepeatIndex(O) is null)
@@ -131,11 +165,54 @@ define function GetHistory(
       take 1
   )
 
-define function GetHistoryValue(
+define function GetHistoryObservationValue(
   code String,
   period String,
   reverseOrderPosition Integer,
   repeatIndex Integer
 ):
-  GetHistory(code, period, reverseOrderPosition, repeatIndex).value
+  GetHistoryObservation(code, period, reverseOrderPosition, repeatIndex).value
+
+// ── Condition family (same current-encounter / history split; no repeat index —
+// Condition entries aren't repeated within one encounter the way vitals are) ──
+
+define function GetConditions(code String):
+  if encounterid is null then {{}} as List<Condition>
+  else
+    [Condition: Code code from "http://snomed.info/sct"] C
+      where C.encounter.reference = 'Encounter/' + encounterid
+
+define function ConditionVerificationCode(C Condition):
+  First(C.verificationStatus.coding.code)
+
+define function GetActiveConditions(code String):
+  GetConditions(code) C
+    where ConditionVerificationCode(C) != 'refuted'
+      and ConditionVerificationCode(C) != 'entered-in-error'
+
+define function GetCondition(code String):
+  First(GetActiveConditions(code) C sort by recordedDate desc)
+
+define function GetConditionValue(code String):
+  exists(GetActiveConditions(code))
+
+define function HasProvisionalCondition(code String):
+  exists(GetConditions(code) C where ConditionVerificationCode(C) = 'provisional')
+
+define function HasConfirmedCondition(code String):
+  exists(GetConditions(code) C where ConditionVerificationCode(C) = 'confirmed')
+
+define function HasRefutedCondition(code String):
+  exists(GetConditions(code) C where ConditionVerificationCode(C) = 'refuted')
+
+define function GetHistoryCondition(code String):
+  First(
+    [Condition: Code code from "http://snomed.info/sct"] C
+      where First(C.verificationStatus.coding.code) != 'refuted'
+        and First(C.verificationStatus.coding.code) != 'entered-in-error'
+      sort by recordedDate desc
+  )
+
+define function GetHistoryConditionValue(code String):
+  exists(GetHistoryCondition(code))
 """

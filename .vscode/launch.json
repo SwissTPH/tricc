@@ -190,7 +190,7 @@
       "program": "tests/build.py",
       "args": [
         "-i",
-        "https://drive.google.com/file/d/13lQI2pcshqnPt28ili6fXm0-5waTMp0C",
+        "https://drive.google.com/drive/folders/1N8kdRO1v-WKYVMDk9S9HBB58TgMc31nd",
         "-l",
         "d",
         "-o",
@@ -213,7 +213,7 @@
       "program": "tests/build.py",
       "args": [
         "-i",
-        "https://drive.google.com/file/d/13lQI2pcshqnPt28ili6fXm0-5waTMp0C",
+        "https://drive.google.com/drive/folders/1N8kdRO1v-WKYVMDk9S9HBB58TgMc31nd",
         "-l",
         "d",
         "-o",
@@ -277,6 +277,30 @@
       }
     },
     {
+      "name": "DEMO OpenSRP",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "tests/build.py",
+      "args": [
+        "-i",
+        "./tests/data/demo.drawio",
+        "-l",
+        "d",
+        "-o",
+        "./tests/output/demo_opensrp",
+        "-t",
+        "-O",
+        "OpenSRPStrategy",
+        "-D",
+        "./tests/output/demo_opensrp"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}${pathSeparator}${env:PYTHONPATH}"
+      }
+    },
+    {
       "name": "Combacal WS ODK",
       "type": "debugpy",
       "request": "launch",
@@ -305,7 +329,8 @@
       "program": "tests/build.py",
       "args": [
         "-i",
-        "https://drive.google.com/file/d/13lQI2pcshqnPt28ili6fXm0-5waTMp0C",
+        //"/mnt/data/Development/tricc_oo/tests/data/etat",
+        "https://drive.google.com/drive/folders/1N8kdRO1v-WKYVMDk9S9HBB58TgMc31nd",
         "-l",
         "d",
         "-o",
@@ -584,7 +609,7 @@
       "program": "tests/build.py",
       "args": [
         "-i",
-        "https://drive.google.com/file/d/13lQI2pcshqnPt28ili6fXm0-5waTMp0C",
+        "https://drive.google.com/drive/folders/1N8kdRO1v-WKYVMDk9S9HBB58TgMc31nd",
         "-l",
         "i",
         "-o",
@@ -602,7 +627,7 @@
       "program": "tests/build.py",
       "args": [
         "-i",
-        "https://drive.google.com/file/d/13lQI2pcshqnPt28ili6fXm0-5waTMp0C",
+        "https://drive.google.com/drive/folders/1N8kdRO1v-WKYVMDk9S9HBB58TgMc31nd",
         "-l",
         "i",
         "-o",

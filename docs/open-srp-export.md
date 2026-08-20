@@ -16,10 +16,16 @@ The `OpenSRPStrategy` extends the base `FHIRStrategy` and produces:
 | `Library` | CQL logic library (one per cpg-common-process + shared helper) |
 | `StructureMap` | Extraction map (Questionnaire → FHIR resources) |
 | `ValueSet` | One per `select_one` / `select_multiple` question |
-| `PlanDefinition` | One per cpg-common-process; named-event trigger + applicability condition |
-| `Composition` | Manifest listing all resources for the form package |
-| `Binary` | App config JSON (base64) + image binaries |
-| FSH files | FHIR Shorthand for all of the above (SUSHI-ready) |
+| `PlanDefinition` (Intervention) | **One per project** (today: one project = one Intervention); one wrapper action carrying `available-care` once, nested with one child `action` per **non-empty** process, **`definitionCanonical` → Questionnaire** (Start care / due now); each child's `trigger` is its own process named-event, plus `tricc-process`/`tricc-process-order` extensions |
+| `StructureMap` (Task) | Optional Task maps for **upcoming planning** only (Questionnaire not due now) |
+| `Composition` | Package manifest (not the openSRP app-id shell) |
+| `Binary` | Image binaries only. Question/answer illustrations reference them from SDC `itemMedia` / `itemAnswerMedia` (`contentType` + `url: Binary/<id>`). Bytes stay on the shared `Binary` so one picture can be reused. The OpenSRP shell app configs (`application`, `sync`, …) are a separate Composition and are not generated here. |
+
+**Artifact mode:** JSON only (no FSH dual-write). Empty questionnaires (`item: []`) are dropped.
+
+**Launch rule:** Start care launches the **Questionnaire** now. Wrapping a Questionnaire in a
+**Task** is reserved for the **planning** feature when the form is **not due now** (see
+`feature/opensrp-register.md` §2.1 and `feature/opensrp-export-hygiene.md` §4).
 
 ---
 
@@ -39,28 +45,54 @@ python tests/build.py \
 ```
 tests/output/opensrp/
 ├── questionnaire/
-│   └── Questionnaire-<process>.json
+│   └── Questionnaire-questionnaire-main.json   # readable name; id inside is UUID
 ├── library/
-│   ├── Library-<form_id>-<process>.json
-│   └── Library-<form_id>Helper.json
-├── structure-map/
-│   └── StructureMap-<process>.json
-├── ValueSet/
-│   └── ValueSet-<node_id>.json
+│   ├── Library-demo-tricc-Helper.json
+│   └── Library-demo-tricc-main.json
 ├── plan-definition/
-│   └── PlanDefinition-<process>.json
+│   └── PlanDefinition-demo-tricc-intervention-PD.json   # 1 project = 1 Intervention; action[] = 1 per process
+├── structure-map/
+│   ├── StructureMap-demo-tricc-main-extract.json
+│   ├── StructureMap-demo-tricc-main-extract.map
+│   ├── StructureMap-demo-tricc-main-task.json
+│   └── StructureMap-demo-tricc-main-task.map
 ├── binary/
-│   ├── Binary-config.json
-│   └── Binary-<node_id>.json   # images
-├── Composition.json
-└── fsh/
-    ├── Questionnaire-<process>.fsh
-    ├── Library-<form_id>-<process>.fsh
-    ├── PlanDefinition-<process>.fsh
-    ├── Composition.fsh
-    └── ...
+│   └── Binary-<image-uuid>.json   # question/answer illustrations
+├── Composition.json            # id inside is UUID
+├── push-to-fhir.sh             # PUT {resourceType}/{json.id} — never the filename
+└── env.fhir.example
 ```
 
+Package **filenames** are human-readable. Server REST paths use the JSON **`id`**
+(UUID). `push-to-fhir.sh` always reads `resourceType` + `id` from the file body.
+
+### Push export to a FHIR server
+
+After export, the package root contains `push-to-fhir.sh`, `compile-structuremap.sh`,
+`env.fhir.example`, and a **`.env` seeded only if it does not already exist**
+(re-export will not overwrite your credentials).
+
+StructureMaps are authored as FML (`.map`). The JSON `group[]` TRicc writes is a
+shell only. **`push-to-fhir.sh` compiles each sibling `.map` with HAPI
+`StructureMapUtilities.parse` and PUTs that result.** A failed compile refuses
+to upload the stub (OpenSRP executes JSON groups, not `text.div`).
+
+```bash
+cd tests/output/opensrp/<form_id>/
+# edit .env (created once from env.fhir.example); secrets can go in .secrets
+
+./push-to-fhir.sh
+# or HAPI direct (no auth):
+SKIP_AUTH=1 FHIR_BASE_URL=http://localhost:8082/fhir ./push-to-fhir.sh
+```
+
+The compiler needs `java` plus either a JDK (`javac`), Docker (`eclipse-temurin`),
+or `FHIR_SM_COMPILER_JAR` / `FHIR_SM_COMPILER_CLASSPATH`. Postman uploads must
+use the compiled JSON, not the stub file.
+
+Credentials are read from the environment, then `.env`, then `.secrets` (later wins).
+Do **not** commit `.env` / `.secrets`. Template sources:
+`tricc_oo/strategies/output/templates/opensrp/`.
 ---
 
 ## Architecture
@@ -70,7 +102,7 @@ tests/output/opensrp/
 ```
 BaseOutPutStrategy
 └── FHIRStrategy          (standard FHIR SDC — Questionnaire, Library, StructureMap, ValueSet, Binary)
-    └── OpenSRPStrategy   (adds PlanDefinition, Composition, Binary config, FSH, openSRP wiring)
+    └── OpenSRPStrategy   (adds PlanDefinition+Task AD, StructureMap, Composition)
 ```
 
 ### Processing pipeline
@@ -84,12 +116,32 @@ execute()
   └── export()
         ├── [FHIRStrategy] write questionnaire/, library/, structure-map/, ValueSet/, binary/
         └── [OpenSRPStrategy]
-              ├── generate_plandefinition(process)  → plan-definition/
+              ├── _prune_empty_questionnaires()     → drop item: []
+              ├── generate_intervention_plandefinition() → single PD, 1 action/process
+              ├── generate_task_structuremap()      → Task map + next Task on done
               ├── _wire_questionnaire_extensions()  → cqlInputResources + planDefinitions on Q
               ├── generate_composition()            → Composition.json
-              ├── generate_binary_config()          → binary/Binary-config.json
-              └── _write_fsh_files()                → fsh/
+              └── _write_image_binaries()           → binary/Binary-<uuid>.json
 ```
+
+---
+
+## Boolean / yes-no questions
+
+Visible `select_yesno` items (and a `select_one` whose two options are a yes/no
+pair) export as native FHIR `boolean`. OpenSRP also attaches a rendering hint so
+the app lays Yes and No **side by side**:
+
+```json
+{
+  "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-choiceOrientation",
+  "valueCode": "horizontal"
+}
+```
+
+Hidden booleans (calculates, proposed diagnoses, waits) do not get the
+extension. Generic `FHIRStrategy` export is unchanged. See
+`feature/20260819-boolean-choice-orientation.md`.
 
 ---
 
@@ -133,24 +185,96 @@ Relevance conditions from the TRICC graph are converted to **FHIRPath** using
   "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-enableWhenExpression",
   "valueExpression": {
     "language": "text/fhirpath",
-    "expression": "%resource.item.where(linkId='age').answer.value >= 18"
+    "expression": "%resource.repeat(item).where(linkId='age').answer.value >= 18"
   }
 }
 ```
 
+### Option relevance (answerOptionsToggleExpression)
+
+A `relevance` on a **select option** (not the question) is emitted as SDC
+`answerOptionsToggleExpression` on the parent choice item. The expression is FHIRPath;
+when it is true the listed option is shown, otherwise it is hidden. Options without
+relevance stay enabled.
+
+```json
+{
+  "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-answerOptionsToggleExpression",
+  "extension": [
+    {"url": "option", "valueCoding": {"code": "demo.angry", "display": "Angry"}},
+    {
+      "url": "expression",
+      "valueExpression": {
+        "language": "text/fhirpath",
+        "expression": "%resource.repeat(item).where(linkId='demo_filter').answer.where($this.exists()).value = true"
+      }
+    }
+  ]
+}
+```
+
+See `fix/20260813-option-relevance-toggle.md`.
+
 ### Calculations (calculatedExpression / initialExpression)
 
-Calculate nodes (and some relevance logic) are converted to **CQL** using
-`convert_expression_to_cql()`. A shared **Helper** library provides data
-access via FHIR resources (e.g. `GetObservationValue("concept.code")`). Per-process
-libraries are thin wrappers that expose named defines.
+`calculatedExpression` **must be FHIRPath** — openSRP/FHIR-Core only evaluates CQL through
+`initialExpression` (at `$populate` time). `generate_calculate()` picks the extension/language
+per calculate node based on where its references live:
 
-In the Questionnaire, expressions use **simple define names** (the
-Questionnaire declares its library/libraries at the top level):
+| At least one reference is an item in *this* Questionnaire | Extension | Language |
+|---|---|---|
+| Yes — value(s) can be read live via `%resource.repeat(item).where(linkId=...)` | `calculatedExpression` | `text/fhirpath` |
+| No — depends only on data outside the form (e.g. observation history via the Helper) | `initialExpression` | `text/cql-identifier` |
+
+In-form calculation (e.g. BMI from weight + height both answered in the same Questionnaire):
 
 ```json
 {
   "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-calculatedExpression",
+  "valueExpression": {
+    "language": "text/fhirpath",
+    "expression": "%resource.repeat(item).where(linkId='weight').answer.value / (%resource.repeat(item).where(linkId='height').answer.value * %resource.repeat(item).where(linkId='height').answer.value)"
+  }
+}
+```
+
+**Updated 2026-08-13** (`fix/20260813-fhirpath-choice-answers.md`):
+
+- Item lookup always uses `%resource.repeat(item).where(linkId=...)` so questions nested
+  in page/activity groups are found.
+- Choice / open-choice answers are stored as `valueCoding`. Membership
+  (`SELECTED` / option `CONTAINS`) emits
+  `…answer.where(value.code = '<code>').exists()` (HAPI FHIRPath has no
+  `valueCoding` child on `answer`). Do not use `'code' in …answer.valueCoding.code`.
+- Page / activity groups take `enableWhenExpression` from `activity.relevance`
+  (XLSForm begin-group relevant), not only the start node's own `relevance`.
+- Boolean / numeric / string items still use `.answer.value`.
+- A calculate whose expression is boolean is emitted as Questionnaire `type: boolean`.
+- Casting a boolean (e.g. `COUNT(select) - SELECTED(opt_none)`) uses `iif(expr, 1, 0)`,
+  not `.toDecimal()`.
+
+Out-of-form calculation (depends on data not captured in this Questionnaire, e.g. observation
+history from a prior process) still routes through CQL, but as a one-time `initialExpression`
+rather than a live `calculatedExpression`. A shared **Helper** library provides data access via
+FHIR resources (e.g. `GetObservationValue("concept.code")`); per-process libraries are thin
+wrappers that expose named defines, referenced by **simple define name** (no library-qualified
+paths in the Questionnaire).
+
+**Updated 2026-08-12** (`feature/20260812-intervention-order-and-dedup.md`): `GetObservationValue`
+(and the functions that delegate through it — `GetObservation`, `GetRepeated`, `GetRepeatedValue`,
+`GetNumberOfRepeat`) are now scoped to the **current encounter** via a library-level
+`encounterid` parameter (populated by the client at `$populate` time; returns nothing when absent,
+e.g. the visit's first process). The Helper library also auto-attaches a dedup
+`initialExpression` to **answerable** Observation/Condition-typed items (never `group` or
+`display` — SDC forbids `initial`/`initialExpression` on those types, and openSRP FHIR Data
+Capture throws at `$populate` if they appear) with no author-authored
+populate/calculate expression, so a later process in the same visit doesn't re-ask a question an
+earlier one already captured. For an any-time/cross-encounter lookback, use
+`GetHistoryObservationValue`/`GetHistoryConditionValue` instead (see "Concept repeat" below).
+
+```json
+{
+  "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression",
   "valueExpression": {
     "language": "text/cql-identifier",
     "expression": "Calc_bmi"
@@ -171,8 +295,15 @@ define Calc_bmi: Helper.GetObservationValue("weight") / (Helper.GetObservationVa
 When a TRICC node has `repeat != 1`, export adds:
 
 - **Questionnaire item extension** — `https://fhir.tricc.io/StructureDefinition/questionnaire-concept-repeat` (`valueInteger`)
-- **Helper CQL functions** — `GetRepeated`, `GetRepeatedValue`, `GetNumberOfRepeat`, `GetHistory`, `GetHistoryValue` (see `repeat_helper.py`); populate accessors `GetPatientValue`, `GetFacilityValue`, `GetLocationValue`, `GetPractitionerValue`, `GetEncounterValue` (see `populate_helper.py`)
-- **StructureMap hints** — FML comments for Observation repeat extension on extraction
+- **Helper CQL functions** — current-encounter-scoped `GetRepeated`, `GetRepeatedValue`,
+  `GetNumberOfRepeat`; any-time `GetHistoryObservation`, `GetHistoryObservationValue` (renamed
+  from `GetHistory`/`GetHistoryValue` 2026-08-12 to disambiguate from the new Condition family);
+  populate accessors `GetPatientValue`, `GetFacilityValue`, `GetLocationValue`,
+  `GetPractitionerValue`, `GetEncounterValue` (see `populate_helper.py`); Condition equivalents
+  `GetConditionValue`/`GetHistoryConditionValue` (see `repeat_helper.py`)
+- **StructureMap extraction rule** — a real executable FML rule (not just a comment, fixed
+  2026-08-12) sets the `https://fhir.tricc.io/StructureDefinition/observation-repeat-index`
+  extension on the extracted Observation
 
 CQL references to repeated concepts use `Helper.GetRepeatedValue("code", n)` when `n != 1`;
 default slot (`repeat=1`) uses `Helper.GetObservationValue("code")`.
@@ -184,34 +315,91 @@ See [TRICC Elements — Concept repeat](./tricc-elements.md#concept-repeat).
 
 ## PlanDefinition
 
-Each cpg-common-process gets a `PlanDefinition` with:
+**One** `PlanDefinition` resource is exported per project — see
+`feature/careplan-intervention-plandefinition.md` for the full rationale and scope. Today
+**one project = one Intervention**; multi-Intervention / multi-CarePlan orchestration and
+applicability/eligibility gating are future work (`feature/careplan-claude.md`).
 
-- **status**: `draft` (experimental export)
-- **library**: reference to the per-process CQL Library
-- **action.trigger**: `named-event` on the action (cpg-common-process name)
-- **action.condition**: CQL applicability via `text/cql-identifier` (`"Is Applicable"`)
-- **action.definitionCanonical**: pointing to the Questionnaire
+An earlier revision also exported a second, wrapping `{form_id}-available-care-catalog`
+PlanDefinition (top action triggered by `available-care`, single child action linking down to
+the Intervention PD). **Removed 2026-08-12**: fhircore's `NamedEventInterventionService`
+resolves a linked PlanDefinition's child actions unconditionally (no applicability check), so
+the catalog produced one extra, unfiltered "Start care" list entry per process action instead
+of a single clean one. See §8 "Findings" trail in `feature/careplan-intervention-plandefinition.md`.
+
+### Intervention PlanDefinition
+
+**Updated 2026-08-12** (`feature/20260812-intervention-order-and-dedup.md`): one PlanDefinition
+for the whole project, with a single **wrapper action** carrying the `available-care` trigger
+once, nested with **one child `action` per non-empty process**
+(**1 process = 1 action = 1 Questionnaire**):
+
+- **status**: `active`
+- **library**: references to every process's CQL Library
+- **action[0]** (wrapper): `trigger` = `[{named-event, "available-care"}]` only — this is what
+  `NamedEventInterventionService` discovers, not the per-process children directly. This is
+  same-resource nesting (`action.action`), not a second linked PlanDefinition — same-resource
+  children still get their own applicability check in fhircore, unlike the removed catalog PD.
+- **action[0].action[]** (one per process): `trigger` = the process's own named-event
+  (cpg-common-process name when known); **two new extensions**:
+  - `tricc-process` (`valueString`, the process name)
+  - `tricc-process-order` (`valueInteger`, a fixed order — 10, 20, 30… by the canonical
+    cpg-common-process list order in `tricc_oo/visitors/utils.py: PROCESS_ORDER`; unrecognized
+    process names get the next free slot past the table's max). Comparable across different
+    PlanDefinitions, so a client juggling several selected Interventions can pick "whichever
+    unlocked action has the lowest order."
+  - **definitionCanonical**: **Questionnaire** absolute URL (launch form **now**)
+- **No** contained Task ActivityDefinition / **no** `transform`, and no applicability
+  `condition` yet (every action is unconditionally listed)
+
+Empty questionnaires (`"item": []`) are **removed** from the package (no action, no library
+entry for that process).
+
+### Task-wrapped Questionnaire (planning — not due now)
+
+**Upcoming planning feature only.** When a form is scheduled but **not due now**, export may
+use ActivityDefinition (`kind: Task`) + StructureMap so the client holds a Task
+(`reasonReference` → Questionnaire) until due. That path is **not** used for Start care.
+
+Optional Task StructureMaps may still be written under `structure-map/` for multi-process
+experiments; they are **not** wired as the Intervention PD's `definitionCanonical` for
+available-care.
+
+See **`feature/opensrp-register.md`** §2.1 and **`feature/opensrp-export-hygiene.md`** §4.
 
 ```json
 {
   "resourceType": "PlanDefinition",
-  "id": "demo-registration-PD",
-  "status": "draft",
-  "library": ["https://fhir.tricc.io/Library/demo-registration"],
-  "action": [{
-    "id": "action-registration",
-    "title": "Launch registration questionnaire",
-    "trigger": [{ "type": "named-event", "name": "registration" }],
-    "condition": [{
-      "kind": "applicability",
-      "expression": {
-        "language": "text/cql-identifier",
-        "expression": "Is Applicable",
-        "reference": "https://fhir.tricc.io/Library/demo-registration"
-      }
-    }],
-    "definitionCanonical": "https://fhir.tricc.io/Questionnaire/demo-registration"
-  }]
+  "id": "…-uuid… (Intervention PD)",
+  "status": "active",
+  "library": ["https://fhir.tricc.io/Library/…"],
+  "action": [
+    {
+      "id": "available-care",
+      "title": "… – Available care",
+      "trigger": [{ "type": "named-event", "name": "available-care" }],
+      "action": [
+        {
+          "title": "Registration",
+          "trigger": [{ "type": "named-event", "name": "registration" }],
+          "extension": [
+            { "url": "https://fhir.tricc.io/StructureDefinition/tricc-process", "valueString": "registration" },
+            { "url": "https://fhir.tricc.io/StructureDefinition/tricc-process-order", "valueInteger": 30 }
+          ],
+          "definitionCanonical": "https://fhir.tricc.io/Questionnaire/…"
+        },
+        {
+          "title": "Triage",
+          "trigger": [{ "type": "named-event", "name": "triage" }],
+          "extension": [
+            { "url": "https://fhir.tricc.io/StructureDefinition/tricc-process", "valueString": "triage" },
+            { "url": "https://fhir.tricc.io/StructureDefinition/tricc-process-order", "valueInteger": 10 }
+          ],
+          "definitionCanonical": "https://fhir.tricc.io/Questionnaire/…"
+        }
+      ]
+    }
+  ]
 }
 ```
 
@@ -238,12 +426,13 @@ Points to the CQL Library for this process:
 
 ### `planDefinitions`
 
-References the PlanDefinition for this process:
+References the shared **Intervention** PlanDefinition (every process's Questionnaire points
+at the same one — see "PlanDefinition" above):
 
 ```json
 {
-  "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-planDefinition",
-  "valueCanonical": "http://example.org/PlanDefinition/pd-<process>"
+  "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-planDefinitions",
+  "valueReference": { "reference": "https://fhir.tricc.io/PlanDefinition/<intervention-pd-id>" }
 }
 ```
 
@@ -251,37 +440,51 @@ References the PlanDefinition for this process:
 
 ## StructureMap (Extraction)
 
-Each node with a `concept` attribute generates a StructureMap rule that
-extracts the answer into the appropriate FHIR resource:
+Each process gets a QuestionnaireResponse → transaction `Bundle` StructureMap
+(under `structure-map/`, referenced from the Questionnaire via SDC
+`targetStructureMap`). HAPI / OpenSRP run the compiled JSON `group[]`, not the
+narrative in `text.div`. The export `.map` is compiled at push time. Classification uses the CodeSystem `conceptType` property
+(the same class `xml_to_tricc.get_concept_type` writes), then the node's
+`concept_type`, then a node-type fallback.
 
-| TRICC concept type | FHIR resource | Profile |
+| Codesystem `conceptType` / node | Extracted resource | Notes |
 |---|---|---|
-| `diagnosis` | `Condition` | `http://hl7.org/fhir/StructureDefinition/Condition` |
-| `proposed_diagnosis` | `Condition` | `http://hl7.org/fhir/StructureDefinition/Condition` |
-| `observation` | `Observation` | `http://hl7.org/fhir/StructureDefinition/Observation` |
-| `medication` | `MedicationRequest` | `http://hl7.org/fhir/StructureDefinition/MedicationRequest` |
-| `procedure` | `Procedure` | `http://hl7.org/fhir/StructureDefinition/Procedure` |
-| `encounter` | `Encounter` | `http://hl7.org/fhir/StructureDefinition/Encounter` |
+| `Symptom-Finding`, `Question`, `finding`, `observation`, `vital`, `lab`, `test` | `Observation` (`status=final`) | Answer copied to `value[x]` |
+| `proposed_diagnosis` / `Diagnosis` (proposed node) | `Condition` | `clinicalStatus=active`, `verificationStatus=provisional` (only when the hidden boolean is true) |
+| AcceptDiag (`pre_final.{code}`) | `Condition` | Accept → `verificationStatus=confirmed`; Reject → `refuted` + `clinicalStatus=inactive`. Same concept code as the proposed diagnosis. |
+| Node with `repeat != 1` | Observation extension | `https://fhir.tricc.io/StructureDefinition/observation-repeat-index` (`valueInteger`) |
+| `Calculation` (`final.{code}`), `InteractSet` (notes), `Value` (options), diagnosis anchors | *(not extracted)* | Confirmed status is the AcceptDiag extract (and CQL `HasConfirmedCondition`) |
+
+`final.{code}` stays an in-form calculate (FHIRPath from Accept/manual) for the
+determine-diagnosis Questionnaire. Later processes read confirmation through
+Helper CQL (`HasConfirmedCondition` / `GetConditionValue`, which ignore
+`refuted`). Optional Task StructureMaps (`*-task`) remain planning-only and are
+**not** the Questionnaire `targetStructureMap`.
 
 ---
 
-## FSH Output
+## Artifact mode (JSON only)
 
-All resources are also serialized to
-[FHIR Shorthand (FSH)](https://build.fhir.org/ig/HL7/fhir-shorthand/)
-in the `fsh/` subdirectory, ready for compilation with
-[SUSHI](https://fshschool.org/docs/sushi/).
+OpenSRPStrategy writes **FHIR JSON only**. Dual-writing hand-built JSON plus FSH was
+dropped because SUSHI-generated resources were incomplete relative to the Python export.
+The FSH serializer remains available for other tooling; OpenSRP packages do not emit `fsh/`.
 
-The FSH serializer (`tricc_oo/converters/fhir/fsh_serializer.py`) supports:
+## FHIR resource ids
 
-- `Questionnaire` → `Instance: … InstanceOf: SDCQuestionnaireExtract`
-- `Library` → `Instance: … InstanceOf: Library`
-- `StructureMap` → `Instance: … InstanceOf: StructureMap`
-- `ValueSet` → `ValueSet: …` with concept includes
-- `PlanDefinition` → `Instance: … InstanceOf: PlanDefinition`
-- `Composition` → `Instance: … InstanceOf: Composition`
-- `Binary` → `Instance: … InstanceOf: Binary`
-- Any other resource type → generic `Instance` with JSON comments
+HAPI / openSRP require legal FHIR R4 ids: **`[A-Za-z0-9.-]{1,64}`** (no underscores).
+
+Server-facing resource **`id`** values are **UUIDs** (openSRP-style REST addressing),
+generated deterministically with UUID5 from form id + resource type + process/role so
+re-exports stay stable for PUT upserts. Human-readable tokens stay in **`name`** /
+**`title`**, CQL library names, and **on-disk filenames**.
+
+| Concern | Source |
+|---------|--------|
+| REST URL | `PUT {base}/{resourceType}/{json.id}` (UUID) |
+| Package file | `PlanDefinition-demo-tricc-main-PD.json` (from `name`) |
+
+`push-to-fhir.sh` skips `contract/`, ignores filename stems for URLs, and fails early
+if any resource `id` is invalid. Re-export cleans stale UUID-named files from older builds.
 
 ---
 
@@ -315,9 +518,13 @@ The FSH serializer (`tricc_oo/converters/fhir/fsh_serializer.py`) supports:
 | File | Purpose |
 |---|---|
 | `tricc_oo/strategies/output/opensrp.py` | `OpenSRPStrategy` class |
+| `tricc_oo/strategies/output/templates/opensrp/` | `push-to-fhir.sh` + `env.fhir.example` (copied into export) |
+| `tricc_oo/converters/fhir/related_person.py` | RelatedPerson contract helpers (PI identifier, roles) |
+| `feature/opensrp-register.md` | Flexible client register + available-care export contract |
 | `tricc_oo/strategies/output/fhir_form.py` | `FHIRStrategy` base class |
 | `tricc_oo/converters/fhir/questionnaire_item_mapper.py` | Node type → FHIR item type mapping |
 | `tricc_oo/converters/fhir/concept_mapper.py` | Concept type → FHIR resource mapping |
+| `tricc_oo/converters/fhir/structuremap.py` | QuestionnaireResponse extraction StructureMap / FML |
 | `tricc_oo/converters/fhir/fsh_serializer.py` | FHIR dict → FSH text serializer |
 | `tricc_oo/converters/fhir/repeat_helper.py` | Concept repeat extensions + Helper CQL block |
 | `tricc_oo/visitors/tricc.py` | `get_process()` graph walker |

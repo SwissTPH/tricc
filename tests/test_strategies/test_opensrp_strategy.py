@@ -11,6 +11,35 @@ from unittest.mock import MagicMock, patch, PropertyMock
 
 
 # ---------------------------------------------------------------------------
+# FHIR id sanitizer
+# ---------------------------------------------------------------------------
+
+class TestFhirIds(unittest.TestCase):
+    def test_underscore_replaced(self):
+        from tricc_oo.converters.fhir.ids import to_fhir_id, is_valid_fhir_id
+        self.assertEqual(to_fhir_id("demo_tricc"), "demo-tricc")
+        self.assertEqual(to_fhir_id("demo_tricc", "main", "PD"), "demo-tricc-main-PD")
+        self.assertTrue(is_valid_fhir_id(to_fhir_id("demo_tricc-config")))
+        self.assertFalse(is_valid_fhir_id("demo_tricc-config"))
+        self.assertFalse(is_valid_fhir_id("fhir_formHelper"))
+
+    def test_helper_id(self):
+        from tricc_oo.converters.fhir.ids import to_fhir_id
+        self.assertEqual(to_fhir_id("demo-tricc", "Helper"), "demo-tricc-Helper")
+
+    def test_fhir_resource_id_is_stable_uuid(self):
+        from tricc_oo.converters.fhir.ids import fhir_resource_id, is_uuid_id, is_valid_fhir_id
+        a = fhir_resource_id("demo_tricc", "PlanDefinition", "main")
+        b = fhir_resource_id("demo_tricc", "PlanDefinition", "main")
+        c = fhir_resource_id("demo_tricc", "PlanDefinition", "triage")
+        self.assertEqual(a, b)
+        self.assertNotEqual(a, c)
+        self.assertTrue(is_uuid_id(a))
+        self.assertTrue(is_valid_fhir_id(a))
+        self.assertEqual(len(a), 36)
+
+
+# ---------------------------------------------------------------------------
 # FSH serializer tests (no TRICC model dependencies)
 # ---------------------------------------------------------------------------
 
@@ -251,6 +280,14 @@ class TestConceptMapper(unittest.TestCase):
         resource, profile, field = self.cm.get_fhir_resource("diagnosis", TriccNodeType.proposed_diagnosis)
         self.assertEqual(resource, "Condition")
 
+    def test_codesystem_symptom_finding_maps_to_observation(self):
+        resource, profile, field = self.cm.get_fhir_resource("Symptom-Finding")
+        self.assertEqual(resource, "Observation")
+
+    def test_codesystem_question_maps_to_observation(self):
+        resource, _, _ = self.cm.get_fhir_resource("Question")
+        self.assertEqual(resource, "Observation")
+
     def test_integer_value_field(self):
         field = self.cm.get_fhir_value_field("integer")
         self.assertEqual(field, "valueInteger")
@@ -370,43 +407,265 @@ class TestOpenSRPStrategyInit(unittest.TestCase):
         self.assertIsNotNone(strategy)
         self.assertIsInstance(strategy.plan_definitions, dict)
 
-    def test_generate_plandefinition_structure(self):
+    def test_generate_intervention_plandefinition_structure(self):
         from tricc_oo.strategies.output.opensrp import OpenSRPStrategy
+        from tricc_oo.converters.fhir.related_person import AVAILABLE_CARE_NAMED_EVENT
+        from tricc_oo.visitors.utils import PROCESS_ORDER
         project = self._make_mock_project()
         strategy = OpenSRPStrategy(project, "/tmp/opensrp_test_out")
-        pd = strategy.generate_plandefinition("registration", "1.0.0")
+        strategy._form_id = "demo"
+        strategy.questionnaires = {
+            "registration": {
+                "id": "questionnaire-registration",
+                "title": "Registration",
+                "item": [{"linkId": "a", "type": "boolean"}],
+            }
+        }
+        strategy.process_chain = ["registration"]
+        pd = strategy.generate_intervention_plandefinition("1.0.0")
         self.assertEqual(pd["resourceType"], "PlanDefinition")
-        self.assertEqual(pd["status"], "draft")
-        # Named-event trigger lives on the action (fhircore cpg-common-process pattern)
-        actions = pd.get("action", [])
-        self.assertTrue(actions)
+        self.assertEqual(pd["status"], "active")
+        self.assertFalse(pd.get("experimental", True))
+        # Single wrapper action carries available-care once, "at the PD level"
+        top_actions = pd.get("action", [])
+        self.assertEqual(len(top_actions), 1)
+        wrapper = top_actions[0]
+        wrapper_trigger_names = [t.get("name", "") for t in wrapper.get("trigger", [])]
+        self.assertEqual(wrapper_trigger_names, [AVAILABLE_CARE_NAMED_EVENT])
+        # 1 process = 1 nested child action = 1 Questionnaire
+        actions = wrapper.get("action", [])
+        self.assertEqual(len(actions), 1)
         triggers = actions[0].get("trigger", [])
         self.assertTrue(any(t.get("type") == "named-event" for t in triggers))
         trigger_names = [t.get("name", "") for t in triggers]
         self.assertTrue(any("registration" in n for n in trigger_names))
+        # available-care no longer repeats on the child action (moved to the wrapper)
+        self.assertNotIn(AVAILABLE_CARE_NAMED_EVENT, trigger_names)
+        # tricc-process / tricc-process-order extensions on the child action
+        extensions = {e["url"]: e for e in actions[0].get("extension", [])}
+        self.assertTrue(any(u.endswith("tricc-process") for u in extensions))
+        self.assertTrue(any(u.endswith("tricc-process-order") for u in extensions))
+        order_ext = next(e for u, e in extensions.items() if u.endswith("tricc-process-order"))
+        self.assertEqual(order_ext["valueInteger"], PROCESS_ORDER["registration"])
+        process_ext = next(e for u, e in extensions.items() if u.endswith("tricc-process"))
+        self.assertEqual(process_ext["valueString"], "registration")
+        # openSRP Start care: definitionCanonical → Questionnaire (direct launch)
+        from tricc_oo.converters.fhir.ids import is_uuid_id
+        def_can = actions[0].get("definitionCanonical", "")
+        self.assertIn("Questionnaire/", def_can, def_can)
+        self.assertFalse(def_can.startswith("#"), def_can)
+        self.assertIsNone(actions[0].get("transform"))
+        self.assertTrue(is_uuid_id(pd["id"]), pd["id"])
+        self.assertFalse(pd.get("contained") or [])
+
+    def test_generate_intervention_plandefinition_multi_process(self):
+        from tricc_oo.strategies.output.opensrp import OpenSRPStrategy
+        project = self._make_mock_project()
+        strategy = OpenSRPStrategy(project, "/tmp/opensrp_test_out")
+        strategy._form_id = "demo"
+        strategy.questionnaires = {
+            "registration": {
+                "id": "demo-registration",
+                "title": "Registration",
+                "item": [{"linkId": "x", "type": "boolean"}],
+            },
+            "triage": {
+                "id": "demo-triage",
+                "title": "Triage",
+                "item": [{"linkId": "y", "type": "boolean"}],
+            },
+        }
+        strategy.process_chain = ["registration", "triage"]
+        pd = strategy.generate_intervention_plandefinition("1.0.0")
+        # One nested child action per process, in graph discovery order
+        actions = pd["action"][0]["action"]
+        self.assertEqual(len(actions), 2)
+        for action, process in zip(actions, ["registration", "triage"]):
+            def_can = action.get("definitionCanonical", "")
+            self.assertIn(f"demo-{process}", def_can, def_can)
+
+    def test_generate_intervention_plandefinition_unknown_process_order(self):
+        from tricc_oo.strategies.output.opensrp import OpenSRPStrategy
+        from tricc_oo.visitors.utils import PROCESS_ORDER
+        project = self._make_mock_project()
+        strategy = OpenSRPStrategy(project, "/tmp/opensrp_test_out")
+        strategy._form_id = "demo"
+        strategy.questionnaires = {
+            "registration": {
+                "id": "demo-registration",
+                "item": [{"linkId": "x", "type": "boolean"}],
+            },
+            "custom-process": {
+                "id": "demo-custom-process",
+                "item": [{"linkId": "y", "type": "boolean"}],
+            },
+        }
+        strategy.process_chain = ["registration", "custom-process"]
+        pd = strategy.generate_intervention_plandefinition("1.0.0")
+        actions = pd["action"][0]["action"]
+        orders = {}
+        for action in actions:
+            proc = next(
+                e["valueString"] for e in action["extension"] if e["url"].endswith("tricc-process")
+            )
+            orders[proc] = next(
+                e["valueInteger"] for e in action["extension"] if e["url"].endswith("tricc-process-order")
+            )
+        self.assertEqual(orders["registration"], PROCESS_ORDER["registration"])
+        # unrecognized process name gets the next free slot after the highest known order
+        self.assertEqual(orders["custom-process"], max(PROCESS_ORDER.values()) + 10)
+
+    def test_prune_empty_questionnaires(self):
+        from tricc_oo.strategies.output.opensrp import OpenSRPStrategy
+        project = self._make_mock_project()
+        strategy = OpenSRPStrategy(project, "/tmp/opensrp_test_out")
+        strategy._form_id = "demo"
+        strategy.questionnaires = {
+            "registration": {
+                "id": "q-reg",
+                "item": [],
+            },
+            "main": {
+                "id": "q-main",
+                "item": [{"linkId": "happy", "type": "boolean"}],
+            },
+        }
+        strategy.cql_defines = {"registration": ["define X: true"], "main": ["define Y: true"]}
+        strategy._prune_empty_questionnaires()
+        self.assertNotIn("registration", strategy.questionnaires)
+        self.assertIn("main", strategy.questionnaires)
+        self.assertNotIn("registration", strategy.cql_defines)
+
+    def test_task_structuremap_chains_next_process(self):
+        from tricc_oo.strategies.output.opensrp import OpenSRPStrategy
+        project = self._make_mock_project()
+        strategy = OpenSRPStrategy(project, "/tmp/opensrp_test_out")
+        strategy._form_id = "demo"
+        strategy.questionnaires = {
+            "registration": {
+                "id": "questionnaire-registration",
+                "item": [{"linkId": "a", "type": "string"}],
+            },
+            "main": {
+                "id": "questionnaire-main",
+                "item": [{"linkId": "b", "type": "boolean"}],
+            },
+        }
+        # Graph discovery order (not hardcoded CPG list)
+        strategy.process_chain = ["registration", "main"]
+        sm = strategy.generate_task_structuremap("registration", "1.0.0")
+        self.assertIsNotNone(sm)
+        self.assertEqual(sm["resourceType"], "StructureMap")
+        group_names = [g.get("name") for g in sm.get("group", [])]
+        self.assertIn("extractThisTask", group_names)
+        self.assertIn("extractNextTaskOnDone", group_names)
+        # reasonReference targets
+        this_rules = sm["group"][0]["rule"][0]["target"][0]["parameter"][0]["valueId"]
+        self.assertEqual(this_rules, "Questionnaire/questionnaire-registration")
+        next_rules = sm["group"][1]["rule"][0]["target"][0]["parameter"][0]["valueId"]
+        self.assertEqual(next_rules, "Questionnaire/questionnaire-main")
+        # last process has no next Task group
+        sm_last = strategy.generate_task_structuremap("main", "1.0.0")
+        last_groups = [g.get("name") for g in sm_last.get("group", [])]
+        self.assertIn("extractThisTask", last_groups)
+        self.assertNotIn("extractNextTaskOnDone", last_groups)
+
+    def test_is_questionnaire_empty(self):
+        from tricc_oo.strategies.output.opensrp import OpenSRPStrategy
+        self.assertTrue(OpenSRPStrategy.is_questionnaire_empty(None))
+        self.assertTrue(OpenSRPStrategy.is_questionnaire_empty({"item": []}))
+        self.assertTrue(OpenSRPStrategy.is_questionnaire_empty({}))
+        self.assertFalse(
+            OpenSRPStrategy.is_questionnaire_empty(
+                {"item": [{"linkId": "x", "type": "boolean"}]}
+            )
+        )
 
     def test_generate_composition_structure(self):
         from tricc_oo.strategies.output.opensrp import OpenSRPStrategy
         project = self._make_mock_project()
         strategy = OpenSRPStrategy(project, "/tmp/opensrp_test_out")
+        strategy._form_id = "demo"
+        strategy.questionnaires = {}
+        strategy.plan_definitions = {}
+        strategy.structuremaps = {}
+        strategy.valuesets = {}
+        strategy.binaries = []
         comp = strategy.generate_composition("1.0.0")
         self.assertEqual(comp["resourceType"], "Composition")
         self.assertIn("section", comp)
         section_titles = [s.get("title", "") for s in comp["section"]]
         self.assertIn("Libraries", section_titles)
 
-    def test_generate_binary_config_structure(self):
-        from tricc_oo.strategies.output.opensrp import OpenSRPStrategy
-        import base64
+    def test_stamp_package_app_id_tags_includes_image_binaries(self):
+        from tricc_oo.strategies.output.opensrp import (
+            APP_ID_TAG_SYSTEM,
+            DEFAULT_OPENSRP_APP_ID,
+            OpenSRPStrategy,
+        )
+
         project = self._make_mock_project()
         strategy = OpenSRPStrategy(project, "/tmp/opensrp_test_out")
-        binary = strategy.generate_binary_config("1.0.0")
-        self.assertEqual(binary["resourceType"], "Binary")
-        self.assertEqual(binary["contentType"], "application/json")
-        # data must be valid base64 JSON
-        decoded = base64.b64decode(binary["data"]).decode("utf-8")
-        config = json.loads(decoded)
-        self.assertIsInstance(config, dict)
+        strategy.binaries = [
+            {
+                "resourceType": "Binary",
+                "id": "img-1",
+                "contentType": "image/png",
+                "data": "aGVsbG8=",
+            }
+        ]
+        strategy._stamp_package_app_id_tags()
+        tags = strategy.binaries[0]["meta"]["tag"]
+        self.assertTrue(
+            any(
+                t.get("system") == APP_ID_TAG_SYSTEM
+                and t.get("code") == DEFAULT_OPENSRP_APP_ID
+                for t in tags
+            ),
+            tags,
+        )
+
+
+# ---------------------------------------------------------------------------
+# RelatedPerson contract helpers
+# ---------------------------------------------------------------------------
+
+
+class TestRelatedPersonContract(unittest.TestCase):
+    def test_build_related_person_patient_is_child(self):
+        from tricc_oo.converters.fhir.related_person import build_related_person
+
+        rp = build_related_person(
+            child_patient_id_or_ref="jean",
+            guardian_patient_id_or_ref="marie",
+            role="mother",
+            related_person_id="rp-1",
+            guardian_display_name="Marie",
+        )
+        self.assertEqual(rp["resourceType"], "RelatedPerson")
+        self.assertEqual(rp["patient"]["reference"], "Patient/jean")
+        self.assertEqual(rp["relationship"][0]["coding"][0]["code"], "MTH")
+        ident = rp["identifier"][0]
+        self.assertEqual(ident["use"], "secondary")
+        self.assertEqual(ident["type"]["coding"][0]["code"], "PI")
+        self.assertEqual(ident["system"], "urn:ietf:rfc:3986")
+        self.assertEqual(ident["value"], "Patient/marie")
+
+    def test_guardian_role_uses_guard(self):
+        from tricc_oo.converters.fhir.related_person import build_related_person
+
+        rp = build_related_person(
+            child_patient_id_or_ref="Patient/c1",
+            guardian_patient_id_or_ref="Patient/g1",
+            role="guardian",
+        )
+        self.assertEqual(rp["relationship"][0]["coding"][0]["code"], "GUARD")
+
+    def test_unknown_role_raises(self):
+        from tricc_oo.converters.fhir.related_person import relationship_coding
+
+        with self.assertRaises(ValueError):
+            relationship_coding("cousin")
 
 
 if __name__ == "__main__":

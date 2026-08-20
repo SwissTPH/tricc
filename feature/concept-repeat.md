@@ -4,7 +4,7 @@
 |-------|-------|
 | **Status** | Implemented |
 | **Branch target** | `feature/repeat` (core); evolutions on `feature/adv_merge_calc` |
-| **Related** | `feature/advanced-merge-calc.md`, `feature/populate-context.md` |
+| **Related** | `feature/advanced-merge-calc.md`, `feature/populate-context.md`, `feature/20260813-concepttype-structuremap.md` (Observation repeat-index on extract) |
 | **Authoring surface** | draw.io attributes + YAML fixtures for tests |
 
 Valid status values: `Draft` → `Approved` → `Implemented` → `Superseded`.
@@ -158,7 +158,7 @@ On FHIR export, non-default repeat index is stored as a **Questionnaire item ext
 | Cross-activity same `(name, repeat)` | Skip on second capture (encounter-wide) — **kept** |
 | FHIR extension URL | `https://fhir.tricc.io/StructureDefinition/questionnaire-concept-repeat` |
 | History helpers | `GetHistoryValue` (not `GetLast`) — see populate-context |
-| `repeat` on diagnosis / proposed_diagnosis | Still open; not required for core capture path |
+| `repeat` on diagnosis / proposed_diagnosis | Still open; not required for core capture path. Observation repeat-index on extract is in `feature/20260813-concepttype-structuremap.md` |
 
 ---
 

@@ -329,7 +329,7 @@ class YamlStrategy(BaseInputStrategy):
                 )
                 continue
             edge = TriccEdge(
-                id=generate_id("e"),
+                id=generate_id(f"e{yedge.source}{yedge.target}{len(edges)}"),
                 source=yedge.source,
                 target=yedge.target,
                 value=yedge.value,

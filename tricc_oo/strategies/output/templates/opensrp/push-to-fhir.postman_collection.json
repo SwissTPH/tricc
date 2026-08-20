@@ -1,0 +1,120 @@
+{
+  "info": {
+    "_postman_id": "b7e2a1d4-6c3f-4e9a-8f2b-1a2b3c4d5e6f",
+    "name": "TRICC OpenSRP → FHIR Push",
+    "description": "Postman equivalent of push-to-fhir.sh (copied into the OpenSRPStrategy export package next to it).\n\nWorkflow:\n1. Run \"Get Access Token\" (skip if your server has SKIP_AUTH=1 / uses a HAPI server with no auth — in that case just remove the Authorization header from the upload requests).\n2. For each exported JSON file under the package (questionnaire/, plan-definition/, library/, structure-map/, value-set/, composition/, …), open \"PUT Resource (template)\", set the `resourceType` and `resourceId` variables to the resource's own `resourceType`/`id` fields (NOT the filename), paste the file contents as the raw body, and Send.\n3. Upload every resource type before Composition — gateways often require the referenced resources (Questionnaire, PlanDefinition, Library, StructureMap, ValueSet, Binary, …) to exist before the Composition that lists them.\n\nPostman collections can't walk a local directory tree, so this does not loop over files automatically the way push-to-fhir.sh does — use the Collection Runner with a data file (one row per {resourceType, resourceId, file} ) if you want to batch it, or fall back to the shell script for bulk pushes.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "FHIR_BASE_URL", "value": "http://localhost:8082/fhir", "type": "string" },
+    { "key": "APP_ID", "value": "cdss", "type": "string" },
+    { "key": "KEYCLOAK_BASE_URL", "value": "", "type": "string" },
+    { "key": "KEYCLOAK_REALM", "value": "opensrp", "type": "string" },
+    { "key": "KEYCLOAK_CLIENT_ID", "value": "fhir-core-client", "type": "string" },
+    { "key": "KEYCLOAK_CLIENT_SECRET", "value": "change-me", "type": "string" },
+    { "key": "KEYCLOAK_USER", "value": "demo", "type": "string" },
+    { "key": "KEYCLOAK_PASSWORD", "value": "demo", "type": "string" },
+    { "key": "FHIR_ACCESS_TOKEN", "value": "", "type": "string" },
+    { "key": "resourceType", "value": "Questionnaire", "type": "string" },
+    { "key": "resourceId", "value": "example-id", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "1. Auth",
+      "item": [
+        {
+          "name": "Get Access Token (Keycloak password grant)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "grant_type", "value": "password", "type": "text" },
+                { "key": "client_id", "value": "{{KEYCLOAK_CLIENT_ID}}", "type": "text" },
+                { "key": "client_secret", "value": "{{KEYCLOAK_CLIENT_SECRET}}", "type": "text" },
+                { "key": "username", "value": "{{KEYCLOAK_USER}}", "type": "text" },
+                { "key": "password", "value": "{{KEYCLOAK_PASSWORD}}", "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "{{KEYCLOAK_BASE_URL}}/realms/{{KEYCLOAK_REALM}}/protocol/openid-connect/token",
+              "host": [ "{{KEYCLOAK_BASE_URL}}" ],
+              "path": [ "realms", "{{KEYCLOAK_REALM}}", "protocol", "openid-connect", "token" ]
+            },
+            "description": "Equivalent of the KEYCLOAK_* password-grant call in push-to-fhir.sh. Skip this request entirely if you already have a token (set FHIR_ACCESS_TOKEN directly) or the target server has SKIP_AUTH=1."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const data = pm.response.json();",
+                  "pm.test('access_token present', () => pm.expect(data.access_token).to.be.a('string'));",
+                  "if (data.access_token) {",
+                  "  pm.collectionVariables.set('FHIR_ACCESS_TOKEN', data.access_token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Upload Resources",
+      "item": [
+        {
+          "name": "PUT Resource (template)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{FHIR_ACCESS_TOKEN}}" },
+              { "key": "App-Id", "value": "{{APP_ID}}" },
+              { "key": "Content-Type", "value": "application/fhir+json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resourceType\": \"{{resourceType}}\",\n  \"id\": \"{{resourceId}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{FHIR_BASE_URL}}/{{resourceType}}/{{resourceId}}",
+              "host": [ "{{FHIR_BASE_URL}}" ],
+              "path": [ "{{resourceType}}", "{{resourceId}}" ]
+            },
+            "description": "Set resourceType/resourceId to match the JSON body's own `resourceType`/`id` fields (never the filename — see push-to-fhir.sh's read_fhir_meta) and replace the body with the exported resource JSON. Duplicate this request per file, or drive it from the Collection Runner with a data file of {resourceType, resourceId, file} rows. Remove the Authorization header if SKIP_AUTH=1 / talking to an open HAPI server."
+          },
+          "response": []
+        },
+        {
+          "name": "PUT Composition (upload last)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{FHIR_ACCESS_TOKEN}}" },
+              { "key": "App-Id", "value": "{{APP_ID}}" },
+              { "key": "Content-Type", "value": "application/fhir+json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resourceType\": \"Composition\",\n  \"id\": \"example-composition-id\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{FHIR_BASE_URL}}/Composition/example-composition-id",
+              "host": [ "{{FHIR_BASE_URL}}" ],
+              "path": [ "Composition", "example-composition-id" ]
+            },
+            "description": "push-to-fhir.sh always uploads Composition resources last, since gateway ACLs typically require the resources a Composition references to already exist. Send this only after every other resource in the package has been PUT successfully."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

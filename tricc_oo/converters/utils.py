@@ -22,6 +22,8 @@ def clean_str(name, replace_dots=False):
 
 
 def clean_name(name, prefix="", replace_dots=False):
+    if isinstance(name, (int, float)):
+        return name
     name = clean_str(name, replace_dots)
     if name and name[0].isdigit():
         name = "id_" + name
