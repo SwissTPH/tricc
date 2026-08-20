@@ -50,6 +50,7 @@ FUNCTION_MAP = {
     "concat": "Concatenate",
     # strings
     "string-length": "Length",
+    "normalize-space": "NormalizeSpace",
     "substring": "Substring",
     "substr": "Substring",
     "contains": "Contains",

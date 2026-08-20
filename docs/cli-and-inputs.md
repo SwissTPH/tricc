@@ -7,7 +7,9 @@ TRICC is commonly executed through `tests/build.py`.
 - `-i`, `--input`: required input (file, directory, or supported URL).
 - `-o`: output directory.
 - `-I`: input strategy class (default `DrawioStrategy`).
-- `-O`: output strategy class (default `XLSFormStrategy`).
+- `-O`: output strategy class (default `XLSFormCDSSStrategy`).
+- `-T`: test strategy class (optional). Runs after the output strategy and adds test
+  material without changing the deployable artifact. See [Test strategies](#test-strategies--t).
 - `-d`: form id.
 - `-l`: log level shortcut (`d`, `i`, `w`).
 - `-D`: download directory.
@@ -106,6 +108,48 @@ before calling `get_output_strategy`).
 | `FHIRStrategy` | FHIR SDC export |
 | `OpenSRPStrategy` | OpenSRP / FHIR-Core bundle |
 | `BaseOutPutStrategy` | Abstract base (not for CLI use) |
+
+## Test strategies (`-T`)
+
+A **test strategy** is a third kind of strategy, alongside input and output. It runs *after*
+the output strategy and emits non-deployable material describing the build that just happened.
+It never changes the deployable artifact, so what you test is exactly what you deploy.
+
+```bash
+python tests/build.py -i flow.drawio -o out/ -O XLSFormCHTStrategy -T TestSpecStrategy
+```
+
+| Name | Emits |
+|---|---|
+| `TestSpecStrategy` | `<form_id>.form-model.json` — export names, types, options, relevance/constraint/calculation references, edges, end and diagnosis nodes |
+
+The output of `-O XLSFormCHTStrategy -T TestSpecStrategy` is identical to `-O
+XLSFormCHTStrategy` plus one JSON file. If a test strategy raises, the error is logged and the
+build still succeeds.
+
+The model is consumed by the browser test harness, which drives the deployed form in
+ODK/Enketo and CHT. See `feature/test-spec-strategy.md` for the schema and the contract a test
+strategy has with the output strategy.
+
+### Writing a test strategy
+
+```python
+from tricc_oo.strategies.registry import register_test_strategy
+from tricc_oo.strategies.test.base_test_strategy import BaseTestStrategy
+
+
+@register_test_strategy("MyTestStrategy")
+class MyTestStrategy(BaseTestStrategy):
+    def execute(self):
+        for node in self.walk_nodes():      # same instances the output exported
+            ...
+        rows = self.survey_rows_by_name()   # the final `survey` frame, read-only
+```
+
+`BaseTestStrategy` gives you `walk_nodes()`, `survey_rows_by_name()`, `choices_by_list()`,
+`survey_frame`, `choice_frame`, `output_strategy_name` and `form_id()`. Everything else on the
+output strategy is private. Remember to import the class in `tricc_oo/strategies/__init__.py`
+so the decorator runs.
 
 Discover at runtime:
 

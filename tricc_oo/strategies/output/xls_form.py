@@ -780,6 +780,12 @@ class XLSFormStrategy(BaseOutPutStrategy):
     def tricc_operation_length(self, ref_expressions, original_references=None):
         return f"string-length({ref_expressions[0]})"
 
+    def tricc_operation_normalize_space(self, ref_expressions, original_references=None):
+        return f"normalize-space({ref_expressions[0]})"
+
+    def tricc_operation_matches(self, ref_expressions, original_references=None):
+        return f"regex({self.clean_coalesce(ref_expressions[0])}, {ref_expressions[1]})"
+
     def tricc_operation_count_selected(self, ref_expressions, original_references=None):
         return f"count-selected({ref_expressions[0]})"
 

@@ -456,6 +456,8 @@ class TriccOperator(StrEnum):
     DATETIME_TO_DECIMAL = "datetime_to_decimal"
     DIAGNOSIS_LIST = "diagnosis_list"
     LENGTH = "length"
+    NORMALIZE_SPACE = "normalize_space"
+    MATCHES = "matches"
     COUNT_SELECTED = "count_selected"
     TODAY = "today"
     NOW = "now"
@@ -477,6 +479,7 @@ RETURNS_BOOLEAN = [
     TriccOperator.OR,
     TriccOperator.BETWEEN,
     TriccOperator.CONTAINS,
+    TriccOperator.MATCHES,
     TriccOperator.EXISTS,
     TriccOperator.NOTEXISTS,
     TriccOperator.ISFALSE,
@@ -520,7 +523,8 @@ RETURNS_DATE = [TriccOperator.CAST_DATE]
 RETURNS_LIST = [TriccOperator.DIAGNOSIS_LIST]
 
 RETURNS_STRING = [
-    TriccOperator.CONCATENATE
+    TriccOperator.CONCATENATE,
+    TriccOperator.NORMALIZE_SPACE,
 ]
 
 RETURNS_CONCEPT = [

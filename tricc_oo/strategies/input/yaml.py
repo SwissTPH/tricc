@@ -428,7 +428,8 @@ class YamlStrategy(BaseInputStrategy):
         # Post-creation wiring for select options (now that the parent exists)
         if type_info.get("has_options"):
             node.options = {}
-            for opt in ynode.options:
+            # Integer keys (0, 1, …) match draw.io and Dict[int, TriccNodeSelectOption].
+            for i, opt in enumerate(ynode.options):
                 opt_node = TriccNodeSelectOption(
                     id=opt.id,
                     name=opt.name,
@@ -437,7 +438,7 @@ class YamlStrategy(BaseInputStrategy):
                     select=node,
                     relevance=parse_expression("", opt.relevance) if opt.relevance else None,
                 )
-                node.options[opt.id] = opt_node
+                node.options[i] = opt_node
                 # Also set activity/group if they exist on the parent
                 opt_node.activity = getattr(node, "activity", None)
                 opt_node.group = getattr(node, "group", None)

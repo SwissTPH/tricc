@@ -1,5 +1,9 @@
 # Strategy loading is now done via the registry (much cleaner + supports direct class usage)
-from tricc_oo.strategies.registry import get_input_strategy, get_output_strategy
+from tricc_oo.strategies.registry import (
+    get_input_strategy,
+    get_output_strategy,
+    get_test_strategy,
+)
 import getopt
 import logging
 import os
@@ -107,6 +111,10 @@ def print_help():
     print("-o / --output xls file ")
     print("-d form_id ")
     print("-s L4 system/strategy (odk, cht, cc)")
+    print("-I input strategy (default DrawioStrategy)")
+    print("-O output strategy (default XLSFormCDSSStrategy)")
+    print("-T test strategy, runs after the output strategy and adds test material")
+    print("     without changing the deployable artifact (e.g. TestSpecStrategy)")
     print("-h / --help print that menu")
 
 
@@ -360,8 +368,13 @@ if __name__ == "__main__":
     input_strategy = "DrawioStrategy"
     #output_strategy = "XLSFormCHTStrategy"
     output_strategy = "XLSFormCDSSStrategy"
+    test_strategy = None
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "hti:o:s:I:O:l:d:D:", ["input=", "output=", "help", "trads"])
+        opts, args = getopt.getopt(
+            sys.argv[1:],
+            "hti:o:s:I:O:T:l:d:D:",
+            ["input=", "output=", "help", "trads"],
+        )
     except getopt.GetoptError:
         print_help()
         sys.exit(1)
@@ -377,6 +390,8 @@ if __name__ == "__main__":
             input_strategy = arg
         elif opt == "-O":
             output_strategy = arg
+        elif opt == "-T":
+            test_strategy = arg
         elif opt == "-d":
             form_id = arg
         elif opt == "-l":
@@ -510,6 +525,18 @@ if __name__ == "__main__":
     # create constraints, clean name
 
     output = strategy.execute()
+
+    # Test strategies run after the output strategy and are given it, so they can
+    # describe exactly the artifacts that were just produced. They must never
+    # change the deployable output: that is what keeps "test what you deploy" true.
+    if test_strategy:
+        TestStrategyCls = get_test_strategy(test_strategy)
+        logger.info(f"Running test strategy {TestStrategyCls.__name__}")
+        try:
+            TestStrategyCls(project, out_path, strategy).execute()
+        except Exception as e:
+            # A failing test emitter must not invalidate a good build.
+            logger.error(f"Test strategy {TestStrategyCls.__name__} failed: {e}")
 
     # compress the output folder to a zip archieve and place it in the download directory
     # shutil.make_archive(os.path.join(download_dir), "zip", os.path.join(out_path))
