@@ -36,6 +36,11 @@ logger = logging.getLogger("default")
 # Maps registered name -> strategy class
 INPUT_STRATEGIES: Dict[str, Type] = {}
 OUTPUT_STRATEGIES: Dict[str, Type] = {}
+#: Test strategies run *after* an output strategy has produced its artifacts and
+#: emit additional, non-deployable material derived from the same build (test
+#: specifications, coverage manifests, ...). They never alter the deployable
+#: output, which is what makes "test exactly what you deploy" hold.
+TEST_STRATEGIES: Dict[str, Type] = {}
 
 
 # ---------------------------------------------------------------------------
@@ -82,6 +87,31 @@ def register_output_strategy(name: str):
             )
         OUTPUT_STRATEGIES[name] = cls
         OUTPUT_STRATEGIES.setdefault(cls.__name__, cls)
+        return cls
+
+    return decorator
+
+
+def register_test_strategy(name: str):
+    """
+    Decorator to register a test strategy under a stable name.
+
+    A test strategy runs after the output strategy and receives it, so it can
+    read the artifacts and intermediate frames that build produced.
+
+    Example:
+        @register_test_strategy("TestSpecStrategy")
+        class TestSpecStrategy(BaseTestStrategy):
+            ...
+    """
+    def decorator(cls: Type) -> Type:
+        if name in TEST_STRATEGIES and TEST_STRATEGIES[name] is not cls:
+            logger.warning(
+                f"Test strategy name '{name}' is already registered to "
+                f"{TEST_STRATEGIES[name]}. Overwriting with {cls}."
+            )
+        TEST_STRATEGIES[name] = cls
+        TEST_STRATEGIES.setdefault(cls.__name__, cls)
         return cls
 
     return decorator
@@ -157,6 +187,34 @@ def get_output_strategy(name_or_cls: Union[str, Type]) -> Type:
         f"Unknown output strategy '{name_or_cls}'. "
         f"Available strategies: {', '.join(available)}"
     )
+
+
+def get_test_strategy(name_or_cls: Union[str, Type]) -> Type:
+    """
+    Resolve a test strategy by registered name or by passing the class directly.
+    """
+    if isinstance(name_or_cls, type):
+        return name_or_cls
+
+    if not isinstance(name_or_cls, str):
+        raise TypeError(
+            f"get_test_strategy expects a string name or a strategy class, "
+            f"got {type(name_or_cls)}"
+        )
+
+    if name_or_cls in TEST_STRATEGIES:
+        return TEST_STRATEGIES[name_or_cls]
+
+    available = sorted(set(TEST_STRATEGIES.keys()))
+    raise ValueError(
+        f"Unknown test strategy '{name_or_cls}'. "
+        f"Available strategies: {', '.join(available) if available else '(none registered)'}"
+    )
+
+
+def list_test_strategies() -> Dict[str, Type]:
+    """Return a copy of the registered test strategies."""
+    return dict(TEST_STRATEGIES)
 
 
 def list_input_strategies() -> Dict[str, Type]:

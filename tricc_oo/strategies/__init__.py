@@ -12,10 +12,13 @@ Preferred way to obtain strategies:
 from tricc_oo.strategies.registry import (
     register_input_strategy,
     register_output_strategy,
+    register_test_strategy,
     get_input_strategy,
     get_output_strategy,
+    get_test_strategy,
     list_input_strategies,
     list_output_strategies,
+    list_test_strategies,
 )
 
 # Eagerly import the built-in strategies so their @register_* decorators run.
@@ -34,11 +37,17 @@ from tricc_oo.strategies.output.openmrs_form import OpenMRSStrategy  # noqa: F40
 from tricc_oo.strategies.output.fhir_form import FHIRStrategy  # noqa: F401
 from tricc_oo.strategies.output.opensrp import OpenSRPStrategy  # noqa: F401
 
+# Test strategies run after the output strategy and never replace it.
+from tricc_oo.strategies.test.test_spec import TestSpecStrategy  # noqa: F401
+
 __all__ = [
     "register_input_strategy",
     "register_output_strategy",
+    "register_test_strategy",
     "get_input_strategy",
     "get_output_strategy",
+    "get_test_strategy",
     "list_input_strategies",
     "list_output_strategies",
+    "list_test_strategies",
 ]
