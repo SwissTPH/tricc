@@ -11,6 +11,7 @@ from tricc_oo.converters.fhir.structuremap import (
     build_extraction_fml,
     build_extraction_rule,
     build_extraction_structuremap,
+    merge_extraction_rules,
 )
 from tricc_oo.models.base import TriccOperation, TriccOperator
 from tricc_oo.models.calculate import TriccNodeProposedDiagnosis
@@ -207,6 +208,51 @@ class TestExtractionFml(unittest.TestCase):
         self.assertIn("extract", names)
         self.assertIn("extractItems", names)
 
+    def test_duplicate_link_id_emits_one_extract_group(self):
+        first = TriccNodeInteger(id="y1", name="p_age_years", label="Age years")
+        second = TriccNodeInteger(id="y2", name="p_age_years", label="Age years")
+        rules = [build_extraction_rule(first), build_extraction_rule(second)]
+        self.assertEqual(rules[0].group_name, "extract_p_age_years")
+        self.assertEqual(rules[1].group_name, "extract_p_age_years")
+        self.assertEqual(len(merge_extraction_rules(rules)), 1)
+        fml = build_extraction_fml(rules, "https://fhir.tricc.io/StructureMap/x", "x")
+        self.assertEqual(fml.count("group extract_p_age_years("), 1)
+        self.assertEqual(fml.count("} \"extract_p_age_years\";"), 1)
+        sm = build_extraction_structuremap(rules, "demo", "main", "https://fhir.tricc.io")
+        dispatch_names = [r["name"] for r in sm["group"][1]["rule"]]
+        self.assertEqual(dispatch_names.count("extract_p_age_years"), 1)
+
+    def test_concept_versions_share_one_group_first_non_null(self):
+        older = TriccNodeInteger(
+            id="y1", name="p_age_years", label="Age years", last=False, version=1, path_len=10
+        )
+        newer = TriccNodeInteger(
+            id="y2", name="p_age_years", label="Age years", last=True, version=2, path_len=20
+        )
+        older_rule = build_extraction_rule(older)
+        newer_rule = build_extraction_rule(newer)
+        self.assertEqual(older_rule.link_id, "p_age_years_Vv_1")
+        self.assertEqual(newer_rule.link_id, "p_age_years")
+        self.assertEqual(older_rule.group_name, "extract_p_age_years")
+        self.assertEqual(newer_rule.group_name, "extract_p_age_years")
+        merged = merge_extraction_rules([older_rule, newer_rule])
+        self.assertEqual(len(merged), 1)
+        self.assertEqual(merged[0].link_ids, ["p_age_years", "p_age_years_Vv_1"])
+        fml = build_extraction_fml([older_rule, newer_rule], "https://fhir.tricc.io/StructureMap/x", "x")
+        self.assertEqual(fml.count("group extract_p_age_years("), 1)
+        self.assertIn("linkId = 'p_age_years'", fml)
+        self.assertIn("linkId = 'p_age_years_Vv_1'", fml)
+        self.assertIn(
+            "src.repeat(item).where(linkId = 'p_age_years').answer.empty()",
+            fml,
+        )
+        self.assertNotIn("item.where(", fml)
+        repeat2 = build_extraction_rule(
+            TriccNodeInteger(id="w2", name="p_age_years", label="Age years", repeat=2)
+        )
+        self.assertEqual(repeat2.group_name, "extract_p_age_years_Rr_2")
+        self.assertEqual(len(merge_extraction_rules([newer_rule, repeat2])), 2)
+
 
 class TestFHIRStrategyExtraction(unittest.TestCase):
     def test_generate_export_collects_observation_not_note(self):
@@ -226,6 +272,41 @@ class TestFHIRStrategyExtraction(unittest.TestCase):
         rules = strategy.extraction_rules.get("main") or []
         self.assertEqual(len(rules), 1)
         self.assertEqual(rules[0].kind, "observation")
+
+    def test_generate_export_skips_duplicate_link_id_and_processed_node(self):
+        project = MagicMock()
+        project.start_pages = {}
+        project.pages = {}
+        project.code_systems = {}
+        strategy = FHIRStrategy(project, "/tmp/fhir-sm-dup")
+        strategy._form_id = "demo"
+        strategy.questionnaires["main"] = {
+            "resourceType": "Questionnaire",
+            "item": [{"linkId": "p_age_years", "type": "integer"}],
+        }
+        first = TriccNodeInteger(
+            id="y1", name="p_age_years", label="Age years", version=2, path_len=20
+        )
+        clone = TriccNodeInteger(
+            id="y2", name="p_age_years", label="Age years", version=2, path_len=20
+        )
+        older = TriccNodeInteger(
+            id="y3", name="p_age_years", label="Age years", last=False, version=1, path_len=5
+        )
+        strategy.generate_export(first)
+        strategy.generate_export(clone)
+        strategy.generate_export(first, processed_nodes={first})
+        strategy.generate_export(older)
+        rules = strategy.extraction_rules.get("main") or []
+        self.assertEqual(len(rules), 2)
+        self.assertEqual({r.link_id for r in rules}, {"p_age_years", "p_age_years_Vv_1"})
+        strategy._assemble_extraction_maps()
+        merged = strategy.extraction_rules["main"]
+        self.assertEqual(len(merged), 1)
+        self.assertEqual(merged[0].link_ids, ["p_age_years", "p_age_years_Vv_1"])
+        fml = strategy.extraction_maps["main"]["_fml"]
+        self.assertEqual(fml.count("group extract_p_age_years("), 1)
+        self.assertIn("src.repeat(item).where(linkId = 'p_age_years').answer.empty()", fml)
 
     def test_assemble_extraction_maps(self):
         project = MagicMock()

@@ -255,11 +255,13 @@ Rules (still **one Questionnaire per CPG process** — registration is not split
 | Rule | Behaviour |
 |---|---|
 | One item per `linkId` per Questionnaire | A re-visit of the same node, or a clone that shares the export name, does not append |
+| One StructureMap extract group per concept + repeat | Versions (`p_age_years`, `p_age_years_Vv_1`) share one group and write one Observation from the **first non-null** answer, newest first. Repeat slot 2 is a second group. Duplicate group names make Android HAPI throw `Multiple possible matches for rule 'extract_p_age_years'` (`fix/20260824-structuremap-duplicate-extract-groups.md`). |
 | Expressions attach to the Questionnaire that **holds** the item | `generate_calculate` / `generate_relevance` use `_segment_for_item`, never `node.segment or "main"` (that field is often unset) |
-| Unused hidden calculates are omitted | After expressions and extraction rules are attached, a hidden calculate-like item is dropped from **this** Questionnaire when nothing here reads its `linkId`, it has no `initialExpression` (populate / encounter dedup / out-of-form CQL), and it is not an extraction source. Another process can still keep its own copy. |
+| Unused hidden calculates are omitted | After expressions and extraction rules are attached, a hidden calculate-like item is dropped from **this** Questionnaire when nothing here reads its `linkId` and **this** process does not extract it. A CQL `initialExpression` alone is not a keep-reason (graph-routing calculates fall back to `true`). Diagnosis anchors and other calculates with no persistable mapping are omitted when unused. Another process can still keep its own copy. |
 
-Visible questions, groups, displays, populate/dedup items, and calculates that a remaining
-expression in the same form reads are kept.
+Visible questions, groups, displays, and calculates that a remaining expression in the
+same form reads are kept. Hidden populate / `load_*` items stay only when this process
+extracts them or something here reads them (`fix/20260824-prune-unused-initial-calculates.md`).
 
 **Updated 2026-08-23** (`fix/20260823-questionnaire-item-order.md`): items follow
 flowchart order (first outgoing edge first). The walk used to push `next_nodes`
@@ -304,9 +306,12 @@ In-form calculation (e.g. BMI from weight + height both answered in the same Que
 - Item lookup always uses `%resource.repeat(item).where(linkId=...)` so questions nested
   in page/activity groups are found.
 - Choice / open-choice answers are stored as `valueCoding`. Membership
-  (`SELECTED` / option `CONTAINS`) emits
-  `…answer.where(value.code = '<code>').exists()` (HAPI FHIRPath has no
-  `valueCoding` child on `answer`). Do not use `'code' in …answer.valueCoding.code`.
+  (`SELECTED` / option `CONTAINS` / **`EQUAL` of a select to an option code**)
+  emits `…answer.where(value.code = '<code>').exists()` (HAPI FHIRPath has no
+  `valueCoding` child on `answer`, and `…answer.value.code = 'x'` is never true).
+  Do not use `'code' in …answer.valueCoding.code` or `.value.code = 'x'`.
+  See `fix/20260817-choice-membership-and-group-relevance.md` and
+  `fix/20260824-fhirpath-choice-equality.md`.
 - Page / activity groups take `enableWhenExpression` from `activity.relevance`
   (XLSForm begin-group relevant), not only the start node's own `relevance`.
 - Boolean / numeric / string items still use `.answer.value`.
@@ -317,8 +322,18 @@ In-form calculation (e.g. BMI from weight + height both answered in the same Que
   `fix/20260821-fhirpath-numeric-compare.md`.
 - Relational FHIRPath (`>`, `>=`, `<`, `<=`, `BETWEEN`) casts operands with
   `.toDecimal()` (literals as `2.0`) so leftover string answers still compare.
+- Arithmetic FHIRPath (`+`, `-`, `*`, `/`, `mod`) uses the same numeric wrap.
+  HAPI rejects `QuestionnaireResponse.item.answer * 30` (`opTimes`). See
+  `fix/20260824-fhirpath-numeric-arithmetic.md`.
+- `COALESCE(item, 0)` unions **decimal values**
+  (`…answer.where($this.exists()).value.toDecimal() | 0.0`), not raw `.answer`
+  collections and not integer `0` (HAPI rejects `decimal | integer`). A numeric
+  COALESCE calculate is `integer` / `decimal`, not `string`.
 - Casting a boolean (e.g. `COUNT(select) - SELECTED(opt_none)`) uses `iif(expr, 1, 0)`,
   not `.toDecimal()`.
+- `CASE` / `IFS` become nested FHIRPath `iif()` (same shape as XLSForm nested `if()`),
+  so in-form calculates such as `age_in_months` get a live `calculatedExpression`.
+  See `fix/20260824-fhirpath-case-iif.md`.
 
 Out-of-form calculation (depends on data not captured in this Questionnaire, e.g. observation
 history from a prior process) still routes through CQL, but as a one-time `initialExpression`

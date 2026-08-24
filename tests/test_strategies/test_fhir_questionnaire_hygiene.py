@@ -8,8 +8,9 @@ A. ``generate_base`` must emit each ``linkId`` at most once per Questionnaire
    (diamond / fan-in revisits, and distinct clones sharing an export name).
 B. ``generate_calculate`` / ``generate_relevance`` attach expressions on the
    Questionnaire that already holds the item, not ``node.segment or "main"``.
-C. Unused hidden calculates (no reader in *this* Questionnaire, no
-   ``initialExpression``, not an extraction source) are pruned.
+C. Unused hidden calculates (no reader in *this* Questionnaire, not an
+   extraction source *of this process*) are pruned — including items that
+   only carry a CQL ``initialExpression``.
 
 Run with:
     python -m pytest tests/test_strategies/test_fhir_questionnaire_hygiene.py -v
@@ -247,10 +248,43 @@ class TestPruneUnusedHiddenCalculates(unittest.TestCase):
         link_ids = [it["linkId"] for it in strategy.questionnaires["registration"]["item"]]
         self.assertEqual(link_ids, ["ask_disclaimer", "needs_test"])
 
-    def test_initial_expression_item_is_kept(self):
+    def test_unused_initial_expression_is_dropped(self):
+        """CQL ``true`` routing calculates must not stay just because they have initialExpression."""
+        strategy = _make_strategy()
+        unused = _hidden_item("pnZZBCRahaURgJo3I0mLJ_58", "boolean")
+        unused["extension"].append(build_initial_expression("Calc_pnZZBCRahaURgJo3I0mLJ_58"))
+        strategy.cql_defines["registration"] = [
+            "define Calc_pnZZBCRahaURgJo3I0mLJ_58: true",
+            "define Dedup_ask_disclaimer: Helper.GetObservationValue('ask_disclaimer')",
+        ]
+        strategy.questionnaires["registration"] = {
+            "resourceType": "Questionnaire",
+            "item": [
+                {
+                    "linkId": "ask_disclaimer",
+                    "type": "boolean",
+                    "extension": [build_initial_expression("Dedup_ask_disclaimer")],
+                },
+                unused,
+            ],
+        }
+
+        strategy._prune_unused_hidden_calculates()
+
+        link_ids = [it["linkId"] for it in strategy.questionnaires["registration"]["item"]]
+        self.assertEqual(link_ids, ["ask_disclaimer"])
+        self.assertEqual(
+            strategy.cql_defines["registration"],
+            ["define Dedup_ask_disclaimer: Helper.GetObservationValue('ask_disclaimer')"],
+        )
+
+    def test_extracted_initial_expression_is_kept(self):
         strategy = _make_strategy()
         populate = _hidden_item("load_weight")
         populate["extension"].append(build_initial_expression("Dedup_load_weight"))
+        strategy.extraction_rules["registration"] = [
+            SimpleNamespace(link_id="load_weight")
+        ]
         strategy.questionnaires["registration"] = {
             "resourceType": "Questionnaire",
             "item": [populate, _hidden_item("needs_test")],
@@ -275,6 +309,24 @@ class TestPruneUnusedHiddenCalculates(unittest.TestCase):
 
         link_ids = [it["linkId"] for it in strategy.questionnaires["registration"]["item"]]
         self.assertEqual(link_ids, ["needs_test"])
+
+    def test_other_process_extraction_does_not_keep_item(self):
+        strategy = _make_strategy()
+        strategy.extraction_rules["determine-diagnosis"] = [
+            SimpleNamespace(link_id="CHE_B23_DE85_Vv_1")
+        ]
+        strategy.questionnaires["registration"] = {
+            "resourceType": "Questionnaire",
+            "item": [
+                {"linkId": "ask_disclaimer", "type": "boolean"},
+                _hidden_item("CHE_B23_DE85_Vv_1", "boolean"),
+            ],
+        }
+
+        strategy._prune_unused_hidden_calculates()
+
+        link_ids = [it["linkId"] for it in strategy.questionnaires["registration"]["item"]]
+        self.assertEqual(link_ids, ["ask_disclaimer"])
 
     def test_unused_calculated_expression_is_dropped(self):
         """Live FHIRPath that nobody in this form reads is still unused."""

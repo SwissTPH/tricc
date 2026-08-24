@@ -14,8 +14,11 @@ Run with:
 import unittest
 from unittest.mock import MagicMock
 
+from decimal import Decimal
+
 from tricc_oo.models.base import TriccOperation, TriccOperator, TriccReference, TriccStatic
-from tricc_oo.strategies.output.fhir_form import FHIRStrategy
+from tricc_oo.models.tricc import TriccNodeInteger
+from tricc_oo.strategies.output.fhir_form import FHIRStrategy, format_fhirpath_decimal
 
 
 def _make_strategy():
@@ -24,6 +27,21 @@ def _make_strategy():
     project.pages = {}
     project.code_systems = {}
     return FHIRStrategy(project, "/tmp/fhir_relevance_test_out")
+
+
+class TestFormatFhirpathDecimal(unittest.TestCase):
+    def test_whole_numbers_keep_a_fractional_part(self):
+        self.assertEqual(format_fhirpath_decimal(0), "0.0")
+        self.assertEqual(format_fhirpath_decimal(12), "12.0")
+        self.assertEqual(format_fhirpath_decimal(-3), "-3.0")
+        self.assertEqual(format_fhirpath_decimal("12"), "12.0")
+        self.assertEqual(format_fhirpath_decimal(12.0), "12.0")
+        self.assertEqual(format_fhirpath_decimal(Decimal("12.0")), "12.0")
+
+    def test_authored_fraction_is_preserved(self):
+        self.assertEqual(format_fhirpath_decimal(4.3), "4.3")
+        self.assertEqual(format_fhirpath_decimal("4.3"), "4.3")
+        self.assertEqual(format_fhirpath_decimal(Decimal("4.30")), "4.3")
 
 
 class TestConvertExpressionToFhirpath(unittest.TestCase):
@@ -98,6 +116,64 @@ class TestConvertExpressionToFhirpath(unittest.TestCase):
         self.assertIn(".value", expr)
         self.assertIn(".toDecimal()", expr)
         self.assertIn("< 2.0", expr)
+
+    def test_searched_case_uses_nested_iif(self):
+        """XLSForm nested if(); FHIRPath nested iif() — age_in_months formula."""
+        years = TriccNodeInteger(id="y1", name="p_age_years", label="Years")
+        months = TriccNodeInteger(id="m1", name="p_age_months", label="Months")
+        when_true = TriccOperation(
+            TriccOperator.PLUS,
+            [
+                TriccOperation(TriccOperator.COALESCE, [months, TriccStatic(0)]),
+                TriccOperation(
+                    TriccOperator.COALESCE,
+                    [
+                        TriccOperation(TriccOperator.MULTIPLIED, [years, TriccStatic(12)]),
+                        TriccStatic(0),
+                    ],
+                ),
+            ],
+        )
+        op = TriccOperation(
+            TriccOperator.CASE,
+            [
+                [
+                    TriccOperation(
+                        TriccOperator.MORE_OR_EQUAL, [months, TriccStatic(0)]
+                    ),
+                    when_true,
+                ],
+                TriccStatic(0),
+            ],
+        )
+        expr = self.strategy.convert_expression_to_fhirpath(op)
+        self.assertTrue(expr.startswith("iif("))
+        self.assertIn("linkId='p_age_months'", expr)
+        self.assertIn("linkId='p_age_years'", expr)
+        self.assertIn(".value", expr)
+        self.assertIn("* 12.0", expr)
+        self.assertIn("|0.0", expr)
+        self.assertTrue(expr.endswith(", 0.0)"))
+        self.assertNotIn("case ", expr)
+        self.assertNotIn(" then ", expr)
+
+    def test_value_case_uses_nested_iif_equality(self):
+        op = TriccOperation(
+            TriccOperator.CASE,
+            [
+                TriccReference("age_in_months"),
+                [TriccStatic(0), TriccStatic("newborn")],
+                [TriccStatic(1), TriccStatic("newborn")],
+                TriccStatic("child"),
+            ],
+        )
+        expr = self.strategy.convert_expression_to_fhirpath(op)
+        self.assertTrue(expr.startswith("iif("))
+        self.assertIn("linkId='age_in_months'", expr)
+        self.assertIn("= 0", expr)
+        self.assertIn("'newborn'", expr)
+        self.assertIn("'child'", expr)
+        self.assertNotIn("case ", expr)
 
     def test_if_uses_iif_not_cql_if_then_else(self):
         cond = TriccOperation(TriccOperator.ISTRUE, [TriccReference("smoker")])
@@ -179,6 +255,60 @@ class TestConvertExpressionToFhirpath(unittest.TestCase):
         self.assertIn("=", eq_expr)
         self.assertIn(".value", eq_expr)
 
+    def test_equal_choice_to_code_uses_membership_not_value_code_equals(self):
+        from tricc_oo.models.tricc import TriccNodeSelectOne, TriccNodeSelectOption
+
+        select = TriccNodeSelectOne(
+            id="CHE_B3_DE06",
+            name="CHE_B3_DE06",
+            label="Type of Consultation",
+            list_name="consult",
+        )
+        opt = TriccNodeSelectOption(
+            id="init",
+            name="CHE.B3.DE04",
+            label="Initial visit",
+            select=select,
+            list_name="consult",
+        )
+        select.options = {0: opt}
+        self.strategy.questionnaires["main"] = {
+            "resourceType": "Questionnaire",
+            "item": [{"linkId": "CHE_B3_DE06", "type": "choice"}],
+        }
+        expr = self.strategy.convert_expression_to_fhirpath(
+            TriccOperation(TriccOperator.EQUAL, [select, TriccStatic("CHE.B3.DE04")])
+        )
+        self.assertEqual(
+            expr,
+            "%resource.repeat(item).where(linkId='CHE_B3_DE06')"
+            ".answer.where(value.code = 'CHE.B3.DE04').exists()",
+        )
+        self.assertNotIn("where($this.exists()).value.code =", expr)
+        self.assertNotIn("valueCoding", expr)
+
+    def test_not_equal_choice_to_code_negates_membership(self):
+        from tricc_oo.models.tricc import TriccNodeSelectOne
+
+        select = TriccNodeSelectOne(
+            id="CHE_B3_DE06",
+            name="CHE_B3_DE06",
+            label="Type of Consultation",
+            list_name="consult",
+        )
+        self.strategy.questionnaires["main"] = {
+            "resourceType": "Questionnaire",
+            "item": [{"linkId": "CHE_B3_DE06", "type": "choice"}],
+        }
+        expr = self.strategy.convert_expression_to_fhirpath(
+            TriccOperation(TriccOperator.NOTEQUAL, [select, TriccStatic("CHE.B3.DE04")])
+        )
+        self.assertEqual(
+            expr,
+            "%resource.repeat(item).where(linkId='CHE_B3_DE06')"
+            ".answer.where(value.code = 'CHE.B3.DE04').exists().not()",
+        )
+
     def test_no_clean_fhirpath_equivalent_raises_not_implemented(self):
         for operator in (
             TriccOperator.MIN,
@@ -246,8 +376,56 @@ class TestConvertExpressionToFhirpath(unittest.TestCase):
         self.assertIn("value.code", expr)
         self.assertIn(".exists()", expr)
         self.assertNotIn("valueCoding", expr)
-        self.assertNotIn("toDecimal()", expr)
+        # CAST_NUMBER of the boolean uses iif, not `.toDecimal()` on the exists() test.
+        # Outer arithmetic may still wrap the minus operands as decimals.
+        self.assertNotIn(".exists()).toDecimal()", expr)
         self.assertIn(".count()", expr)
+
+    def test_multiplied_wraps_item_answer_value_and_casts_to_decimal(self):
+        """HAPI rejects ``.answer * 30`` — the left operand must be a number."""
+        years = TriccNodeInteger(id="y1", name="p_age_years", label="Years")
+        op = TriccOperation(TriccOperator.MULTIPLIED, [years, TriccStatic(12)])
+        expr = self.strategy.convert_expression_to_fhirpath(op)
+        self.assertIn("linkId='p_age_years'", expr)
+        self.assertIn(".value", expr)
+        self.assertIn(".toDecimal()", expr)
+        self.assertIn("* 12.0", expr)
+        self.assertNotIn(".answer *", expr)
+
+    def test_age_in_days_coalesce_multiply_reads_answer_value(self):
+        """Registration ``age_in_days``: COALESCE(months, 0) * 30 + 365 * COALESCE(years, 0)."""
+        years = TriccNodeInteger(id="y1", name="p_age_years", label="Years")
+        months = TriccNodeInteger(id="m1", name="p_age_months", label="Months")
+        op = TriccOperation(
+            TriccOperator.PLUS,
+            [
+                TriccOperation(
+                    TriccOperator.MULTIPLIED,
+                    [
+                        TriccOperation(TriccOperator.COALESCE, [months, TriccStatic(0)]),
+                        TriccStatic(30),
+                    ],
+                ),
+                TriccOperation(
+                    TriccOperator.MULTIPLIED,
+                    [
+                        TriccStatic(365),
+                        TriccOperation(TriccOperator.COALESCE, [years, TriccStatic(0)]),
+                    ],
+                ),
+            ],
+        )
+        expr = self.strategy.convert_expression_to_fhirpath(op)
+        self.assertIn("linkId='p_age_months'", expr)
+        self.assertIn("linkId='p_age_years'", expr)
+        self.assertIn(".value", expr)
+        self.assertIn(".toDecimal()", expr)
+        self.assertIn("* 30.0", expr)
+        self.assertIn("365.0 *", expr)
+        self.assertNotIn(".answer *", expr)
+        self.assertNotIn(".answer|0", expr)
+        self.assertNotIn("|0)", expr)
+        self.assertIn("|0.0", expr)
 
     def test_selected_on_boolean_item_compares_value(self):
         self.strategy.questionnaires["main"] = {

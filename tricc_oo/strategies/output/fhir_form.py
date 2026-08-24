@@ -22,6 +22,7 @@ import json
 import logging
 import os
 import re
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -30,6 +31,9 @@ from tricc_oo.converters.fhir.structuremap import (
     apply_questionnaire_item_to_rule,
     build_extraction_rule,
     build_extraction_structuremap,
+    extraction_rule_link_ids,
+    extraction_rules_conflict,
+    merge_extraction_rules,
 )
 from tricc_oo.converters.fhir.ids import (
     fhir_resource_id,
@@ -90,7 +94,9 @@ from tricc_oo.models.base import (
 from tricc_oo.models.tricc import (
     TriccNodeBaseModel,
     TriccNodeCalculateBase,
+    TriccNodeDecimal,
     TriccNodeInputModel,
+    TriccNodeInteger,
     TriccNodeSelect,
     TriccNodeSelectOption,
     TriccNodeSelectYesNo,
@@ -123,6 +129,37 @@ _INTERNAL_ITEM_LABEL_PREFIXES = ("path:", "contains:", "save:")
 _PRUNE_CALC_ITEM_TYPES = frozenset({"boolean", "string", "integer", "decimal", "quantity"})
 _LINK_ID_IN_EXPRESSION = re.compile(r"""linkId\s*=\s*['"]([^'"]+)['"]""")
 _NUMERIC_LITERAL = re.compile(r"^-?\d+(\.\d+)?$")
+# Choice EQUAL wraps as ``…answer.where($this.exists()).value.code = 'x'``.
+# HAPI does not resolve that chain; membership ``answer.where(value.code = 'x')`` does.
+# See fix/20260824-fhirpath-choice-equality.md.
+_CHOICE_CODE_EQUALITY = re.compile(
+    r"^(?P<base>.+)\.value(?:Coding)?\.code\s*(?P<op>=|!=)\s*(?P<code>'[^']*'|\"[^\"]*\")$"
+)
+_DECIMAL_ONE = Decimal("1.0")
+
+
+def format_fhirpath_decimal(value) -> str:
+    """Render ``value`` as a FHIRPath decimal literal (always with a fraction).
+
+    Uses ``decimal.Decimal`` so draw.io ``12``, ``12.0``, and ``4.3`` all become
+    a typed decimal (``12.0``, ``4.3``) instead of appending ``'.0'`` to a string.
+    """
+    if isinstance(value, bool) or value is None:
+        raise ValueError(f"not a decimal literal: {value!r}")
+    try:
+        number = value if isinstance(value, Decimal) else Decimal(str(value))
+    except (InvalidOperation, ValueError, TypeError) as exc:
+        raise ValueError(f"not a decimal literal: {value!r}") from exc
+    if not number.is_finite():
+        raise ValueError(f"not a finite decimal: {value!r}")
+    if number == number.to_integral_value():
+        return format(number.quantize(_DECIMAL_ONE), "f")
+    rendered = format(number, "f")
+    whole, _, frac = rendered.partition(".")
+    frac = frac.rstrip("0") or "0"
+    return f"{whole}.{frac}"
+
+
 _RETURNS_INTEGER = frozenset(
     {
         TriccOperator.AGE_DAY,
@@ -340,15 +377,14 @@ class FHIRStrategy(BaseOutPutStrategy):
         self.process_calculate(self.project.start_pages, pages=self.project.pages)
         logger.info("FHIRStrategy: generating export (StructureMap)")
         self.process_export(self.project.start_pages, pages=self.project.pages)
-        self._assemble_extraction_maps()
-
-        # Build the actual CQL library texts from collected defines (Phase 2)
-        # Must happen before export()
-        self._assemble_cql_libraries()
 
         logger.info("FHIRStrategy: writing output files")
         self._sanitize_questionnaires()
         self._prune_unused_hidden_calculates()
+        # StructureMaps and CQL libraries must see the pruned Questionnaire
+        # (fix/20260824-prune-unused-initial-calculates.md).
+        self._assemble_extraction_maps()
+        self._assemble_cql_libraries()
         self.export(self.project.start_pages, version=version)
         logger.info("FHIRStrategy: validating")
         self.validate()
@@ -1069,6 +1105,14 @@ class FHIRStrategy(BaseOutPutStrategy):
         """Collect conceptType-driven extraction rules and attach dedup expressions."""
         from tricc_oo.converters.fhir.concept_mapper import resolve_concept_type
 
+        if processed_nodes is None:
+            processed_nodes = kwargs.get("processed_nodes")
+        if processed_nodes is not None and node in processed_nodes:
+            # Same node re-stashed on diamond / fan-in. generate_base already
+            # skips; extract groups must stay unique too.
+            # See fix/20260824-structuremap-duplicate-extract-groups.md.
+            return True
+
         concept_type = resolve_concept_type(
             node, getattr(self.project, "code_systems", None)
         )
@@ -1087,7 +1131,27 @@ class FHIRStrategy(BaseOutPutStrategy):
             q_item = self._find_item_anywhere(rule.link_id)
             apply_questionnaire_item_to_rule(rule, q_item)
             segment = self._segment_for_item(node, rule.link_id)
-            self.extraction_rules.setdefault(segment, []).append(rule)
+            existing = self.extraction_rules.setdefault(segment, [])
+            collected = {
+                lid
+                for prior in existing
+                for lid in extraction_rule_link_ids(prior)
+            }
+            if rule.link_id in collected:
+                return True
+            prior = next((r for r in existing if r.group_name == rule.group_name), None)
+            if prior is not None and extraction_rules_conflict(prior, rule):
+                logger.warning(
+                    "FHIRStrategy: extra extract source '%s' for group '%s' "
+                    "(kept kind=%s type=%s; skipped kind=%s type=%s)",
+                    rule.link_id,
+                    rule.group_name,
+                    prior.kind,
+                    prior.item_type,
+                    rule.kind,
+                    rule.item_type,
+                )
+            existing.append(rule)
             # Dedup only on items that are actually extracted as Observation/Condition.
             # Notes/groups default to Observation in get_fhir_resource() and must not
             # receive initialExpression (SDC + openSRP $populate).
@@ -1100,7 +1164,8 @@ class FHIRStrategy(BaseOutPutStrategy):
         form_key = self.resolve_form_id()
         processes = set(self.questionnaires or {}) | set(self.extraction_rules or {})
         for process in processes:
-            rules = list(self.extraction_rules.get(process) or [])
+            rules = merge_extraction_rules(self.extraction_rules.get(process) or [])
+            self.extraction_rules[process] = rules
             sm = build_extraction_structuremap(
                 rules=rules,
                 form_id=form_key,
@@ -1179,30 +1244,41 @@ class FHIRStrategy(BaseOutPutStrategy):
                 )
 
     def _prune_unused_hidden_calculates(self) -> None:
-        """Drop hidden calculate items this Questionnaire does not read.
+        """Drop hidden calculate items this Questionnaire does not need.
 
-        Per-process: a calculate used only in diagnostic-testing stays there and
-        is omitted from registration. Items with ``initialExpression`` (populate,
-        encounter dedup, out-of-form CQL) and extraction sources are kept.
-        Iterates until a fixpoint so a chain of unused calculates all go.
-        See fix/20260821-opensrp-questionnaire-duplicate-calculates.md.
+        Needed means a remaining item here reads the ``linkId``, or *this*
+        process extracts it. A CQL ``initialExpression`` alone is not enough
+        (graph-routing calculates fall back to ``true``). Extraction keep is
+        per Questionnaire. See fix/20260824-prune-unused-initial-calculates.md.
         """
-        extraction_ids = {
-            getattr(rule, "link_id", None)
-            for rules in (self.extraction_rules or {}).values()
-            for rule in rules
-        }
-        extraction_ids.discard(None)
         for segment, q in (self.questionnaires or {}).items():
+            extract_here = {
+                lid
+                for rule in (self.extraction_rules or {}).get(segment, [])
+                for lid in extraction_rule_link_ids(rule)
+            }
             total = 0
             while True:
                 referenced = self._collect_expression_link_ids(q.get("item"))
-                keep_ids = referenced | extraction_ids
+                keep_ids = referenced | extract_here
                 new_items, removed = self._filter_unused_hidden_calculates(q.get("item"), keep_ids)
                 q["item"] = new_items
                 total += removed
                 if removed == 0:
                     break
+            surviving = self._collect_all_link_ids(q.get("item"))
+            if segment in (self.extraction_rules or {}):
+                kept = []
+                for rule in self.extraction_rules[segment]:
+                    ids = [lid for lid in extraction_rule_link_ids(rule) if lid in surviving]
+                    if not ids:
+                        continue
+                    if hasattr(rule, "link_ids"):
+                        rule.link_ids = ids
+                    rule.link_id = ids[0]
+                    kept.append(rule)
+                self.extraction_rules[segment] = kept
+            self._drop_orphan_cql_defines(segment, q.get("item"))
             if total:
                 logger.info(
                     "FHIRStrategy: pruned %s unused hidden calculate item(s) from Questionnaire '%s'",
@@ -1220,12 +1296,6 @@ class FHIRStrategy(BaseOutPutStrategy):
         )
 
     @staticmethod
-    def _item_has_initial_expression(item: Optional[dict]) -> bool:
-        if not item:
-            return False
-        return any(e.get("url") == SDC_EXT_INITIAL_EXPR for e in item.get("extension") or [])
-
-    @staticmethod
     def _collect_expression_link_ids(items) -> set:
         """Return every ``linkId`` mentioned in SDC expressions on ``items``."""
         refs = set()
@@ -1235,8 +1305,50 @@ class FHIRStrategy(BaseOutPutStrategy):
                     continue
                 expr = (ext.get("valueExpression") or {}).get("expression") or ""
                 refs.update(_LINK_ID_IN_EXPRESSION.findall(expr))
+                for nested in ext.get("extension") or []:
+                    nested_expr = (nested.get("valueExpression") or {}).get("expression") or ""
+                    refs.update(_LINK_ID_IN_EXPRESSION.findall(nested_expr))
             refs.update(FHIRStrategy._collect_expression_link_ids(item.get("item")))
         return refs
+
+    @staticmethod
+    def _collect_all_link_ids(items) -> set:
+        """Every ``linkId`` still present on ``items`` (nested groups included)."""
+        ids = set()
+        for item in items or []:
+            link_id = item.get("linkId")
+            if link_id:
+                ids.add(link_id)
+            ids.update(FHIRStrategy._collect_all_link_ids(item.get("item")))
+        return ids
+
+    @staticmethod
+    def _collect_initial_expression_names(items) -> set:
+        """CQL define names referenced by remaining ``initialExpression``s."""
+        names = set()
+        for item in items or []:
+            for ext in item.get("extension") or []:
+                if ext.get("url") != SDC_EXT_INITIAL_EXPR:
+                    continue
+                expr = ((ext.get("valueExpression") or {}).get("expression") or "").strip()
+                if expr:
+                    names.add(expr)
+            names.update(FHIRStrategy._collect_initial_expression_names(item.get("item")))
+        return names
+
+    def _drop_orphan_cql_defines(self, segment: str, items) -> None:
+        """Drop ``Calc_*`` / ``Dedup_*`` defines no remaining item names."""
+        used = self._collect_initial_expression_names(items)
+        defines = self.cql_defines.get(segment) or []
+        if not defines:
+            return
+        kept = []
+        for statement in defines:
+            name = statement.split(":", 1)[0].replace("define", "", 1).strip()
+            if name.startswith(("Calc_", "Dedup_")) and name not in used:
+                continue
+            kept.append(statement)
+        self.cql_defines[segment] = kept
 
     @staticmethod
     def _filter_unused_hidden_calculates(items, keep_ids) -> Tuple[list, int]:
@@ -1269,8 +1381,6 @@ class FHIRStrategy(BaseOutPutStrategy):
         if item.get("type") not in _PRUNE_CALC_ITEM_TYPES:
             return False
         if not FHIRStrategy._item_is_hidden(item):
-            return False
-        if FHIRStrategy._item_has_initial_expression(item):
             return False
         link_id = item.get("linkId")
         if link_id in keep_ids:
@@ -1552,22 +1662,19 @@ class FHIRStrategy(BaseOutPutStrategy):
             # Nested groups are the common case; repeat(item) walks descendants.
             return self._fhirpath_answer(get_export_name(r.value))
         elif isinstance(r, TriccStatic):
+            if isinstance(r.value, bool):
+                return "true" if r.value else "false"
+            if isinstance(r.value, (int, float, Decimal)):
+                return format_fhirpath_decimal(r.value)
             if isinstance(r.value, str):
-                value = f"'{r.value}'"
-            else:
-                value = str(r.value)
-            if value == "True":
-                return "true"
-            elif value == "False":
-                return "false"
-            else:
-                return value
+                return f"'{r.value}'"
+            return str(r.value)
         elif isinstance(r, bool):
-            return 'true' if r else 'false'
+            return "true" if r else "false"
         elif isinstance(r, str):
             return f"'{r}'"
-        elif isinstance(r, (int, float)):
-            return str(r)
+        elif isinstance(r, (int, float, Decimal)):
+            return format_fhirpath_decimal(r)
         elif isinstance(r, TriccNodeSelectOption):
             if self._is_yesno_boolean_select(getattr(r, "select", None)):
                 literal = self._yesno_option_boolean_literal(r)
@@ -1594,12 +1701,13 @@ class FHIRStrategy(BaseOutPutStrategy):
         return f"({ref_expressions[0]}).not()"
 
     def tricc_operation_fhirpath_plus(self, ref_expressions, original_references=None):
-        return " + ".join(ref_expressions)
+        return " + ".join(self._fhirpath_numeric_parts(ref_expressions, original_references))
 
     def tricc_operation_fhirpath_minus(self, ref_expressions, original_references=None):
-        if len(ref_expressions) > 1:
-            return " - ".join(ref_expressions)
-        return f"-{ref_expressions[0]}"
+        parts = self._fhirpath_numeric_parts(ref_expressions, original_references)
+        if len(parts) > 1:
+            return " - ".join(parts)
+        return f"-{parts[0]}" if parts else ""
 
     def tricc_operation_fhirpath_more(self, ref_expressions, original_references=None):
         return self._fhirpath_numeric_compare(">", ref_expressions, original_references)
@@ -1704,11 +1812,73 @@ class FHIRStrategy(BaseOutPutStrategy):
                 node_or_expression, "expression", None
             )
         expr = self._unwrap_operation(expr)
+        if isinstance(expr, TriccOperation) and expr.operator == TriccOperator.COALESCE:
+            return self._coalesce_fhir_number_type(expr)
+        if isinstance(expr, TriccOperation) and expr.operator in (
+            TriccOperator.CASE,
+            TriccOperator.IFS,
+            TriccOperator.IF,
+        ):
+            return self._conditional_fhir_number_type(expr)
         if not isinstance(expr, TriccOperation) or expr.operator not in RETURNS_NUMBER:
             return None
         if expr.operator in _RETURNS_INTEGER:
             return "integer"
         return "decimal"
+
+    def _operand_fhir_number_type(self, operand) -> Optional[str]:
+        """Number type of one COALESCE / arithmetic operand, or None if unknown."""
+        if isinstance(operand, TriccStatic):
+            value = operand.value
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                return None
+            return "decimal" if isinstance(value, float) else "integer"
+        if isinstance(operand, bool):
+            return None
+        if isinstance(operand, float):
+            return "decimal"
+        if isinstance(operand, int):
+            return "integer"
+        if isinstance(operand, TriccNodeInteger):
+            return "integer"
+        if isinstance(operand, TriccNodeDecimal):
+            return "decimal"
+        return self._expression_fhir_number_type(operand)
+
+    def _coalesce_fhir_number_type(self, expr: TriccOperation) -> Optional[str]:
+        """``integer`` / ``decimal`` when every COALESCE operand is numeric."""
+        types = [self._operand_fhir_number_type(operand) for operand in expr.reference or []]
+        if not types or any(t is None for t in types):
+            return None
+        return "integer" if all(t == "integer" for t in types) else "decimal"
+
+    def _conditional_branch_values(self, expr: TriccOperation) -> list:
+        """Then/else (or CASE value) operands, skipping conditions."""
+        refs = list(expr.reference or [])
+        if expr.operator == TriccOperator.IF:
+            return refs[1:]
+        if refs and isinstance(refs[0], list):
+            values = []
+            for item in refs:
+                if isinstance(item, list) and len(item) >= 2:
+                    values.append(item[1])
+                else:
+                    values.append(item)
+            return values
+        values = []
+        for item in refs[1:]:
+            if isinstance(item, list) and len(item) >= 2:
+                values.append(item[1])
+            else:
+                values.append(item)
+        return values
+
+    def _conditional_fhir_number_type(self, expr: TriccOperation) -> Optional[str]:
+        """``integer`` / ``decimal`` when every CASE / IFS / IF value branch is numeric."""
+        types = [self._operand_fhir_number_type(operand) for operand in self._conditional_branch_values(expr)]
+        if not types or any(t is None for t in types):
+            return None
+        return "integer" if all(t == "integer" for t in types) else "decimal"
 
     def _apply_calculate_item_type(self, item: Optional[dict], expression) -> None:
         """Coerce a default ``string`` calculate item to boolean / integer / decimal."""
@@ -1822,6 +1992,27 @@ class FHIRStrategy(BaseOutPutStrategy):
         """
         answers = self._choice_answer_collection(answer_expr)
         return f"{answers}.where(value.code = {code_expr}).exists()"
+
+    def _rewrite_choice_code_equality(self, expr: str) -> Optional[str]:
+        """Turn ``…value.code = 'x'`` into membership (HAPI-safe).
+
+        ``EQUAL`` on a choice item wraps to
+        ``…answer.where($this.exists()).value.code = 'CHE.B3.DE04'``, which is
+        never true on openSRP. Same for inherited-value unions that already end
+        in ``.value.code``. See fix/20260824-fhirpath-choice-equality.md.
+        """
+        s = (expr or "").strip()
+        match = _CHOICE_CODE_EQUALITY.match(s)
+        if not match:
+            return None
+        base = match.group("base")
+        exists_suffix = ".where($this.exists())"
+        if base.endswith(exists_suffix):
+            base = base[: -len(exists_suffix)]
+        membership = f"{base}.where(value.code = {match.group('code')}).exists()"
+        if match.group("op") == "!=":
+            return f"{membership}.not()"
+        return membership
 
     def _choice_codes_expr(self, answer_expr: str) -> str:
         """Collection of choice codes from an ``…answer`` FHIRPath."""
@@ -2006,21 +2197,39 @@ class FHIRStrategy(BaseOutPutStrategy):
         return " ".join(parts)
 
     def tricc_operation_case(self, ref_expressions, original_references=None):
-        # Similar to IFS but value-based matching
-        # Layout: [value, (match1, res1), (match2, res2), ..., default]
-        if len(ref_expressions) < 3:
-            return ref_expressions[0] if ref_expressions else "null"
+        # Parser emits list-pair when-items ``[test, result]``. Searched CASE
+        # (first ref is a pair) is CQL if/then/else, same idea as XLSForm ``if()``.
+        if ref_expressions and isinstance(ref_expressions[0], list):
+            return self._cql_searched_case(ref_expressions)
+        if not ref_expressions:
+            return "null"
         value = ref_expressions[0]
         parts = []
-        i = 1
-        while i < len(ref_expressions) - 1:
-            match_val = ref_expressions[i]
-            res = ref_expressions[i + 1]
-            parts.append(f"when {match_val} then {res}")
-            i += 2
-        if i < len(ref_expressions):
-            parts.append(f"else {ref_expressions[-1]}")
-        return f"case {value} {' '.join(parts)} end"
+        default = None
+        for item in ref_expressions[1:]:
+            if isinstance(item, list) and len(item) >= 2:
+                parts.append(f"when {item[0]} then {item[1]}")
+            else:
+                default = item
+        if not parts:
+            return str(value) if default is None else str(default)
+        body = " ".join(parts)
+        if default is None:
+            return f"case {value} {body} end"
+        return f"case {value} {body} else {default} end"
+
+    def _cql_searched_case(self, ref_expressions) -> str:
+        parts = []
+        default = "null"
+        for item in ref_expressions:
+            if isinstance(item, list) and len(item) >= 2:
+                parts.append(f"if {item[0]} then {item[1]}")
+            else:
+                default = item
+                break
+        if not parts:
+            return str(default)
+        return " else ".join(parts) + f" else {default}"
 
     def tricc_operation_coalesce(self, ref_expressions, original_references=None):
         # CQL coalesce
@@ -2093,14 +2302,14 @@ class FHIRStrategy(BaseOutPutStrategy):
     # FHIRPath variants – delegate to CQL handlers.
     # ============================================================
     def tricc_operation_fhirpath_equal(self, ref_expressions, original_references=None):
-        # Operands are already scalar-wrapped; just build the comparison.
-        r_expr =  self.tricc_operation_equal(ref_expressions)
-        return self._wrap_operand_if_needed(r_expr, original_references)
+        r_expr = self.tricc_operation_equal(ref_expressions)
+        wrapped = self._wrap_operand_if_needed(r_expr, original_references)
+        return self._rewrite_choice_code_equality(wrapped) or wrapped
 
     def tricc_operation_fhirpath_not_equal(self, ref_expressions, original_references=None):
-        # Operands are already scalar-wrapped; just build the comparison.
-        r_expr =  self.tricc_operation_not_equal(ref_expressions)
-        return self._wrap_operand_if_needed(r_expr, original_references)
+        r_expr = self.tricc_operation_not_equal(ref_expressions)
+        wrapped = self._wrap_operand_if_needed(r_expr, original_references)
+        return self._rewrite_choice_code_equality(wrapped) or wrapped
 
     def tricc_operation_fhirpath_less_or_equal(self, ref_expressions, original_references=None):
         return self._fhirpath_numeric_compare("<=", ref_expressions, original_references)
@@ -2128,23 +2337,42 @@ class FHIRStrategy(BaseOutPutStrategy):
         ):
             return expr
         if _NUMERIC_LITERAL.fullmatch(s):
-            if "." in s:
-                return s
-            return f"{s}.0"
+            return format_fhirpath_decimal(s)
         return f"({s}).toDecimal()"
 
     def _fhirpath_numeric_operand(self, expr: str, original_ref=None) -> str:
         wrapped = self._wrap_operand_if_needed(expr, original_ref)
         return self._fhirpath_as_decimal(wrapped, original_ref)
 
-    def _fhirpath_numeric_compare(self, operator: str, ref_expressions, original_references=None) -> str:
+    def _fhirpath_numeric_parts(self, ref_expressions, original_references=None):
+        """Wrap each arithmetic operand as a FHIRPath decimal scalar."""
         refs = list(original_references or [])
-        left_ref = refs[0] if refs else None
-        right_ref = refs[1] if len(refs) > 1 else None
-        left = self._fhirpath_numeric_operand(ref_expressions[0], left_ref)
-        right = self._fhirpath_numeric_operand(ref_expressions[1], right_ref)
-        return f"{left} {operator} {right}"
+        return [
+            self._fhirpath_numeric_operand(expr, refs[i] if i < len(refs) else None)
+            for i, expr in enumerate(ref_expressions)
+        ]
 
+    def _fhirpath_numeric_compare(self, operator: str, ref_expressions, original_references=None) -> str:
+        parts = self._fhirpath_numeric_parts(ref_expressions, original_references)
+        return f"{parts[0]} {operator} {parts[1]}"
+
+    def tricc_operation_fhirpath_multiplied(self, ref_expressions, original_references=None):
+        parts = self._fhirpath_numeric_parts(ref_expressions, original_references)
+        if len(parts) >= 2:
+            return f"({parts[0]} * {parts[1]})"
+        return parts[0] if parts else ""
+
+    def tricc_operation_fhirpath_divided(self, ref_expressions, original_references=None):
+        parts = self._fhirpath_numeric_parts(ref_expressions, original_references)
+        if len(parts) >= 2:
+            return f"({parts[0]} / {parts[1]})"
+        return parts[0] if parts else ""
+
+    def tricc_operation_fhirpath_modulo(self, ref_expressions, original_references=None):
+        parts = self._fhirpath_numeric_parts(ref_expressions, original_references)
+        if len(parts) >= 2:
+            return f"({parts[0]} mod {parts[1]})"
+        return parts[0] if parts else ""
 
     def tricc_operation_fhirpath_istrue(self, ref_expressions, original_references=None):
         # FHIRPath has no "is true" — CQL's tricc_operation_istrue() is not reused here.
@@ -2205,8 +2433,32 @@ class FHIRStrategy(BaseOutPutStrategy):
     def tricc_operation_fhirpath_notexists(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]}.empty()"
 
+    def _fhirpath_is_numeric_operand(self, original_ref, expr: str) -> bool:
+        """True when a COALESCE / iif value should be a FHIRPath decimal scalar."""
+        if self._operand_fhir_number_type(original_ref) is not None:
+            return True
+        return bool(_NUMERIC_LITERAL.fullmatch((expr or "").strip()))
+
+    def _fhirpath_typed_scalar(self, expr: str, original_ref=None) -> str:
+        """Item/literal scalar: decimal when numeric (``0`` → ``0.0``), else wrap only.
+
+        HAPI ``|`` / ``iif`` are type-strict: ``(x).toDecimal() * 12.0 | 0`` fails
+        because ``0`` is integer. See fix/20260824-fhirpath-numeric-arithmetic.md.
+        """
+        if self._fhirpath_is_numeric_operand(original_ref, expr):
+            return self._fhirpath_numeric_operand(expr, original_ref)
+        return self._wrap_operand_if_needed(expr, original_ref)
+
     def tricc_operation_fhirpath_coalesce(self, ref_expressions, original_references=None):
-        joined = "|".join(ref_expressions) if ref_expressions else ""
+        # Union of raw ``.answer`` collections makes ``.first()`` an Answer
+        # resource; HAPI then rejects ``answer * 30``. Wrap each item operand to
+        # a scalar first (fix/20260824-fhirpath-numeric-arithmetic.md).
+        refs = list(original_references or [])
+        wrapped = [
+            self._fhirpath_typed_scalar(expr, refs[i] if i < len(refs) else None)
+            for i, expr in enumerate(ref_expressions)
+        ]
+        joined = "|".join(wrapped) if wrapped else ""
         return f"({joined}).where($this.exists()).first()"
 
     def _inherited_operand_link_id(self, original_ref) -> Optional[str]:
@@ -2337,11 +2589,61 @@ class FHIRStrategy(BaseOutPutStrategy):
         return self._wrap_operand_if_needed(r_expr, original_references)
 
     def tricc_operation_fhirpath_ifs(self, ref_expressions, original_references=None):
-        # IFS/CASE not supported in FHIRPath 2.0 – raise explicit error
-        raise NotImplementedError("IFS is not supported by FHIRPath 2.0 – use CQL instead")
+        # XLSForm nested if(cond, then, else); FHIRPath is nested iif().
+        return self._fhirpath_searched_iif(ref_expressions, original_references)
 
     def tricc_operation_fhirpath_case(self, ref_expressions, original_references=None):
-        raise NotImplementedError("CASE is not supported by FHIRPath 2.0 – use CQL instead")
+        if ref_expressions and isinstance(ref_expressions[0], list):
+            return self._fhirpath_searched_iif(ref_expressions, original_references)
+        return self._fhirpath_value_case_iif(ref_expressions, original_references)
+
+    def _fhirpath_pair_wrap(self, expr, original_ref):
+        if isinstance(expr, list):
+            orig = original_ref if isinstance(original_ref, list) else []
+            return [
+                self._fhirpath_typed_scalar(part, orig[i] if i < len(orig) else None)
+                for i, part in enumerate(expr)
+            ]
+        return self._fhirpath_typed_scalar(expr, original_ref)
+
+    def _fhirpath_searched_iif(self, ref_expressions, original_references=None) -> str:
+        """``[[cond, val], …, default]`` → ``iif(cond, val, iif(…, default))``."""
+        refs = list(original_references or [])
+        pairs = []
+        default = "{}"
+        for i, item in enumerate(ref_expressions):
+            orig = refs[i] if i < len(refs) else None
+            if isinstance(item, list) and len(item) >= 2:
+                wrapped = self._fhirpath_pair_wrap(item, orig)
+                pairs.append((wrapped[0], wrapped[1]))
+            else:
+                default = self._fhirpath_typed_scalar(item, orig)
+                break
+        return self._fhirpath_nested_iif(pairs, default)
+
+    def _fhirpath_value_case_iif(self, ref_expressions, original_references=None) -> str:
+        """``[x, [a, va], …, default]`` → ``iif(x = a, va, iif(…, default))``."""
+        if not ref_expressions:
+            return "{}"
+        refs = list(original_references or [])
+        value = self._fhirpath_typed_scalar(ref_expressions[0], refs[0] if refs else None)
+        pairs = []
+        default = "{}"
+        for i, item in enumerate(ref_expressions[1:], start=1):
+            orig = refs[i] if i < len(refs) else None
+            if isinstance(item, list) and len(item) >= 2:
+                wrapped = self._fhirpath_pair_wrap(item, orig)
+                pairs.append((f"{value} = {wrapped[0]}", wrapped[1]))
+            else:
+                default = self._fhirpath_typed_scalar(item, orig)
+        return self._fhirpath_nested_iif(pairs, default)
+
+    @staticmethod
+    def _fhirpath_nested_iif(pairs, default: str) -> str:
+        expr = default if default not in (None, "") else "{}"
+        for cond, result in reversed(pairs):
+            expr = f"iif({cond}, {result}, {expr})"
+        return expr
 
     def tricc_operation_fhirpath_zscore(self, ref_expressions, original_references=None):
         raise NotImplementedError("ZSCORE is not supported by FHIRPath 2.0")
