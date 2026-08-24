@@ -281,11 +281,12 @@ class TestConvertExpressionToFhirpath(unittest.TestCase):
         )
         self.assertEqual(
             expr,
-            "%resource.repeat(item).where(linkId='CHE_B3_DE06')"
+            "%resource.item.where(linkId='CHE_B3_DE06')"
             ".answer.where(value.code = 'CHE.B3.DE04').exists()",
         )
         self.assertNotIn("where($this.exists()).value.code =", expr)
         self.assertNotIn("valueCoding", expr)
+        self.assertNotIn("repeat(item)", expr)
 
     def test_not_equal_choice_to_code_negates_membership(self):
         from tricc_oo.models.tricc import TriccNodeSelectOne
@@ -305,7 +306,7 @@ class TestConvertExpressionToFhirpath(unittest.TestCase):
         )
         self.assertEqual(
             expr,
-            "%resource.repeat(item).where(linkId='CHE_B3_DE06')"
+            "%resource.item.where(linkId='CHE_B3_DE06')"
             ".answer.where(value.code = 'CHE.B3.DE04').exists().not()",
         )
 
@@ -334,6 +335,52 @@ class TestConvertExpressionToFhirpath(unittest.TestCase):
             expr,
             "%resource.repeat(item).where(linkId='select_why').answer.where(value.code = 'demo.hungry').exists()",
         )
+
+    def test_nested_item_uses_group_path_instead_of_repeat(self):
+        from tricc_oo.models.tricc import TriccNodeSelectOne, TriccNodeSelectOption
+
+        select = TriccNodeSelectOne(
+            id="CHE_B3_DE06",
+            name="CHE_B3_DE06",
+            label="Type of Consultation",
+            list_name="consult",
+        )
+        select.options = {
+            0: TriccNodeSelectOption(
+                id="init",
+                name="CHE.B3.DE04",
+                label="Initial visit",
+                select=select,
+                list_name="consult",
+            )
+        }
+        self.strategy.questionnaires["main"] = {
+            "resourceType": "Questionnaire",
+            "item": [
+                {
+                    "linkId": "page_reg",
+                    "type": "group",
+                    "item": [
+                        {
+                            "linkId": "activity_reg",
+                            "type": "group",
+                            "item": [{"linkId": "CHE_B3_DE06", "type": "choice"}],
+                        }
+                    ],
+                }
+            ],
+        }
+        expr = self.strategy.convert_expression_to_fhirpath(
+            TriccOperation(TriccOperator.EQUAL, [select, TriccStatic("CHE.B3.DE04")])
+        )
+        self.assertEqual(
+            expr,
+            "%resource.item.where(linkId='page_reg')"
+            ".item.where(linkId='activity_reg')"
+            ".item.where(linkId='CHE_B3_DE06')"
+            ".answer.where(value.code = 'CHE.B3.DE04').exists()",
+        )
+        self.assertNotIn("repeat(item)", expr)
 
     def test_contains_uses_in_on_value_coding_code(self):
         from tricc_oo.models.tricc import TriccNodeSelectMultiple

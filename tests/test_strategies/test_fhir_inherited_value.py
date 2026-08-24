@@ -91,7 +91,8 @@ class TestInheritedValueInForm(unittest.TestCase):
 
         item = strategy._find_item_by_link_id(strategy.questionnaires["main"]["item"], "note1")
         expr = _extension(item, ENABLE_WHEN)[0]["valueExpression"]["expression"]
-        self.assertEqual(expr.count("%resource.repeat(item)"), 2)
+        self.assertEqual(expr.count("%resource.item.where(linkId="), 2)
+        self.assertNotIn("repeat(item)", expr)
         # newest version first, and only the winning answer is tested
         self.assertLess(expr.index("linkId='fever_Vv_2'"), expr.index("linkId='fever_Vv_1'"))
         self.assertIn(".where($this.exists()).first()", expr)

@@ -110,8 +110,9 @@ class TestGenerateCalculateExpressionLanguage(unittest.TestCase):
         self.assertEqual(len(extensions), 1)
         value_expr = extensions[0]["valueExpression"]
         self.assertEqual(value_expr["language"], "text/fhirpath")
-        self.assertIn("%resource.repeat(item).where(linkId='weight')", value_expr["expression"])
-        self.assertIn("%resource.repeat(item).where(linkId='height')", value_expr["expression"])
+        self.assertIn("%resource.item.where(linkId='weight')", value_expr["expression"])
+        self.assertIn("%resource.item.where(linkId='height')", value_expr["expression"])
+        self.assertNotIn("repeat(item)", value_expr["expression"])
         # No CQL define should have been recorded for a pure in-form calculation.
         self.assertEqual(strategy.cql_defines, {})
 

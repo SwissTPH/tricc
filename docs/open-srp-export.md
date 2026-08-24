@@ -211,7 +211,7 @@ Relevance conditions from the TRICC graph are converted to **FHIRPath** using
   "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-enableWhenExpression",
   "valueExpression": {
     "language": "text/fhirpath",
-    "expression": "%resource.repeat(item).where(linkId='age').answer.value >= 18"
+    "expression": "%resource.item.where(linkId='age').answer.value >= 18"
   }
 }
 ```
@@ -232,7 +232,7 @@ relevance stay enabled.
       "url": "expression",
       "valueExpression": {
         "language": "text/fhirpath",
-        "expression": "%resource.repeat(item).where(linkId='demo_filter').answer.where($this.exists()).value = true"
+        "expression": "%resource.item.where(linkId='demo_filter').answer.where($this.exists()).value = true"
       }
     }
   ]
@@ -286,7 +286,7 @@ per calculate node based on where its references live:
 
 | At least one reference is an item in *this* Questionnaire | Extension | Language |
 |---|---|---|
-| Yes — value(s) can be read live via `%resource.repeat(item).where(linkId=...)` | `calculatedExpression` | `text/fhirpath` |
+| Yes — value(s) can be read live via nested `%resource.item.where(linkId=...)` | `calculatedExpression` | `text/fhirpath` |
 | No — depends only on data outside the form (e.g. observation history via the Helper) | `initialExpression` | `text/cql-identifier` |
 
 In-form calculation (e.g. BMI from weight + height both answered in the same Questionnaire):
@@ -296,15 +296,18 @@ In-form calculation (e.g. BMI from weight + height both answered in the same Que
   "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-calculatedExpression",
   "valueExpression": {
     "language": "text/fhirpath",
-    "expression": "%resource.repeat(item).where(linkId='weight').answer.value / (%resource.repeat(item).where(linkId='height').answer.value * %resource.repeat(item).where(linkId='height').answer.value)"
+    "expression": "%resource.item.where(linkId='weight').answer.value / (%resource.item.where(linkId='height').answer.value * %resource.item.where(linkId='height').answer.value)"
   }
 }
 ```
 
 **Updated 2026-08-13** (`fix/20260813-fhirpath-choice-answers.md`):
 
-- Item lookup always uses `%resource.repeat(item).where(linkId=...)` so questions nested
-  in page/activity groups are found.
+- Item lookup uses a nested `%resource.item.where(linkId='<group>').item.where(linkId='<q>')`
+  path when the item is on the Questionnaire (OpenSRP re-evaluates live expressions on
+  every answer; `repeat(item)` would walk the whole tree each time). Unknown `linkId`s
+  still use `%resource.repeat(item).where(linkId=...)`. See
+  `fix/20260824-fhirpath-nested-item-path.md`.
 - Choice / open-choice answers are stored as `valueCoding`. Membership
   (`SELECTED` / option `CONTAINS` / **`EQUAL` of a select to an option code**)
   emits `…answer.where(value.code = '<code>').exists()` (HAPI FHIRPath has no

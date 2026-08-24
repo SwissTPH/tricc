@@ -282,6 +282,8 @@ class FHIRStrategy(BaseOutPutStrategy):
         self._image_binary_ids: Dict[str, str] = {}
         self._project_image_index: Optional[Dict[str, str]] = None
         self._form_id: Optional[str] = None
+        self._item_path_index: Optional[Dict[str, Dict[str, List[str]]]] = None
+        self._item_path_index_key = None
         self.cql_libraries: Dict[str, str] = {}
         self.libraries: Dict[str, dict] = {}   # Phase 2: actual FHIR Library resources
         self.fml_mappings: Dict[str, str] = {}
@@ -733,8 +735,10 @@ class FHIRStrategy(BaseOutPutStrategy):
         self._group_stack = []
         self._item_sort_keys = {}
         self._item_seq = 0
+        self._item_path_index = None
         super().process_base(start_pages, **kwargs)
         self._sort_questionnaire_items()
+        self._item_path_index = None
 
     def _sort_questionnaire_items(self) -> None:
         """Put earlier flowchart nodes first within each Questionnaire / group."""
@@ -1007,7 +1011,7 @@ class FHIRStrategy(BaseOutPutStrategy):
                 return True
 
             # calculatedExpression is FHIRPath-only; it can only reach values already
-            # answered/computed in *this* Questionnaire (%resource.repeat(item).where(linkId=...)).
+            # answered/computed in *this* Questionnaire (nested item.where(linkId=...)).
             # If at least one reference is captured here, prefer the live-recalculating
             # calculatedExpression; otherwise fall back to a one-time CQL initialExpression.
             references = self._collect_calculate_references(expression)
@@ -1659,7 +1663,6 @@ class FHIRStrategy(BaseOutPutStrategy):
         if isinstance(r, TriccOperation):
             return self.get_tricc_operation_expression_fhirpath(r)
         elif isinstance(r, TriccReference):
-            # Nested groups are the common case; repeat(item) walks descendants.
             return self._fhirpath_answer(get_export_name(r.value))
         elif isinstance(r, TriccStatic):
             if isinstance(r.value, bool):
@@ -1769,10 +1772,66 @@ class FHIRStrategy(BaseOutPutStrategy):
             return True
         return False
 
+    def _item_path_index_fingerprint(self):
+        """Detect Questionnaire tree replacement so the path index is rebuilt."""
+        return tuple(
+            (segment, id(q), len(q.get("item") or []))
+            for segment, q in (self.questionnaires or {}).items()
+        )
+
+    def _ensure_item_path_index(self) -> None:
+        key = self._item_path_index_fingerprint()
+        if self._item_path_index is not None and self._item_path_index_key == key:
+            return
+        index: Dict[str, Dict[str, List[str]]] = {}
+        for segment, q in (self.questionnaires or {}).items():
+            bucket: Dict[str, List[str]] = {}
+            self._index_item_paths(q.get("item") or [], [], bucket)
+            index[segment] = bucket
+        self._item_path_index = index
+        self._item_path_index_key = key
+
     @staticmethod
-    def _fhirpath_answer(link_id: str) -> str:
-        """QuestionnaireResponse.answer collection for ``link_id``, including nested groups."""
-        return f"%resource.repeat(item).where(linkId='{link_id}').answer"
+    def _index_item_paths(items, prefix: List[str], bucket: Dict[str, List[str]]) -> None:
+        for item in items or []:
+            lid = item.get("linkId")
+            here = list(prefix)
+            if lid:
+                here = prefix + [lid]
+                bucket[lid] = here
+            nested = item.get("item")
+            if nested:
+                FHIRStrategy._index_item_paths(nested, here, bucket)
+
+    def _item_path_for_link_id(self, link_id: str) -> Optional[List[str]]:
+        """Root-to-item ``linkId`` path on the current Questionnaire, if known."""
+        if not link_id:
+            return None
+        self._ensure_item_path_index()
+        index = self._item_path_index or {}
+        segment = getattr(self, "_current_segment", None)
+        if segment and segment in index and link_id in index[segment]:
+            return index[segment][link_id]
+        for bucket in index.values():
+            if link_id in bucket:
+                return bucket[link_id]
+        return None
+
+    def _fhirpath_item(self, link_id: str) -> str:
+        """QuestionnaireResponse item for ``link_id``.
+
+        Nested ``item.where(linkId=…)`` when the item lives on a Questionnaire
+        (cheap at OpenSRP eval time). ``repeat(item)`` only if the path is
+        unknown. See fix/20260824-fhirpath-nested-item-path.md.
+        """
+        path = self._item_path_for_link_id(link_id)
+        if not path:
+            return f"%resource.repeat(item).where(linkId='{link_id}')"
+        return "%resource" + "".join(f".item.where(linkId='{lid}')" for lid in path)
+
+    def _fhirpath_answer(self, link_id: str) -> str:
+        """QuestionnaireResponse.answer collection for ``link_id``."""
+        return f"{self._fhirpath_item(link_id)}.answer"
 
     @staticmethod
     def _sanitize_hidden_item_text(node, label) -> str:

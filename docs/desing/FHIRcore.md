@@ -92,7 +92,7 @@ Output: FHIR SDC resources (Questionnaire, PlanDefinition, Library+CQL, Structur
   - **Populate helpers**: `GetPatientValue`, `GetFacilityValue`, `GetLocationValue`, `GetPractitionerValue`, `GetEncounterValue`, `GetHistoryObservationValue` — in `populate_helper.py`, injected into the Helper template.
   - Thin **per-process/segment** libraries that include the Helper and define named calculations (simple `define "Calc_xxx": ...` expressions, often delegating to the Helper).
   - A Questionnaire typically references only one main library (declared via the `library` element or SDC `cqlInputResources` extension).
-  - Expressions in the Questionnaire use **simple define names** (e.g. `"Calc_bmi"`) with `text/cql-identifier` — but only inside `initialExpression`. `calculatedExpression` never carries CQL; it is FHIRPath referencing other Questionnaire items via `%resource.repeat(item).where(linkId=...)` (nested groups). Choice membership tests read `.answer.valueCoding.code`; primitives use `.answer.value`. See `fix/20260813-fhirpath-choice-answers.md`.
+  - Expressions in the Questionnaire use **simple define names** (e.g. `"Calc_bmi"`) with `text/cql-identifier` — but only inside `initialExpression`. `calculatedExpression` never carries CQL; it is FHIRPath referencing other Questionnaire items via nested `%resource.item.where(linkId=...)` (group path; `repeat(item)` only if the item is not on the Questionnaire). Choice membership tests read `.answer.where(value.code = '…').exists()`; primitives use `.answer.value`. See `fix/20260813-fhirpath-choice-answers.md`, `fix/20260824-fhirpath-nested-item-path.md`.
   - This design follows patterns from pyfhirsdc and WHO SMART CQL libraries.
 
 - **Advanced TRICC Navigation**  
@@ -130,7 +130,7 @@ Output: FHIR SDC resources (Questionnaire, PlanDefinition, Library+CQL, Structur
 - [x] Concept repeat: Questionnaire item extension + Helper repeat functions + FML hints (`repeat_helper.py`).
 - [x] `FHIRStrategy` registered via `@register_output_strategy("FHIRStrategy")` and eager import in `strategies/__init__.py`.
 - [x] Basic nesting support for groups/activities in Questionnaires.
-- [x] Full StructureMap / data extraction driven by concept_type (CodeSystem `conceptType`: Symptom-Finding/Question → Observation; proposed_diagnosis → Condition provisional; AcceptDiag → confirmed/refuted; `repeat != 1` → Observation extension).
+- [x] Full StructureMap / data extraction driven by concept_type (CodeSystem `conceptType`: Symptom-Finding/Question → Observation; proposed_diagnosis → Condition provisional; AcceptDiag → confirmed/refuted; `repeat != 1` → Observation extension). One extract group per concept + repeat; versioned `linkId`s share that group and take the first non-null answer newest-first (HAPI `resolveGroupReference` requires unique group names — `fix/20260824-structuremap-duplicate-extract-groups.md`).
 - [ ] Complete ValueSet generation.
 - [x] Binary (images) generation — question/answer illustration images via `itemMedia`/
       `itemAnswerMedia` extensions (`contentType` + `Binary/<id>` URL) and per-image

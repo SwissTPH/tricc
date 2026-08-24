@@ -131,8 +131,9 @@ When touching `FHIRStrategy` or `OpenSRPStrategy` (`tricc_oo/converters/fhir/`,
 `tricc_oo/strategies/output/fhir_form.py`, `opensrp.py`): route resource access through a single
 Helper CQL library keyed by concept, keep per-segment libraries thin, and use unqualified `define`
 names in Questionnaire expressions — never raw QuestionnaireResponse item paths in CQL.
-In-form FHIRPath uses `%resource.repeat(item).where(linkId=...)` and, for choice answers,
-`.answer.valueCoding.code`. Full architecture in `docs/desing/FHIRcore.md`; user-facing
+In-form FHIRPath uses nested `%resource.item.where(linkId=...)` group paths (`repeat(item)`
+only if the item is not on the Questionnaire). Choice membership is
+`.answer.where(value.code = '…').exists()`. Full architecture in `docs/desing/FHIRcore.md`; user-facing
 export guide in `docs/open-srp-export.md`. Issue-specific emission and semantics live in
 `fix/` — not here.
 
