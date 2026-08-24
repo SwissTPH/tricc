@@ -112,14 +112,37 @@ class XLSFormStrategy(BaseOutPutStrategy):
             return str(expression[9:-4])
         return str(expression)
 
-    def generate_base(self, node, **kwargs):
-        return generate_base(node, **kwargs)
+    def generate_base(
+        self, node, processed_nodes=None, stashed_nodes=None, process=None, warn=False, **kwargs
+    ):
+        return generate_base(
+            node,
+            processed_nodes=processed_nodes,
+            stashed_nodes=stashed_nodes,
+            process=process,
+            warn=warn,
+            **kwargs,
+        )
 
-    def generate_relevance(self, node, **kwargs):
-        return self.generate_xls_form_relevance(node, **kwargs)
+    def generate_relevance(
+        self, node, processed_nodes=None, stashed_nodes=None, process=None, warn=False, **kwargs
+    ):
+        # Relevance is serialised during generate_export from node.relevance
+        # (computed in load_calculate). This pass is a no-op so the shared
+        # execute() pipeline can call process_relevance for every strategy.
+        return True
 
-    def generate_calculate(self, node, **kwargs):
-        return generate_calculate(node, **kwargs)
+    def generate_calculate(
+        self, node, processed_nodes=None, stashed_nodes=None, process=None, warn=False, **kwargs
+    ):
+        return generate_calculate(
+            node,
+            processed_nodes=processed_nodes,
+            stashed_nodes=stashed_nodes,
+            process=process,
+            warn=warn,
+            **kwargs,
+        )
 
     def __init__(self, project, output_path):
         super().__init__(project, output_path)
@@ -137,8 +160,18 @@ class XLSFormStrategy(BaseOutPutStrategy):
             "calculates": self.calculates,
         }
 
-    def generate_export(self, node, **kwargs):
-        return generate_xls_form_export(self, node, **kwargs)
+    def generate_export(
+        self, node, processed_nodes=None, stashed_nodes=None, process=None, warn=False, **kwargs
+    ):
+        return generate_xls_form_export(
+            self,
+            node,
+            processed_nodes=processed_nodes,
+            stashed_nodes=stashed_nodes,
+            process=process,
+            warn=warn,
+            **kwargs,
+        )
 
     def inject_version(self):
         # Add hidden version field using ODK's version()

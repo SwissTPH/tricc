@@ -107,6 +107,11 @@ BaseOutPutStrategy
 
 ### Processing pipeline
 
+The four `process_*` walks use the **shared** output callback contract
+(`node`, `processed_nodes`, `stashed_nodes`, `process`, `warn`). OpenSRP extra
+resources are **not** produced by that walk — they are assembled in `export()`
+after the FHIR Questionnaire / CQL / StructureMap walks complete.
+
 ```
 execute()
   ├── process_base()       → generate_base(node)      builds Questionnaire items
@@ -126,6 +131,8 @@ execute()
               └── _write_image_binaries()           → binary/Binary-<uuid>.json
 ```
 
+See `feature/20260824-output-walk-context.md`.
+
 ---
 
 ## Boolean / yes-no questions
@@ -144,6 +151,23 @@ the app lays Yes and No **side by side**:
 Hidden booleans (calculates, proposed diagnoses, waits) do not get the
 extension. Generic `FHIRStrategy` export is unchanged. See
 `feature/20260819-boolean-choice-orientation.md`.
+
+---
+
+## Help and hint messages
+
+Draw.io **help-message** and **hint-message** boxes (copied onto the question as
+`help` / `hint`) become nested `display` children of that Questionnaire item:
+
+| Authoring | Child `linkId` | `questionnaire-itemControl` |
+|-----------|----------------|-----------------------------|
+| help-message | `<question>-help` | `help` |
+| hint-message | `<question>-hint` | `flyover` |
+
+Those codes are display item-controls; they are **not** put on the question
+itself. Hidden items (calculates, diagnoses, waits) get neither child. The
+children are display-only and are not extracted. See
+`feature/20260824-fhir-help-hint-itemcontrol.md`.
 
 ---
 

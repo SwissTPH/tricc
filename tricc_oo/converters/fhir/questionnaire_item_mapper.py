@@ -101,6 +101,9 @@ SKIP_NODE_TYPES = {
     TriccNodeType.context,
     TriccNodeType.remote_reference,
     TriccNodeType.operation,
+    # Enrichment boxes are copied onto the target node's help/hint; they are not items.
+    TriccNodeType.help,
+    TriccNodeType.hint,
 }
 
 # SDC forbids Questionnaire.item.initial and sdc-questionnaire-initialExpression on
@@ -331,6 +334,29 @@ def build_item_control_extension(control_code: str) -> dict:
                 }
             ]
         },
+    }
+
+
+def build_item_control_display_item(link_id: str, text: str, control_code: str) -> dict:
+    """Build a nested display item that carries a questionnaire-itemControl code.
+
+    ``help`` and ``flyover`` are display codes: they belong on a child ``display``
+    item of the question, not on the question itself. See
+    ``feature/20260824-fhir-help-hint-itemcontrol.md``.
+
+    Args:
+        link_id: Child item linkId (e.g. ``weight-help``).
+        text: Display text.
+        control_code: Item-control code (``help``, ``flyover``, …).
+
+    Returns:
+        FHIR Questionnaire.item dict.
+    """
+    return {
+        "linkId": link_id,
+        "type": FHIR_TYPE_DISPLAY,
+        "text": text,
+        "extension": [build_item_control_extension(control_code)],
     }
 
 

@@ -1698,6 +1698,7 @@ def walktrhough_tricc_node_processed_stached(
                                 recursive,
                                 warn=warn,
                                 node_path=node_path.copy(),
+                                process=process,
                                 **kwargs,
                             )
                 else:
@@ -1720,6 +1721,7 @@ def walktrhough_tricc_node_processed_stached(
                         recursive=recursive,
                         warn=warn,
                         node_path=node_path.copy(),
+                        process=process,
                         **kwargs,
                     )
                 for c in node.activity.calculates:
@@ -1733,6 +1735,7 @@ def walktrhough_tricc_node_processed_stached(
                             recursive=recursive,
                             warn=warn,
                             node_path=node_path.copy(),
+                            process=process,
                             **kwargs,
                         )
             else:
@@ -1747,6 +1750,7 @@ def walktrhough_tricc_node_processed_stached(
                     stashed_nodes=stashed_nodes,
                     warn=warn,
                     node_path=node_path,
+                    process=process,
                     **kwargs,
                 )
                 if option not in processed_nodes:
@@ -1764,6 +1768,7 @@ def walktrhough_tricc_node_processed_stached(
                     recursive,
                     warn=warn,
                     node_path=node_path,
+                    process=process,
                     **kwargs,
                 )
         if isinstance(node, TriccNodeActivity):
@@ -1780,6 +1785,7 @@ def walktrhough_tricc_node_processed_stached(
                             recursive,
                             warn=warn,
                             node_path=node_path.copy(),
+                            process=process,
                             **kwargs,
                         )
                     elif node.root not in stashed_nodes:
@@ -1797,6 +1803,7 @@ def walktrhough_tricc_node_processed_stached(
                     recursive,
                     warn=warn,
                     node_path=node_path,
+                    process=process,
                     **kwargs,
                 )
             else:
@@ -1818,7 +1825,16 @@ def walktrhough_tricc_node_processed_stached(
 
 
 def walkthrough_tricc_next_nodes(
-    node, callback, processed_nodes, stashed_nodes, path_len, recursive, warn=False, node_path=[], **kwargs
+    node,
+    callback,
+    processed_nodes,
+    stashed_nodes,
+    path_len,
+    recursive,
+    warn=False,
+    node_path=[],
+    process=None,
+    **kwargs,
 ):
 
     if not recursive:
@@ -1837,6 +1853,7 @@ def walkthrough_tricc_next_nodes(
                         recursive,
                         warn=warn,
                         node_path=node_path.copy(),
+                        process=process,
                         **kwargs,
                     )
             else:
@@ -1847,7 +1864,16 @@ def walkthrough_tricc_next_nodes(
 
 
 def walkthrough_tricc_option(
-    node, callback, processed_nodes, stashed_nodes, path_len, recursive, warn=False, node_path=[], **kwargs
+    node,
+    callback,
+    processed_nodes,
+    stashed_nodes,
+    path_len,
+    recursive,
+    warn=False,
+    node_path=[],
+    process=None,
+    **kwargs,
 ):
     if not recursive:
         for option in reversed(list(node.options.values())):
@@ -1873,6 +1899,7 @@ def walkthrough_tricc_option(
                                     recursive,
                                     warn=warn,
                                     node_path=node_path.copy(),
+                                    process=process,
                                     **kwargs,
                                 )
 

@@ -326,19 +326,19 @@ class SpiceStrategy(BaseOutPutStrategy):
 
         # Handle stashed nodes (if needed)
 
-    def tricc_operation_equal(self, ref_expressions):
+    def tricc_operation_equal(self, ref_expressions, original_references=None):
         return {
             "eq": str(ref_expressions[1]),
             "targetId": str(ref_expressions[0]),
             "visibility": "visible",
         }
 
-    def tricc_operation_in(self, ref_expressions):
+    def tricc_operation_in(self, ref_expressions, original_references=None):
         return {
             "eq": str(ref_expressions[0]),
             "targetId": str(ref_expressions[1]),
             "visibility": "visible",
         }
 
-    # def tricc_operation_in(self, ref_expressions):
+    # def tricc_operation_in(self, ref_expressions, original_references=None):
     #     return ref_expressions[0].replace("visible", "gone")

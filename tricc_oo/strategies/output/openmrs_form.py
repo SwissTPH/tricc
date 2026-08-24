@@ -98,9 +98,11 @@ class OpenMRSStrategy(BaseOutPutStrategy):
     def get_tricc_operation_expression(self, operation):
         # Similar to HTML, but for JSON, perhaps convert to string expressions
         ref_expressions = []
+        original_references = []
         if not hasattr(operation, "reference"):
             return self.get_tricc_operation_operand(operation)
         for r in operation.reference:
+            original_references.append(r)
             if isinstance(r, list):
                 r_expr = [
                     (
@@ -123,7 +125,7 @@ class OpenMRSStrategy(BaseOutPutStrategy):
         # build lower level
         if hasattr(self, f"tricc_operation_{operation.operator}"):
             callable = getattr(self, f"tricc_operation_{operation.operator}")
-            return callable(ref_expressions)
+            return callable(ref_expressions, original_references)
         else:
             raise NotImplementedError(
                 f"This type of operation '{operation.operator}' is not supported in this strategy"
@@ -420,21 +422,21 @@ class OpenMRSStrategy(BaseOutPutStrategy):
             return self.get_tricc_operation_operand(expression)
 
     # Operation methods similar, but for string expressions
-    def tricc_operation_equal(self, ref_expressions):
+    def tricc_operation_equal(self, ref_expressions, original_references=None):
         if ref_expressions[1] == TriccStatic(True) or ref_expressions[1] is True or ref_expressions[1] == 'true':
             return f"{self._boolean(ref_expressions, '===', CIEL_YES, 'true')}"
         elif ref_expressions[1] == TriccStatic(False) or ref_expressions[1] is False or ref_expressions[1] == 'false':
             return f"{self._boolean(ref_expressions, '===', CIEL_NO, 'false')}"
         return f"{ref_expressions[0]} === {ref_expressions[1]}"
 
-    def tricc_operation_not_equal(self, ref_expressions):
+    def tricc_operation_not_equal(self, ref_expressions, original_references=None):
         if ref_expressions[1] == TriccStatic(True) or ref_expressions[1] is True or ref_expressions[1] == 'true':
             return f"!{self._boolean(ref_expressions, '===', CIEL_YES, 'true')}"
         elif ref_expressions[1] == TriccStatic(False) or ref_expressions[1] is False or ref_expressions[1] == 'false':
             return f"!{self._boolean(ref_expressions, '===', CIEL_NO, 'false')}"
         return f"{ref_expressions[0]} !== {ref_expressions[1]}"
 
-    def tricc_operation_and(self, ref_expressions):
+    def tricc_operation_and(self, ref_expressions, original_references=None):
         if len(ref_expressions) == 1:
             return ref_expressions[0]
         if len(ref_expressions) > 1:
@@ -442,7 +444,7 @@ class OpenMRSStrategy(BaseOutPutStrategy):
         else:
             return "true"
 
-    def tricc_operation_or(self, ref_expressions):
+    def tricc_operation_or(self, ref_expressions, original_references=None):
         if len(ref_expressions) == 1:
             return ref_expressions[0]
         if len(ref_expressions) > 1:
@@ -450,91 +452,91 @@ class OpenMRSStrategy(BaseOutPutStrategy):
         else:
             return "true"
 
-    def tricc_operation_not(self, ref_expressions):
+    def tricc_operation_not(self, ref_expressions, original_references=None):
         return f"!({ref_expressions[0]})"
 
-    def tricc_operation_plus(self, ref_expressions):
+    def tricc_operation_plus(self, ref_expressions, original_references=None):
         return "(" + " + ".join(ref_expressions) + ")"
 
-    def tricc_operation_minus(self, ref_expressions):
+    def tricc_operation_minus(self, ref_expressions, original_references=None):
         if len(ref_expressions) > 1:
             return " - ".join(map(str, ref_expressions))
         elif len(ref_expressions) == 1:
             return f"-{ref_expressions[0]}"
 
-    def tricc_operation_more(self, ref_expressions):
+    def tricc_operation_more(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]} > {ref_expressions[1]}"
 
-    def tricc_operation_less(self, ref_expressions):
+    def tricc_operation_less(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]} < {ref_expressions[1]}"
 
-    def tricc_operation_more_or_equal(self, ref_expressions):
+    def tricc_operation_more_or_equal(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]} >= {ref_expressions[1]}"
 
-    def tricc_operation_less_or_equal(self, ref_expressions):
+    def tricc_operation_less_or_equal(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]} <= {ref_expressions[1]}"
 
-    def tricc_operation_selected(self, ref_expressions):
+    def tricc_operation_selected(self, ref_expressions, original_references=None):
         # For choice questions, returns true if the second reference (value) is included in the first (field)
         return f"({ref_expressions[0]}.includes({ref_expressions[1]}))"
 
-    def tricc_operation_count(self, ref_expressions):
+    def tricc_operation_count(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]}.length"
 
-    def tricc_operation_multiplied(self, ref_expressions):
+    def tricc_operation_multiplied(self, ref_expressions, original_references=None):
         return "*".join(ref_expressions)
 
-    def tricc_operation_divided(self, ref_expressions):
+    def tricc_operation_divided(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]} / {ref_expressions[1]}"
 
-    def tricc_operation_modulo(self, ref_expressions):
+    def tricc_operation_modulo(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]} % {ref_expressions[1]}"
 
-    def tricc_operation_coalesce(self, ref_expressions):
+    def tricc_operation_coalesce(self, ref_expressions, original_references=None):
         return f"coalesce({','.join(ref_expressions)})"
 
-    def tricc_operation_module(self, ref_expressions):
+    def tricc_operation_module(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]} % {ref_expressions[1]}"
 
-    def tricc_operation_native(self, ref_expressions):
+    def tricc_operation_native(self, ref_expressions, original_references=None):
         if len(ref_expressions) > 0:
             return f"{ref_expressions[0]}({','.join(ref_expressions[1:])})"
 
-    def tricc_operation_istrue(self, ref_expressions):
+    def tricc_operation_istrue(self, ref_expressions, original_references=None):
         # return f"{ref_expressions[0]} === true"
         return f"{self._boolean(ref_expressions, '===', CIEL_YES, 'true')}"
 
-    def tricc_operation_isfalse(self, ref_expressions):
+    def tricc_operation_isfalse(self, ref_expressions, original_references=None):
         # return f"{ref_expressions[0]} === false"
         return f"{self._boolean(ref_expressions, '===', CIEL_NO, 'false')}"
 
-    def tricc_operation_parenthesis(self, ref_expressions):
+    def tricc_operation_parenthesis(self, ref_expressions, original_references=None):
         return f"({ref_expressions[0]})"
 
-    def tricc_operation_between(self, ref_expressions):
+    def tricc_operation_between(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]} >= {ref_expressions[1]} && {ref_expressions[0]} < {ref_expressions[2]}"
 
-    def tricc_operation_isnull(self, ref_expressions):
+    def tricc_operation_isnull(self, ref_expressions, original_references=None):
         return f"isEmpty({ref_expressions[0]})"
 
-    def tricc_operation_isnotnull(self, ref_expressions):
+    def tricc_operation_isnotnull(self, ref_expressions, original_references=None):
         return f"!isEmpty{ref_expressions[0]})"
 
-    def tricc_operation_isnottrue(self, ref_expressions):
+    def tricc_operation_isnottrue(self, ref_expressions, original_references=None):
         # return f"{ref_expressions[0]} !== true"
         return f"!{self._boolean(ref_expressions, '===', CIEL_YES, 'true')}"
 
-    def tricc_operation_isnotfalse(self, ref_expressions):
+    def tricc_operation_isnotfalse(self, ref_expressions, original_references=None):
         # return f"{ref_expressions[0]} !== false"
         return f"!{self._boolean(ref_expressions, '===', CIEL_NO, 'false')}"
 
     def _boolean(self, ref_expressions, operator, answer_uuid, bool_val='false'):
         return f"({ref_expressions[0]} {operator} {bool_val} || {ref_expressions[0]} {operator} '{answer_uuid}')"
 
-    def tricc_operation_notexist(self, ref_expressions):
+    def tricc_operation_notexist(self, ref_expressions, original_references=None):
         return f"typeof {ref_expressions[0]} === 'undefined'"
 
-    def tricc_operation_case(self, ref_expressions):
+    def tricc_operation_case(self, ref_expressions, original_references=None):
         # Simplified, assuming list of conditions
         parts = []
         for i in range(0, len(ref_expressions), 2):
@@ -542,42 +544,42 @@ class OpenMRSStrategy(BaseOutPutStrategy):
                 parts.append(f"if({ref_expressions[i]}, {ref_expressions[i+1]})")
         return " || ".join(parts)  # Simplified
 
-    def tricc_operation_ifs(self, ref_expressions):
+    def tricc_operation_ifs(self, ref_expressions, original_references=None):
         # Similar to case
         return self.tricc_operation_case(ref_expressions[1:])
 
-    def tricc_operation_if(self, ref_expressions):
+    def tricc_operation_if(self, ref_expressions, original_references=None):
         return f"if({ref_expressions[0]}, {ref_expressions[1]}, {ref_expressions[2]})"
 
-    def tricc_operation_contains(self, ref_expressions):
+    def tricc_operation_contains(self, ref_expressions, original_references=None):
         return f"contains({ref_expressions[0]}, {ref_expressions[1]})"
 
-    def tricc_operation_exists(self, ref_expressions):
+    def tricc_operation_exists(self, ref_expressions, original_references=None):
         parts = []
         for ref in ref_expressions:
             parts.append(f"!isEmpty{ref})")
         return " && ".join(parts)
 
-    def tricc_operation_cast_number(self, ref_expressions):
+    def tricc_operation_cast_number(self, ref_expressions, original_references=None):
         return f"Number({ref_expressions[0]})"
 
-    def tricc_operation_cast_integer(self, ref_expressions):
+    def tricc_operation_cast_integer(self, ref_expressions, original_references=None):
         return f"Number({ref_expressions[0]})"
 
-    def tricc_operation_zscore(self, ref_expressions):
+    def tricc_operation_zscore(self, ref_expressions, original_references=None):
         # Simplified, assuming params
         return f"zscore({','.join(ref_expressions)})"
 
-    def tricc_operation_datetime_to_decimal(self, ref_expressions):
+    def tricc_operation_datetime_to_decimal(self, ref_expressions, original_references=None):
         return f"decimal-date-time({ref_expressions[0]})"
 
-    def tricc_operation_round(self, ref_expressions):
+    def tricc_operation_round(self, ref_expressions, original_references=None):
         return f"round({ref_expressions[0]})"
 
-    def tricc_operation_izscore(self, ref_expressions):
+    def tricc_operation_izscore(self, ref_expressions, original_references=None):
         return f"izscore({','.join(ref_expressions)})"
 
-    def tricc_operation_concatenate(self, ref_expressions):
+    def tricc_operation_concatenate(self, ref_expressions, original_references=None):
         return f"concat({','.join(ref_expressions)})"
 
     def clean_sections(self):

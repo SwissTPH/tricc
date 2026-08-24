@@ -796,10 +796,9 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             logger.critical("Main process required")
 
         logger.info("generate the relevance based on edges")
+        self.process_relevance(self.project.start_pages, pages=self.project.pages)
 
-        # create relevance Expression
-
-        # create calculate Expression
+        logger.info("generate the calculate based on edges")
         self.process_calculate(self.project.start_pages, pages=self.project.pages)
         logger.info("generate the export format")
         # create calculate Expression

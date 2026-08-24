@@ -1,0 +1,31 @@
+# Question with authored help-message and hint-message (YAML attrs).
+# FHIR/OpenSRP nest these as display children with itemControl help / flyover.
+# See feature/20260824-fhir-help-hint-itemcontrol.md.
+
+id: help_hint
+title: Help and hint
+process: main
+
+nodes:
+  - id: start
+    type: start
+    label: Start
+    name: start_hh
+    form_id: help-hint
+
+  - id: q_weight
+    type: integer
+    name: weight
+    label: Weight (kg)
+    help: Enter the weight in kilograms
+    hint: e.g. 12.5
+
+  - id: end
+    type: end
+    label: End
+
+edges:
+  - source: start
+    target: q_weight
+  - source: q_weight
+    target: end

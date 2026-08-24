@@ -62,6 +62,7 @@ from tricc_oo.converters.fhir.questionnaire_item_mapper import (
     build_initial_expression_cql,
     build_calculated_expression_fhirpath,
     build_item_answer_media_extension,
+    build_item_control_display_item,
     build_item_media_extension,
     get_display_type_extensions,
     get_fhir_item_type,
@@ -475,7 +476,9 @@ class FHIRStrategy(BaseOutPutStrategy):
         binary_id, content_type = registered
         return build_item_answer_media_extension(binary_id, content_type)
 
-    def generate_base(self, node, **kwargs):
+    def generate_base(
+        self, node, processed_nodes=None, stashed_nodes=None, process=None, warn=False, **kwargs
+    ):
         """Build a Questionnaire.item from a TRICC node using the central mapper.
 
         Supports basic nesting: group-like nodes (activity_start, start, etc.)
@@ -489,7 +492,8 @@ class FHIRStrategy(BaseOutPutStrategy):
         if should_skip(tricc_type) or isinstance(node, TriccNodeSelectOption):
             return True
 
-        processed_nodes = kwargs.get("processed_nodes")
+        if processed_nodes is None:
+            processed_nodes = kwargs.get("processed_nodes")
         if processed_nodes is not None and node in processed_nodes:
             # Same node object re-stashed by a later predecessor (diamond / fan-in).
             # XLSForm skips the write; FHIR used to append another sibling item.
@@ -640,7 +644,54 @@ class FHIRStrategy(BaseOutPutStrategy):
             # Push this item onto the stack so children attach under it
             self._group_stack.append((segment, item))
 
+        if not hidden:
+            self._attach_help_hint_items(item, node)
+
         return True
+
+    def _questionnaire_item_text(self, value) -> Optional[str]:
+        """Render help/hint/label-like text for a Questionnaire item, or None if blank."""
+        if value is None:
+            return None
+        if issubclass(value.__class__, TriccNodeBaseModel):
+            return self._questionnaire_item_text(getattr(value, "label", None))
+        if isinstance(value, TriccOperation):
+            rendered = self.get_tricc_operation_expression(value)
+            text = str(rendered).strip() if rendered is not None else ""
+            return text or None
+        if isinstance(value, dict):
+            for locale_value in value.values():
+                text = self._questionnaire_item_text(locale_value)
+                if text:
+                    return text
+            return None
+        text = str(value).strip()
+        return text or None
+
+    def _attach_help_hint_items(self, item: dict, node) -> None:
+        """Nest help-message / hint-message as itemControl help and flyover children."""
+        parent_id = item.get("linkId")
+        if not parent_id:
+            return
+        path_len = int(getattr(node, "path_len", 0) or 0)
+        children = []
+        help_text = self._questionnaire_item_text(getattr(node, "help", None))
+        if help_text:
+            children.append(
+                build_item_control_display_item(f"{parent_id}-help", help_text, "help")
+            )
+        hint_text = self._questionnaire_item_text(getattr(node, "hint", None))
+        if hint_text:
+            children.append(
+                build_item_control_display_item(f"{parent_id}-hint", hint_text, "flyover")
+            )
+        if not children:
+            return
+        nested = item.setdefault("item", [])
+        item["item"] = children + nested
+        for child in children:
+            self._item_seq += 1
+            self._item_sort_keys[id(child)] = (path_len, self._item_seq)
 
     def process_base(self, start_pages, **kwargs):
         self._group_stack = []
@@ -687,7 +738,9 @@ class FHIRStrategy(BaseOutPutStrategy):
         self._current_segment = None
         self._current_node_link_id = None
 
-    def generate_relevance(self, node, **kwargs):
+    def generate_relevance(
+        self, node, processed_nodes=None, stashed_nodes=None, process=None, warn=False, **kwargs
+    ):
         """Attach enableWhenExpression / option toggles (or hide the item)."""
         self._attach_option_toggles(node)
 
@@ -853,7 +906,9 @@ class FHIRStrategy(BaseOutPutStrategy):
             return [expression]
         return []
 
-    def generate_calculate(self, node, **kwargs):
+    def generate_calculate(
+        self, node, processed_nodes=None, stashed_nodes=None, process=None, warn=False, **kwargs
+    ):
         """Record the calculate node's value source and attach the matching SDC
         extension: calculatedExpression (FHIRPath) when it can be recomputed live
         from other items already in this Questionnaire, otherwise initialExpression
@@ -893,9 +948,10 @@ class FHIRStrategy(BaseOutPutStrategy):
                     getattr(node, "expression", None) is None
                     and issubclass(node.__class__, TriccNodeCalculateBase)
                 ):
-                    processed = kwargs.get("processed_nodes")
+                    processed = processed_nodes if processed_nodes is not None else kwargs.get("processed_nodes")
                     if (
                         processed is not None
+                        and not warn
                         and not kwargs.get("warn", False)
                         and not is_ready_to_process(node, processed_nodes=processed)
                     ):
@@ -908,7 +964,7 @@ class FHIRStrategy(BaseOutPutStrategy):
                         # (fix/20260821-output-pass-calculate-readiness.md).
                         return False
                     node.expression = get_node_expressions(
-                        node, processed, process=kwargs.get("process")
+                        node, processed, process=process if process is not None else kwargs.get("process")
                     )
                 expression = getattr(node, "expression", None)
             if not expression:
@@ -1007,7 +1063,9 @@ class FHIRStrategy(BaseOutPutStrategy):
                     return process
         return self._node_segment(node)
 
-    def generate_export(self, node, **kwargs):
+    def generate_export(
+        self, node, processed_nodes=None, stashed_nodes=None, process=None, warn=False, **kwargs
+    ):
         """Collect conceptType-driven extraction rules and attach dedup expressions."""
         from tricc_oo.converters.fhir.concept_mapper import resolve_concept_type
 

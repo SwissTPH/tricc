@@ -83,3 +83,19 @@ Lookup by name: `get_output_strategy("XLSFormCHTHFStrategy")` or pass the class 
 List registered names: `list_output_strategies()` from `tricc_oo.strategies.registry`.
 
 `GET_INHERITED_VALUE` serializes as **`coalesce(...)`** in XLSForm/CHT strategies.
+
+### Output walk contract
+
+`BaseOutPutStrategy.execute()` runs four node walks, then writes and validates:
+
+```text
+process_base        → generate_base
+process_relevance   → generate_relevance
+process_calculate   → generate_calculate
+process_export      → generate_export
+export / validate
+```
+
+Each `generate_*` callback is invoked with `node`, `processed_nodes`, `stashed_nodes`, `process`, and `warn`. The walker keeps a mutable `process` list (default `["main"]`) and forwards it on every recursive step, including nested activity roots, groups, dangling calculates, options, and post-activity `next_nodes`. XLSForm relevance is still written during export (`generate_relevance` is a no-op there). FHIR/OpenSRP keep assembling CQL, StructureMaps, PlanDefinition, and Composition **after** these walks — those artifacts are not produced by the node walker.
+
+See `feature/20260824-output-walk-context.md`.

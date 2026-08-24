@@ -93,6 +93,11 @@ Scratchpad includes reusable patterns for:
 
 These are attached through edges and enrich target question nodes during conversion.
 
+**FHIR / OpenSRP:** `help-message` becomes a nested `display` item with
+`questionnaire-itemControl` = `help`; `hint-message` becomes a nested `display`
+item with `flyover`. Hidden items emit neither. See
+[OpenSRP / FHIR-Core Export](./open-srp-export.md#help-and-hint-messages).
+
 ## Common attributes
 
 Examples used across element families:
