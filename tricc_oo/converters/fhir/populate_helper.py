@@ -22,6 +22,12 @@ MASTER_CONTEXTS = frozenset({"patient", "facility", "practitioner", "location"})
 ENCOUNTER_CONTEXT = "encounter"
 HISTORY_CONTEXT = "history"
 ALLOWED_CONTEXTS = MASTER_CONTEXTS | {ENCOUNTER_CONTEXT, HISTORY_CONTEXT}
+# CHT injects external data two ways: the form's ``inputs`` group (contact-doc
+# fields and task ``modifyContent`` keys, read as ``../inputs/contact/<field>``)
+# and the contact-summary instance (``instance('contact-summary')/context/<key>``,
+# the only route for anything derived from previous reports). Encounter values are
+# the task-injected ones; every other context is contact-summary backed.
+INPUTS_GROUP_CONTEXTS = frozenset({ENCOUNTER_CONTEXT})
 DEFAULT_HISTORY_PERIOD = "P1Y"
 
 _ISO_DURATION_RE = re.compile(
@@ -101,6 +107,21 @@ def _repeat_cql_arg(node) -> str:
     return "null" if repeat == 1 else str(repeat)
 
 
+def populate_fhir_target(node) -> str:
+    """FHIR resource a populate node reads from (``Observation`` by default).
+
+    Encounter / history accessors are resource-specific — an Observation is read by
+    value, a Condition by existence — so the accessor name has to follow the node's
+    ``concept_type`` rather than assuming Observation.
+    """
+    from tricc_oo.converters.fhir.concept_mapper import get_fhir_resource
+
+    resource, _, _ = get_fhir_resource(
+        getattr(node, "concept_type", None), getattr(node, "tricc_type", None)
+    )
+    return resource
+
+
 def resolve_populate_reference(node: "TriccNodePopulate", qualified: bool = False) -> str:
     """Return author-facing CQL accessor for a populate node (*Value helpers only)."""
     prefix = "Helper." if qualified else ""
@@ -116,18 +137,33 @@ def resolve_populate_reference(node: "TriccNodePopulate", qualified: bool = Fals
         return f"{prefix}GetLocationValue('{code}')"
     if ctx == "practitioner":
         return f"{prefix}GetPractitionerValue('{code}')"
+    target = populate_fhir_target(node)
     if ctx == ENCOUNTER_CONTEXT:
+        if target == "Condition":
+            return f"{prefix}GetEncounterConditionValue('{code}')"
         return (
-            f"{prefix}GetEncounterValue('{code}', {repeat_arg}, "
+            f"{prefix}GetEncounterObservationValue('{code}', {repeat_arg}, "
             f"{_cql_string_literal(node.period)})"
         )
     if ctx == HISTORY_CONTEXT:
         period = node.period or DEFAULT_HISTORY_PERIOD
+        if target == "Condition":
+            return f"{prefix}GetHistoryConditionValue('{code}')"
         return (
             f"{prefix}GetHistoryObservationValue("
             f"'{code}', {_cql_string_literal(period)}, 1, {repeat_arg})"
         )
     return f"{prefix}GetPatientValue('{code}')"
+
+
+def populate_uses_inputs_group(node) -> bool:
+    """True when CHT delivers this populate value through the form ``inputs`` group.
+
+    Those nodes need a hidden field named after the source document field plus a
+    calculate that reads it; contact-summary backed nodes need the calculate only
+    (see ``get_cht_contact_summary_expression``).
+    """
+    return getattr(node, "context", None) in INPUTS_GROUP_CONTEXTS
 
 
 def get_cht_contact_summary_expression(node: "TriccNodePopulate", replace_dots: bool = True) -> str:
@@ -155,8 +191,21 @@ define function GetLocationValue(code String):
 define function GetPractitionerValue(code String):
   null
 
-define function GetEncounterValue(code String, repeatIndex Integer, period String):
+// Current-encounter accessors. GetObservations/GetConditions already filter on the
+// `encounterid` parameter, so these are GetObservationValue / GetConditionValue
+// scoped to this encounter; the names stay resource-specific so a populate node with
+// a Condition concept_type does not read an Observation value
+// (fix/20260821-merge-input-into-populate.md).
+
+define function GetEncounterObservationValue(code String, repeatIndex Integer, period String):
   if repeatIndex is null or repeatIndex = 1 then GetObservationValue(code)
   else GetRepeatedValue(code, repeatIndex)
+
+define function GetEncounterConditionValue(code String):
+  GetConditionValue(code)
+
+// Deprecated alias: resource-agnostic name kept for previously generated libraries.
+define function GetEncounterValue(code String, repeatIndex Integer, period String):
+  GetEncounterObservationValue(code, repeatIndex, period)
 """
 

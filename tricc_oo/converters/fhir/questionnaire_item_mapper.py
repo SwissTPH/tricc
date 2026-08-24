@@ -14,7 +14,6 @@ from typing import Dict, Optional, Tuple
 
 
 from tricc_oo.models.base import TriccNodeType
-from tricc_oo.models.calculate import TriccNodeInput
 
 logger = logging.getLogger("default")
 
@@ -100,7 +99,6 @@ SKIP_NODE_TYPES = {
     TriccNodeType.select_option,
     TriccNodeType.not_available,
     TriccNodeType.context,
-    TriccNodeType.input,
     TriccNodeType.remote_reference,
     TriccNodeType.operation,
 }
@@ -109,6 +107,16 @@ SKIP_NODE_TYPES = {
 # these types (http://build.fhir.org/ig/HL7/sdc/expressions.html#initialExpression).
 # openSRP FHIR Data Capture throws IllegalStateException at $populate if they appear.
 FHIR_TYPES_WITHOUT_INITIAL = frozenset({FHIR_TYPE_DISPLAY, FHIR_TYPE_GROUP})
+
+# SDC 0..1 on Questionnaire.item. A second copy crashes openSRP FHIR Data Capture
+# at render time (fix/20260821-sdc-singleton-expressions.md).
+SDC_SINGLETON_ITEM_EXPRESSION_URLS = frozenset(
+    {
+        SDC_EXT_CALCULATED_EXPR,
+        SDC_EXT_INITIAL_EXPR,
+        SDC_EXT_ENABLE_WHEN_EXPR,
+    }
+)
 
 
 def item_allows_initial(item: Optional[dict]) -> bool:
@@ -166,6 +174,65 @@ def strip_illegal_initials(items: Optional[list]) -> int:
     return stripped
 
 
+def set_item_extension(item: Optional[dict], extension: dict) -> None:
+    """Set one item extension, replacing any existing entry with the same URL.
+
+    Used for SDC 0..1 expression extensions (``calculatedExpression``,
+    ``initialExpression``, ``enableWhenExpression``) so a walkthrough re-visit
+    cannot append a second copy. ``answerOptionsToggleExpression`` is 0..*
+    and should be appended with ``item.setdefault("extension", []).append``.
+
+    Args:
+        item: A Questionnaire.item dict (no-op if None).
+        extension: The extension dict to store (must include ``url``).
+    """
+    if not item:
+        return
+    url = extension.get("url")
+    existing = item.setdefault("extension", [])
+    if url:
+        for index, ext in enumerate(existing):
+            if ext.get("url") == url:
+                existing[index] = extension
+                return
+    existing.append(extension)
+
+
+def dedupe_singleton_item_extensions(items: Optional[list]) -> int:
+    """Keep the last ``calculatedExpression`` / ``initialExpression`` /
+    ``enableWhenExpression`` on each item.
+
+    Last-line defence for any attach path that still appended. Nested ``item``
+    children are walked in place.
+
+    Args:
+        items: Questionnaire.item list (may be None).
+
+    Returns:
+        Number of extra singleton extensions removed.
+    """
+    removed = 0
+    for item in items or []:
+        exts = item.get("extension") or []
+        last_index = {}
+        kept = []
+        for ext in exts:
+            url = ext.get("url")
+            if url in SDC_SINGLETON_ITEM_EXPRESSION_URLS and url in last_index:
+                kept[last_index[url]] = ext
+                removed += 1
+                continue
+            if url in SDC_SINGLETON_ITEM_EXPRESSION_URLS:
+                last_index[url] = len(kept)
+            kept.append(ext)
+        if kept:
+            item["extension"] = kept
+        elif "extension" in item:
+            item.pop("extension", None)
+        removed += dedupe_singleton_item_extensions(item.get("item"))
+    return removed
+
+
 # Node types that produce hidden calculate items (populated via CQL calculatedExpression)
 CALCULATE_NODE_TYPES = {
     TriccNodeType.calculate,
@@ -177,11 +244,6 @@ CALCULATE_NODE_TYPES = {
     TriccNodeType.proposed_diagnosis,
     TriccNodeType.populate,
 }
-
-
-def is_default_or_odk_input(node) -> bool:
-    """Return True only for real TriccNodeInput instances (primitive odk inputs)."""
-    return isinstance(node, TriccNodeInput)
 
 
 def get_fhir_item_type(tricc_type: str) -> str:

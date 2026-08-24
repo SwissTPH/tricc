@@ -76,9 +76,28 @@ class TestConvertExpressionToFhirpath(unittest.TestCase):
         )
         expr = self.strategy.convert_expression_to_fhirpath(op)
         self.assertNotIn("between", expr)
-        self.assertIn(">= 1", expr)
-        self.assertIn("<= 5", expr)
+        self.assertIn(">= 1.0", expr)
+        self.assertIn("<= 5.0", expr)
         self.assertIn(".value", expr)
+        self.assertIn(".toDecimal()", expr)
+
+    def test_more_or_equal_casts_item_and_literal_to_decimal(self):
+        """HAPI refuses string >= integer; age calculates used to be type string."""
+        op = TriccOperation(
+            TriccOperator.MORE_OR_EQUAL, [TriccReference("age_in_months"), TriccStatic(2)]
+        )
+        expr = self.strategy.convert_expression_to_fhirpath(op)
+        self.assertIn("linkId='age_in_months'", expr)
+        self.assertIn(".toDecimal()", expr)
+        self.assertIn(">= 2.0", expr)
+        self.assertIn(".value", expr)
+
+    def test_less_wraps_answer_value_and_casts_to_decimal(self):
+        op = TriccOperation(TriccOperator.LESS, [TriccReference("age_in_months"), TriccStatic(2)])
+        expr = self.strategy.convert_expression_to_fhirpath(op)
+        self.assertIn(".value", expr)
+        self.assertIn(".toDecimal()", expr)
+        self.assertIn("< 2.0", expr)
 
     def test_if_uses_iif_not_cql_if_then_else(self):
         cond = TriccOperation(TriccOperator.ISTRUE, [TriccReference("smoker")])

@@ -214,7 +214,6 @@ def infer_concept_type(node) -> str:
         TriccNodeType.quantity,
         TriccNodeType.select_one,
         TriccNodeType.select_yesno,
-        TriccNodeType.input,
     ):
         return "Symptom-Finding"
     return "Misc"

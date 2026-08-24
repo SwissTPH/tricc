@@ -4,7 +4,7 @@
 |-------|-------|
 | **Status** | Implemented |
 | **Branch target** | `feature/repeat` (core); evolutions on `feature/adv_merge_calc` |
-| **Related** | `feature/advanced-merge-calc.md`, `feature/populate-context.md`, `feature/20260813-concepttype-structuremap.md` (Observation repeat-index on extract) |
+| **Related** | `feature/advanced-merge-calc.md`, `feature/populate-context.md`, `feature/20260813-concepttype-structuremap.md` (Observation repeat-index on extract), `feature/20260821-get-repeated-value-operation.md` (`GetRepeatedValue` as an expression operation) |
 | **Authoring surface** | draw.io attributes + YAML fixtures for tests |
 
 Valid status values: `Draft` → `Approved` → `Implemented` → `Superseded`.
@@ -137,7 +137,7 @@ Implemented Helper functions (see `repeat_helper.py`, `populate_helper.py`, and 
 
 | Function | Purpose |
 |----------|---------|
-| `GetRepeated` / `GetRepeatedValue` | Resource / scalar for a specific within-form repeat slot |
+| `GetRepeated` / `GetRepeatedValue` | Resource / scalar for a specific within-form repeat slot. `GetRepeatedValue` is also a TRICC operation usable in any expression and supported on the XLSForm/CHT path — see `feature/20260821-get-repeated-value-operation.md` |
 | `GetNumberOfRepeat(code)` | How many repeat slots have been captured for this concept |
 | `GetHistory` / `GetHistoryValue` | Chart history (resource / scalar); supersedes former `GetLast` / `GetLastValue` |
 

@@ -31,7 +31,6 @@ from tricc_oo.models.calculate import (
     TriccNodeActivityEnd,
     TriccNodeDiagnosis,
     TriccNodeEnd,
-    TriccNodeInput,
     TriccNodePopulate,
     TriccNodeProposedDiagnosis,
 )

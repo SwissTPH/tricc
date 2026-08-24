@@ -189,6 +189,42 @@ class TestGenerateCalculateExpressionLanguage(unittest.TestCase):
         self.assertNotIn("valueCoding", expr)
         self.assertIn("'demo.hungry'", expr)
 
+    def test_age_month_calculate_item_type_is_integer(self):
+        strategy = _make_strategy()
+        age = TriccNodeCalculate(id="age1", name="age_in_months", label="Age in months")
+        age.expression_reference = TriccOperation(
+            TriccOperator.AGE_MONTH, [TriccReference("dob")]
+        )
+        strategy.questionnaires["main"] = {
+            "resourceType": "Questionnaire",
+            "item": [{"linkId": "age_in_months", "type": "string"}],
+        }
+
+        strategy.generate_calculate(age)
+
+        item = strategy.questionnaires["main"]["item"][0]
+        self.assertEqual(item["type"], "integer")
+
+    def test_plus_calculate_item_type_is_decimal(self):
+        strategy = _make_strategy()
+        years = TriccNodeInteger(id="y1", name="p_age_years", label="Years")
+        months = TriccNodeInteger(id="m1", name="p_age_months", label="Months")
+        age = TriccNodeCalculate(id="age1", name="age_in_months", label="Age in months")
+        age.expression_reference = TriccOperation(TriccOperator.PLUS, [years, months])
+        strategy.questionnaires["main"] = {
+            "resourceType": "Questionnaire",
+            "item": [
+                _item("p_age_years", "integer"),
+                _item("p_age_months", "integer"),
+                {"linkId": "age_in_months", "type": "string"},
+            ],
+        }
+
+        strategy.generate_calculate(age)
+
+        item = strategy.questionnaires["main"]["item"][2]
+        self.assertEqual(item["type"], "decimal")
+
 
 if __name__ == "__main__":
     unittest.main()

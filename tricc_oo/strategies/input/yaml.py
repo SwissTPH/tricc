@@ -97,6 +97,7 @@ class YamlNode(BaseModel):
     repeat: Optional[int] = None
     context: Optional[str] = None
     period: Optional[str] = None
+    form_id: Optional[str] = None            # start node only; required by XLSForm export
 
 
 class YamlEdge(BaseModel):
@@ -123,7 +124,8 @@ class YamlActivity(BaseModel):
 NODE_TYPE_MAP: Dict[str, Dict[str, Any]] = {
     "start": {
         "model": TriccNodeMainStart,
-        "attrs": ["process", "label", "relevance"],
+        # form_id is required by the XLSForm export, so fixtures can drive a full export
+        "attrs": ["process", "label", "relevance", "form_id"],
         "tricc_type": TriccNodeType.start,
     },
     "activity_start": {

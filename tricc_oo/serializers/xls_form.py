@@ -424,6 +424,22 @@ def generate_choice_filter(strategy, node):
         return strategy.get_tricc_operation_expression(choice_filter)
 
 
+def _empty_calculation_default(node, column):
+    """Default for a `calculation` cell the graph could not fill.
+
+    ODK rejects an empty `calculation` on a `calculate` row, and dropping the row
+    instead would break every `${name}` reference to it, so an underivable calculate
+    serialises as `1` (the visitor no longer injects a constant of its own — see
+    fix/20260821-output-pass-calculate-readiness.md).
+    """
+    if column != "calculation":
+        return ""
+    tricc_type = getattr(node, "tricc_type", None)
+    if ODK_TRICC_TYPE_MAP.get(tricc_type) == "calculate":
+        return "1"
+    return ""
+
+
 def get_attr_if_exists(strategy, node, column, map_array):
     if column in map_array:
         mapping = map_array[column]
@@ -488,7 +504,7 @@ def get_attr_if_exists(strategy, node, column, map_array):
             elif value is not None:
                 return str(value) if not isinstance(value, dict) else value
             else:
-                return ""
+                return _empty_calculation_default(node, column)
         elif column == "choice_filter":
             return generate_choice_filter(strategy, node)
 
@@ -709,28 +725,21 @@ def get_input_line(node, replace_dots=True):
 
 
 def get_populate_calc_line(node, replace_dots=True):
-    """CHT calculate row for a populate node (contact-summary context binding)."""
+    """CHT calculate row for a populate node (contact-summary context binding).
+
+    Built from ``get_input_calc_line`` with only the calculation swapped: hand-written
+    literal rows drifted out of sync with ``SURVEY_MAP`` (16 cells against 19), which
+    made every CHT export containing a populate node raise
+    ``ValueError: cannot set a row with mismatched columns``
+    (fix/20260821-merge-input-into-populate.md).
+    """
     from tricc_oo.converters.fhir.populate_helper import get_cht_contact_summary_expression
 
-    empty = langs.get_trads("", force_dict=True)
-    return [
-        "calculate",
-        get_export_name(node),
-        *list(empty.values()),
-        *list(empty.values()),
-        *list(empty.values()),
-        "",
-        "",
-        *list(empty.values()),
-        "",
-        "",
-        "",
-        *list(empty.values()),
-        get_cht_contact_summary_expression(node, replace_dots=replace_dots),
-        "",
-        "",
-        "",
-    ]
+    row = get_input_calc_line(node, replace_dots=replace_dots)
+    row[list(SURVEY_MAP).index("calculation")] = get_cht_contact_summary_expression(
+        node, replace_dots=replace_dots
+    )
+    return row
 
 
 def get_input_calc_line(node, replace_dots=True):

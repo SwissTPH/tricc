@@ -428,7 +428,7 @@ Reference implementation pattern: **`cht-chad`** (`../cht-chad` relative to TRIC
 | Optional scaffolds | Lists of context keys for contact-summary JS and/or task JS (reuse `xform_pd.get_tasksstrings` pattern) |
 | `history` + `period` | Document required JS filter (`reported_date` within ISO window) in scaffold comments |
 
-`load.<concept>` export names (current `TriccNodeInput` pattern) apply only where the strategy explicitly maps master-record populate to legacy `load.` bindings; prefer `contact-summary` context paths for CHT.
+`load.<concept>` export names (current `TriccNodePopulate` pattern) apply only where the strategy explicitly maps master-record populate to legacy `load.` bindings; prefer `contact-summary` context paths for CHT.
 
 ### 10.3 CDSS
 

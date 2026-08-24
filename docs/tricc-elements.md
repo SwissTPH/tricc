@@ -25,7 +25,10 @@ This page documents TRICC modeling elements and their meaning based on:
 - `select_multiple`: multiple-choice question.
 - `select_yesno`: yes/no convenience selection. In FHIR output this typically becomes a native `boolean` item type (preferred over `choice` for simple yes/no questions). OpenSRP export also attaches `questionnaire-choiceOrientation` = `horizontal` on visible boolean/yes-no items so Yes/No render side by side; hidden booleans (calculates, diagnoses, waits) do not.
 - `integer`, `decimal`, `text`, `date`: typed user inputs.
-- `input`: generic input node used in conversion workflows.
+- `input`: **legacy alias of `populate`** (kept so existing diagrams keep parsing). It builds the
+  same node, with `context` defaulting to `encounter` — the data it always fetched. Not a
+  question: always hidden, only ever fetches context or historical data. See
+  `fix/20260821-merge-input-into-populate.md`.
 - `populate`: pre-loaded data node (non-display calculate). Attributes: `context`
   (`patient`, `facility`, `practitioner`, `location`, `encounter`, `history`),
   optional `period` (ISO Duration/Period; default `P1Y` for `history` only),
@@ -109,7 +112,7 @@ integer `repeat` on a capture node or on `activity_start`.
 | Scope | Attribute | Effect |
 |-------|-----------|--------|
 | Capture node | `repeat=<n>` | Versioning and skip logic use `(name, repeat)` instead of `name` alone |
-| Activity start | `repeat=<n>` | Propagated to in-scope descendants (overrides node-level `repeat`; excludes `input` and `populate` nodes) |
+| Activity start | `repeat=<n>` | Propagated to in-scope descendants (overrides node-level `repeat`; excludes `populate` nodes, including the `input` alias) |
 
 **Defaults and rules:**
 
@@ -117,16 +120,55 @@ integer `repeat` on a capture node or on `activity_start`.
 - Same `name` + same `repeat` in a later activity is skipped if already captured (encounter-wide).
 - **No cross-repeat inheritance** — a value at `repeat=1` is not merged into logic at `repeat=2`.
 - Export suffix **`_Rr_<n>` only when `repeat > 1`** (alongside `_Vv_<n>` version and `_Ii_<n>` instance suffixes). Values `0` and `-1` do not get `_Rr_`.
-- `repeat=0` on `input` / pre-filled nodes forces in-form collection even when pre-encounter data exists.
+- `repeat=0` on `populate` / pre-filled nodes forces in-form collection even when pre-encounter data exists.
 - **`repeat=-1` (local-only):** node stays referenceable by name, but does **not** inherit prior values, does **not** feed other nodes’ multi-version coalesce, and is **not** skip-suppressed against other `repeat=-1` occurrences of the same concept (each capture is fully independent — e.g. two different callers each injecting the same snippet activity both get their own, unsuppressed capture). Shares the export base with default `repeat=1`; uniqueness uses `_Vv_n` peer renumbering.
 
 **Same-name value merge:** when several versions of a concept exist in one slot, calculates and expression refs may merge **all** prior versions (`GET_INHERITED_VALUE` → ODK `coalesce`). See `feature/advanced-merge-calc.md`.
+
+**Reading a specific slot — `GetRepeatedValue`:** in any calculate or relevance expression,
+
+```text
+GetRepeatedValue("<concept name>", <slot>)
+```
+
+reads the capture of `<concept name>` made at `repeat=<slot>`. It behaves exactly like a plain
+concept reference — including merging several versions of that concept via `coalesce` — but
+**restricted to the requested slot**, so it never falls back to another slot:
+
+```text
+integer  name=weight  repeat=1     "Weight at triage"
+integer  name=weight  repeat=2     "Weight after treatment"
+
+calculate  name=weight_delta
+  GetRepeatedValue("weight", 2) - GetRepeatedValue("weight", 1)
+```
+
+exports to ODK as `coalesce(${weight_Rr_2},'') - coalesce(${weight},'')`.
+
+- The slot must be a **literal integer** — it is resolved while the graph is built, before any
+  answer exists. Omitting it means slot `1` (with a warning).
+- The slot must be **captured earlier in the flow**. If no capture matches
+  `(name, slot)`, the reference is reported unresolved — there is no silent fallback.
+- `GetRepeatedValue("x", -1)` addresses a local-only node and never merges encounter slots.
+- Supported on XLSForm/ODK, CHT, and FHIR/OpenSRP.
+
+Full specification: `feature/20260821-get-repeated-value-operation.md`.
+
+**Not yet usable in expressions:** `GetRepeated` (returns a resource, not a value),
+`GetNumberOfRepeat`, and the history accessors `GetHistoryValue` /
+`GetHistoryObservationValue` / `GetHistoryConditionValue`. These exist as **generated Helper CQL**
+only — reach the same data from an expression by declaring a `populate` node (`context=history`)
+and referencing it by name. The history accessors are *not* inherently FHIR-only: CHT already
+serves `context=history` populate nodes from the contact summary
+(`instance('contact-summary')/context/<concept>`), so making them callable from expressions is a
+matter of desugaring them into generated populate nodes — see
+`feature/20260821-get-repeated-value-operation.md` §14.1.
 
 **FHIR / OpenSRP:** non-default repeat slots emit Questionnaire item extensions and
 repeat-aware Helper CQL (`GetRepeatedValue`, `GetNumberOfRepeat`, `GetHistoryValue`). See
 [OpenSRP / FHIR-Core Export](./open-srp-export.md#concept-repeat-fhir--cql).
 
-Full specification: `feature/concept-repeat.md` (status: Implemented).
+Full concept-repeat specification: `feature/concept-repeat.md` (status: Implemented).
 
 ## Edge labels (conditional flow)
 

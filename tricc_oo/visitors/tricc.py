@@ -3,6 +3,7 @@ import logging
 import requests
 import base64
 from collections import defaultdict
+from typing import Optional
 from tricc_oo.visitors.text_injection import TEXT_INJECTION_FIELDS
 
 from tricc_oo.models.base import get_repeat
@@ -27,7 +28,6 @@ from tricc_oo.models.calculate import (
     TriccNodeAdd,
     TriccNodeFakeCalculateBase,
     TriccRhombusMixIn,
-    TriccNodeInput,
     TriccNodePopulate,
     TriccNodeActivityEnd,
     TriccNodeActivityStart,
@@ -215,8 +215,12 @@ def get_node_expressions(node, processed_nodes, process=None):
         and str(expression) != ""
         and not isinstance(node, (TriccNodeWait, TriccNodeActivityEnd, TriccNodeActivityStart, TriccNodeEnd))
     ):
+        # No substitution: a calculate whose expression cannot be derived must stay
+        # visibly absent rather than silently become a constant `true` — the output
+        # strategies decide what an absent expression means for their format
+        # (fix/20260821-output-pass-calculate-readiness.md).
         logger.warning("Calculate {0} returning no calculations".format(node.get_name()))
-        expression = TriccStatic(True)
+        expression = None
     return expression
 
 
@@ -1135,6 +1139,122 @@ def process_reference(
     return True
 
 
+def get_repeat_index_arg(operation) -> Optional[int]:
+    """Extract the repeat-slot literal of a ``GET_REPEATED_VALUE`` operation.
+
+    ``GET_REPEATED_VALUE(<concept reference>, <slot literal>)`` consumes its second
+    operand while resolving the first: the slot pins which capture node the reference
+    may bind to (see ``feature/20260821-get-repeated-value-operation.md``).
+
+    Args:
+        operation: The ``TriccOperation`` carrying the slot as its second reference.
+
+    Returns:
+        The slot as an int; ``1`` when the argument is missing (default capture slot);
+        ``None`` when it is not a literal integer, which leaves the reference
+        unscoped rather than failing the whole conversion.
+    """
+    references = list(getattr(operation, "reference", None) or [])
+    if len(references) < 2:
+        logger.warning(
+            "GetRepeatedValue without a repeat slot argument; defaulting to slot 1"
+        )
+        return 1
+    raw = references[1]
+    value = raw.value if isinstance(raw, TriccStatic) else raw
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        logger.warning(
+            f"GetRepeatedValue repeat slot {value!r} is not an integer literal; "
+            "resolving the reference across all slots"
+        )
+        return None
+
+
+def resolve_slot_scoped_children(
+    operation,
+    node,
+    processed_nodes,
+    calculates=None,
+    used_calculates=None,
+    replace_reference=False,
+    warn=False,
+    codesystems=None,
+    inherit_display_versions=False,
+):
+    """Resolve ``GET_REPEATED_VALUE`` sub-operations against their own repeat slot.
+
+    ``process_operation_reference`` resolves a name once for the whole expression, so
+    ``GetRepeatedValue("weight", 2) - GetRepeatedValue("weight", 1)`` would bind both
+    occurrences to the same node (``replace_node`` rewrites the entire tree). Each
+    slot-scoped child is therefore resolved on its own subtree — where it *is* the
+    top-level operator, so the slot argument applies — and spliced back in place.
+
+    Args:
+        operation: Operation whose subtree may contain slot-scoped children.
+        node: Node the expression belongs to (path_len / used-calculate bookkeeping).
+        processed_nodes: Nodes already processed, used for version lookup.
+
+    Returns:
+        A modified copy of *operation* when a child was resolved, ``None`` when there was
+        nothing to resolve, or ``False`` when a child cannot be resolved yet (defer).
+    """
+    if not isinstance(operation, TriccOperation):
+        return None
+    if not any(isinstance(r, TriccOperation) for r in (operation.reference or [])):
+        return None  # no sub-operations: nothing this pass can own
+
+    deferred = False
+
+    def _has_unresolved(op):
+        return any(isinstance(r, TriccReference) for r in (op.get_references() or []))
+
+    def _walk(container):
+        """Splice resolved slot-scoped children into *container*; return True if changed.
+
+        Deferral is reported through the ``deferred`` flag, never the return value — a
+        falsy return only ever means "nothing to change here".
+        """
+        nonlocal deferred
+        changed = False
+        for index, item in enumerate(container):
+            if deferred:
+                return changed
+            if isinstance(item, list):
+                changed = _walk(item) or changed
+                continue
+            if not isinstance(item, TriccOperation):
+                continue
+            if item.operator == TriccOperator.GET_REPEATED_VALUE and _has_unresolved(item):
+                resolved = process_operation_reference(
+                    item,
+                    node,
+                    processed_nodes,
+                    calculates=calculates,
+                    used_calculates=used_calculates,
+                    replace_reference=replace_reference,
+                    warn=warn,
+                    codesystems=codesystems,
+                    inherit_display_versions=inherit_display_versions,
+                )
+                if resolved is False:
+                    deferred = True
+                    return changed
+                if resolved is not None:
+                    container[index] = resolved
+                    changed = True
+                continue
+            changed = _walk(item.reference) or changed
+        return changed
+
+    candidate = operation.copy(keep_node=True)
+    changed = _walk(candidate.reference)
+    if deferred:
+        return False
+    return candidate if changed else None
+
+
 def process_operation_reference(
     operation,
     node,
@@ -1165,11 +1285,45 @@ def process_operation_reference(
     resolved_nodes = []           # TriccNodeBaseModel instances
     resolved_refs = []            # TriccReference objects kept for compatibility
     unresolved_names = []         # strings that are still not resolved
+
+    # ───────────────────────────────────────────────
+    # 0. Slot-scoped sub-operations first
+    # ───────────────────────────────────────────────
+    # GET_REPEATED_VALUE names one repeat slot, but the flat pass below resolves every
+    # occurrence of a name identically (replace_node rewrites the whole tree). So each
+    # GetRepeatedValue(<concept>, <slot>) child is resolved in its own scope, before its
+    # reference can be caught by the flat pass.
+    prepass = resolve_slot_scoped_children(
+        operation,
+        node,
+        processed_nodes,
+        calculates=calculates,
+        used_calculates=used_calculates,
+        replace_reference=replace_reference,
+        warn=warn,
+        codesystems=codesystems,
+        inherit_display_versions=inherit_display_versions,
+    )
+    if prepass is False:
+        return False
+    if prepass is not None:
+        modified_op = prepass
+    source_op = modified_op if modified_op is not None else operation
+
     # ───────────────────────────────────────────────
     # 1. Collect all reference strings and classify them
     # ───────────────────────────────────────────────
-    string_refs = [r.value for r in operation.get_references() if isinstance(r, TriccReference)]
-    real_node_refs = [r for r in operation.get_references() if issubclass(r.__class__, TriccNodeBaseModel)]
+    string_refs = [r.value for r in source_op.get_references() if isinstance(r, TriccReference)]
+    real_node_refs = [r for r in source_op.get_references() if issubclass(r.__class__, TriccNodeBaseModel)]
+
+    # Repeat slot the whole operation is scoped to, when the operator selects one.
+    # GET_HISTORY_VALUE reads outside the encounter slots; GET_REPEATED_VALUE names a slot.
+    if source_op.operator == TriccOperator.GET_HISTORY_VALUE:
+        op_repeat = 0
+    elif source_op.operator == TriccOperator.GET_REPEATED_VALUE:
+        op_repeat = get_repeat_index_arg(source_op)
+    else:
+        op_repeat = None
 
     for ref_str in string_refs:
         option_label = None
@@ -1184,11 +1338,7 @@ def process_operation_reference(
         # Try to find the referenced node
         from tricc_oo.models.base import get_repeat
 
-        ref_repeat = None  # TODO: manage repeat in scv get_repeat(node)
-        if operation.operator == TriccOperator.GET_HISTORY_VALUE:
-            ref_repeat = 0
-        elif operation.operator == TriccOperator.GET_REPEATED_VALUE:
-            ref_repeat = int(operation.reference[1])
+        ref_repeat = op_repeat  # TODO: manage repeat in scv get_repeat(node)
         # Same-name nodes in the activity (common after snippet inject of a module
         # multiple times). Do NOT require every candidate to be processed — later
         # injects are not yet processed when earlier calculates resolve, and that
@@ -1292,7 +1442,6 @@ def process_operation_reference(
                     (
                         TriccNodeDisplayModel,
                         TriccNodeDisplayCalculateBase,
-                        TriccNodeInput,
                         TriccNodePopulate,
                     ),
                 )
@@ -1371,7 +1520,10 @@ def process_operation_reference(
                     exit(1)
             else:
                 if warn:
-                    logger.debug(f"Unresolved reference {ref!r} in calculate/display {node.get_name()}")
+                    slot = f" (repeat slot {op_repeat})" if op_repeat is not None else ""
+                    logger.debug(
+                        f"Unresolved reference {ref!r}{slot} in calculate/display {node.get_name()}"
+                    )
                 return False
 
     # ───────────────────────────────────────────────
@@ -1461,6 +1613,21 @@ def get_select_yes_no_options(node, group):
 # there 2 strategies : process it the first time or the last time (wait that all the previuous node are processed)
 
 
+def stash_next_nodes(stashed_nodes, next_nodes):
+    """Push successors so the first next-node is processed first.
+
+    ``insert_at_top`` plus ``pop()`` from the front is a stack. Inserting in
+    authored order would reverse siblings (last edge first). Insert reversed
+    so the first edge sits at the front of the stash.
+    See fix/20260823-questionnaire-item-order.md.
+    """
+    if not next_nodes:
+        return
+    for nn in reversed(list(next_nodes)):
+        if nn not in stashed_nodes:
+            stashed_nodes.insert_at_top(nn)
+
+
 def walktrhough_tricc_node_processed_stached(
     node,
     callback,
@@ -1519,9 +1686,9 @@ def walktrhough_tricc_node_processed_stached(
                 # (nodes wired as next_nodes of the TriccNodeActivity itself, e.g. when a repeated
                 # instance has no bridge/wait in between) - the activity is never revisited on its
                 # own once it defers to its root, so this is the only place this can happen.
-                for next_node in node.activity.next_nodes:
-                    if next_node not in stashed_nodes:
-                        if recursive:
+                if recursive:
+                    for next_node in node.activity.next_nodes:
+                        if next_node not in processed_nodes:
                             walktrhough_tricc_node_processed_stached(
                                 next_node,
                                 callback,
@@ -1533,8 +1700,8 @@ def walktrhough_tricc_node_processed_stached(
                                 node_path=node_path.copy(),
                                 **kwargs,
                             )
-                        else:
-                            stashed_nodes.insert_at_top(next_node)
+                else:
+                    stash_next_nodes(stashed_nodes, node.activity.next_nodes)
         elif node in stashed_nodes:
             stashed_nodes.remove(node)
             # logger.debug("{}::{}: unstashed ({})".format(callback.__name__, node.get_name(), len(stashed_nodes)))
@@ -1616,7 +1783,7 @@ def walktrhough_tricc_node_processed_stached(
                             **kwargs,
                         )
                     elif node.root not in stashed_nodes:
-                        stashed_nodes.insert_at_top(node.root)
+                        stash_next_nodes(stashed_nodes, [node.root])
                     return
 
         elif hasattr(node, "next_nodes") and len(node.next_nodes) > 0 and not isinstance(node, TriccNodeActivity):
@@ -1633,9 +1800,7 @@ def walktrhough_tricc_node_processed_stached(
                     **kwargs,
                 )
             else:
-                for nn in node.next_nodes:
-                    if nn not in stashed_nodes:
-                        stashed_nodes.insert_at_top(nn)
+                stash_next_nodes(stashed_nodes, node.next_nodes)
         if not recursive:
             #global _last_reordered_group
             #if _last_reordered_group != node.group:
@@ -1657,9 +1822,7 @@ def walkthrough_tricc_next_nodes(
 ):
 
     if not recursive:
-        for next_node in node.next_nodes:
-            if next_node not in stashed_nodes:
-                stashed_nodes.insert_at_top(next_node)
+        stash_next_nodes(stashed_nodes, node.next_nodes)
     else:
         list_next = set(node.next_nodes)
         for next_node in list_next:
@@ -1687,12 +1850,9 @@ def walkthrough_tricc_option(
     node, callback, processed_nodes, stashed_nodes, path_len, recursive, warn=False, node_path=[], **kwargs
 ):
     if not recursive:
-        for option in node.options.values():
+        for option in reversed(list(node.options.values())):
             if hasattr(option, "next_nodes") and len(option.next_nodes) > 0:
-                for next_node in option.next_nodes:
-                    if next_node not in stashed_nodes:
-                        stashed_nodes.insert_at_top(next_node)
-                        # stashed_nodes.insert(0,next_node)
+                stash_next_nodes(stashed_nodes, option.next_nodes)
     else:
         list_option = []
         while not all(elem in list_option for elem in list(node.options.values())):

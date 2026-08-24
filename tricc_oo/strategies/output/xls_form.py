@@ -818,8 +818,22 @@ class XLSFormStrategy(BaseOutPutStrategy):
 
     def tricc_operation_get_inherited_value(self, ref_expressions, original_references=None):
         return self.tricc_operation_coalesce(ref_expressions, original_references=None)
-    
-    
+
+    def tricc_operation_get_repeated_value(self, ref_expressions, original_references=None):
+        """Render the value operand of ``GetRepeatedValue(<concept>, <slot>)``.
+
+        The slot argument was consumed while resolving the reference, so the operand is
+        already the capture node of that slot (its export name carries ``_Rr_<n>`` for
+        ``n > 1``) — possibly wrapped in ``GET_INHERITED_VALUE`` when the slot has several
+        versions. Rendering is therefore transparent: the trailing slot literal is dropped.
+
+        Not delegated to ``tricc_operation_get_inherited_value`` on purpose: the CHT
+        override of that method prepends ``"."`` (the current question's value), which is
+        wrong for reading another node's slot.
+        See ``feature/20260821-get-repeated-value-operation.md``.
+        """
+        return ref_expressions[0] if ref_expressions else ""
+
     def _get_trigger(self, expression):
         """ODK trigger column: comma-separated field refs (no coalesce(., …))."""
         refs = expression.get_references()

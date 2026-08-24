@@ -110,9 +110,11 @@ BaseOutPutStrategy
 ```
 execute()
   ├── process_base()       → generate_base(node)      builds Questionnaire items
+  │                         (authored next-node order; then sort by path_len)
   ├── process_relevance()  → generate_relevance(node)  adds enableWhenExpression (FHIRPath)
   ├── process_calculate()  → generate_calculate(node)  adds CQL defines + calculatedExpression
   ├── process_export()     → generate_export(node)     builds StructureMap rules
+  ├── _sanitize_questionnaires() / _prune_unused_hidden_calculates()
   └── export()
         ├── [FHIRStrategy] write questionnaire/, library/, structure-map/, ValueSet/, binary/
         └── [OpenSRPStrategy]
@@ -215,6 +217,41 @@ relevance stay enabled.
 
 See `fix/20260813-option-relevance-toggle.md`.
 
+### Unique `linkId`s and unused hidden calculates
+
+**Updated 2026-08-21** (`fix/20260821-opensrp-questionnaire-duplicate-calculates.md`):
+the output walk can re-stash a node every time a predecessor is processed (diamond /
+fan-in). XLSForm ignores the extra visits; FHIR `generate_base` used to append another
+sibling item each time, so a hub calculate such as `needs_test` was emitted tens of
+thousands of times on the registration Questionnaire — same `linkId`, no expression,
+never referenced. That is invalid SDC (`linkId` must be unique) and unusable on device.
+
+Rules (still **one Questionnaire per CPG process** — registration is not split):
+
+| Rule | Behaviour |
+|---|---|
+| One item per `linkId` per Questionnaire | A re-visit of the same node, or a clone that shares the export name, does not append |
+| Expressions attach to the Questionnaire that **holds** the item | `generate_calculate` / `generate_relevance` use `_segment_for_item`, never `node.segment or "main"` (that field is often unset) |
+| Unused hidden calculates are omitted | After expressions and extraction rules are attached, a hidden calculate-like item is dropped from **this** Questionnaire when nothing here reads its `linkId`, it has no `initialExpression` (populate / encounter dedup / out-of-form CQL), and it is not an extraction source. Another process can still keep its own copy. |
+
+Visible questions, groups, displays, populate/dedup items, and calculates that a remaining
+expression in the same form reads are kept.
+
+**Updated 2026-08-23** (`fix/20260823-questionnaire-item-order.md`): items follow
+flowchart order (first outgoing edge first). The walk used to push `next_nodes`
+onto a stack in authored order, which **reversed** siblings — the registration /
+clinician-script page landed last. FHIR also waits until previous nodes are
+processed (same `is_ready_to_process` gate as XLSForm) and nests groups only
+inside the same Questionnaire, then sorts by `path_len`.
+
+**Updated 2026-08-21** (`fix/20260821-sdc-singleton-expressions.md`): each item may carry
+**at most one** `calculatedExpression`, one `initialExpression`, and one
+`enableWhenExpression`. A second copy crashes openSRP FHIR Data Capture at render
+(uncaught in the SDK ViewModel). Re-visits of the same node replace the existing
+extension instead of appending; a sanitizer collapses any leftover duplicates
+before write. `answerOptionsToggleExpression` stays 0..* (one group of options per
+expression).
+
 ### Calculations (calculatedExpression / initialExpression)
 
 `calculatedExpression` **must be FHIRPath** — openSRP/FHIR-Core only evaluates CQL through
@@ -250,6 +287,12 @@ In-form calculation (e.g. BMI from weight + height both answered in the same Que
   (XLSForm begin-group relevant), not only the start node's own `relevance`.
 - Boolean / numeric / string items still use `.answer.value`.
 - A calculate whose expression is boolean is emitted as Questionnaire `type: boolean`.
+- A calculate whose expression is numeric (`AGE_MONTH`, `PLUS`, `COUNT`, …) is
+  `integer` or `decimal`, not `string`. A string item compared with `>= 2` crashes
+  HAPI (`Unable to compare values of type string and integer`). See
+  `fix/20260821-fhirpath-numeric-compare.md`.
+- Relational FHIRPath (`>`, `>=`, `<`, `<=`, `BETWEEN`) casts operands with
+  `.toDecimal()` (literals as `2.0`) so leftover string answers still compare.
 - Casting a boolean (e.g. `COUNT(select) - SELECTED(opt_none)`) uses `iif(expr, 1, 0)`,
   not `.toDecimal()`.
 
@@ -289,6 +332,61 @@ include fhir_formHelper version '1.0.0' called Helper
 
 define Calc_bmi: Helper.GetObservationValue("weight") / (Helper.GetObservationValue("height") * Helper.GetObservationValue("height"))
 ```
+
+### Pre-loaded values (`populate`, and the legacy `input` alias)
+
+**Updated 2026-08-21** (`fix/20260821-merge-input-into-populate.md`): `input` and `populate` were
+two node classes for one concept — a value the form receives rather than asks for. There is now
+one node type (`TriccNodePopulate`); the `input` keyword still parses, building the same node with
+`context` defaulting to `encounter`. Consequences for this export:
+
+- The node becomes a **hidden `string` item** with a CQL `initialExpression` (define named
+  `Calc_<linkId>`), like any other populate node — previously an `input` node produced no item and
+  no expression at all, while extraction still emitted a rule for it, so the StructureMap wrote
+  back a `linkId` that existed in no Questionnaire.
+- References to it from other expressions resolve through `resolve_populate_reference`, i.e. the
+  accessor implied by its `context` (`GetEncounterValue` for the migrated default, which reduces
+  to `GetObservationValue` / `GetRepeatedValue` in the Helper library).
+- The `No FHIR item type mapping for TRICC type 'input'` warning is gone: nothing carries that
+  type any more.
+
+Encounter accessors are resource-specific, so a `Condition`-typed populate never reads an
+Observation value:
+
+| node | CQL emitted |
+|---|---|
+| `context=encounter`, Observation concept | `Helper.GetEncounterObservationValue('<code>', <slot>, <period>)` |
+| `context=encounter`, Condition concept (`diagnosis` / `proposed_diagnosis`) | `Helper.GetEncounterConditionValue('<code>')` |
+| `context=history`, Observation / Condition | `Helper.GetHistoryObservationValue(…)` / `Helper.GetHistoryConditionValue('<code>')` |
+
+Both encounter accessors resolve to `GetObservationValue` / `GetConditionValue`, which filter on
+the library's `encounterid` parameter through `GetObservations` / `GetConditions` — i.e. the value
+recorded in *this* encounter. `GetEncounterValue` is kept only as a deprecated alias delegating to
+the Observation form.
+
+For CHT, the same node picks its binding from where the data comes from: `encounter` reads
+`../inputs/contact/<field>` through the form `inputs` group (with a `load.`-prefixed calculate,
+since the inputs field is named after the source document field), every other context reads
+`instance('contact-summary')/context/<key>` and needs no inputs field.
+
+### Inherited values (a question asked on several paths)
+
+**Updated 2026-08-20** (`fix/20260820-opensrp-inherited-value.md`): when the same question or
+calculate is reachable through several paths, TRICC keeps one item per occurrence ("versions",
+exported as `name_Vv_1`, `name_Vv_2`, …) and merges their values with `GET_INHERITED_VALUE`.
+XLSForm/CHT serialise that as `coalesce(…)`; openSRP cannot, because only versions captured in
+the *current* Questionnaire are reachable from `%resource`, and versions answered in another
+process are already prefilled by the encounter dedup `initialExpression`.
+
+| Situation | What is exported |
+|---|---|
+| At least one version is an item of this Questionnaire | FHIRPath union of **those** versions, newest first, reading the winning answer: `(…linkId='fever_Vv_2'.answer \| …linkId='fever_Vv_1'.answer).where($this.exists()).first().value.code`. Versions from other processes are dropped from the union. |
+| The item carrying the expression is itself one of the versions | It contributes as `$this` (the FHIR analogue of ODK's `coalesce(., …)`), never as a self `linkId` reference. |
+| No version is an item of this Questionnaire | No `calculatedExpression`. A calculate falls back to the CQL `initialExpression`, where all versions collapse to one concept-keyed Helper accessor (no `Coalesce(x, x)`); a relevance simply gets no `enableWhenExpression` (the item stays visible) since `enableWhenExpression` is FHIRPath-only. |
+
+The trailing value suffix follows the item type (`.value.code` for choice/open-choice, `.value`
+otherwise), which is what lets `SELECTED` / `CONTAINS` re-append
+`.where(value.code = '<code>').exists()` on top of the merged value.
 
 ### Concept repeat (FHIR / CQL)
 

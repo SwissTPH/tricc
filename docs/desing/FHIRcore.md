@@ -120,6 +120,13 @@ Output: FHIR SDC resources (Questionnaire, PlanDefinition, Library+CQL, Structur
 - [x] OpenSRP visible boolean / yes-no items emit `questionnaire-choiceOrientation`=`horizontal`
       (`feature/20260819-boolean-choice-orientation.md`).
 - [x] CQL architecture: Helper library for FHIR resource access by concept + thin per-segment libraries. Simple define names used in Questionnaire expressions.
+- [x] Multi-version values (`GET_INHERITED_VALUE`): FHIRPath unions only the versions captured in the
+      current Questionnaire, newest first (`(v2.answer | v1.answer).where($this.exists()).first()` +
+      `.value` / `.value.code`); the item's own version contributes as `$this`; with no version in this
+      process the operator raises so `generate_calculate` falls back to the CQL `initialExpression`
+      (where concept-keyed Helper accessors are deduplicated rather than `Coalesce`d) and
+      `generate_relevance` skips the FHIRPath-only `enableWhenExpression` instead of aborting the export
+      (`fix/20260820-opensrp-inherited-value.md`).
 - [x] Concept repeat: Questionnaire item extension + Helper repeat functions + FML hints (`repeat_helper.py`).
 - [x] `FHIRStrategy` registered via `@register_output_strategy("FHIRStrategy")` and eager import in `strategies/__init__.py`.
 - [x] Basic nesting support for groups/activities in Questionnaires.

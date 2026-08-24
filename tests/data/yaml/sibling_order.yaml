@@ -1,0 +1,39 @@
+# Two questions hang off start in authored order. The output walk used to
+# process the last edge first (insert_at_top + pop front), so "Later assessment"
+# appeared before "Clinician Script" in the Questionnaire.
+# See fix/20260823-questionnaire-item-order.md.
+
+id: sibling_order
+title: Sibling order
+process: main
+
+nodes:
+  - id: start
+    type: start
+    label: Start
+    name: start_sib
+    form_id: sibling-order
+
+  - id: q_first
+    type: note
+    name: first_question
+    label: Clinician Script
+
+  - id: q_second
+    type: note
+    name: later_question
+    label: Later assessment
+
+  - id: end
+    type: end
+    label: End
+
+edges:
+  - source: start
+    target: q_first
+  - source: start
+    target: q_second
+  - source: q_first
+    target: end
+  - source: q_second
+    target: end

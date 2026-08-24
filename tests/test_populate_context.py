@@ -68,7 +68,7 @@ class TestPopulateReferences(unittest.TestCase):
         normalize_populate_node(node)
         self.assertEqual(
             resolve_populate_reference(node, qualified=True),
-            "Helper.GetEncounterValue('weight', null, null)",
+            "Helper.GetEncounterObservationValue('weight', null, null)",
         )
 
     def test_cht_contact_summary_expression(self):

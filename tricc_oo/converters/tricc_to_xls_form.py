@@ -1,7 +1,8 @@
 import logging
 from tricc_oo.converters.utils import clean_name
 from tricc_oo.models.tricc import TriccNodeSelectOption, TRICC_TRUE_VALUE, TRICC_FALSE_VALUE, TriccNodeActivity
-from tricc_oo.models.calculate import TriccNodeInput
+from tricc_oo.converters.fhir.populate_helper import populate_uses_inputs_group
+from tricc_oo.models.calculate import TriccNodePopulate
 from tricc_oo.models.base import TriccNodeBaseModel, TriccStatic, TriccReference, get_repeat
 
 # from babel import _
@@ -90,7 +91,10 @@ def get_export_name(node, replace_dots=True):
         elif node.last is False:
             node.export_name = _concept_export_base_name(node, replace_dots) + VERSION_SEPARATOR + str(node.version)
             node.export_name = clean_name(node.export_name, replace_dots=replace_dots)
-        elif isinstance(node, TriccNodeInput):
+        elif isinstance(node, TriccNodePopulate) and populate_uses_inputs_group(node):
+            # The inputs-group field is named after the source document field, so the
+            # value needs a second, distinct name to be referenced from the survey
+            # (fix/20260821-merge-input-into-populate.md).
             node.export_name = clean_name("load." + node.name, replace_dots=replace_dots)
         else:
             node.export_name = _concept_export_base_name(node, replace_dots)
