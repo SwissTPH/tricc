@@ -282,7 +282,7 @@ class TestConvertExpressionToFhirpath(unittest.TestCase):
         self.assertEqual(
             expr,
             "%resource.item.where(linkId='CHE_B3_DE06')"
-            ".answer.where(value.code = 'CHE.B3.DE04').exists()",
+            ".answer.where($this.value.code = 'CHE.B3.DE04').exists()",
         )
         self.assertNotIn("where($this.exists()).value.code =", expr)
         self.assertNotIn("valueCoding", expr)
@@ -307,7 +307,7 @@ class TestConvertExpressionToFhirpath(unittest.TestCase):
         self.assertEqual(
             expr,
             "%resource.item.where(linkId='CHE_B3_DE06')"
-            ".answer.where(value.code = 'CHE.B3.DE04').exists().not()",
+            ".answer.where($this.value.code = 'CHE.B3.DE04').exists().not()",
         )
 
     def test_no_clean_fhirpath_equivalent_raises_not_implemented(self):
@@ -333,7 +333,7 @@ class TestConvertExpressionToFhirpath(unittest.TestCase):
         expr = self.strategy.convert_expression_to_fhirpath(op)
         self.assertEqual(
             expr,
-            "%resource.repeat(item).where(linkId='select_why').answer.where(value.code = 'demo.hungry').exists()",
+            "%resource.repeat(item).where(linkId='select_why').answer.where($this.value.code = 'demo.hungry').exists()",
         )
 
     def test_nested_item_uses_group_path_instead_of_repeat(self):
@@ -378,9 +378,76 @@ class TestConvertExpressionToFhirpath(unittest.TestCase):
             "%resource.item.where(linkId='page_reg')"
             ".item.where(linkId='activity_reg')"
             ".item.where(linkId='CHE_B3_DE06')"
-            ".answer.where(value.code = 'CHE.B3.DE04').exists()",
+            ".answer.where($this.value.code = 'CHE.B3.DE04').exists()",
         )
         self.assertNotIn("repeat(item)", expr)
+
+    def test_nested_select_multiple_uses_parent_scoped_repeat_item(self):
+        from tricc_oo.models.tricc import TriccNodeSelectMultiple, TriccNodeSelectOption
+
+        select = TriccNodeSelectMultiple(
+            id="select_why", name="select_why", label="Why ?", list_name="why"
+        )
+        select.options = {
+            0: TriccNodeSelectOption(
+                id="bad",
+                name="demo.bad_p",
+                label="Bad presentation",
+                select=select,
+                list_name="why",
+            )
+        }
+        self.strategy.questionnaires["main"] = {
+            "resourceType": "Questionnaire",
+            "item": [
+                {
+                    "linkId": "page_reg",
+                    "type": "group",
+                    "item": [
+                        {
+                            "linkId": "activity_reg",
+                            "type": "group",
+                            "item": [
+                                {
+                                    "linkId": "select_why",
+                                    "type": "choice",
+                                    "repeats": True,
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+        expr = self.strategy.convert_expression_to_fhirpath(
+            TriccOperation(TriccOperator.CONTAINS, [select, "demo.bad_p"])
+        )
+        self.assertEqual(
+            expr,
+            "%resource.item.where(linkId='page_reg')"
+            ".item.where(linkId='activity_reg')"
+            ".repeat(item).where(linkId='select_why')"
+            ".answer.where($this.value.code = 'demo.bad_p').exists()",
+        )
+
+    def test_top_level_select_multiple_uses_repeat_item(self):
+        from tricc_oo.models.tricc import TriccNodeSelectMultiple
+
+        select = TriccNodeSelectMultiple(
+            id="select_why", name="select_why", label="Why ?", list_name="why"
+        )
+        self.strategy.questionnaires["main"] = {
+            "resourceType": "Questionnaire",
+            "item": [{"linkId": "select_why", "type": "choice", "repeats": True}],
+        }
+        expr = self.strategy.convert_expression_to_fhirpath(
+            TriccOperation(TriccOperator.SELECTED, [select, TriccStatic("demo.hungry")])
+        )
+        self.assertEqual(
+            expr,
+            "%resource.repeat(item).where(linkId='select_why')"
+            ".answer.where($this.value.code = 'demo.hungry').exists()",
+        )
 
     def test_contains_uses_in_on_value_coding_code(self):
         from tricc_oo.models.tricc import TriccNodeSelectMultiple
@@ -392,7 +459,7 @@ class TestConvertExpressionToFhirpath(unittest.TestCase):
         expr = self.strategy.convert_expression_to_fhirpath(op)
         self.assertEqual(
             expr,
-            "%resource.repeat(item).where(linkId='select_why').answer.where(value.code = 'demo.bad_p').exists()",
+            "%resource.repeat(item).where(linkId='select_why').answer.where($this.value.code = 'demo.bad_p').exists()",
         )
 
     def test_contains_on_text_item_stays_substring(self):

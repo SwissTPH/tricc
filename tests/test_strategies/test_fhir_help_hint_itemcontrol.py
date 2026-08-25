@@ -1,4 +1,4 @@
-"""Tests for help-message / hint-message → nested itemControl display items.
+"""Tests for help-message → itemControl help child, hint-message → entryFormat.
 
 See feature/20260824-fhir-help-hint-itemcontrol.md.
 
@@ -9,7 +9,11 @@ Run with:
 import unittest
 from unittest.mock import MagicMock
 
-from tricc_oo.converters.fhir.questionnaire_item_mapper import SDC_EXT_ITEM_CONTROL
+from tricc_oo.converters.fhir.questionnaire_item_mapper import (
+    SDC_EXT_ENTRY_FORMAT,
+    SDC_EXT_ITEM_CONTROL,
+    build_entry_format_extension,
+)
 from tricc_oo.converters.tricc_to_xls_form import get_export_name
 from tricc_oo.models.base import TriccNodeType
 from tricc_oo.models.calculate import TriccNodeCalculate
@@ -43,8 +47,20 @@ def _child_by_control(parent, code):
     return None
 
 
+def _entry_format(item):
+    for ext in item.get("extension") or []:
+        if ext.get("url") == SDC_EXT_ENTRY_FORMAT:
+            return ext.get("valueString")
+    return None
+
+
 class TestHelpHintItemControl(unittest.TestCase):
-    def test_help_and_hint_become_nested_display_children(self):
+    def test_entry_format_uses_official_fhir_url(self):
+        ext = build_entry_format_extension("e.g. 12.5")
+        self.assertEqual(ext["url"], "http://hl7.org/fhir/StructureDefinition/entryFormat")
+        self.assertEqual(ext["valueString"], "e.g. 12.5")
+
+    def test_help_and_hint_become_help_child_and_entry_format(self):
         strategy = _make_strategy()
         node = TriccNodeInteger(id="w", name="weight", label="Weight (kg)")
         node.help = "Enter the weight in kilograms"
@@ -54,22 +70,17 @@ class TestHelpHintItemControl(unittest.TestCase):
         parent = strategy.questionnaires["main"]["item"][0]
         link_id = get_export_name(node)
         children = parent.get("item") or []
-        self.assertEqual(len(children), 2)
+        self.assertEqual(len(children), 1)
 
         help_item = children[0]
-        hint_item = children[1]
         self.assertEqual(help_item["type"], "display")
         self.assertEqual(help_item["linkId"], f"{link_id}-help")
         self.assertEqual(help_item["text"], "Enter the weight in kilograms")
         self.assertEqual(_item_control_codes(help_item), ["help"])
 
-        self.assertEqual(hint_item["type"], "display")
-        self.assertEqual(hint_item["linkId"], f"{link_id}-hint")
-        self.assertEqual(hint_item["text"], "e.g. 12.5")
-        self.assertEqual(_item_control_codes(hint_item), ["flyover"])
-
+        self.assertEqual(_entry_format(parent), "e.g. 12.5")
         self.assertNotIn("help", _item_control_codes(parent))
-        self.assertNotIn("flyover", _item_control_codes(parent))
+        self.assertIsNone(_child_by_control(parent, "flyover"))
 
     def test_only_help(self):
         strategy = _make_strategy()
@@ -80,7 +91,7 @@ class TestHelpHintItemControl(unittest.TestCase):
         parent = strategy.questionnaires["main"]["item"][0]
         self.assertEqual(len(parent.get("item") or []), 1)
         self.assertIsNotNone(_child_by_control(parent, "help"))
-        self.assertIsNone(_child_by_control(parent, "flyover"))
+        self.assertIsNone(_entry_format(parent))
 
     def test_only_hint(self):
         strategy = _make_strategy()
@@ -89,19 +100,21 @@ class TestHelpHintItemControl(unittest.TestCase):
 
         strategy.generate_base(node)
         parent = strategy.questionnaires["main"]["item"][0]
-        self.assertEqual(len(parent.get("item") or []), 1)
-        self.assertIsNotNone(_child_by_control(parent, "flyover"))
+        self.assertEqual(parent.get("item") or [], [])
+        self.assertEqual(_entry_format(parent), "e.g. 12.5")
         self.assertIsNone(_child_by_control(parent, "help"))
 
-    def test_hidden_calculate_does_not_get_help_child(self):
+    def test_hidden_calculate_does_not_get_help_or_hint(self):
         strategy = _make_strategy()
         node = TriccNodeCalculate(id="c", name="flag", label="Flag")
         node.help = "Should not appear"
+        node.hint = "e.g. hidden"
 
         strategy.generate_base(node)
         parent = strategy.questionnaires["main"]["item"][0]
         self.assertTrue(parent.get("extension"))
         self.assertEqual(parent.get("item") or [], [])
+        self.assertIsNone(_entry_format(parent))
 
     def test_blank_help_and_missing_hint_emit_no_children(self):
         strategy = _make_strategy()
@@ -111,6 +124,7 @@ class TestHelpHintItemControl(unittest.TestCase):
         strategy.generate_base(node)
         parent = strategy.questionnaires["main"]["item"][0]
         self.assertEqual(parent.get("item") or [], [])
+        self.assertIsNone(_entry_format(parent))
 
     def test_parent_widget_item_control_stays_on_parent(self):
         strategy = _make_strategy()
@@ -153,8 +167,7 @@ class TestHelpHintYamlWalk(unittest.TestCase):
         weight = find(q.get("item"), "weight")
         self.assertIsNotNone(weight, q.get("item"))
         help_item = _child_by_control(weight, "help")
-        hint_item = _child_by_control(weight, "flyover")
         self.assertIsNotNone(help_item)
         self.assertEqual(help_item["text"], "Enter the weight in kilograms")
-        self.assertIsNotNone(hint_item)
-        self.assertEqual(hint_item["text"], "e.g. 12.5")
+        self.assertEqual(_entry_format(weight), "e.g. 12.5")
+        self.assertIsNone(_child_by_control(weight, "flyover"))

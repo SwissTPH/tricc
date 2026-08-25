@@ -96,7 +96,7 @@ class TestInheritedValueInForm(unittest.TestCase):
         # newest version first, and only the winning answer is tested
         self.assertLess(expr.index("linkId='fever_Vv_2'"), expr.index("linkId='fever_Vv_1'"))
         self.assertIn(".where($this.exists()).first()", expr)
-        self.assertTrue(expr.endswith(".where(value.code = 'yes').exists()"), expr)
+        self.assertTrue(expr.endswith(".where($this.value.code = 'yes').exists()"), expr)
 
     def test_scalar_comparison_keeps_value_suffix(self):
         strategy = _make_strategy()

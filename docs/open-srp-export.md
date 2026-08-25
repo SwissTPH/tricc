@@ -157,16 +157,16 @@ extension. Generic `FHIRStrategy` export is unchanged. See
 ## Help and hint messages
 
 Draw.io **help-message** and **hint-message** boxes (copied onto the question as
-`help` / `hint`) become nested `display` children of that Questionnaire item:
+`help` / `hint`) are emitted as follows:
 
-| Authoring | Child `linkId` | `questionnaire-itemControl` |
-|-----------|----------------|-----------------------------|
-| help-message | `<question>-help` | `help` |
-| hint-message | `<question>-hint` | `flyover` |
+| Authoring | FHIR emission |
+|-----------|---------------|
+| help-message | Nested `display` child `linkId` `<question>-help` with `questionnaire-itemControl` = `help` |
+| hint-message | `entryFormat` extension on the question (`http://hl7.org/fhir/StructureDefinition/entryFormat`, `valueString`) |
 
-Those codes are display item-controls; they are **not** put on the question
-itself. Hidden items (calculates, diagnoses, waits) get neither child. The
-children are display-only and are not extracted. See
+`help` is a display item-control on the child, not on the question itself.
+Hidden items (calculates, diagnoses, waits) get neither. Help children are
+display-only and are not extracted. See
 `feature/20260824-fhir-help-hint-itemcontrol.md`.
 
 ---
@@ -310,11 +310,17 @@ In-form calculation (e.g. BMI from weight + height both answered in the same Que
   `fix/20260824-fhirpath-nested-item-path.md`.
 - Choice / open-choice answers are stored as `valueCoding`. Membership
   (`SELECTED` / option `CONTAINS` / **`EQUAL` of a select to an option code**)
-  emits `…answer.where(value.code = '<code>').exists()` (HAPI FHIRPath has no
+  emits `…answer.where($this.value.code = '<code>').exists()` (HAPI FHIRPath has no
   `valueCoding` child on `answer`, and `…answer.value.code = 'x'` is never true).
-  Do not use `'code' in …answer.valueCoding.code` or `.value.code = 'x'`.
-  See `fix/20260817-choice-membership-and-group-relevance.md` and
-  `fix/20260824-fhirpath-choice-equality.md`.
+  `$this` keeps `value.code` on the current Answer so a `select_multiple` with
+  several ticked options still matches. Do not use `'code' in …answer.valueCoding.code`
+  or `.value.code = 'x'`. Repeating choice items (`select_multiple`, `repeats=true`)
+  look up answers with a parent-scoped `repeat(item).where(linkId=…)` so sibling
+  copies and nested wrappers are included; non-repeating `select_one` keeps the
+  precise nested `item.where` path. See
+  `fix/20260817-choice-membership-and-group-relevance.md`,
+  `fix/20260824-fhirpath-choice-equality.md`, and
+  `fix/20260824-fhirpath-select-multiple-membership.md`.
 - Page / activity groups take `enableWhenExpression` from `activity.relevance`
   (XLSForm begin-group relevant), not only the start node's own `relevance`.
 - Boolean / numeric / string items still use `.answer.value`.
@@ -428,7 +434,7 @@ process are already prefilled by the encounter dedup `initialExpression`.
 
 The trailing value suffix follows the item type (`.value.code` for choice/open-choice, `.value`
 otherwise), which is what lets `SELECTED` / `CONTAINS` re-append
-`.where(value.code = '<code>').exists()` on top of the merged value.
+`.where($this.value.code = '<code>').exists()` on top of the merged value.
 
 ### Concept repeat (FHIR / CQL)
 

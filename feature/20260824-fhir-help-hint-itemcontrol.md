@@ -1,4 +1,4 @@
-# FHIR / OpenSRP: help-message → `itemControl` help, hint-message → flyover
+# FHIR / OpenSRP: help-message → `itemControl` help, hint-message → `entryFormat`
 
 | Field | Value |
 |-------|-------|
@@ -23,9 +23,9 @@ Authors already attach two kinds of extra text to a question in the flowchart:
 | Box in the diagram | What the clinician should see |
 |--------------------|-------------------------------|
 | **help-message** | Explicit help for that question (help icon / expandable help in the app) |
-| **hint-message** | A short flyover / hover hint on the question text |
+| **hint-message** | A short format / placeholder hint on the question (e.g. `e.g. 12.5`) |
 
-In ODK/XLSForm this already works (`hint` column; help as a more-info note). In the OpenSRP / FHIR Questionnaire those texts are currently **dropped**. This change emits them in the way FHIR SDC and the OpenSRP renderer expect: nested **display** children with `questionnaire-itemControl` codes **`help`** and **`flyover`**.
+In ODK/XLSForm this already works (`hint` column; help as a more-info note). In the OpenSRP / FHIR Questionnaire those texts are currently **dropped**. This change emits them the way FHIR expects: a nested **display** child with `questionnaire-itemControl` **`help`**, and the official FHIR core **`entryFormat`** extension (`http://hl7.org/fhir/StructureDefinition/entryFormat`) for the hint.
 
 No change to how diagrams are drawn. The captured answer is unchanged.
 
@@ -33,7 +33,7 @@ No change to how diagrams are drawn. The captured answer is unchanged.
 
 On a question “Weight (kg)” with a help box “Enter the weight in kilograms” and a hint box “e.g. 12.5”:
 
-- Hovering / focusing the question shows **e.g. 12.5** (flyover).
+- The input shows **e.g. 12.5** as the entry-format / placeholder hint.
 - The help control shows **Enter the weight in kilograms**.
 
 Hidden logic (calculates, diagnoses, waits) does not show help or hint — those items are not rendered.
@@ -41,7 +41,7 @@ Hidden logic (calculates, diagnoses, waits) does not show help or hint — those
 ## 3. Benefits
 
 - Help and hint authored in draw.io appear in OpenSRP, not only in ODK.
-- Uses the standard FHIR item-control codes the OpenSRP FHIR Data Capture library already understands.
+- Uses the standard FHIR `itemControl` **help** child and the official `entryFormat` extension.
 
 ## 4. Limitations
 
@@ -53,7 +53,7 @@ Hidden logic (calculates, diagnoses, waits) does not show help or hint — those
 
 - Changing how help is written in XLSForm (more-info note).
 - New draw.io node types.
-- Putting `itemControl` help/flyover on the **question** itself (those codes are for child display items).
+- Putting `itemControl` **help** on the **question** itself (that code is for a child display item). Hint uses `entryFormat` on the question, not a nested display.
 
 ---
 
@@ -67,7 +67,7 @@ YAML fixtures get `hint` and `help` on capture / note nodes so tests do not need
 
 ## 7. Emission rules
 
-`help` and `flyover` are **display** codes in `http://hl7.org/fhir/questionnaire-item-control`. They are emitted as **child** `Questionnaire.item` entries of the question (or group), not as extensions on the parent.
+`help` is a **display** code in `http://hl7.org/fhir/questionnaire-item-control`. It is emitted as a **child** `Questionnaire.item`. Hint is **not** a display child: it is the official FHIR core `entryFormat` extension on the parent item.
 
 **R1 — help-message.** If the parent item is emitted, is not hidden, and `node.help` has a non-empty text, append a child:
 
@@ -88,11 +88,20 @@ YAML fixtures get `hint` and `help` on capture / note nodes so tests do not need
 }
 ```
 
-**R2 — hint-message.** Same, with `linkId` `<parentLinkId>-hint`, `code` **`flyover`**, text from `node.hint`.
+**R2 — hint-message.** If the parent item is emitted, is not hidden, and `node.hint` has a non-empty text, set this extension on the **parent** item (`valueString`):
 
-**R3 — order.** Children are appended to the parent’s `item` list: help first, then flyover, then any later nested questions (groups).
+```json
+{
+  "url": "http://hl7.org/fhir/StructureDefinition/entryFormat",
+  "valueString": "<hint text>"
+}
+```
 
-**R4 — skip.** Do not emit either child when:
+Do **not** emit a nested display / `flyover` child for hint.
+
+**R3 — order.** The help child is prepended to the parent’s `item` list (before any later nested questions). `entryFormat` is an extension on the parent, not an item.
+
+**R4 — skip.** Do not emit help child or `entryFormat` when:
 
 - the parent is not written (skipped / no FHIR type / already in `processed_nodes`);
 - the parent is hidden (`questionnaire-hidden`, calculates, diagnoses, waits, bridges, …);
@@ -100,20 +109,20 @@ YAML fixtures get `hint` and `help` on capture / note nodes so tests do not need
 
 **R5 — standalone `help` / `hint` node types.** If a node with `tricc_type` `help-message` / `hint-message` is walked (should not happen after enrichment), **skip** it. The parent attributes are the source of truth.
 
-**R6 — not extracted.** Child display items are synthesised in `generate_base` only. They are not graph nodes, so `generate_export` does not create StructureMap rules for them. They must not receive `initial` / `initialExpression` (already illegal on `display`).
+**R6 — not extracted.** The help child is synthesised in `generate_base` only. It is not a graph node, so `generate_export` does not create a StructureMap rule for it. It must not receive `initial` / `initialExpression` (already illegal on `display`). `entryFormat` is display-only and is not extracted.
 
 **R7 — text rendering.** Same as the parent `text`: `TriccOperation` via `get_tricc_operation_expression`; multi-lang dict → first non-empty locale; otherwise `str`. Empty result → skip (R4).
 
-Reuse `build_item_control_extension` in `questionnaire_item_mapper.py`.
+Reuse `build_item_control_extension` / `build_entry_format_extension` in `questionnaire_item_mapper.py`.
 
 ## 8. Code checklist
 
 | File | Change |
 |------|--------|
-| `tricc_oo/converters/fhir/questionnaire_item_mapper.py` | [x] `build_item_control_display_item`; skip standalone `help`/`hint` node types. |
-| `tricc_oo/strategies/output/fhir_form.py` | [x] After appending a visible item in `generate_base`, attach help/flyover children (R1–R4, R7). |
+| `tricc_oo/converters/fhir/questionnaire_item_mapper.py` | [x] `build_item_control_display_item`; `build_entry_format_extension`; skip standalone `help`/`hint` node types. |
+| `tricc_oo/strategies/output/fhir_form.py` | [x] After appending a visible item in `generate_base`, attach help child + `entryFormat` (R1–R4, R7). |
 | `tricc_oo/strategies/input/yaml.py` | [x] `hint`, `help` on `YamlNode` and capture / note `attrs`. |
-| `docs/open-srp-export.md` | [x] Help → nested `itemControl` help; hint → flyover. |
+| `docs/open-srp-export.md` | [x] Help → nested `itemControl` help; hint → `entryFormat`. |
 | `docs/tricc-elements.md` | [x] FHIR/OpenSRP row for hint-message / help-message. |
 | `tests/test_strategies/test_fhir_help_hint_itemcontrol.py` | [x] Unit + YAML walk tests. |
 
@@ -123,24 +132,24 @@ Reuse `build_item_control_extension` in `questionnaire_item_mapper.py`.
 
 | Case | Assert |
 |------|--------|
-| Integer with `help` and `hint` | Parent item has two `display` children; first `itemControl` `help`, second `flyover`; texts match; linkIds `<export>-help` / `<export>-hint`. |
-| Only `help` | One child, code `help`. |
-| Only `hint` | One child, code `flyover`. |
-| Hidden calculate with `help` | No child items. |
-| Blank `help` / missing `hint` | No children. |
-| Parent widget `itemControl` (e.g. radio-button) | Still present on the **parent**; help/flyover only on children. |
-| YAML fixture integer with `help`/`hint`, `process_base` | Same nesting after a real walk. |
+| Integer with `help` and `hint` | One `display` child with `itemControl` `help` (`<export>-help`); parent has `entryFormat` `valueString` matching the hint. |
+| Only `help` | One child, code `help`; no `entryFormat`. |
+| Only `hint` | No children; parent has `entryFormat`. |
+| Hidden calculate with `help` / `hint` | No child items; no `entryFormat`. |
+| Blank `help` / missing `hint` | No children; no `entryFormat`. |
+| Parent widget `itemControl` (e.g. radio-button) | Still present on the **parent**; help only on the child. |
+| YAML fixture integer with `help`/`hint`, `process_base` | Same after a real walk. |
 
 ## 10. Acceptance criteria
 
-1. OpenSRP Questionnaire shows authored help as `itemControl` **help** and authored hint as **flyover**, nested under the question.
+1. OpenSRP Questionnaire shows authored help as a nested `itemControl` **help** child and authored hint as **`entryFormat`** on the question.
 2. Hidden items and blank texts emit nothing extra.
 3. XLSForm/CHT hint column and more-info help are unchanged.
 4. Authors draw the same boxes as today.
 
 ## 11. Implementation phases
 
-1. Mapper helper + `generate_base` attach + skip standalone types.
+1. Mapper helpers (`itemControl` help child, `entryFormat` for hint) + `generate_base` attach + skip standalone types.
 2. YAML `hint`/`help` attrs.
 3. Tests + docs.
 

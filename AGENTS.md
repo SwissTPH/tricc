@@ -132,8 +132,9 @@ When touching `FHIRStrategy` or `OpenSRPStrategy` (`tricc_oo/converters/fhir/`,
 Helper CQL library keyed by concept, keep per-segment libraries thin, and use unqualified `define`
 names in Questionnaire expressions — never raw QuestionnaireResponse item paths in CQL.
 In-form FHIRPath uses nested `%resource.item.where(linkId=...)` group paths (`repeat(item)`
-only if the item is not on the Questionnaire). Choice membership is
-`.answer.where(value.code = '…').exists()`. Full architecture in `docs/desing/FHIRcore.md`; user-facing
+only if the item is not on the Questionnaire, or parent-scoped for repeating
+`select_multiple`). Choice membership is
+`.answer.where($this.value.code = '…').exists()`. Full architecture in `docs/desing/FHIRcore.md`; user-facing
 export guide in `docs/open-srp-export.md`. Issue-specific emission and semantics live in
 `fix/` — not here.
 

@@ -24,6 +24,7 @@ import os
 import re
 from typing import Any, Dict, List, Optional
 
+from tricc_oo.converters.fhir.populate_helper import populate_uses_inputs_group
 from tricc_oo.converters.tricc_to_xls_form import get_export_name
 from tricc_oo.converters.utils import clean_name
 from tricc_oo.models.base import TriccOperation, get_repeat
@@ -236,10 +237,10 @@ class TestSpecStrategy(BaseTestStrategy):
         """Map every name a node might be addressable by -> the node.
 
         A node can reach the survey sheet under more than one spelling: the
-        export name usually, but a ``TriccNodeInput`` exports as ``load_<name>``
-        while the CHT strategy writes its row as ``<name>``. Both are indexed so
-        the sheet can be joined either way, with the export name taking
-        precedence.
+        export name usually, but an encounter-context populate (the CHT
+        ``inputs`` group) exports as ``load_<name>`` while the CHT strategy
+        writes its row as ``<name>``. Both are indexed so the sheet can be
+        joined either way, with the export name taking precedence.
 
         Returns:
             ``{name: node}``, first occurrence winning.
@@ -354,6 +355,12 @@ class TestSpecStrategy(BaseTestStrategy):
             constraint = expression_text(survey_row.get("constraint")) or constraint
             calculation = expression_text(survey_row.get("calculation")) or calculation
 
+        # Former ``TriccNodeInput`` is now ``TriccNodePopulate``. The harness
+        # still needs the CHT *data source*: encounter-context populates land in
+        # the form ``inputs`` group; every other context is contact-summary backed.
+        is_populate_node = isinstance(node, TriccNodePopulate)
+        uses_inputs_group = is_populate_node and populate_uses_inputs_group(node)
+
         entry: Dict[str, Any] = {
             "exportName": export_name,
             "conceptCode": getattr(node, "name", None),
@@ -381,8 +388,8 @@ class TestSpecStrategy(BaseTestStrategy):
             "instance": getattr(node, "instance", 1),
             "version": getattr(node, "version", 1),
             "isLastVersion": getattr(node, "last", True) is not False,
-            "isInput": isinstance(node, TriccNodeInput),
-            "isPopulate": isinstance(node, TriccNodePopulate),
+            "isInput": uses_inputs_group,
+            "isPopulate": is_populate_node and not uses_inputs_group,
             # Fall back to the shipped type when no node was located, so a
             # calculate is still recognised as derived rather than answerable.
             "isCalculate": isinstance(node, TriccNodeCalculateBase)

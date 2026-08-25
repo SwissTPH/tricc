@@ -65,6 +65,7 @@ from tricc_oo.converters.fhir.questionnaire_item_mapper import (
     build_initial_expression,
     build_initial_expression_cql,
     build_calculated_expression_fhirpath,
+    build_entry_format_extension,
     build_item_answer_media_extension,
     build_item_control_display_item,
     build_item_media_extension,
@@ -130,7 +131,7 @@ _PRUNE_CALC_ITEM_TYPES = frozenset({"boolean", "string", "integer", "decimal", "
 _LINK_ID_IN_EXPRESSION = re.compile(r"""linkId\s*=\s*['"]([^'"]+)['"]""")
 _NUMERIC_LITERAL = re.compile(r"^-?\d+(\.\d+)?$")
 # Choice EQUAL wraps as ``…answer.where($this.exists()).value.code = 'x'``.
-# HAPI does not resolve that chain; membership ``answer.where(value.code = 'x')`` does.
+# HAPI does not resolve that chain; membership ``answer.where($this.value.code = 'x')`` does.
 # See fix/20260824-fhirpath-choice-equality.md.
 _CHOICE_CODE_EQUALITY = re.compile(
     r"^(?P<base>.+)\.value(?:Coding)?\.code\s*(?P<op>=|!=)\s*(?P<code>'[^']*'|\"[^\"]*\")$"
@@ -707,29 +708,25 @@ class FHIRStrategy(BaseOutPutStrategy):
         return text or None
 
     def _attach_help_hint_items(self, item: dict, node) -> None:
-        """Nest help-message / hint-message as itemControl help and flyover children."""
+        """Attach help-message as an itemControl help child; hint-message as entryFormat."""
+        hint_text = self._questionnaire_item_text(getattr(node, "hint", None))
+        if hint_text:
+            set_item_extension(item, build_entry_format_extension(hint_text))
+
+        help_text = self._questionnaire_item_text(getattr(node, "help", None))
+        if not help_text:
+            return
         parent_id = item.get("linkId")
         if not parent_id:
             return
-        path_len = int(getattr(node, "path_len", 0) or 0)
-        children = []
-        help_text = self._questionnaire_item_text(getattr(node, "help", None))
-        if help_text:
-            children.append(
-                build_item_control_display_item(f"{parent_id}-help", help_text, "help")
-            )
-        hint_text = self._questionnaire_item_text(getattr(node, "hint", None))
-        if hint_text:
-            children.append(
-                build_item_control_display_item(f"{parent_id}-hint", hint_text, "flyover")
-            )
-        if not children:
-            return
+        help_item = build_item_control_display_item(f"{parent_id}-help", help_text, "help")
         nested = item.setdefault("item", [])
-        item["item"] = children + nested
-        for child in children:
-            self._item_seq += 1
-            self._item_sort_keys[id(child)] = (path_len, self._item_seq)
+        item["item"] = [help_item] + nested
+        self._item_seq += 1
+        self._item_sort_keys[id(help_item)] = (
+            int(getattr(node, "path_len", 0) or 0),
+            self._item_seq,
+        )
 
     def process_base(self, start_pages, **kwargs):
         self._group_stack = []
@@ -1817,16 +1814,34 @@ class FHIRStrategy(BaseOutPutStrategy):
                 return bucket[link_id]
         return None
 
+    def _link_id_repeats(self, link_id: str) -> bool:
+        """True when the Questionnaire item for ``link_id`` has ``repeats=true``.
+
+        ``select_multiple`` is exported as repeating choice (Android FHIR
+        rejects multiple answers on a non-repeating question). See
+        fix/20260824-fhirpath-select-multiple-membership.md.
+        """
+        item = self._find_item_anywhere(link_id)
+        return bool(item and item.get("repeats") is True)
+
     def _fhirpath_item(self, link_id: str) -> str:
         """QuestionnaireResponse item for ``link_id``.
 
         Nested ``item.where(linkId=…)`` when the item lives on a Questionnaire
         (cheap at OpenSRP eval time). ``repeat(item)`` only if the path is
-        unknown. See fix/20260824-fhirpath-nested-item-path.md.
+        unknown. Repeating items (``select_multiple``) use a parent-scoped
+        ``repeat(item)`` so sibling copies and nested wrappers are included.
+        See fix/20260824-fhirpath-nested-item-path.md and
+        fix/20260824-fhirpath-select-multiple-membership.md.
         """
         path = self._item_path_for_link_id(link_id)
         if not path:
             return f"%resource.repeat(item).where(linkId='{link_id}')"
+        if self._link_id_repeats(link_id):
+            if len(path) == 1:
+                return f"%resource.repeat(item).where(linkId='{link_id}')"
+            parent = "".join(f".item.where(linkId='{lid}')" for lid in path[:-1])
+            return f"%resource{parent}.repeat(item).where(linkId='{link_id}')"
         return "%resource" + "".join(f".item.where(linkId='{lid}')" for lid in path)
 
     def _fhirpath_answer(self, link_id: str) -> str:
@@ -2046,11 +2061,15 @@ class FHIRStrategy(BaseOutPutStrategy):
 
         HAPI FHIRPath on ``QuestionnaireResponse.item.answer`` exposes polymorphic
         ``value``, not ``valueCoding``. ``'code' in …answer.valueCoding.code`` is
-        always empty/false. ``answer.where(value.code = 'x').exists()`` matches
-        a selected option.
+        always empty/false. ``answer.where($this.value.code = 'x').exists()``
+        matches a selected option on both singleton (``select_one``) and
+        multi-answer (``select_multiple``) collections — unqualified ``value``
+        inside ``.where()`` can be resolved against the whole answer list, and
+        ``('a' | 'b') = 'a'`` is empty. See
+        fix/20260824-fhirpath-select-multiple-membership.md.
         """
         answers = self._choice_answer_collection(answer_expr)
-        return f"{answers}.where(value.code = {code_expr}).exists()"
+        return f"{answers}.where($this.value.code = {code_expr}).exists()"
 
     def _rewrite_choice_code_equality(self, expr: str) -> Optional[str]:
         """Turn ``…value.code = 'x'`` into membership (HAPI-safe).
@@ -2058,7 +2077,8 @@ class FHIRStrategy(BaseOutPutStrategy):
         ``EQUAL`` on a choice item wraps to
         ``…answer.where($this.exists()).value.code = 'CHE.B3.DE04'``, which is
         never true on openSRP. Same for inherited-value unions that already end
-        in ``.value.code``. See fix/20260824-fhirpath-choice-equality.md.
+        in ``.value.code``. See fix/20260824-fhirpath-choice-equality.md and
+        fix/20260824-fhirpath-select-multiple-membership.md.
         """
         s = (expr or "").strip()
         match = _CHOICE_CODE_EQUALITY.match(s)
@@ -2068,7 +2088,7 @@ class FHIRStrategy(BaseOutPutStrategy):
         exists_suffix = ".where($this.exists())"
         if base.endswith(exists_suffix):
             base = base[: -len(exists_suffix)]
-        membership = f"{base}.where(value.code = {match.group('code')}).exists()"
+        membership = f"{base}.where($this.value.code = {match.group('code')}).exists()"
         if match.group("op") == "!=":
             return f"{membership}.not()"
         return membership
