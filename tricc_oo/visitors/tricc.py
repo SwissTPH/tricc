@@ -1146,20 +1146,21 @@ def get_repeat_index_arg(operation) -> Optional[int]:
     operand while resolving the first: the slot pins which capture node the reference
     may bind to (see ``feature/20260821-get-repeated-value-operation.md``).
 
+    When the slot is omitted, ``None`` is returned so ``version_filter`` matches any
+    slot — the latest capture collected so far (see
+    ``feature/20260825-get-repeated-value-latest.md``).
+
     Args:
-        operation: The ``TriccOperation`` carrying the slot as its second reference.
+        operation: The ``TriccOperation`` carrying the optional slot as its second reference.
 
     Returns:
-        The slot as an int; ``1`` when the argument is missing (default capture slot);
-        ``None`` when it is not a literal integer, which leaves the reference
-        unscoped rather than failing the whole conversion.
+        The slot as an int; ``None`` when the argument is omitted (any slot / latest)
+        or is not a literal integer, which leaves the reference unscoped rather than
+        failing the whole conversion.
     """
     references = list(getattr(operation, "reference", None) or [])
     if len(references) < 2:
-        logger.warning(
-            "GetRepeatedValue without a repeat slot argument; defaulting to slot 1"
-        )
-        return 1
+        return None
     raw = references[1]
     value = raw.value if isinstance(raw, TriccStatic) else raw
     try:
