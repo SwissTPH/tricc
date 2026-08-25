@@ -56,11 +56,38 @@ FUNCTION_MAP = {
     "CountSelected": TriccOperator.COUNT_SELECTED,
     "GetRepeatedValue": TriccOperator.GET_REPEATED_VALUE,
 }
+
+# Operators whose first argument is a concept code rather than a value expression.
+CONCEPT_REF_FIRST_ARG = {
+    TriccOperator.GET_REPEATED_VALUE,
+}
 # TODO
 # Min
 # Max
 # Round
 # this need to be done by contribution to DMN
+
+
+def as_concept_reference(arg, function_name):
+    """Coerce a concept-code argument into a TriccReference.
+
+    A code written as a CQL string literal (``'weight'``) parses to a TriccStatic, which
+    exposes no graph reference. Resolution would skip it and the code would be exported
+    as a literal string instead of the collected value, so both spellings are normalized.
+
+    Args:
+        arg: Parsed first argument of the function invocation.
+        function_name: Authored function name, for error reporting.
+
+    Returns:
+        A TriccReference when the argument is a concept code, otherwise ``arg`` unchanged.
+    """
+    if isinstance(arg, TriccReference):
+        return arg
+    if isinstance(arg, TriccStatic) and isinstance(arg.value, str):
+        return TriccReference(arg.value)
+    logger.error(f"{function_name} expects a concept code as first argument, got '{arg}'")
+    return arg
 
 
 class cqlToXlsFormVisitor(cqlVisitor):
@@ -146,6 +173,8 @@ class cqlToXlsFormVisitor(cqlVisitor):
         args = ctx.paramList()
         if args:
             op.reference += [self.visit(arg) for arg in args.expression() if arg]
+        if operator in CONCEPT_REF_FIRST_ARG and op.reference:
+            op.reference[0] = as_concept_reference(op.reference[0], function_name)
         op.update_origin()
 
         return op

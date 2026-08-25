@@ -750,11 +750,14 @@ class XLSFormStrategy(BaseOutPutStrategy):
         # @param r reference to be translated
         if isinstance(r, TriccOperation):
             return self.get_tricc_operation_expression(r)
-        elif isinstance(r, (TriccStatic, str, int, float)):
-            return get_export_name(r)
         elif isinstance(r, TriccReference):
+            # Checked before TriccStatic: TriccReference subclasses it, so the generic
+            # static branch would otherwise swallow unresolved references and emit a
+            # bare token instead of ${field}.
             logger.warning(f"reference `{r.value}` still used in a calculate")
             return f"${{{get_export_name(r.value)}}}"
+        elif isinstance(r, (TriccStatic, str, int, float)):
+            return get_export_name(r)
 
         elif isinstance(r, TriccNodeSelectOption):
             logger.debug(f"select option {r.get_name()} from {r.select.get_name()} was used as a reference")
@@ -853,19 +856,43 @@ class XLSFormStrategy(BaseOutPutStrategy):
         return self.tricc_operation_coalesce(ref_expressions, original_references=None)
 
     def tricc_operation_get_repeated_value(self, ref_expressions, original_references=None):
-        """Render the value operand of ``GetRepeatedValue(<concept>, <slot>)``.
+        """Render the value operand of ``GetRepeatedValue(<concept>[, <slot>])``.
 
         The slot argument was consumed while resolving the reference, so the operand is
-        already the capture node of that slot (its export name carries ``_Rr_<n>`` for
-        ``n > 1``) — possibly wrapped in ``GET_INHERITED_VALUE`` when the slot has several
-        versions. Rendering is therefore transparent: the trailing slot literal is dropped.
+        already the capture node (its export name carries ``_Rr_<n>`` for ``n > 1``) —
+        possibly wrapped in ``GET_INHERITED_VALUE`` when several versions/slots match.
+        Rendering is therefore transparent: the trailing slot literal is dropped.
 
         Not delegated to ``tricc_operation_get_inherited_value`` on purpose: the CHT
         override of that method prepends ``"."`` (the current question's value), which is
         wrong for reading another node's slot.
-        See ``feature/20260821-get-repeated-value-operation.md``.
+        See ``feature/20260821-get-repeated-value-operation.md`` and
+        ``feature/20260825-get-repeated-value-latest.md``.
         """
-        return ref_expressions[0] if ref_expressions else ""
+        self._assert_repeated_value_resolved(ref_expressions, original_references)
+        return ref_expressions[0]
+
+    def _assert_repeated_value_resolved(self, ref_expressions, original_references):
+        """Stop the build when GetRepeatedValue did not resolve to a collected field.
+
+        An unresolved concept would serialize as a string literal, and an empty operand
+        list produces an empty calculate whose ``${name}`` references are later rewritten
+        to ``1`` (including inside note labels), so both must fail loudly instead of
+        exporting.
+        """
+        unresolved = None
+        if original_references:
+            concept = original_references[0]
+            if isinstance(concept, (TriccStatic, TriccReference)):
+                unresolved = str(getattr(concept, "value", concept))
+        if ref_expressions and unresolved is None:
+            return
+        logger.critical(
+            f"GetRepeatedValue('{unresolved or '?'}') could not be resolved: that concept "
+            "is not collected earlier in the flow. Move the calculate after a capture of "
+            "the concept, or use a populate node to read it from outside the form."
+        )
+        exit(1)
 
     def _get_trigger(self, expression):
         """ODK trigger column: comma-separated field refs (no coalesce(., …))."""
