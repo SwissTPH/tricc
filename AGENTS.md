@@ -1,7 +1,12 @@
 # TRICC Project - Cline Rules
 
-This file (`AGENTS.md`) is the source of truth for coding standards, domain reference, and workflow
-in this repository — including for Claude Code (`CLAUDE.md` just points here).
+This file (`AGENTS.md`) is the source of truth for coding standards, domain overview, and
+workflow in this repository — including for Claude Code (`CLAUDE.md` just points here).
+
+It is **not** a dump of issue analyses or emission rules. Those belong in dated files under
+`fix/` (bugs / export correctness) or `feature/` (new capabilities), and, once they are
+lasting architecture, in `docs/`. Do not copy `fix/` or `feature/` technical detail into
+this file.
 
 ## Project Overview
 
@@ -126,10 +131,12 @@ When touching `FHIRStrategy` or `OpenSRPStrategy` (`tricc_oo/converters/fhir/`,
 `tricc_oo/strategies/output/fhir_form.py`, `opensrp.py`): route resource access through a single
 Helper CQL library keyed by concept, keep per-segment libraries thin, and use unqualified `define`
 names in Questionnaire expressions — never raw QuestionnaireResponse item paths in CQL.
-In-form FHIRPath uses `%resource.repeat(item).where(linkId=...)` and, for choice answers,
-`.answer.valueCoding.code`. Full architecture in `docs/desing/FHIRcore.md`; user-facing
-export guide in `docs/open-srp-export.md`. See the "FHIR CQL / Library Generation" section
-below for the detailed rules.
+In-form FHIRPath uses nested `%resource.item.where(linkId=...)` group paths (`repeat(item)`
+only if the item is not on the Questionnaire, or parent-scoped for repeating
+`select_multiple`). Choice membership is
+`.answer.where($this.value.code = '…').exists()`. Full architecture in `docs/desing/FHIRcore.md`; user-facing
+export guide in `docs/open-srp-export.md`. Issue-specific emission and semantics live in
+`fix/` — not here.
 
 ## Coding Standards
 
@@ -254,6 +261,20 @@ issue-analysis write-ups. Cross-link the other folder only from the Related row.
 
 Example: `fix/20260813-fhirpath-choice-answers.md`.
 
+### What does *not* belong in `AGENTS.md`
+
+`AGENTS.md` documents this workflow only. Do **not** paste into this file:
+
+- root-cause analysis, expected-vs-actual, or who is affected
+- emission / semantics rules (FHIRPath snippets, CQL accessors, Questionnaire
+  extension constraints, XLSForm serialization quirks, …)
+- per-issue code checklists or acceptance criteria
+- citations of individual `fix/*.md` files as if they were standing rules here
+
+Those stay in the dated `fix/<YYYYMMDD>-<issue-name>.md` (and, after
+`Implemented`, in `docs/` if they are lasting architecture). When a fix changes
+behaviour, update that spec and the docs — not this file.
+
 ## Documentation Requirements
 
 ### When Adding Features
@@ -305,18 +326,15 @@ Example: `fix/20260813-fhirpath-choice-answers.md`.
 5. Document operator behavior and return types
 
 ### FHIR CQL / Library Generation (FHIRStrategy)
-- `calculatedExpression` is **FHIRPath-only** (openSRP/FHIR-Core does not evaluate CQL through it) — never emit a CQL identifier there. `initialExpression` is the **only** extension allowed to carry CQL (`text/cql-identifier` / `text/cql`), evaluated once at `$populate`.
-- `generate_calculate()` routes each calculate node by whether at least one of its references is itself an item in the *same* Questionnaire (reachable via `%resource.repeat(item).where(linkId=...)`): if so, emit a live `calculatedExpression` in FHIRPath; otherwise the value depends on data outside the form (e.g. observation history) and must be computed once via CQL `initialExpression` instead.
-- In-form FHIRPath **must** walk nested groups with `%resource.repeat(item).where(linkId=...)` — never a top-level-only `%resource.item.where(...)`.
-- Select-option `relevance` is emitted as SDC `answerOptionsToggleExpression` on the parent choice item (`fix/20260813-option-relevance-toggle.md`), not as a hidden Questionnaire item.
-- Choice / open-choice answers are `valueCoding`. Membership tests (`SELECTED` / `CONTAINS`) emit `…answer.where(value.code = '<code>').exists()`. Scalar comparisons on primitives keep `.answer.value`. See `fix/20260817-choice-membership-and-group-relevance.md`.
-- Use a **Helper** library for all FHIR resource access (Observations, Conditions, etc.) keyed by concept name/code — only reachable from the CQL/`initialExpression` path, never from FHIRPath.
-- Keep per-process/segment libraries **thin** — they should mostly contain named `define` statements that delegate to the Helper.
-- In `initialExpression`, use **simple define names only** (e.g. `"Calc_bmi"`). Do not qualify with library name.
-- The Questionnaire declares its library/libraries at the top level (via `library` element or SDC `cqlInputResources` extension).
-- Avoid embedding raw questionnaire answer paths (`%resource.repeat(item).where(...)`) in CQL. Route data access through the Helper using concept identifiers. (FHIRPath expressions, by contrast, use `%resource.repeat(item).where(...)` directly — that's the whole point of using FHIRPath for in-form calculations.)
-- Follow patterns from pyfhirsdc and WHO SMART CQL examples (thin form libs + rich base/helper libs).
-- When adding new CQL helpers or changing the template, update `docs/desing/FHIRcore.md` and `docs/open-srp-export.md`.
+
+Standing architecture (Helper library, thin per-segment libraries, unqualified
+`define` names, FHIRPath vs CQL split) is in `docs/desing/FHIRcore.md` and
+`docs/open-srp-export.md`. High-level reminders are in "FHIR / CQL specifics"
+above and in the FHIR notes under "Adding a New Output Strategy".
+
+Do **not** put issue-specific emission rules in this file. Those live in `fix/`
+(and in `docs/` once they are lasting architecture). When changing FHIR/CQL
+behaviour, update the relevant `fix/` spec and those docs — not `AGENTS.md`.
 
 ## Validation Checklist
 

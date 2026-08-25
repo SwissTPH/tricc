@@ -3,7 +3,7 @@
 import unittest
 
 from tricc_oo.models.tricc import TriccNodeInteger
-from tricc_oo.models.calculate import TriccNodeInput
+from tricc_oo.models.calculate import TriccNodePopulate
 from tricc_oo.converters.fhir.populate_helper import cql_helper_populate_block
 from tricc_oo.converters.fhir.repeat_helper import (
     TRICC_OBSERVATION_REPEAT_EXT,
@@ -44,7 +44,7 @@ class TestRepeatHelper(unittest.TestCase):
         )
 
     def test_cql_accessor_for_input_node(self):
-        node = TriccNodeInput(id="i1", name="temperature", label="Temp", repeat=2)
+        node = TriccNodePopulate(id="i1", name="temperature", label="Temp", repeat=2)
         self.assertEqual(
             get_observation_cql_accessor_for_node(node),
             "Helper.GetRepeatedValue('temperature', 2)",

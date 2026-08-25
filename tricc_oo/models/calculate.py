@@ -64,10 +64,6 @@ class TriccNodeFakeCalculateBase(TriccNodeCalculateBase):
     ...
 
 
-class TriccNodeInput(TriccNodeFakeCalculateBase):
-    tricc_type: TriccNodeType = TriccNodeType.input
-
-
 class TriccNodePopulate(TriccNodeFakeCalculateBase):
     """Pre-loaded data node (non-display calculate) with explicit data context."""
 

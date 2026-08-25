@@ -97,6 +97,9 @@ class YamlNode(BaseModel):
     repeat: Optional[int] = None
     context: Optional[str] = None
     period: Optional[str] = None
+    form_id: Optional[str] = None            # start node only; required by XLSForm export
+    hint: Optional[str] = None
+    help: Optional[str] = None
 
 
 class YamlEdge(BaseModel):
@@ -123,7 +126,8 @@ class YamlActivity(BaseModel):
 NODE_TYPE_MAP: Dict[str, Dict[str, Any]] = {
     "start": {
         "model": TriccNodeMainStart,
-        "attrs": ["process", "label", "relevance"],
+        # form_id is required by the XLSForm export, so fixtures can drive a full export
+        "attrs": ["process", "label", "relevance", "form_id"],
         "tricc_type": TriccNodeType.start,
     },
     "activity_start": {
@@ -143,39 +147,39 @@ NODE_TYPE_MAP: Dict[str, Dict[str, Any]] = {
     },
     "note": {
         "model": TriccNodeNote,
-        "attrs": ["label", "name", "relevance"],
+        "attrs": ["label", "name", "relevance", "hint", "help"],
         "tricc_type": TriccNodeType.note,
     },
     "integer": {
         "model": TriccNodeInteger,
-        "attrs": ["label", "name", "required", "min", "max", "relevance", "save", "repeat"],
+        "attrs": ["label", "name", "required", "min", "max", "relevance", "save", "repeat", "hint", "help"],
         "tricc_type": TriccNodeType.integer,
     },
     "decimal": {
         "model": TriccNodeDecimal,
-        "attrs": ["label", "name", "required", "min", "max", "relevance", "save", "repeat"],
+        "attrs": ["label", "name", "required", "min", "max", "relevance", "save", "repeat", "hint", "help"],
         "tricc_type": TriccNodeType.decimal,
     },
     "text": {
         "model": TriccNodeText,
-        "attrs": ["label", "name", "required", "relevance", "save", "repeat"],
+        "attrs": ["label", "name", "required", "relevance", "save", "repeat", "hint", "help"],
         "tricc_type": TriccNodeType.text,
     },
     "select_one": {
         "model": TriccNodeSelectOne,
-        "attrs": ["label", "name", "required", "relevance", "save", "repeat"],
+        "attrs": ["label", "name", "required", "relevance", "save", "repeat", "hint", "help"],
         "has_options": True,
         "tricc_type": TriccNodeType.select_one,
     },
     "select_multiple": {
         "model": TriccNodeSelectMultiple,
-        "attrs": ["label", "name", "required", "relevance", "save", "repeat"],
+        "attrs": ["label", "name", "required", "relevance", "save", "repeat", "hint", "help"],
         "has_options": True,
         "tricc_type": TriccNodeType.select_multiple,
     },
     "select_yesno": {
         "model": TriccNodeSelectYesNo,
-        "attrs": ["label", "name", "required", "relevance", "save", "repeat"],
+        "attrs": ["label", "name", "required", "relevance", "save", "repeat", "hint", "help"],
         "has_options": True,
         "tricc_type": TriccNodeType.select_yesno,
     },

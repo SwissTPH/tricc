@@ -15,7 +15,6 @@ from tricc_oo.models.calculate import (
     TriccNodeExclusive,
     TriccNodeProposedDiagnosis,
     TriccNodeDiagnosis,
-    TriccNodeInput,
     TriccNodePopulate,
 )
 
@@ -311,11 +310,24 @@ TYPE_MAP = {
         "mandatory_attributes": ["name", "label"],
         "model": TriccNodeProposedDiagnosis,
     },
+    # Legacy keyword for a pre-loaded value: same node as `populate` (the newer,
+    # richer model). Kept so existing diagrams keep parsing; `context` defaults to
+    # `encounter`, which is what the old input path fetched
+    # (fix/20260821-merge-input-into-populate.md).
     TriccNodeType.input: {
         "objects": ["UserObject", "object"],
-        "attributes": ["save", "reference", "data_type", "concept_type", "repeat"],
+        "attributes": [
+            "save",
+            "reference",
+            "data_type",
+            "concept_type",
+            "context",
+            "period",
+            "repeat",
+        ],
         "mandatory_attributes": ["name", "label"],
-        "model": TriccNodeInput,
+        "model": TriccNodePopulate,
+        "defaults": {"context": "encounter"},
     },
     TriccNodeType.populate: {
         "objects": ["UserObject", "object"],

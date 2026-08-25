@@ -12,8 +12,9 @@ Driven by the CodeSystem ``conceptType`` (and node-type fallbacks in
 
 from __future__ import annotations
 
+import logging
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Iterable, List, Optional
 
 from tricc_oo.converters.datadictionnary import lookup_codesystems_code
@@ -37,6 +38,8 @@ from tricc_oo.converters.fhir.repeat_helper import (
 from tricc_oo.converters.tricc_to_xls_form import get_export_name
 from tricc_oo.models.base import RETURNS_BOOLEAN, TriccOperation, TriccOperator, get_repeat
 
+logger = logging.getLogger("default")
+
 _YESNO_MARKERS = {"true", "yes", "1", "y", "false", "no", "0", "n"}
 
 CONDITION_CLINICAL_SYSTEM = "http://terminology.hl7.org/CodeSystem/condition-clinical"
@@ -52,7 +55,12 @@ _GROUP_SAFE = re.compile(r"[^A-Za-z0-9]+")
 
 @dataclass
 class ExtractionRule:
-    """One extractable Questionnaire item → FHIR resource mapping."""
+    """One extractable concept/repeat slot → FHIR resource mapping.
+
+    ``link_ids`` lists Questionnaire ``linkId``s for this concept and repeat
+    (newest first). Extraction writes one resource from the first non-null
+    answer among those items.
+    """
 
     link_id: str
     concept_code: str
@@ -65,6 +73,9 @@ class ExtractionRule:
     code_system_url: str
     group_name: str
     only_when_true: bool = False
+    link_ids: List[str] = field(default_factory=list)
+    version: int = 1
+    path_len: int = 0
 
 
 def _expression_is_boolean(node) -> bool:
@@ -128,6 +139,105 @@ def _group_name(prefix: str, link_id: str) -> str:
     return f"{prefix}_{cleaned}"
 
 
+def _repeat_slot(repeat: Optional[int]) -> int:
+    """Default capture slot is 1 (``None`` and ``1`` are the same Observation)."""
+    return 1 if repeat is None else int(repeat)
+
+
+def _extract_group_name(concept_code: str, repeat: Optional[int]) -> str:
+    """StructureMap group name: one per concept + repeat, never a ``_Vv_`` version."""
+    base = concept_code or "item"
+    slot = _repeat_slot(repeat)
+    if slot != 1:
+        base = f"{base}_Rr_{str(slot).replace('-', 'n')}"
+    return _group_name("extract", str(base))
+
+
+def _rule_rank(rule: ExtractionRule) -> tuple:
+    """Newest-first rank, same as GET_INHERITED_VALUE: (path_len, version)."""
+    return (int(rule.path_len or 0), int(rule.version or 0))
+
+
+def extraction_rule_link_ids(rule) -> List[str]:
+    """Questionnaire ``linkId``s this rule reads, newest first."""
+    ids: List[str] = []
+    for lid in list(getattr(rule, "link_ids", None) or []):
+        if lid and lid not in ids:
+            ids.append(str(lid))
+    lid = getattr(rule, "link_id", None)
+    if lid and str(lid) not in ids:
+        ids.insert(0, str(lid))
+    return ids
+
+
+def extraction_rules_conflict(left: ExtractionRule, right: ExtractionRule) -> bool:
+    """True when two rules share a concept/repeat key but would extract differently."""
+    return (
+        left.kind,
+        left.item_type,
+        left.only_when_true,
+        left.qr_value_field,
+    ) != (
+        right.kind,
+        right.item_type,
+        right.only_when_true,
+        right.qr_value_field,
+    )
+
+
+def _merge_key(rule: ExtractionRule) -> tuple:
+    return (rule.kind, str(rule.concept_code), _repeat_slot(rule.repeat))
+
+
+def merge_extraction_rules(rules: List[ExtractionRule]) -> List[ExtractionRule]:
+    """One rule per concept + repeat; ``link_ids`` newest first.
+
+    HAPI ``resolveGroupReference`` requires a unique group name. Versions of
+    the same concept (``p_age_years``, ``p_age_years_Vv_1``) share one group
+    and extract the first non-null answer. See
+    fix/20260824-structuremap-duplicate-extract-groups.md.
+    """
+    buckets: dict = {}
+    order: List[tuple] = []
+    for rule in rules or []:
+        key = _merge_key(rule)
+        if key not in buckets:
+            buckets[key] = []
+            order.append(key)
+        buckets[key].append(rule)
+    out: List[ExtractionRule] = []
+    for key in order:
+        members = sorted(buckets[key], key=_rule_rank, reverse=True)
+        winner = members[0]
+        for other in members[1:]:
+            if extraction_rules_conflict(winner, other):
+                logger.warning(
+                    "StructureMap: merging extract group '%s' despite mismatched "
+                    "kind/type (kept %s/%s, skipped %s/%s from linkId %s)",
+                    winner.group_name,
+                    winner.kind,
+                    winner.item_type,
+                    other.kind,
+                    other.item_type,
+                    other.link_id,
+                )
+        seen_ids: List[str] = []
+        for member in members:
+            for lid in extraction_rule_link_ids(member):
+                if lid not in seen_ids:
+                    seen_ids.append(lid)
+        winner.link_ids = seen_ids
+        winner.link_id = seen_ids[0]
+        winner.group_name = _extract_group_name(winner.concept_code, winner.repeat)
+        out.append(winner)
+    return out
+
+
+def dedupe_extraction_rules(rules: List[ExtractionRule]) -> List[ExtractionRule]:
+    """Alias for ``merge_extraction_rules`` (unique group per concept/repeat)."""
+    return merge_extraction_rules(rules)
+
+
 def _concept_system_url(codesystems, code: str, default_url: str) -> str:
     if not codesystems or not code:
         return default_url
@@ -178,8 +288,9 @@ def build_extraction_rule(
     only_when_true = kind == "observation" and _is_hidden_boolean_flag(node, item_type)
 
     repeat = get_repeat(node) if should_emit_repeat_metadata(node) and kind == "observation" else None
+    export_id = str(link_id)
     return ExtractionRule(
-        link_id=str(link_id),
+        link_id=export_id,
         concept_code=str(concept_code),
         display=display,
         concept_type=resolve_concept_type(node, codesystems),
@@ -188,8 +299,11 @@ def build_extraction_rule(
         item_type=item_type,
         repeat=repeat,
         code_system_url=_concept_system_url(codesystems, concept_code, default_code_system),
-        group_name=_group_name("extract", str(link_id)),
+        group_name=_extract_group_name(str(concept_code), repeat),
         only_when_true=only_when_true,
+        link_ids=[export_id],
+        version=int(getattr(node, "version", None) or 1),
+        path_len=int(getattr(node, "path_len", None) or 0),
     )
 
 
@@ -327,38 +441,83 @@ def _condition_group(rule: ExtractionRule, verification: str, clinical: str, gro
     )
 
 
-def _dispatch_block(link_id: str, group_name: str, extra_where: str = "") -> str:
+def _and_where(*parts: str) -> str:
+    return " and ".join(p for p in parts if p)
+
+
+def _preferred_unanswered_where(preferred_link_ids: List[str]) -> str:
+    """True when every newer version of this concept has no answer.
+
+    Evaluated against the current item; ``src`` is the QuestionnaireResponse
+    StructureMap variable (HAPI FHIRPath ``resolveConstant``).
+    """
+    return " and ".join(
+        f"src.repeat(item).where(linkId = '{_fml_escape(lid)}').answer.empty()"
+        for lid in preferred_link_ids
+        if lid
+    )
+
+
+def _dispatch_block(
+    link_id: str,
+    group_name: str,
+    extra_where: str = "",
+    rule_name: Optional[str] = None,
+) -> str:
     """HAPI FML ``where`` clause (not FHIRPath ``item.where()``).
 
     OpenSRP compiles FML with ``StructureMapUtilities.parse``. The parser
     accepts ``item as q where(linkId = 'x')`` the same way
     ``cdss-client-registration.map`` does, and rejects ``item.where(...)``.
     """
-    where = f"linkId = '{link_id}'"
-    if extra_where:
-        where = f"{where} and {extra_where}"
+    where = _and_where(f"linkId = '{link_id}'", extra_where)
+    name = rule_name or group_name
     return (
         f"  item as q where({where}) then {{\n"
         f"    q.answer as answer then {group_name}(answer, src, bundle) \"answer\";\n"
-        f'  }} "{group_name}";'
+        f'  }} "{name}";'
     )
 
 
 def _item_dispatch_rule(rule: ExtractionRule) -> str:
-    lid = _fml_escape(rule.link_id)
-    if rule.kind == "observation" and rule.only_when_true:
-        return _dispatch_block(lid, rule.group_name, "answer.valueBoolean = true")
-    if rule.kind == "proposed_condition":
-        return _dispatch_block(lid, rule.group_name, "answer.valueBoolean = true")
-    if rule.kind == "accept_condition":
-        yes = f"{rule.group_name}_confirmed"
-        no = f"{rule.group_name}_refuted"
-        return (
-            _dispatch_block(lid, yes, "answer.valueBoolean = true")
-            + "\n"
-            + _dispatch_block(lid, no, "answer.valueBoolean = false")
-        )
-    return _dispatch_block(lid, rule.group_name)
+    """Dispatch each version ``linkId`` to one group; older only if newer is empty."""
+    ids = extraction_rule_link_ids(rule)
+    if not ids:
+        return ""
+    multi = len(ids) > 1
+    lines: List[str] = []
+    for index, lid in enumerate(ids):
+        preferred = _preferred_unanswered_where(ids[:index])
+        suffix = f"_{index}" if multi else ""
+        escaped = _fml_escape(lid)
+        if rule.kind == "observation" and rule.only_when_true:
+            extra = _and_where(preferred, "answer.valueBoolean = true")
+            lines.append(
+                _dispatch_block(escaped, rule.group_name, extra, rule.group_name + suffix)
+            )
+        elif rule.kind == "proposed_condition":
+            extra = _and_where(preferred, "answer.valueBoolean = true")
+            lines.append(
+                _dispatch_block(escaped, rule.group_name, extra, rule.group_name + suffix)
+            )
+        elif rule.kind == "accept_condition":
+            yes = f"{rule.group_name}_confirmed"
+            no = f"{rule.group_name}_refuted"
+            lines.append(
+                _dispatch_block(
+                    escaped, yes, _and_where(preferred, "answer.valueBoolean = true"), yes + suffix
+                )
+            )
+            lines.append(
+                _dispatch_block(
+                    escaped, no, _and_where(preferred, "answer.valueBoolean = false"), no + suffix
+                )
+            )
+        else:
+            lines.append(
+                _dispatch_block(escaped, rule.group_name, preferred, rule.group_name + suffix)
+            )
+    return "\n".join(lines)
 
 
 def build_extraction_fml(
@@ -367,6 +526,7 @@ def build_extraction_fml(
     name: str,
 ) -> str:
     """Return FML source for a QuestionnaireResponse → transaction Bundle map."""
+    rules = merge_extraction_rules(rules)
     uses = [
         f'map "{url}" = \'{name}\'',
         "",
@@ -441,6 +601,7 @@ def build_extraction_structuremap(
     version: str = "1.0.0",
 ) -> dict:
     """Build a FHIR StructureMap resource (JSON + ``_fml`` companion text)."""
+    rules = merge_extraction_rules(rules)
     sm_id = fhir_resource_id(form_id, "StructureMap", process, "extract")
     sm_name = to_fhir_id(form_id, process, "extract").replace("-", "_")
     url = f"{base_url.rstrip('/')}/StructureMap/{sm_id}"
@@ -448,13 +609,21 @@ def build_extraction_structuremap(
 
     dispatch_rules = []
     for rule in rules:
-        dispatch_rules.append(
-            {
-                "name": rule.group_name,
-                "source": [{"context": "item", "condition": f"linkId = '{rule.link_id}'"}],
-                "dependent": [{"name": rule.group_name, "variable": ["answer", "src", "bundle"]}],
-            }
-        )
+        ids = extraction_rule_link_ids(rule)
+        multi = len(ids) > 1
+        for index, lid in enumerate(ids):
+            preferred = _preferred_unanswered_where(ids[:index])
+            condition = _and_where(f"linkId = '{_fml_escape(lid)}'", preferred)
+            suffix = f"_{index}" if multi else ""
+            dispatch_rules.append(
+                {
+                    "name": rule.group_name + suffix,
+                    "source": [{"context": "item", "condition": condition}],
+                    "dependent": [
+                        {"name": rule.group_name, "variable": ["answer", "src", "bundle"]}
+                    ],
+                }
+            )
 
     structuremap = {
         "resourceType": "StructureMap",

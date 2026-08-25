@@ -23,6 +23,7 @@ import unittest
 import pandas as pd
 
 from tests.helpers import load_yaml_project
+from tricc_oo.models.calculate import TriccNodePopulate
 from tricc_oo.serializers.xls_form import CHOICE_MAP, SURVEY_MAP
 from tricc_oo.strategies.output.xls_form import XLSFormStrategy
 from tricc_oo.strategies.output.xlsform_cdss import XLSFormCDSSStrategy
@@ -159,6 +160,35 @@ class TestRegistryWiring(unittest.TestCase):
         self.assertTrue(issubclass(TestSpecStrategy, BaseTestStrategy))
         self.assertNotIn("TestSpecStrategy", (cls.__name__ for cls in XLSFormStrategy.__mro__))
         self.assertIn("TestSpecStrategy", list_test_strategies())
+
+
+class TestInputPopulateFlags(unittest.TestCase):
+    """``TriccNodeInput`` was merged into ``TriccNodePopulate``.
+
+    The form-model flags still distinguish CHT data sources: encounter-context
+    populates use the form ``inputs`` group; other contexts are contact-summary.
+    """
+
+    def _entry(self, node):
+        strategy = TestSpecStrategy(project=None, output_path=".", output_strategy=None)
+        return strategy.node_entry(node.name, node, None)
+
+    def test_encounter_populate_is_classified_as_input(self):
+        node = TriccNodePopulate(id="p1", name="weight", label="Weight", context="encounter")
+        entry = self._entry(node)
+        self.assertTrue(entry["isInput"])
+        self.assertFalse(entry["isPopulate"])
+
+    def test_patient_populate_is_classified_as_populate(self):
+        node = TriccNodePopulate(id="p2", name="p_age", label="Age", context="patient")
+        entry = self._entry(node)
+        self.assertFalse(entry["isInput"])
+        self.assertTrue(entry["isPopulate"])
+
+    def test_non_populate_is_neither(self):
+        entry = self._entry(_FakeNode(name="fever", label="Fever?"))
+        self.assertFalse(entry["isInput"])
+        self.assertFalse(entry["isPopulate"])
 
 
 class _Fixture:

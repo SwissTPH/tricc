@@ -117,9 +117,11 @@ class DHIS2Strategy(BaseOutPutStrategy):
 
     def get_tricc_operation_expression(self, operation):
         ref_expressions = []
+        original_references = []
         if not hasattr(operation, "reference"):
             return self.get_tricc_operation_operand(operation)
         for r in operation.reference:
+            original_references.append(r)
             if isinstance(r, list):
                 r_expr = [
                     (
@@ -141,7 +143,7 @@ class DHIS2Strategy(BaseOutPutStrategy):
 
         if hasattr(self, f"tricc_operation_{operation.operator}"):
             callable = getattr(self, f"tricc_operation_{operation.operator}")
-            return callable(ref_expressions)
+            return callable(ref_expressions, original_references)
         else:
             raise NotImplementedError(
                 f"This type of operation '{operation.operator}' is not supported in this strategy"
@@ -767,13 +769,13 @@ class DHIS2Strategy(BaseOutPutStrategy):
         return expr
 
     # Operation methods for DHIS2 expressions
-    def tricc_operation_equal(self, ref_expressions):
+    def tricc_operation_equal(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]} == {ref_expressions[1]}"
 
-    def tricc_operation_not_equal(self, ref_expressions):
+    def tricc_operation_not_equal(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]} != {ref_expressions[1]}"
 
-    def tricc_operation_and(self, ref_expressions):
+    def tricc_operation_and(self, ref_expressions, original_references=None):
         if len(ref_expressions) == 1:
             return ref_expressions[0]
         if len(ref_expressions) > 1:
@@ -781,7 +783,7 @@ class DHIS2Strategy(BaseOutPutStrategy):
         else:
             return "true"
 
-    def tricc_operation_or(self, ref_expressions):
+    def tricc_operation_or(self, ref_expressions, original_references=None):
         if len(ref_expressions) == 1:
             return ref_expressions[0]
         if len(ref_expressions) > 1:
@@ -789,81 +791,81 @@ class DHIS2Strategy(BaseOutPutStrategy):
         else:
             return "true"
 
-    def tricc_operation_not(self, ref_expressions):
+    def tricc_operation_not(self, ref_expressions, original_references=None):
         return f"!({ref_expressions[0]})"
 
-    def tricc_operation_plus(self, ref_expressions):
+    def tricc_operation_plus(self, ref_expressions, original_references=None):
         return " + ".join(ref_expressions)
 
-    def tricc_operation_minus(self, ref_expressions):
+    def tricc_operation_minus(self, ref_expressions, original_references=None):
         if len(ref_expressions) > 1:
             return " - ".join(map(str, ref_expressions))
         elif len(ref_expressions) == 1:
             return f"-{ref_expressions[0]}"
 
-    def tricc_operation_more(self, ref_expressions):
+    def tricc_operation_more(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]} > {ref_expressions[1]}"
 
-    def tricc_operation_less(self, ref_expressions):
+    def tricc_operation_less(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]} < {ref_expressions[1]}"
 
-    def tricc_operation_more_or_equal(self, ref_expressions):
+    def tricc_operation_more_or_equal(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]} >= {ref_expressions[1]}"
 
-    def tricc_operation_less_or_equal(self, ref_expressions):
+    def tricc_operation_less_or_equal(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]} <= {ref_expressions[1]}"
 
-    def tricc_operation_selected(self, ref_expressions):
+    def tricc_operation_selected(self, ref_expressions, original_references=None):
         # For DHIS2, check if value is selected in multi-select
         return f"d2:countIfValue({ref_expressions[0]}, {ref_expressions[1]})>0"
 
-    def tricc_operation_count(self, ref_expressions):
+    def tricc_operation_count(self, ref_expressions, original_references=None):
         return f"d2:count({ref_expressions[0]})"
 
-    def tricc_operation_multiplied(self, ref_expressions):
+    def tricc_operation_multiplied(self, ref_expressions, original_references=None):
         return "*".join(ref_expressions)
 
-    def tricc_operation_divided(self, ref_expressions):
+    def tricc_operation_divided(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]} / {ref_expressions[1]}"
 
-    def tricc_operation_modulo(self, ref_expressions):
+    def tricc_operation_modulo(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]} % {ref_expressions[1]}"
 
-    def tricc_operation_coalesce(self, ref_expressions):
+    def tricc_operation_coalesce(self, ref_expressions, original_references=None):
         return f"d2:coalesce({','.join(ref_expressions)})"
 
-    def tricc_operation_native(self, ref_expressions):
+    def tricc_operation_native(self, ref_expressions, original_references=None):
         if len(ref_expressions) > 0:
             return f"{ref_expressions[0]}({','.join(ref_expressions[1:])})"
 
-    def tricc_operation_istrue(self, ref_expressions):
+    def tricc_operation_istrue(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]} == true"
 
-    def tricc_operation_isfalse(self, ref_expressions):
+    def tricc_operation_isfalse(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]} == false"
 
-    def tricc_operation_parenthesis(self, ref_expressions):
+    def tricc_operation_parenthesis(self, ref_expressions, original_references=None):
         return f"({ref_expressions[0]})"
 
-    def tricc_operation_between(self, ref_expressions):
+    def tricc_operation_between(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]} >= {ref_expressions[1]} && {ref_expressions[0]} < {ref_expressions[2]}"
 
-    def tricc_operation_isnull(self, ref_expressions):
+    def tricc_operation_isnull(self, ref_expressions, original_references=None):
         return f"!d2:hasValue({ref_expressions[0]})"
 
-    def tricc_operation_isnotnull(self, ref_expressions):
+    def tricc_operation_isnotnull(self, ref_expressions, original_references=None):
         return f"d2:hasValue({ref_expressions[0]})"
 
-    def tricc_operation_isnottrue(self, ref_expressions):
+    def tricc_operation_isnottrue(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]} != true"
 
-    def tricc_operation_isnotfalse(self, ref_expressions):
+    def tricc_operation_isnotfalse(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]} != false"
 
-    def tricc_operation_notexist(self, ref_expressions):
+    def tricc_operation_notexist(self, ref_expressions, original_references=None):
         return f"!d2:hasValue({ref_expressions[0]})"
 
-    def tricc_operation_case(self, ref_expressions):
+    def tricc_operation_case(self, ref_expressions, original_references=None):
         # Simplified case handling
         parts = []
         for i in range(0, len(ref_expressions), 2):
@@ -871,39 +873,39 @@ class DHIS2Strategy(BaseOutPutStrategy):
                 parts.append(f"if({ref_expressions[i]}, {ref_expressions[i+1]})")
         return " || ".join(parts)
 
-    def tricc_operation_ifs(self, ref_expressions):
+    def tricc_operation_ifs(self, ref_expressions, original_references=None):
         return self.tricc_operation_case(ref_expressions[1:])
 
-    def tricc_operation_if(self, ref_expressions):
+    def tricc_operation_if(self, ref_expressions, original_references=None):
         return f"if({ref_expressions[0]}, {ref_expressions[1]}, {ref_expressions[2]})"
 
-    def tricc_operation_contains(self, ref_expressions):
+    def tricc_operation_contains(self, ref_expressions, original_references=None):
         return f"d2:contains({ref_expressions[0]}, {ref_expressions[1]})"
 
-    def tricc_operation_exists(self, ref_expressions):
+    def tricc_operation_exists(self, ref_expressions, original_references=None):
         parts = []
         for ref in ref_expressions:
             parts.append(f"d2:hasValue({ref})")
         return " && ".join(parts)
 
-    def tricc_operation_cast_number(self, ref_expressions):
+    def tricc_operation_cast_number(self, ref_expressions, original_references=None):
         return f"d2:toNumber({ref_expressions[0]})"
 
-    def tricc_operation_cast_integer(self, ref_expressions):
+    def tricc_operation_cast_integer(self, ref_expressions, original_references=None):
         return f"d2:toNumber({ref_expressions[0]})"
 
-    def tricc_operation_zscore(self, ref_expressions):
+    def tricc_operation_zscore(self, ref_expressions, original_references=None):
         # Placeholder - would need specific implementation
         return f"zscore({','.join(ref_expressions)})"
 
-    def tricc_operation_datetime_to_decimal(self, ref_expressions):
+    def tricc_operation_datetime_to_decimal(self, ref_expressions, original_references=None):
         return f"d2:daysBetween({ref_expressions[0]}, '1970-01-01')"
 
-    def tricc_operation_round(self, ref_expressions):
+    def tricc_operation_round(self, ref_expressions, original_references=None):
         return f"d2:round({ref_expressions[0]})"
 
-    def tricc_operation_izscore(self, ref_expressions):
+    def tricc_operation_izscore(self, ref_expressions, original_references=None):
         return f"izscore({','.join(ref_expressions)})"
 
-    def tricc_operation_concatenate(self, ref_expressions):
+    def tricc_operation_concatenate(self, ref_expressions, original_references=None):
         return f"d2:concatenate({','.join(ref_expressions)})"

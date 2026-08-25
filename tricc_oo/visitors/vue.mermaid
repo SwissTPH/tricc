@@ -1,0 +1,93 @@
+flowchart TD
+    n_06c383724e5652a563052a56bc9fe25c7609["TriccNodeSelectOne<br/>SelectOne|select_length_height|1|1|Would you pr..."]
+    n_7065875bda9e2c0e4bc39e491784e7a4fd9e["TriccNodeActivityStart<br/>ActivityStart|9ee52f1bccbd4b5eb17779855d6bcc76c..."]
+    n_12b6f8c2b11edf71c7dec5fbd1d6bc314e83["TriccNodeCalculate<br/>Calculate|WFL|1|1|WFL"]
+    n_09ec6241a05a4bd3c0e3d8197cc7f9cbadf5["TriccNodeDecimal<br/>Decimal|CHE.B6.DE13|1|1|Length (cm)"]
+    n_7dae4829d2431e030f721f153f44a37c2c49["TriccNodeDecimal<br/>Decimal|CHE.B6.DE07|1|1|Weight (kilograms)"]
+    n_670425d47aaa3d1fc2991120fe36596cf5fe["TriccNodeSelectOne<br/>SelectOne|p_sex|1|1|Sex"]
+    n_82bef15aa5b3da66f37a6ad162a0e0bcc93f["TriccNodeCalculate<br/>Calculate|CHE.B27.G.DE01|1|1|Danger Sign"]
+    effc98f8452708fc1be89987b963f7e90925["TriccNodeCalculate<br/>Calculate|child|1|1|child"]
+    n_9ad702caf3fb5062ca51cc12c519c91e3d4e["TriccNodeCalculate<br/>Calculate|CHE.B27.G.DE03|1|1|Severe acute malnu..."]
+    n_3467ae700405275bdace417d7926b49f27ec["TriccNodeCalculate<br/>Calculate|WFH|1|1|WFH"]
+    n_5361b0cd9994a652bff4729f44ed3c4ebb67["TriccNodeCalculate<br/>Calculate|WFA|1|1|WFA"]
+    n_892bab5c2f2a8224dfef3c2984b110a894bb["TriccNodeDecimal<br/>Decimal|CHE.B6.DE19|1|1|Mid-upper arm circumfer..."]
+    n_4d387f19ad5c7c7125905a0f47cb83d5ca1e["TriccNodeCalculate<br/>Calculate|age_in_months|1|1|Age in months"]
+    n_0e5a1ae9947405a16f8c1e6f4f14d3382304["TriccNodeDecimal<br/>Decimal|CHE.B6.DE10|1|1|Height (cm)"]
+    e67847dfb6a1e253c38c33a60ffaef4b1242["TriccNodeWait<br/>Wait|n18b6fd12f0c55271|0|1"]
+    n_1c3adac2a3ce051b34b7adeb67fecf49894e["TriccNodeBridge<br/>Bridge|poZtiGXhyvskWzhK2gbt0-15|0|1|path: GoTo|..."]
+    n_1af6afc06c9c3b82cda34398c4c9a872df62["TriccNodeActivity<br/>Activity|lki_measurements_weight|1|1|Weight Mea..."]
+    n_3f8980db811286e8dd3bc96d9c0560109bc3["TriccNodeWait<br/>Wait|nad82d2c3c7dc83d6|0|1"]
+    cf804f143e709a491c0c1d25f9c16dafa7a9["TriccNodeMainStart<br/>MainStart|<span style='font-family: helvetica; ..."]
+    qPwR8C_fryeQROtLUUxe["TriccNodeActivity<br/>Activity|ccc_registration|0|1|Global Alamanch C..."]
+    ab3d121b69edb012ebcb99abd22c8ad67e35["TriccNodeCalculate<br/>Calculate|test_appetite|1|1|Appetite_test"]
+    ref_CHE_B16S2_DE01["Reference<br/>CHE.B16S2.DE01"]
+    ref_CHE_B27_G_DE04["Reference<br/>CHE.B27.G.DE04"]
+    n_1e1fcfd2f641b241e108f8aecc5e2e4d9e26["TriccNodeCalculate<br/>Calculate|tests_display|1|1|Tests"]
+    ref_test_urine_str["Reference<br/>test_urine_str"]
+    ref_assess_bronchodilator_str["Reference<br/>assess_bronchodilator_str"]
+    ref_second_temperature_str["Reference<br/>second_temperature_str"]
+    ref_test_apetite_str["Reference<br/>test_apetite_str"]
+    ref_test_malaria_str["Reference<br/>test_malaria_str"]
+    d385bb880f1cd12209c764da7530422fece0["TriccNodeWait<br/>Wait|n63046aa02c9d26f3|1|1"]
+    n_5e53d30ff29dc5ea69ea161c92d8db31dd45["TriccNodeDisplayBridge<br/>DisplayBridge|pL_qcudoAtlwiP3todriI-49|1|1|path..."]
+    n_8716805722772fddceb46bc0ec29c540e4e6["TriccNodeActivity<br/>Activity|lki_measurements_height|1|1|Height and..."]
+    n_494bab3913a4d6c944c45028742bad9aa24c["TriccNodeWait<br/>Wait|nc5398eef5b90d514|1|1"]
+    n_2be93ada76d49fcedb2132fc20d0137638fd["TriccNodeDisplayBridge<br/>DisplayBridge|pGu58oViyXPmqma7RcGfT-30|1|1|path..."]
+    n_708d4fa6de45ce1c010c469d0f4ca8a1082a["TriccNodeActivity<br/>Activity|che_start_measurement|1|1|Temperature ..."]
+    d385bb880f1cd12209c764da7530422fece0 -->|ref| n_8716805722772fddceb46bc0ec29c540e4e6
+    n_1e1fcfd2f641b241e108f8aecc5e2e4d9e26 -->|ref| ref_test_urine_str
+    n_06c383724e5652a563052a56bc9fe25c7609 -->|prev| n_7065875bda9e2c0e4bc39e491784e7a4fd9e
+    n_9ad702caf3fb5062ca51cc12c519c91e3d4e -->|ref| effc98f8452708fc1be89987b963f7e90925
+    n_3f8980db811286e8dd3bc96d9c0560109bc3 -->|prev| cf804f143e709a491c0c1d25f9c16dafa7a9
+    n_1e1fcfd2f641b241e108f8aecc5e2e4d9e26 -->|ref| ref_test_apetite_str
+    e67847dfb6a1e253c38c33a60ffaef4b1242 -->|prev| n_1c3adac2a3ce051b34b7adeb67fecf49894e
+    n_9ad702caf3fb5062ca51cc12c519c91e3d4e -->|ref| n_12b6f8c2b11edf71c7dec5fbd1d6bc314e83
+    n_12b6f8c2b11edf71c7dec5fbd1d6bc314e83 -->|ref| n_670425d47aaa3d1fc2991120fe36596cf5fe
+    ab3d121b69edb012ebcb99abd22c8ad67e35 -->|ref| n_4d387f19ad5c7c7125905a0f47cb83d5ca1e
+    e67847dfb6a1e253c38c33a60ffaef4b1242 -->|wait| n_1af6afc06c9c3b82cda34398c4c9a872df62
+    n_9ad702caf3fb5062ca51cc12c519c91e3d4e -->|ref| n_82bef15aa5b3da66f37a6ad162a0e0bcc93f
+    n_12b6f8c2b11edf71c7dec5fbd1d6bc314e83 -->|ref| n_7dae4829d2431e030f721f153f44a37c2c49
+    n_3467ae700405275bdace417d7926b49f27ec -->|ref| n_670425d47aaa3d1fc2991120fe36596cf5fe
+    n_9ad702caf3fb5062ca51cc12c519c91e3d4e -->|ref| n_892bab5c2f2a8224dfef3c2984b110a894bb
+    n_12b6f8c2b11edf71c7dec5fbd1d6bc314e83 -->|ref| effc98f8452708fc1be89987b963f7e90925
+    n_9ad702caf3fb5062ca51cc12c519c91e3d4e -->|ref| n_5361b0cd9994a652bff4729f44ed3c4ebb67
+    n_3467ae700405275bdace417d7926b49f27ec -->|ref| n_7dae4829d2431e030f721f153f44a37c2c49
+    n_3467ae700405275bdace417d7926b49f27ec -->|ref| effc98f8452708fc1be89987b963f7e90925
+    ab3d121b69edb012ebcb99abd22c8ad67e35 -->|ref| n_12b6f8c2b11edf71c7dec5fbd1d6bc314e83
+    d385bb880f1cd12209c764da7530422fece0 -->|wait| n_8716805722772fddceb46bc0ec29c540e4e6
+    n_9ad702caf3fb5062ca51cc12c519c91e3d4e -->|loop| n_12b6f8c2b11edf71c7dec5fbd1d6bc314e83
+    n_12b6f8c2b11edf71c7dec5fbd1d6bc314e83 -->|ref| n_09ec6241a05a4bd3c0e3d8197cc7f9cbadf5
+    n_12b6f8c2b11edf71c7dec5fbd1d6bc314e83 -->|ref| n_82bef15aa5b3da66f37a6ad162a0e0bcc93f
+    n_3f8980db811286e8dd3bc96d9c0560109bc3 -->|ref| qPwR8C_fryeQROtLUUxe
+    ab3d121b69edb012ebcb99abd22c8ad67e35 -->|ref| ref_CHE_B16S2_DE01
+    n_9ad702caf3fb5062ca51cc12c519c91e3d4e -->|ref| n_3467ae700405275bdace417d7926b49f27ec
+    n_3467ae700405275bdace417d7926b49f27ec -->|ref| n_82bef15aa5b3da66f37a6ad162a0e0bcc93f
+    ab3d121b69edb012ebcb99abd22c8ad67e35 -->|ref| n_5361b0cd9994a652bff4729f44ed3c4ebb67
+    n_494bab3913a4d6c944c45028742bad9aa24c -->|ref| n_708d4fa6de45ce1c010c469d0f4ca8a1082a
+    n_494bab3913a4d6c944c45028742bad9aa24c -->|prev| n_2be93ada76d49fcedb2132fc20d0137638fd
+    n_3467ae700405275bdace417d7926b49f27ec -->|ref| n_0e5a1ae9947405a16f8c1e6f4f14d3382304
+    d385bb880f1cd12209c764da7530422fece0 -->|prev| n_5e53d30ff29dc5ea69ea161c92d8db31dd45
+    ab3d121b69edb012ebcb99abd22c8ad67e35 -->|loop| n_12b6f8c2b11edf71c7dec5fbd1d6bc314e83
+    ab3d121b69edb012ebcb99abd22c8ad67e35 -->|ref| n_892bab5c2f2a8224dfef3c2984b110a894bb
+    n_9ad702caf3fb5062ca51cc12c519c91e3d4e -->|loop| n_3467ae700405275bdace417d7926b49f27ec
+    ab3d121b69edb012ebcb99abd22c8ad67e35 -->|ref| n_3467ae700405275bdace417d7926b49f27ec
+    n_1e1fcfd2f641b241e108f8aecc5e2e4d9e26 -->|ref| ref_second_temperature_str
+    n_3f8980db811286e8dd3bc96d9c0560109bc3 -->|wait| qPwR8C_fryeQROtLUUxe
+    n_1e1fcfd2f641b241e108f8aecc5e2e4d9e26 -->|ref| ref_assess_bronchodilator_str
+    e67847dfb6a1e253c38c33a60ffaef4b1242 -->|ref| n_1af6afc06c9c3b82cda34398c4c9a872df62
+    n_494bab3913a4d6c944c45028742bad9aa24c -->|wait| n_708d4fa6de45ce1c010c469d0f4ca8a1082a
+    ab3d121b69edb012ebcb99abd22c8ad67e35 -->|loop| n_3467ae700405275bdace417d7926b49f27ec
+    n_1e1fcfd2f641b241e108f8aecc5e2e4d9e26 -->|ref| ref_test_malaria_str
+    ab3d121b69edb012ebcb99abd22c8ad67e35 -->|ref| ref_CHE_B27_G_DE04
+    n_9ad702caf3fb5062ca51cc12c519c91e3d4e -->|ref| n_4d387f19ad5c7c7125905a0f47cb83d5ca1e
+    classDef stashed fill:#ffa500,stroke:#333,color:#000
+    classDef processed fill:#90EE90,stroke:#333,color:#000
+    classDef reference fill:#ff6666,stroke:#333,color:#fff
+    classDef other fill:#cccccc,stroke:#333,color:#000
+    class n_06c383724e5652a563052a56bc9fe25c7609,n_12b6f8c2b11edf71c7dec5fbd1d6bc314e83,n_9ad702caf3fb5062ca51cc12c519c91e3d4e,n_3467ae700405275bdace417d7926b49f27ec,e67847dfb6a1e253c38c33a60ffaef4b1242,n_3f8980db811286e8dd3bc96d9c0560109bc3,ab3d121b69edb012ebcb99abd22c8ad67e35,n_1e1fcfd2f641b241e108f8aecc5e2e4d9e26,d385bb880f1cd12209c764da7530422fece0,n_494bab3913a4d6c944c45028742bad9aa24c stashed
+    
+    class n_7065875bda9e2c0e4bc39e491784e7a4fd9e,n_7dae4829d2431e030f721f153f44a37c2c49,n_670425d47aaa3d1fc2991120fe36596cf5fe,n_82bef15aa5b3da66f37a6ad162a0e0bcc93f,effc98f8452708fc1be89987b963f7e90925,n_5361b0cd9994a652bff4729f44ed3c4ebb67,n_4d387f19ad5c7c7125905a0f47cb83d5ca1e,n_1c3adac2a3ce051b34b7adeb67fecf49894e,cf804f143e709a491c0c1d25f9c16dafa7a9,n_5e53d30ff29dc5ea69ea161c92d8db31dd45,n_2be93ada76d49fcedb2132fc20d0137638fd processed
+
+    class ref_CHE_B16S2_DE01,ref_CHE_B27_G_DE04,ref_test_urine_str,ref_assess_bronchodilator_str,ref_second_temperature_str,ref_test_apetite_str,ref_test_malaria_str reference
+    
+    class n_09ec6241a05a4bd3c0e3d8197cc7f9cbadf5,n_892bab5c2f2a8224dfef3c2984b110a894bb,n_0e5a1ae9947405a16f8c1e6f4f14d3382304,n_1af6afc06c9c3b82cda34398c4c9a872df62,qPwR8C_fryeQROtLUUxe,n_8716805722772fddceb46bc0ec29c540e4e6,n_708d4fa6de45ce1c010c469d0f4ca8a1082a other

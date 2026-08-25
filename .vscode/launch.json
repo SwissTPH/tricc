@@ -97,12 +97,36 @@
         "-l",
         "d",
         "-o",
-        "/mnt/data/Development/global-almanach/output",
+        "../tests/output/global",
         "-t",
         "-O",
         "XLSFormCHTHFStrategy",
         "-D",
-        "/mnt/data/Development/global-almanach/output"
+        "../tests/output/global"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}${pathSeparator}${env:PYTHONPATH}"
+      }
+    },
+    {
+      "name": "Global OpenSRP",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "tests/build.py",
+      "args": [
+        "-i",
+        "/mnt/data/Development/global-almanach/L2/child,/mnt/data/Development/global-almanach/L2/common",
+        "-l",
+        "d",
+        "-o",
+        "../tests/output/global_opensrp",
+        "-t",
+        "-O",
+        "OpenSRPStrategy",
+        "-D",
+        "../tests/output/global_opensrp"
       ],
       "console": "integratedTerminal",
       "justMyCode": true,
@@ -229,7 +253,32 @@
       "env": {
         "PYTHONPATH": "${workspaceFolder}${pathSeparator}${env:PYTHONPATH}"
       }
-    },   {
+    },
+    {
+      "name": "ETAT OpenSRP",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "tests/build.py",
+      "args": [
+        "-i",
+        "https://drive.google.com/drive/folders/1N8kdRO1v-WKYVMDk9S9HBB58TgMc31nd",
+        "-l",
+        "d",
+        "-o",
+        "../tests/output/global_opensrp",
+        "-t",
+        "-O",
+        "OpenSRPStrategy",
+        "-D",
+        "../tests/output/global_opensrp"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}${pathSeparator}${env:PYTHONPATH}"
+      }
+    },
+   {
       "name": "DEMO FHIR",
       "type": "debugpy",
       "request": "launch",

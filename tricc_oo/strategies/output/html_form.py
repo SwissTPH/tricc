@@ -30,9 +30,11 @@ class HTMLStrategy(BaseOutPutStrategy):
 
     def get_tricc_operation_expression(self, operation):
         ref_expressions = []
+        original_references = []
         if not hasattr(operation, "reference"):
             return self.get_tricc_operation_operand(operation)
         for r in operation.reference:
+            original_references.append(r)
             if isinstance(r, list):
                 r_expr = [
                     (
@@ -53,7 +55,7 @@ class HTMLStrategy(BaseOutPutStrategy):
         # build lower level
         if hasattr(self, f"tricc_operation_{operation.operator}"):
             callable = getattr(self, f"tricc_operation_{operation.operator}")
-            return callable(ref_expressions)
+            return callable(ref_expressions, original_references)
         else:
             raise NotImplementedError(
                 f"This type of operation '{operation.operator}' is not supported in this strategy"
@@ -178,13 +180,13 @@ window.onload = updateForm;
             return self.get_tricc_operation_operand(expression)
 
     # Implement operation methods as needed, similar to XLSForm but for JS
-    def tricc_operation_equal(self, ref_expressions):
+    def tricc_operation_equal(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]} === {ref_expressions[1]}"
 
-    def tricc_operation_not_equal(self, ref_expressions):
+    def tricc_operation_not_equal(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]} !== {ref_expressions[1]}"
 
-    def tricc_operation_and(self, ref_expressions):
+    def tricc_operation_and(self, ref_expressions, original_references=None):
         if len(ref_expressions) == 1:
             return ref_expressions[0]
         if len(ref_expressions) > 1:
@@ -192,7 +194,7 @@ window.onload = updateForm;
         else:
             return "true"
 
-    def tricc_operation_or(self, ref_expressions):
+    def tricc_operation_or(self, ref_expressions, original_references=None):
         if len(ref_expressions) == 1:
             return ref_expressions[0]
         if len(ref_expressions) > 1:
@@ -200,28 +202,28 @@ window.onload = updateForm;
         else:
             return "true"
 
-    def tricc_operation_not(self, ref_expressions):
+    def tricc_operation_not(self, ref_expressions, original_references=None):
         return f"!({ref_expressions[0]})"
 
-    def tricc_operation_plus(self, ref_expressions):
+    def tricc_operation_plus(self, ref_expressions, original_references=None):
         return " + ".join(ref_expressions)
 
-    def tricc_operation_minus(self, ref_expressions):
+    def tricc_operation_minus(self, ref_expressions, original_references=None):
         if len(ref_expressions) > 1:
             return " - ".join(map(str, ref_expressions))
         elif len(ref_expressions) == 1:
             return f"-{ref_expressions[0]}"
 
-    def tricc_operation_more(self, ref_expressions):
+    def tricc_operation_more(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]} > {ref_expressions[1]}"
 
-    def tricc_operation_less(self, ref_expressions):
+    def tricc_operation_less(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]} < {ref_expressions[1]}"
 
-    def tricc_operation_more_or_equal(self, ref_expressions):
+    def tricc_operation_more_or_equal(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]} >= {ref_expressions[1]}"
 
-    def tricc_operation_less_or_equal(self, ref_expressions):
+    def tricc_operation_less_or_equal(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]} <= {ref_expressions[1]}"
 
     # Add more operations as needed...

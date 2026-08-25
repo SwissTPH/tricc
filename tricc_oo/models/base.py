@@ -467,7 +467,7 @@ class TriccOperator(StrEnum):
     SUM = "sum"
     FORMAT_DATE = "format_date"
         # repeat TODO
-    GET_REPEATED_VALUE = "ge_repeated_value"
+    GET_REPEATED_VALUE = "get_repeated_value"
     GET_NUMBER_OF_REPEAT = "get_number_of_repeat"
     GET_HISTORY_VALUE = "get_history_value"
 

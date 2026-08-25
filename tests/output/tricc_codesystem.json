@@ -10,13 +10,58 @@
     "content": "complete",
     "concept": [
         {
-            "id": "1a2da40f-f330-572a-a1db-e7371123b660",
-            "code": "opt_none",
-            "display": "None of the above",
+            "id": "b06ab444-a1d3-5ba5-9200-f94022e0c9aa",
+            "code": "triage",
+            "display": "Triage: Emergency signs",
             "property": [
                 {
                     "code": "dataType",
                     "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Value"
+                }
+            ]
+        },
+        {
+            "id": "facebc60-caff-5214-adb5-df0073fb4daa",
+            "code": "assessment_and_tt",
+            "display": "Emergency  assessment and treatement",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Value"
+                }
+            ]
+        },
+        {
+            "id": "61b10191-08c1-564f-a478-bc48a5e1e2db",
+            "code": "priority",
+            "display": "Triage: Priority signs",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Value"
+                }
+            ]
+        },
+        {
+            "id": "4699d536-ec68-5bba-b3ab-38f93e1a0e2b",
+            "code": "select_sXwoYoZlbffDs_xxgCUi-1",
+            "display": "Which algorithm do you need ?",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Coded"
                 },
                 {
                     "code": "conceptType",
@@ -25,9 +70,9 @@
             ]
         },
         {
-            "id": "19671d39-b9f2-5919-9814-00b01aff54b4",
-            "code": "select_why",
-            "display": "Why ?",
+            "id": "78e1ca35-9cbb-5ba2-a846-fef3f7ce6b2f",
+            "code": "end_ztCu8TYYsCslaHXmn3DO-1",
+            "display": "end",
             "property": [
                 {
                     "code": "dataType",
@@ -35,12 +80,87 @@
                 },
                 {
                     "code": "conceptType",
-                    "valueString": "Question"
+                    "valueString": "Calculation"
                 }
             ]
         },
         {
-            "id": "9920b352-cff9-5fff-b1f5-fa857c3ca227",
+            "id": "0f9fe773-7e3a-5f76-bdc8-935e0313c064",
+            "code": "end_30tw850i-OaCCfvjO9Ns-7",
+            "display": "end",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "3d40e9cb-288c-51c5-be12-799193eae25a",
+            "code": "end_ztCu8TYYsCslaHXmn3DO-3",
+            "display": "end",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "50f3dc43-4bd5-51e8-894e-8a03bbcfc1e4",
+            "code": "female",
+            "display": "Female",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Value"
+                }
+            ]
+        },
+        {
+            "id": "4725cb57-f0d4-59c2-b628-0a68204a28f0",
+            "code": "male",
+            "display": "Male",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Value"
+                }
+            ]
+        },
+        {
+            "id": "83ceed19-a6eb-5e23-9809-7803859d084b",
+            "code": "etat.r.010",
+            "display": "Not stable enough, Weight cannot be measured",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Value"
+                }
+            ]
+        },
+        {
+            "id": "9e8a6b98-f082-5859-ad1c-73a316e4e94a",
             "code": "true",
             "display": "Yes",
             "property": [
@@ -55,7 +175,7 @@
             ]
         },
         {
-            "id": "1bb46aa4-2804-51d1-8310-c1799c229a4c",
+            "id": "726c4481-d9d5-530b-a969-3f4d666eefed",
             "code": "false",
             "display": "No",
             "property": [
@@ -66,6 +186,921 @@
                 {
                     "code": "conceptType",
                     "valueString": "Value"
+                }
+            ]
+        },
+        {
+            "id": "9f22bdef-516b-5760-a280-c152390acc97",
+            "code": "opt_none",
+            "display": "None of the above",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "b331a16a-792b-5fc5-9a17-25ec8b145d72",
+            "code": "has_odema_both_feet",
+            "display": "Odema both feet",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "56d66967-d986-54e0-93f7-304e0ea26d9e",
+            "code": "select_FKnkeBRB23bGKAKp5A5V-39",
+            "display": "For further treatment choose available medication:",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Coded"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "22428f7b-b2dd-56f9-b9b0-3899f8db6785",
+            "code": "select_1TAxsjmKVakINujz1GSt-17",
+            "display": "What is the most likely cause of septic shock?",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Coded"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "93e7a762-72c5-5510-9872-bb5ad7643c96",
+            "code": "artesunate_2_4mg_ivio_vol",
+            "display": "Artesunate 2.4mg IV/IO",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "97cb3025-e726-56f4-9b44-a91448197974",
+            "code": "ors_ngt_20ml_vol",
+            "display": "ORS via NGT 20ml vol",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "f2e59773-d9d7-51c7-8050-16261b0f6dcf",
+            "code": "artesunate_2_4mg",
+            "display": "Artesunate 2.4mg IV/IO/IM",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "f4d01145-39b4-5790-8c87-a9cb39de621a",
+            "code": "whole_blood_20ml",
+            "display": "Whole blood 20ml",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "232da85a-369e-567d-acb7-54e38aa7f390",
+            "code": "artesunate_2_4mg_im_vol",
+            "display": "Artesunate 2.4mg IM",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "aa9dd92f-39e1-5d33-9f40-856dfc317a22",
+            "code": "gentamicin_40mg_5mg",
+            "display": "Gentamicin IV/IO/IM 40mg/ml volume",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "7b0417a2-c430-5a84-8490-1edc18faf60d",
+            "code": "diazepam_05mg",
+            "display": "diazepam 0.5mg",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "3b5ae2e6-c142-5bf2-8a91-10ca0caf541b",
+            "code": "diazepam_025mg",
+            "display": "diazepam 0.25mg",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "3cb399c1-9093-55c2-9725-8cb01967e81c",
+            "code": "phenobarbitone_10mg",
+            "display": "Phenobarbitone 10mg",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "071c35fd-3514-57d9-bb69-b97426c57b4d",
+            "code": "resomal_vol",
+            "display": "ReSoMal total volume",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "9b349559-b52c-5d6f-b1b5-802e03ec8de7",
+            "code": "phenobarbitone_20mg",
+            "display": "Phenobarbitone 20mg",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "1050de62-0f48-56b8-af7b-6b416608de4a",
+            "code": "diazepam_cv_no_ivio",
+            "display": "Diazepam cv no ivio",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "ffe2e537-a3a6-5137-8b58-bba49f44b6a7",
+            "code": "paraldehyde_im_mg",
+            "display": "Paraldehyde IM mg",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "8f908a33-8862-5381-b28e-01a173f90a37",
+            "code": "f75_100ml_vol",
+            "display": "F75 Oral or NGT 100ml vol",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "e86018d0-7406-5222-93fd-3db30008f3dd",
+            "code": "resomal_10ml",
+            "display": "ReSoMal 10ml",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "80de61bc-b0a4-5e49-97c8-5f6016df6817",
+            "code": "f75_100ml",
+            "display": "F75 Oral or NGT 100ml",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "9b3057aa-b19c-5c6b-8d95-5744c246eb9b",
+            "code": "drops_wset_whole_blood",
+            "display": "Whole blood drops per second with blood giving set",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "1165d11a-7c58-5a83-8644-90b3d9267cdb",
+            "code": "drops_wset_packed_rc",
+            "display": "Packed red cells drops per second with blood giving set",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "7bafe51e-51eb-5d18-b7ff-3f0b5f58ddc3",
+            "code": "packed_rc_10ml",
+            "display": "Packed red cells 10ml",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "06c07be7-abc2-5dd8-8182-295dee386811",
+            "code": "drops_noset_packed_rc",
+            "display": "Packed red cells drops per second without blood giving set",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "df5c9759-ca13-59de-9642-8c42b7cae283",
+            "code": "drops_wset_whole_blood_no_sam",
+            "display": "Whole blood drops per second with blood giving set no SAM",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "9b98e6b6-020b-5fd5-9afe-978a7d147179",
+            "code": "whole_blood_10ml",
+            "display": "Whole blood 10ml",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "716fb87d-b35a-5841-ba2a-d8a06c760f74",
+            "code": "drops_noset_whole_blood_sam",
+            "display": "Whole blood drops per second without blood giving set SAM",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "6aceafc6-cb36-5cca-b367-4f560be7d0c6",
+            "code": "diazepam_cv_ivio",
+            "display": "Diazepam cv ivio",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "369e4966-aa09-5e82-b6ad-d3ed466f091f",
+            "code": "ringers_lactate_ml",
+            "display": "ringers lactate",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "a6ab314a-0509-56b5-8228-df067332403f",
+            "code": "common_denominator",
+            "display": "Common denominator Constant",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "92979832-4a5e-55cb-b30f-514e7ee2d535",
+            "code": "phenobarbitone_iv",
+            "display": "Phenobarbitone IV",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "96bed925-291f-5348-9643-31ab9e6bf6c0",
+            "code": "resomal_ml",
+            "display": "ReSoMal ml",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "02ac382f-5554-545d-853b-7e01d972dc19",
+            "code": "f75_130ml_total",
+            "display": "F75 Oral or NGT 130ml",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "9f159bd8-907d-56df-a238-37f725556996",
+            "code": "phenobarbitone_im",
+            "display": "Phenobarbitone IM",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "d56737ef-ae0c-5f79-bc0d-d45c7d317637",
+            "code": "f75_100ml_total",
+            "display": "F75 Oral or NGT 100ml",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "e8a14f60-5865-51f1-ba84-acbb3e694319",
+            "code": "phenobarbitone_im_2nd",
+            "display": "Phenobarbitone IM 2nd dose",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "9ffaaaad-30b1-5459-8df3-ca69a9579fb9",
+            "code": "benzylpenicillin_3gvial",
+            "display": "Benzylpenicillin vial 3g mg / kg",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "9f6dcca1-681c-5195-a8ad-1b44c386a815",
+            "code": "drops_noset_whole_blood_no_sam",
+            "display": "Whole blood drops per second without blood giving set no SAM",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "c142263c-a0e8-56f5-b7b1-7aa1cb0e8196",
+            "code": "benzylpenicillin_3gvial_ml",
+            "display": "Benzylpenicillin vial 3gml / kg",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "0b7dae5c-7ed5-589c-8cd3-38fca754716f",
+            "code": "phenobarbitone_iv_2nd",
+            "display": "Phenobarbitone IV 2nd dose",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "73dca436-2aec-5ad3-a236-231716dac1ea",
+            "code": "gentamicin_40mg",
+            "display": "Gentamicin IV/IO/IM 40mg/ml mg",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "841fd7aa-6717-5ca8-841e-b34a6b59f44f",
+            "code": "ors_5ml",
+            "display": "ORS 5ml",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "877f669b-9350-5c1a-a22d-4b8acb4078ab",
+            "code": "f75_130ml_vol",
+            "display": "F75 Oral or NGT 130ml vol",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "d07a5eff-7fc2-52e1-a073-e28bf1de077f",
+            "code": "gentamicin_40mg_vol",
+            "display": "Gentamicin IV/IO/IM 40mg/ml volume",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "1b113c5d-85b4-541c-8d35-fa06b1340e67",
+            "code": "phenytoin_iv_18mg",
+            "display": "Phenytoin IV or IO",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "d98ff1ea-bdb6-5700-848a-32d41bfe7cb4",
+            "code": "ceftriaxone_100mg",
+            "display": "Ceftriaxone 50mg",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "833a5262-2ab2-5617-9b20-90fb0ec73c69",
+            "code": "paraldehyde_rectal_ml",
+            "display": "Paraldehyde rectal",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "8b8b76dc-15d5-5d21-ae85-1a0586c3fe74",
+            "code": "ceftriaxone_100mg_vol",
+            "display": "Ceftriaxone 100mg volume",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "c6493191-ef73-5ae5-b9c1-a3261bf50df9",
+            "code": "glucose_ml",
+            "display": "glucose calc",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "fcc1092e-59fe-5e03-a18f-239dd1de645e",
+            "code": "ceftriaxone_50mg",
+            "display": "Ceftriaxone 50mg",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "942be298-2363-53c4-8e06-08eda6949661",
+            "code": "ors_ngt_20ml",
+            "display": "ORS via NGT 20ml",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "9712aa18-1821-5d7f-8d99-9e67dc60ec6b",
+            "code": "ceftriaxone_50mg_vol",
+            "display": "Ceftriaxone 50mg volume",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "91852f80-6b68-58ce-be47-79da29bb85b7",
+            "code": "f75_130ml",
+            "display": "F75 Oral or NGT 130ml",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "673932fb-50c1-535e-bb75-a71a37e4bb4b",
+            "code": "gentamicin_40mg_5mg_vol",
+            "display": "Gentamicin IV/IO/IM 40mg/ml volume",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "a2d34ead-80da-5692-a86e-842fdedf24ed",
+            "code": "artesunate_3mg_ivio_vol",
+            "display": "Artesunate 3mg IV/IO",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "c228f1cb-bc34-5705-a638-7f0ef45c9d4e",
+            "code": "artesunate_3mg",
+            "display": "Artesunate 3mg IV/IO/IM mg",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "4cf840e8-3eb7-51f1-bb75-6c4c0f8e0f89",
+            "code": "artesunate_3mg_im_vol",
+            "display": "Artesunate 3mg IM",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "719deb40-4929-5c13-9743-04339dbb9ef3",
+            "code": "latest_weight",
+            "display": "Latest weight",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "a9f59517-ba96-53b7-bba4-23fbe7b8959a",
+            "code": "latest_estimated_weight",
+            "display": "Latest usable weight",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "86fe3fda-54cd-5d32-8c49-db7f2d76f7c9",
+            "code": "paracetamol_oral",
+            "display": "Paracetamol oral",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "233ef8a7-8bce-5f26-adaa-7c85fcabc87a",
+            "code": "paracetamol_oral_vol",
+            "display": "Paracetamol oral volume",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
                 }
             ]
         }

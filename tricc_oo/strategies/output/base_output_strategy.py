@@ -32,14 +32,11 @@ class BaseOutPutStrategy(abc.ABC):
             logger.critical("Main process required")
 
         logger.info("generate the relevance based on edges")
+        self.process_relevance(self.project.start_pages, pages=self.project.pages)
 
-        # create relevance Expression
-
-        # create calculate Expression
+        logger.info("generate the calculate based on edges")
         self.process_calculate(self.project.start_pages, pages=self.project.pages)
         logger.info("generate the export format")
-        # create calculate Expression
-        
         self.process_export(self.project.start_pages, pages=self.project.pages)
 
         logger.info("print the export")
@@ -86,24 +83,32 @@ class BaseOutPutStrategy(abc.ABC):
         )
         self.do_clean(**{**self.get_kwargs(), **kwargs})
 
-    # node function
+    # node function — walker always supplies processed_nodes, stashed_nodes, process, warn
     @abc.abstractmethod
-    def generate_calculate(self, node, **kwargs):
+    def generate_calculate(
+        self, node, processed_nodes=None, stashed_nodes=None, process=None, warn=False, **kwargs
+    ):
         # called to generate the calculates on the project
         pass
 
     @abc.abstractmethod
-    def generate_base(self, node, **kwargs):
+    def generate_base(
+        self, node, processed_nodes=None, stashed_nodes=None, process=None, warn=False, **kwargs
+    ):
         pass
 
     @abc.abstractmethod
-    def generate_relevance(self, node, **kwargs):
+    def generate_relevance(
+        self, node, processed_nodes=None, stashed_nodes=None, process=None, warn=False, **kwargs
+    ):
         # called to generate the references on the project
 
         pass
 
     @abc.abstractmethod
-    def generate_export(self, node, **kwargs):
+    def generate_export(
+        self, node, processed_nodes=None, stashed_nodes=None, process=None, warn=False, **kwargs
+    ):
         # called to the project export
 
         pass
@@ -116,116 +121,116 @@ class BaseOutPutStrategy(abc.ABC):
     def validate(self):
         pass
 
-    def tricc_operation_equal(self, ref_expressions):
+    def tricc_operation_equal(self, ref_expressions, original_references=None):
         # r[0] = r[1]
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
-    def tricc_operation_not_equal(self, ref_expressions):
+    def tricc_operation_not_equal(self, ref_expressions, original_references=None):
         # r[0] != r[1]
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
-    def tricc_operation_not(self, ref_expressions):
+    def tricc_operation_not(self, ref_expressions, original_references=None):
         # !r[0]
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
-    def tricc_operation_and(self, ref_expressions):
+    def tricc_operation_and(self, ref_expressions, original_references=None):
         # r[0] and r[1] ... and r[n]
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
-    def tricc_operation_or(self, ref_expressions):
+    def tricc_operation_or(self, ref_expressions, original_references=None):
         # r[0] or r[1] ... or r[n]
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
-    def tricc_operation_or_and(self, ref_expressions):
+    def tricc_operation_or_and(self, ref_expressions, original_references=None):
         # (r[0] or r[1] ... or r[n-1]) and r[n]
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
-    def tricc_operation_native(self, ref_expressions):
+    def tricc_operation_native(self, ref_expressions, original_references=None):
         # r[0](*r[1:])
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
-    def tricc_operation_istrue(self, ref_expressions):
+    def tricc_operation_istrue(self, ref_expressions, original_references=None):
         # r[0] is true
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
-    def tricc_operation_isfalse(self, ref_expressions):
+    def tricc_operation_isfalse(self, ref_expressions, original_references=None):
         # r[0] is false
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
-    def tricc_operation_selected(self, ref_expressions):
+    def tricc_operation_selected(self, ref_expressions, original_references=None):
         # for choice question (single or multiple) it returns true if the second reference is selected
         # r[1] in r[0]
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
-    def tricc_operation_more_or_equal(self, ref_expressions):
+    def tricc_operation_more_or_equal(self, ref_expressions, original_references=None):
         # r[0] >= r[1]
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
-    def tricc_operation_less_or_equal(self, ref_expressions):
+    def tricc_operation_less_or_equal(self, ref_expressions, original_references=None):
         # r[0] <= r[1]
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
-    def tricc_operation_more(self, ref_expressions):
+    def tricc_operation_more(self, ref_expressions, original_references=None):
         # r[0] > r[1]
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
-    def tricc_operation_less(self, ref_expressions):
+    def tricc_operation_less(self, ref_expressions, original_references=None):
         # r[0] < r[1]
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
-    def tricc_operation_between(self, ref_expressions):
+    def tricc_operation_between(self, ref_expressions, original_references=None):
         # r[0] between r[1] and r[2]
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
-    def tricc_operation_case(self, ref_expressions):
+    def tricc_operation_case(self, ref_expressions, original_references=None):
         # case r[0] when r[1][0] then r[1][1] ...  when r[n-1][0] then r[n-1][1] else (r[n] or None)
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
-    def tricc_operation_if(self, ref_expressions):
+    def tricc_operation_if(self, ref_expressions, original_references=None):
         # if r[0][0] then r[0][1] ... elif r[n-1][0] then r[n-1][1] else (r[n] or None)
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
-    def tricc_operation_contains(self, ref_expressions):
+    def tricc_operation_contains(self, ref_expressions, original_references=None):
         # r[0] contains r[1]
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
-    def tricc_operation_exists(self, ref_expressions):
+    def tricc_operation_exists(self, ref_expressions, original_references=None):
         # r[0] exists
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
-    def tricc_operation_has_qualifier(self, ref_expressions):
+    def tricc_operation_has_qualifier(self, ref_expressions, original_references=None):
         # r[0] is a class and has r[1] qualifier
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
-    def tricc_operation_zscore(self, ref_expressions):
+    def tricc_operation_zscore(self, ref_expressions, original_references=None):
         # FIXME zscore((gender=r[0], Xfy=r[1], xfY=r[2])
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
-    def tricc_operation_datetime_to_decimal(self, ref_expressions):
+    def tricc_operation_datetime_to_decimal(self, ref_expressions, original_references=None):
         # cast r[0] in decimal
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
-    def tricc_operation_round(self, ref_expressions):
+    def tricc_operation_round(self, ref_expressions, original_references=None):
         # round(r[0], r[1])
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
-    def tricc_operation_izscore(self, ref_expressions):
+    def tricc_operation_izscore(self, ref_expressions, original_references=None):
         # FIXME izscore(gender=r[0], Z=r[1], xfY=r[2])
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
-    def tricc_operation_age_day(self, ref_expressions):
+    def tricc_operation_age_day(self, ref_expressions, original_references=None):
         # Patient age in day
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
-    def tricc_operation_age_month(self, ref_expressions):
+    def tricc_operation_age_month(self, ref_expressions, original_references=None):
         # Patient age in Month
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
-    def tricc_operation_age_year(self, ref_expressions):
+    def tricc_operation_age_year(self, ref_expressions, original_references=None):
         # Patient age in Years
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
-    def tricc_operation_concatenate(self, ref_expressions):
+    def tricc_operation_concatenate(self, ref_expressions, original_references=None):
         # concatenate(*r)
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 

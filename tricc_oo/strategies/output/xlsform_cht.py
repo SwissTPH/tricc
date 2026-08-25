@@ -10,7 +10,8 @@ import pandas as pd
 from pyxform.xls2xform import convert
 
 from tricc_oo.models.lang import SingletonLangClass
-from tricc_oo.models.calculate import TriccNodeEnd, TriccNodePopulate
+from tricc_oo.converters.fhir.populate_helper import populate_uses_inputs_group
+from tricc_oo.models.calculate import TriccNodeEnd
 from tricc_oo.models.tricc import TriccNodeDisplayModel
 from tricc_oo.serializers.xls_form import (
     SURVEY_MAP,
@@ -248,11 +249,11 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
         ]
         inputs = self.export_inputs(start_pages[self.processes[0]], **kwargs)
         for input in inputs:
-            if isinstance(input, TriccNodePopulate):
-                row = get_input_line(input)
-                row[1] = get_export_name(input)
-                df_input.loc[len(df_input)] = row
-            else:
+            # Only values CHT injects through the `inputs` group get a hidden field
+            # here, named after the source document field. Contact-summary backed
+            # values never pass through `inputs` — they only need their calculate row
+            # (fix/20260821-merge-input-into-populate.md).
+            if populate_uses_inputs_group(input):
                 df_input.loc[len(df_input)] = get_input_line(input)
         self.get_contact_inputs(df_input)
         df_input.loc[len(df_input)] = [
@@ -494,10 +495,12 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
         ]
 
         for input in inputs:
-            if isinstance(input, TriccNodePopulate):
-                df_input.loc[len(df_input)] = get_populate_calc_line(input)
-            else:
+            if populate_uses_inputs_group(input):
+                # reads ../inputs/contact/<source field>
                 df_input.loc[len(df_input)] = get_input_calc_line(input)
+            else:
+                # reads instance('contact-summary')/context/<key>
+                df_input.loc[len(df_input)] = get_populate_calc_line(input)
 
         return df_input
 
@@ -793,10 +796,9 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             logger.critical("Main process required")
 
         logger.info("generate the relevance based on edges")
+        self.process_relevance(self.project.start_pages, pages=self.project.pages)
 
-        # create relevance Expression
-
-        # create calculate Expression
+        logger.info("generate the calculate based on edges")
         self.process_calculate(self.project.start_pages, pages=self.project.pages)
         logger.info("generate the export format")
         # create calculate Expression

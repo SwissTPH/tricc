@@ -54,6 +54,7 @@ FUNCTION_MAP = {
     "NormalizeSpace": TriccOperator.NORMALIZE_SPACE,
     "Matches": TriccOperator.MATCHES,
     "CountSelected": TriccOperator.COUNT_SELECTED,
+    "GetRepeatedValue": TriccOperator.GET_REPEATED_VALUE,
 }
 # TODO
 # Min

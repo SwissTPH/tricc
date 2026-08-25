@@ -3,7 +3,7 @@ import re
 from typing import List, Set
 
 from tricc_oo.models.tricc import TriccNodeActivity
-from tricc_oo.models.calculate import TriccNodeInput, TriccNodePopulate
+from tricc_oo.models.calculate import TriccNodePopulate
 from tricc_oo.models.base import (
     TriccOperation,
     TriccOperator,
@@ -218,7 +218,7 @@ class XLSFormCDSSStrategy(XLSFormStrategy):
         for node in activity.nodes.values():
             if isinstance(node, TriccNodeActivity):
                 inputs = self.export_inputs(node, inputs, **kwargs)
-            if isinstance(node, (TriccNodeInput, TriccNodePopulate)):
+            if isinstance(node, TriccNodePopulate):
                 inputs.append(node)
         return inputs
    

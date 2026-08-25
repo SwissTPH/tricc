@@ -26,7 +26,6 @@ from tricc_oo.models.calculate import (
     TriccNodeProposedDiagnosis,
     TriccNodeDiagnosis,
     TriccRhombusMixIn,
-    TriccNodeInput,
     TriccNodePopulate,
 )
 from tricc_oo.models.tricc import (
@@ -101,6 +100,7 @@ def get_all_nodes(diagram, activity, nodes):
                 attributes=TYPE_MAP[tricc_type]["attributes"],
                 mandatory_attributes=TYPE_MAP[tricc_type]["mandatory_attributes"],
                 has_options=TYPE_MAP[tricc_type].get("has_options", None),
+                defaults=TYPE_MAP[tricc_type].get("defaults", None),
             )
 
     return nodes
@@ -149,7 +149,7 @@ def propagate_activity_repeat(activity):
         return
 
     for node in activity.nodes.values():
-        if isinstance(node, (TriccNodeInput, TriccNodePopulate)):
+        if isinstance(node, TriccNodePopulate):
             continue
         if isinstance(node, TriccNodeSelectOption):
             continue
@@ -198,7 +198,7 @@ def get_activity_details(diagram, activity, project, media_path):
     nodes = get_nodes(diagram, activity)
     for n in nodes.values():
         if (
-            issubclass(n.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase, TriccNodeInput, TriccNodePopulate))
+            issubclass(n.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase, TriccNodePopulate))
             and not isinstance(n, (TriccRhombusMixIn, TriccNodeRhombus, TriccNodeDisplayBridge))
             and not n.name.startswith("label_")  # FIXME
         ):
@@ -645,7 +645,6 @@ def get_concept_type(node):
             TriccNodeSelectOne,
             TriccNodeSelectYesNo,
             TriccNodeSelectNotAvailable,
-            TriccNodeInput,
             TriccNodePopulate,
         ),
     ):
@@ -838,6 +837,7 @@ def add_tricc_base_node(
     attributes=[],
     mandatory_attributes=[],
     has_options=None,
+    defaults=None,
 ):
     for elm in list:
         external_id = elm.attrib.get("id")
@@ -849,6 +849,9 @@ def add_tricc_base_node(
             # parent=parent,
             group=group,
             activity=group,
+            # TYPE_MAP defaults (e.g. the legacy `input` keyword implies
+            # context=encounter); an author-set attribute overrides them below.
+            **(defaults or {}),
             **set_mandatory_attribute(elm, mandatory_attributes, diagram),
         )
         if has_options:

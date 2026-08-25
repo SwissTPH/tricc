@@ -19,7 +19,7 @@ import types
 import unittest
 from unittest.mock import MagicMock
 
-from tricc_oo.models.base import TriccNodeType, TriccOperation, TriccOperator, TriccReference
+from tricc_oo.models.base import TriccNodeType, TriccOperation, TriccOperator, TriccReference, TriccStatic
 from tricc_oo.models.calculate import TriccNodeCalculate
 from tricc_oo.models.tricc import TriccNodeInteger
 from tricc_oo.strategies.output.fhir_form import FHIRStrategy
@@ -110,8 +110,9 @@ class TestGenerateCalculateExpressionLanguage(unittest.TestCase):
         self.assertEqual(len(extensions), 1)
         value_expr = extensions[0]["valueExpression"]
         self.assertEqual(value_expr["language"], "text/fhirpath")
-        self.assertIn("%resource.repeat(item).where(linkId='weight')", value_expr["expression"])
-        self.assertIn("%resource.repeat(item).where(linkId='height')", value_expr["expression"])
+        self.assertIn("%resource.item.where(linkId='weight')", value_expr["expression"])
+        self.assertIn("%resource.item.where(linkId='height')", value_expr["expression"])
+        self.assertNotIn("repeat(item)", value_expr["expression"])
         # No CQL define should have been recorded for a pure in-form calculation.
         self.assertEqual(strategy.cql_defines, {})
 
@@ -188,6 +189,117 @@ class TestGenerateCalculateExpressionLanguage(unittest.TestCase):
         self.assertIn(".exists()", expr)
         self.assertNotIn("valueCoding", expr)
         self.assertIn("'demo.hungry'", expr)
+
+    def test_age_in_months_case_uses_fhirpath_calculated_expression(self):
+        """In-form searched CASE must be live FHIRPath, not CQL initialExpression."""
+        strategy = _make_strategy()
+        years = TriccNodeInteger(id="y1", name="p_age_years", label="Years")
+        months = TriccNodeInteger(id="m1", name="p_age_months", label="Months")
+        age = TriccNodeCalculate(id="age1", name="age_in_months", label="Age in months")
+        age.expression_reference = TriccOperation(
+            TriccOperator.CASE,
+            [
+                [
+                    TriccOperation(
+                        TriccOperator.MORE_OR_EQUAL, [months, TriccStatic(0)]
+                    ),
+                    TriccOperation(
+                        TriccOperator.PLUS,
+                        [
+                            TriccOperation(TriccOperator.COALESCE, [months, TriccStatic(0)]),
+                            TriccOperation(
+                                TriccOperator.COALESCE,
+                                [
+                                    TriccOperation(
+                                        TriccOperator.MULTIPLIED, [years, TriccStatic(12)]
+                                    ),
+                                    TriccStatic(0),
+                                ],
+                            ),
+                        ],
+                    ),
+                ],
+                TriccStatic(0),
+            ],
+        )
+        strategy.questionnaires["main"] = {
+            "resourceType": "Questionnaire",
+            "item": [
+                _item("p_age_years", "integer"),
+                _item("p_age_months", "integer"),
+                {"linkId": "age_in_months", "type": "string"},
+            ],
+        }
+
+        strategy.generate_calculate(age)
+
+        item = strategy.questionnaires["main"]["item"][2]
+        self.assertEqual(item["type"], "decimal")
+        ext = item["extension"][0]["valueExpression"]
+        self.assertEqual(ext["language"], "text/fhirpath")
+        self.assertTrue(ext["expression"].startswith("iif("))
+        self.assertIn("linkId='p_age_months'", ext["expression"])
+        self.assertEqual(strategy.cql_defines, {})
+
+    def test_age_month_calculate_item_type_is_integer(self):
+        strategy = _make_strategy()
+        age = TriccNodeCalculate(id="age1", name="age_in_months", label="Age in months")
+        age.expression_reference = TriccOperation(
+            TriccOperator.AGE_MONTH, [TriccReference("dob")]
+        )
+        strategy.questionnaires["main"] = {
+            "resourceType": "Questionnaire",
+            "item": [{"linkId": "age_in_months", "type": "string"}],
+        }
+
+        strategy.generate_calculate(age)
+
+        item = strategy.questionnaires["main"]["item"][0]
+        self.assertEqual(item["type"], "integer")
+
+    def test_plus_calculate_item_type_is_decimal(self):
+        strategy = _make_strategy()
+        years = TriccNodeInteger(id="y1", name="p_age_years", label="Years")
+        months = TriccNodeInteger(id="m1", name="p_age_months", label="Months")
+        age = TriccNodeCalculate(id="age1", name="age_in_months", label="Age in months")
+        age.expression_reference = TriccOperation(TriccOperator.PLUS, [years, months])
+        strategy.questionnaires["main"] = {
+            "resourceType": "Questionnaire",
+            "item": [
+                _item("p_age_years", "integer"),
+                _item("p_age_months", "integer"),
+                {"linkId": "age_in_months", "type": "string"},
+            ],
+        }
+
+        strategy.generate_calculate(age)
+
+        item = strategy.questionnaires["main"]["item"][2]
+        self.assertEqual(item["type"], "decimal")
+
+    def test_coalesce_integer_fallback_item_type_is_integer(self):
+        strategy = _make_strategy()
+        years = TriccNodeInteger(id="y1", name="p_age_years", label="Years")
+        age = TriccNodeCalculate(id="age1", name="age_in_years", label="Age in years")
+        age.expression_reference = TriccOperation(
+            TriccOperator.COALESCE, [years, TriccStatic(0)]
+        )
+        strategy.questionnaires["main"] = {
+            "resourceType": "Questionnaire",
+            "item": [
+                _item("p_age_years", "integer"),
+                {"linkId": "age_in_years", "type": "string"},
+            ],
+        }
+
+        strategy.generate_calculate(age)
+
+        item = strategy.questionnaires["main"]["item"][1]
+        self.assertEqual(item["type"], "integer")
+        expr = item["extension"][0]["valueExpression"]["expression"]
+        self.assertIn(".value", expr)
+        self.assertNotIn(".answer|0", expr)
+        self.assertIn("|0.0", expr)
 
 
 if __name__ == "__main__":
