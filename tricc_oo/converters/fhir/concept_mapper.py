@@ -285,6 +285,7 @@ def classify_extraction(node, codesystems=None) -> Optional[str]:
         TriccNodeType.start,
         TriccNodeType.activity_start,
         TriccNodeType.activity,
+        TriccNodeType.segment,
         TriccNodeType.page,
     ):
         return None

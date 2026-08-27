@@ -112,7 +112,7 @@ OCLRessourceType = Literal[tuple(OclConstants.RESOURCE_TYPES)]
 def get_data_type(tricc_type):
     if tricc_type.lower() in ("integer", "decimal", "add", "count"):
         return OclConstants.DATA_TYPE_NUMERIC
-    elif tricc_type.lower() in ("activity", "page"):
+    elif tricc_type.lower() in ("activity", "segment", "page"):
         return OclConstants.DATA_TYPE_DOCUMENT
     elif tricc_type.lower() in ("select_one"):
         return OclConstants.DATA_TYPE_CODED

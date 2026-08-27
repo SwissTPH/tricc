@@ -280,7 +280,7 @@ ODK_TRICC_TYPE_MAP = {
     "populate": "calculate",
 }
 
-GROUP_TRICC_TYPE = [TriccNodeType.page, TriccNodeType.activity]
+GROUP_TRICC_TYPE = [TriccNodeType.page, TriccNodeType.activity, TriccNodeType.segment]
 
 SURVEY_MAP = {
     "type": ODK_TRICC_TYPE_MAP,

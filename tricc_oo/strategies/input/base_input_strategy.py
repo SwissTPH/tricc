@@ -2,7 +2,8 @@ import abc
 
 from tricc_oo.models.tricc import (
     TriccNodeMainStart,
-    TriccNodeActivity,
+    TriccSegment,
+    node_container_for_root,
 )
 from tricc_oo.converters.utils import generate_id
 from tricc_oo.visitors.tricc import (
@@ -66,6 +67,8 @@ class BaseInputStrategy:
                     diags_activity = create_determine_diagnosis_activity(unique_diags)
                     sorted_pages[process] = [diags_activity]
                     project.start_pages["determine-diagnosis"] = diags_activity
+                    if isinstance(diags_activity, TriccSegment):
+                        project.register_segment(diags_activity)
             root_process = sorted_pages[list(sorted_pages.keys())[0]][0].root
             root = TriccNodeMainStart(
                 id=generate_id("s-main"),
@@ -75,7 +78,9 @@ class BaseInputStrategy:
             )
             nodes = {}
             nodes[root.id] = root
-            app = TriccNodeActivity(id=generate_id("a-main"), name=root_process.name, root=root, nodes=nodes)
+            app = node_container_for_root(
+                root, id=generate_id("a-main"), name=root_process.name, nodes=nodes
+            )
             root.activity = app
             root.group = app
             # loop back to app to avoid None

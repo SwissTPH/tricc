@@ -49,6 +49,7 @@ from tricc_oo.models.tricc import (
     TriccNodeDisplayModel,
     TriccNodeMainStart,
     TriccNodeAcceptDiagnostic,
+    node_container_for_root,
     TRICC_FALSE_VALUE,
     TRICC_TRUE_VALUE,
 )
@@ -3685,11 +3686,11 @@ def create_determine_diagnosis_activity(diags):
         id=generate_id("start.determine-diagnosis"), name="start.determine-diagnosis", process="determine-diagnosis"
     )
 
-    activity = TriccNodeActivity(
+    activity = node_container_for_root(
+        start,
         id=generate_id("activity-determine-diagnosis"),
         name="determine-diagnosis",
         label="Classifications",
-        root=start,
     )
 
     start.activity = activity

@@ -65,7 +65,6 @@ from tricc_oo.converters.fhir.questionnaire_item_mapper import (
     build_initial_expression,
     build_initial_expression_cql,
     build_calculated_expression_fhirpath,
-    build_entry_format_extension,
     build_item_answer_media_extension,
     build_item_control_display_item,
     build_item_media_extension,
@@ -708,25 +707,29 @@ class FHIRStrategy(BaseOutPutStrategy):
         return text or None
 
     def _attach_help_hint_items(self, item: dict, node) -> None:
-        """Attach help-message as an itemControl help child; hint-message as entryFormat."""
-        hint_text = self._questionnaire_item_text(getattr(node, "hint", None))
-        if hint_text:
-            set_item_extension(item, build_entry_format_extension(hint_text))
-
-        help_text = self._questionnaire_item_text(getattr(node, "help", None))
-        if not help_text:
-            return
+        """Nest help-message / hint-message as itemControl help and flyover children."""
         parent_id = item.get("linkId")
         if not parent_id:
             return
-        help_item = build_item_control_display_item(f"{parent_id}-help", help_text, "help")
+        path_len = int(getattr(node, "path_len", 0) or 0)
+        children = []
+        help_text = self._questionnaire_item_text(getattr(node, "help", None))
+        if help_text:
+            children.append(
+                build_item_control_display_item(f"{parent_id}-help", help_text, "help")
+            )
+        hint_text = self._questionnaire_item_text(getattr(node, "hint", None))
+        if hint_text:
+            children.append(
+                build_item_control_display_item(f"{parent_id}-hint", hint_text, "flyover")
+            )
+        if not children:
+            return
         nested = item.setdefault("item", [])
-        item["item"] = [help_item] + nested
-        self._item_seq += 1
-        self._item_sort_keys[id(help_item)] = (
-            int(getattr(node, "path_len", 0) or 0),
-            self._item_seq,
-        )
+        item["item"] = children + nested
+        for child in children:
+            self._item_seq += 1
+            self._item_sort_keys[id(child)] = (path_len, self._item_seq)
 
     def process_base(self, start_pages, **kwargs):
         self._group_stack = []
