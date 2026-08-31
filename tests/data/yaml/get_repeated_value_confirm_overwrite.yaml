@@ -1,0 +1,77 @@
+# Confirm-and-overwrite flow: show the weight already collected this consultation,
+# re-ask into a second capture slot only when the user says it is wrong, then read
+# the latest value again so downstream logic picks up the correction.
+
+id: get_repeated_value_confirm
+title: GetRepeatedValue confirm and overwrite
+process: main
+
+nodes:
+  - id: start
+    type: start
+    label: "Start"
+    name: start_grv_confirm
+
+  - id: q_weight
+    type: decimal
+    name: weight
+    label: "Weight (kg)"
+    required: true
+
+  - id: calc_last_weight
+    type: calculate
+    name: last_weight_value
+    label: "Weight already collected"
+    calculate: "GetRepeatedValue('weight')"
+
+  - id: note_confirm
+    type: note
+    name: note_weight_confirm
+    label: "For this child the weight is ${last_weight_value}. Is this correct?"
+
+  - id: q_confirmed
+    type: select_one
+    name: weight_confirmed
+    label: "Is the weight correct?"
+    required: true
+    options:
+      - id: opt_yes
+        name: "yes"
+        label: "Yes"
+      - id: opt_no
+        name: "no"
+        label: "No"
+
+  - id: q_weight_again
+    type: decimal
+    name: weight
+    label: "Corrected weight (kg)"
+    repeat: 2
+    relevance: "weight_confirmed = 'no'"
+
+  - id: calc_effective
+    type: calculate
+    name: weight_effective
+    label: "Weight used for dosing"
+    calculate: "GetRepeatedValue('weight')"
+
+  - id: end
+    type: end
+    label: "End"
+    name: end_grv_confirm
+
+edges:
+  - source: start
+    target: q_weight
+  - source: q_weight
+    target: calc_last_weight
+  - source: calc_last_weight
+    target: note_confirm
+  - source: note_confirm
+    target: q_confirmed
+  - source: q_confirmed
+    target: q_weight_again
+  - source: q_weight_again
+    target: calc_effective
+  - source: calc_effective
+    target: end

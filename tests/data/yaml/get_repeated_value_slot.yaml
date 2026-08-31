@@ -1,0 +1,47 @@
+# GetRepeatedValue with an explicit repeat slot: the lookup is pinned to slot 2
+# and the slot number must never reach the exported expression.
+
+id: get_repeated_value_slot
+title: GetRepeatedValue explicit slot
+process: main
+
+nodes:
+  - id: start
+    type: start
+    label: "Start"
+    name: start_grv_slot
+
+  - id: q_weight_1
+    type: decimal
+    name: weight
+    label: "Weight at triage (kg)"
+    repeat: 1
+    required: true
+
+  - id: q_weight_2
+    type: decimal
+    name: weight
+    label: "Weight re-check (kg)"
+    repeat: 2
+    required: true
+
+  - id: calc_slot_2
+    type: calculate
+    name: weight_recheck
+    label: "Weight from re-check slot"
+    calculate: "GetRepeatedValue('weight', 2)"
+
+  - id: end
+    type: end
+    label: "End"
+    name: end_grv_slot
+
+edges:
+  - source: start
+    target: q_weight_1
+  - source: q_weight_1
+    target: q_weight_2
+  - source: q_weight_2
+    target: calc_slot_2
+  - source: calc_slot_2
+    target: end

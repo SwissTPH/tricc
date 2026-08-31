@@ -59,7 +59,8 @@ Core walk in `tricc_oo/visitors/tricc.py` (`load_calculate` and related):
 4. **Relevance / skip** — same-slot prior captures can suppress re-asking; different `repeat` slots do not.
 5. **`process_reference` / `process_operation_reference`** — resolve refs; for value expressions,
    multi-version display models expand to `GET_INHERITED_VALUE` (newer-first). Relevance keeps a
-   single last-version ref.
+   single last-version ref. `GET_REPEATED_VALUE` (authored as `GetRepeatedValue`) pins resolution
+   to one capture slot, or to any slot (latest so far) when the slot argument is omitted.
 
 ## 7) Output strategy execution
 
@@ -83,6 +84,8 @@ Lookup by name: `get_output_strategy("XLSFormCHTHFStrategy")` or pass the class 
 List registered names: `list_output_strategies()` from `tricc_oo.strategies.registry`.
 
 `GET_INHERITED_VALUE` serializes as **`coalesce(...)`** in XLSForm/CHT strategies.
+`GET_REPEATED_VALUE` serializes its resolved concept operand only — an explicit repeat slot is a
+resolution-time filter and never reaches the exported expression.
 
 ### Output walk contract
 

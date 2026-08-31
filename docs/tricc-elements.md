@@ -130,15 +130,19 @@ integer `repeat` on a capture node or on `activity_start`.
 
 **Same-name value merge:** when several versions of a concept exist in one slot, calculates and expression refs may merge **all** prior versions (`GET_INHERITED_VALUE` → ODK `coalesce`). See `feature/advanced-merge-calc.md`.
 
-**Reading a specific slot — `GetRepeatedValue`:** in any calculate or relevance expression,
+**Reading a captured value — `GetRepeatedValue`:** in any calculate or relevance expression:
 
 ```text
-GetRepeatedValue("<concept name>", <slot>)
+GetRepeatedValue("<concept name>"[, <slot>])
 ```
 
-reads the capture of `<concept name>` made at `repeat=<slot>`. It behaves exactly like a plain
-concept reference — including merging several versions of that concept via `coalesce` — but
-**restricted to the requested slot**, so it never falls back to another slot:
+| Authored | Meaning |
+|----------|---------|
+| `GetRepeatedValue("weight", 2)` | Capture at `repeat=2` only (never falls back to another slot) |
+| `GetRepeatedValue("weight")` | Latest capture so far this consultation, any slot |
+
+With an explicit slot it behaves like a plain concept reference — including merging several
+versions of that concept via `coalesce` — but **restricted to the requested slot**:
 
 ```text
 integer  name=weight  repeat=1     "Weight at triage"
@@ -150,14 +154,20 @@ calculate  name=weight_delta
 
 exports to ODK as `coalesce(${weight_Rr_2},'') - coalesce(${weight},'')`.
 
-- The slot must be a **literal integer** — it is resolved while the graph is built, before any
-  answer exists. Omitting it means slot `1` (with a warning).
-- The slot must be **captured earlier in the flow**. If no capture matches
-  `(name, slot)`, the reference is reported unresolved — there is no silent fallback.
-- `GetRepeatedValue("x", -1)` addresses a local-only node and never merges encounter slots.
-- Supported on XLSForm/ODK, CHT, and FHIR/OpenSRP.
+Omit the slot for confirm-and-overwrite: show the value already collected, re-ask into a new
+slot if it is wrong, then read `GetRepeatedValue("weight")` again so downstream logic picks up
+the correction.
 
-Full specification: `feature/20260821-get-repeated-value-operation.md`.
+- An explicit slot must be a **literal integer** — it is resolved while the graph is built,
+  before any answer exists.
+- The matching capture must sit **earlier in the flow**. If none is processed yet, the
+  reference is unresolved — there is no silent fallback to an empty calculate / `1`.
+- `GetRepeatedValue("x", -1)` addresses a local-only node and never merges encounter slots.
+- Supported on XLSForm/ODK and CHT. FHIR/OpenSRP supports the explicit-slot form; omit-slot
+  (latest across slots) is XLSForm/CHT first.
+
+Full specification: `feature/20260821-get-repeated-value-operation.md` (explicit slot) and
+`feature/20260825-get-repeated-value-latest.md` (optional slot).
 
 **Not yet usable in expressions:** `GetRepeated` (returns a resource, not a value),
 `GetNumberOfRepeat`, and the history accessors `GetHistoryValue` /
