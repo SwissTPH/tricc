@@ -218,7 +218,10 @@ class TriccNodeActivity(TriccNodeBaseModel):
             if isinstance(node_instance, (TriccNodeActivityEnd)):
                 node_instance.set_name()
             # update root
-            if isinstance(node_origin, TriccNodeActivityStart) and node_origin == node_origin.activity.root:
+            if (
+                isinstance(node_origin, (TriccNodeActivityStart, TriccNodeMainStart))
+                and node_origin == node_origin.activity.root
+            ):
                 self.root = node_instance
             if issubclass(node_instance.__class__, TriccRhombusMixIn):
                 old_path = node_origin.path
@@ -332,6 +335,24 @@ class TriccNodeMainStart(TriccNodeBaseModel):
     process: Optional[str] = None
     relevance: Optional[Union[Expression, TriccOperation]] = None
     datatype: str = "boolean"
+
+
+class TriccSegment(TriccNodeActivity):
+    """Process / CPG-common-process container.
+
+    Same shape as ``TriccNodeActivity`` (root, nodes, edges, make_instance)
+    but a distinct class: a page whose root is ``TriccNodeMainStart`` is a
+    segment; a page whose root is ``TriccNodeActivityStart`` stays an activity.
+    The main start remains a separate node and is this container's ``root``.
+    """
+
+    tricc_type: TriccNodeType = TriccNodeType.segment
+
+
+def node_container_for_root(root, **kwargs):
+    """Build a TriccSegment when ``root`` is a main start, else TriccNodeActivity."""
+    cls = TriccSegment if isinstance(root, TriccNodeMainStart) else TriccNodeActivity
+    return cls(root=root, **kwargs)
 
 
 class TriccNodeLinkIn(TriccNodeBaseModel):
@@ -479,8 +500,17 @@ class TriccProject(BaseModel):
     # list of context:
     pages: Dict[str, TriccNodeActivity] = {}
     start_pages: Dict[str, TriccNodeActivity] = {}
+    # process name -> authored segments (main-start pages)
+    segments: Dict[str, List[TriccSegment]] = {}
     images: List[Dict[str, str]] = []
     contexts: Set[triccName] = set()
+
+    def register_segment(self, segment: TriccSegment) -> None:
+        root = getattr(segment, "root", None)
+        proc = getattr(root, "process", None) or "main"
+        self.segments.setdefault(proc, [])
+        if segment not in self.segments[proc]:
+            self.segments[proc].append(segment)
 
     # TODO manage trad properly
     def get_keyword_trad(keyword):

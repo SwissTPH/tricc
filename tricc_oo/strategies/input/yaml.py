@@ -31,8 +31,10 @@ from tricc_oo.strategies.registry import register_input_strategy
 from tricc_oo.models.tricc import (
     TriccProject,
     TriccNodeActivity,
+    TriccSegment,
     TriccEdge,
     TriccNodeMainStart,
+    node_container_for_root,
     TriccNodeNote,
     TriccNodeSelectOne,
     TriccNodeSelectMultiple,
@@ -340,12 +342,12 @@ class YamlStrategy(BaseInputStrategy):
             )
             edges.append(edge)
 
-        # 3. Assemble the activity
-        activity = TriccNodeActivity(
+        # 3. Assemble the activity (segment when root is a main start)
+        activity = node_container_for_root(
+            root_node,
             id=yaml_act.id,
             label=yaml_act.title,
             name=yaml_act.title.lower().replace(" ", "_"),
-            root=root_node,
             nodes=nodes,
             edges=edges,
             process=yaml_act.process,
@@ -527,6 +529,8 @@ class YamlStrategy(BaseInputStrategy):
                 project.start_pages[proc] = []
             if activity not in project.start_pages[proc]:
                 project.start_pages[proc].append(activity)
+        if isinstance(activity, TriccSegment):
+            project.register_segment(activity)
 
     # The following two methods are inherited from BaseInputStrategy / DrawioStrategy
     # and are called by execute_linked_process / process_pages.

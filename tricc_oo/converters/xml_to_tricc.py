@@ -32,6 +32,8 @@ from tricc_oo.models.tricc import (
     TriccNodeCalculateBase,
     TriccNodeMainStart,
     TriccNodeActivity,
+    TriccSegment,
+    node_container_for_root,
     TriccGroup,
     TriccNodeSelect,
     TriccNodeGoTo,
@@ -278,6 +280,8 @@ def get_activity_details(diagram, activity, project, media_path):
 def assign_activity_process(activity, project):
      if activity.root is not None:
         project.pages[activity.id] = activity
+        if isinstance(activity, TriccSegment):
+            project.register_segment(activity)
         if activity.root.tricc_type == TriccNodeType.start:
             if "main" not in project.start_pages and (
                 activity.root.process == "main" or activity.root.process is None
@@ -303,8 +307,8 @@ def create_activity(diagram, media_path, project):
     label = diagram.attrib.get("name")
     form_id = diagram.attrib.get("name", None)
     if root is not None:
-        activity = TriccNodeActivity(
-            root=root,
+        activity = node_container_for_root(
+            root,
             name=name,  # start node 'name' is saved in label
             id=id,
             external_id=external_id,

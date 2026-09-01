@@ -45,7 +45,6 @@ SDC_EXT_ITEM_ANSWER_MEDIA = "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-
 SDC_EXT_HIDDEN = "http://hl7.org/fhir/StructureDefinition/questionnaire-hidden"
 SDC_EXT_CHOICE_ORIENTATION = "http://hl7.org/fhir/StructureDefinition/questionnaire-choiceOrientation"
 SDC_EXT_ITEM_CONTROL = "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl"
-SDC_EXT_ENTRY_FORMAT = "http://hl7.org/fhir/StructureDefinition/entryFormat"
 OPENSRP_EXT_POPULATE = "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-itemPopulationContext"
 
 # ---------------------------------------------------------------------------
@@ -89,6 +88,7 @@ NODE_TYPE_TO_FHIR: Dict[str, Tuple[str, bool, bool]] = {
     TriccNodeType.link_in:          (None, False, True),
     TriccNodeType.link_out:         (None,    False, True),
     TriccNodeType.activity:         (FHIR_TYPE_GROUP, False, False),
+    TriccNodeType.segment:          (FHIR_TYPE_GROUP, False, False),
     TriccNodeType.exclusive:         (None, False, False),
 }
 
@@ -96,6 +96,7 @@ NODE_TYPE_TO_FHIR: Dict[str, Tuple[str, bool, bool]] = {
 SKIP_NODE_TYPES = {
     TriccNodeType.page,
     TriccNodeType.activity,
+    TriccNodeType.segment,
     TriccNodeType.edge,
     TriccNodeType.select_option,
     TriccNodeType.not_available,
@@ -341,15 +342,14 @@ def build_item_control_extension(control_code: str) -> dict:
 def build_item_control_display_item(link_id: str, text: str, control_code: str) -> dict:
     """Build a nested display item that carries a questionnaire-itemControl code.
 
-    ``help`` is a display code: it belongs on a child ``display`` item of the
-    question, not on the question itself. Hint text uses ``entryFormat`` on the
-    parent (see ``build_entry_format_extension`` and
-    ``feature/20260824-fhir-help-hint-itemcontrol.md``).
+    ``help`` and ``flyover`` are display codes: they belong on a child ``display``
+    item of the question, not on the question itself. See
+    ``feature/20260824-fhir-help-hint-itemcontrol.md``.
 
     Args:
         link_id: Child item linkId (e.g. ``weight-help``).
         text: Display text.
-        control_code: Item-control code (``help``, …).
+        control_code: Item-control code (``help``, ``flyover``, …).
 
     Returns:
         FHIR Questionnaire.item dict.
@@ -360,22 +360,6 @@ def build_item_control_display_item(link_id: str, text: str, control_code: str) 
         "text": text,
         "extension": [build_item_control_extension(control_code)],
     }
-
-
-def build_entry_format_extension(text: str) -> dict:
-    """Build an entryFormat extension from authored hint-message text.
-
-    Official FHIR core extension ``http://hl7.org/fhir/StructureDefinition/entryFormat``
-    (valueString) is the placeholder / format hint on ``Questionnaire.item``.
-    See ``feature/20260824-fhir-help-hint-itemcontrol.md``.
-
-    Args:
-        text: Hint text to show as the entry format (e.g. ``e.g. 12.5``).
-
-    Returns:
-        FHIR extension dict.
-    """
-    return {"url": SDC_EXT_ENTRY_FORMAT, "valueString": text}
 
 
 def build_hidden_extension() -> dict:

@@ -1,5 +1,5 @@
 # Question with authored help-message and hint-message (YAML attrs).
-# FHIR/OpenSRP: help → nested itemControl help; hint → entryFormat on the question.
+# FHIR/OpenSRP nest these as display children with itemControl help / flyover.
 # See feature/20260824-fhir-help-hint-itemcontrol.md.
 
 id: help_hint

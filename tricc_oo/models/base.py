@@ -46,6 +46,7 @@ class TriccNodeType(StrEnum):
     add = "add"  # add counts
     container_hint_media = "container_hint_media"  # DEPRECATED
     activity = "activity"
+    segment = "segment"  # activity container rooted at a main start (process page)
     help = "help-message"
     hint = "hint-message"
     exclusive = "not"

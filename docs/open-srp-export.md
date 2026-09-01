@@ -157,16 +157,16 @@ extension. Generic `FHIRStrategy` export is unchanged. See
 ## Help and hint messages
 
 Draw.io **help-message** and **hint-message** boxes (copied onto the question as
-`help` / `hint`) are emitted as follows:
+`help` / `hint`) become nested `display` children of that Questionnaire item:
 
-| Authoring | FHIR emission |
-|-----------|---------------|
-| help-message | Nested `display` child `linkId` `<question>-help` with `questionnaire-itemControl` = `help` |
-| hint-message | `entryFormat` extension on the question (`http://hl7.org/fhir/StructureDefinition/entryFormat`, `valueString`) |
+| Authoring | Child `linkId` | `questionnaire-itemControl` |
+|-----------|----------------|-----------------------------|
+| help-message | `<question>-help` | `help` |
+| hint-message | `<question>-hint` | `flyover` |
 
-`help` is a display item-control on the child, not on the question itself.
-Hidden items (calculates, diagnoses, waits) get neither. Help children are
-display-only and are not extracted. See
+Those codes are display item-controls; they are **not** put on the question
+itself. Hidden items (calculates, diagnoses, waits) get neither child. The
+children are display-only and are not extracted. See
 `feature/20260824-fhir-help-hint-itemcontrol.md`.
 
 ---
