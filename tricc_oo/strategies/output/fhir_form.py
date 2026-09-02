@@ -54,6 +54,7 @@ from tricc_oo.converters.fhir.repeat_helper import (
 )
 from tricc_oo.converters.fhir.questionnaire_item_mapper import (
     CALCULATE_NODE_TYPES,
+    CQF_EXT_TEXT_EXPRESSION,
     SDC_EXT_ANSWER_OPTIONS_TOGGLE,
     SDC_EXT_CALCULATED_EXPR,
     SDC_EXT_ENABLE_WHEN_EXPR,
@@ -75,6 +76,7 @@ from tricc_oo.converters.fhir.questionnaire_item_mapper import (
     is_repeating,
     item_allows_initial,
     set_item_extension,
+    set_item_text_expression,
     should_skip,
     strip_illegal_initials,
     dedupe_singleton_item_extensions,
@@ -106,6 +108,7 @@ from tricc_oo.models.calculate import TriccNodeDisplayCalculateBase, TriccNodePo
 from tricc_oo.strategies.output.base_output_strategy import BaseOutPutStrategy
 from tricc_oo.strategies.registry import register_output_strategy
 from tricc_oo.visitors.tricc import get_node_expressions, get_process, is_ready_to_process
+from tricc_oo.visitors.text_injection import serialize_injection_for_js_text
 logger = logging.getLogger("default")
 
 # ---------------------------------------------------------------------------
@@ -135,6 +138,14 @@ _NUMERIC_LITERAL = re.compile(r"^-?\d+(\.\d+)?$")
 _CHOICE_CODE_EQUALITY = re.compile(
     r"^(?P<base>.+)\.value(?:Coding)?\.code\s*(?P<op>=|!=)\s*(?P<code>'[^']*'|\"[^\"]*\")$"
 )
+# A single-quoted option code, as an authored ``'option_1'`` serialises to.
+# See fix/20260902-select-operand-coded-equality.md.
+_CODE_LITERAL = re.compile(r"^'(?P<code>[^']*)'$")
+# An operand expression that still yields ``…answer`` elements, so
+# ``.where($this.value.code = …)`` can be applied to it. An operand already
+# reduced to a code (a COALESCE union of ``.value.code`` members, say) must keep
+# a plain ``=`` comparison instead.
+_ANSWER_COLLECTION = re.compile(r"\.answer\)*$")
 _DECIMAL_ONE = Decimal("1.0")
 
 
@@ -297,6 +308,14 @@ class FHIRStrategy(BaseOutPutStrategy):
         # FHIRPath) from "version elsewhere" (CQL initialExpression dedup).
         self._current_segment: Optional[str] = None
         self._current_node_link_id: Optional[str] = None
+        # Display text authored with ``${REF}``: (node, item, CONCATENATE op).
+        # Resolved to a cqf-expression once every Questionnaire item exists, so
+        # references can use nested item paths. See
+        # fix/20260831-fhir-dynamic-display-text.md.
+        self._pending_text_expressions: List[Tuple[object, dict, TriccOperation]] = []
+        # True while serialising display text: choice references then render the
+        # option label (.value.display) rather than the code.
+        self._in_display_text: bool = False
 
     def get_tricc_operation_expression(self, operation):
         # For CQL
@@ -368,6 +387,7 @@ class FHIRStrategy(BaseOutPutStrategy):
         self.resolve_form_id()
         if "main" in self.project.start_pages:
             self._group_stack = []  # reset nesting stack for a fresh run
+            self._pending_text_expressions = []
             self.process_base(self.project.start_pages, pages=self.project.pages, version=version)
         else:
             logger.critical("Main process required")
@@ -377,6 +397,8 @@ class FHIRStrategy(BaseOutPutStrategy):
         self.process_relevance(self.project.start_pages, pages=self.project.pages)
         logger.info("FHIRStrategy: generating calculate (initialExpression / CQL)")
         self.process_calculate(self.project.start_pages, pages=self.project.pages)
+        logger.info("FHIRStrategy: generating dynamic display text (cqf-expression)")
+        self.process_display_text(self.project.start_pages, pages=self.project.pages)
         logger.info("FHIRStrategy: generating export (StructureMap)")
         self.process_export(self.project.start_pages, pages=self.project.pages)
 
@@ -602,16 +624,19 @@ class FHIRStrategy(BaseOutPutStrategy):
         if self._find_item_by_link_id(q.get("item", []), link_id) is not None:
             return True
 
-        label = getattr(node, 'label', None) or getattr(node, 'text', None) or ''
-        # FIXME, does not work like this
-        if isinstance(label, TriccOperation):
-            # Display injection (CONCATENATE) or multi-lang: render via op expression / first locale
-            label = self.get_tricc_operation_expression(label)
+        raw_label = getattr(node, 'label', None) or getattr(node, 'text', None) or ''
+        # ``${REF}`` injection keeps a readable static text here; the live value is
+        # rendered from the cqf-expression attached in process_display_text().
+        label, text_operation = self._display_text_and_operation(raw_label)
+        label = label or ''
         hidden = fhir_type != "group" and (
             is_hidden(tricc_type) or isinstance(node, TriccNodeDisplayCalculateBase)
         )
         if hidden:
             label = self._sanitize_hidden_item_text(node, label)
+            # Nothing is rendered for a hidden item, so a text expression there is
+            # dead weight the renderer would still have to evaluate.
+            text_operation = None
         item = {
             "linkId": link_id,
             "text": label,
@@ -677,6 +702,8 @@ class FHIRStrategy(BaseOutPutStrategy):
             self._item_seq,
         )
         target_list.append(item)
+        if text_operation is not None:
+            self._pending_text_expressions.append((node, item, text_operation))
 
         if is_group_starter:
             # Push this item onto the stack so children attach under it
@@ -689,22 +716,58 @@ class FHIRStrategy(BaseOutPutStrategy):
 
     def _questionnaire_item_text(self, value) -> Optional[str]:
         """Render help/hint/label-like text for a Questionnaire item, or None if blank."""
+        return self._display_text_and_operation(value)[0]
+
+    def _display_text_and_operation(self, value) -> Tuple[Optional[str], Optional[TriccOperation]]:
+        """Split a display-text field into static text and its dynamic operation.
+
+        ``${REF}`` injection is loaded as a ``CONCATENATE`` operation
+        (``feature/display-text-injection.md``). FHIR keeps the author's tokens in
+        ``item.text`` as a fallback for renderers without dynamic-text support, and
+        returns the operation so a ``cqf-expression`` can be attached once every
+        Questionnaire item exists.
+
+        Args:
+            value: Raw ``label`` / ``hint`` / ``help`` value (str, dict of locales,
+                node, or ``TriccOperation``).
+
+        Returns:
+            ``(static text or None, CONCATENATE operation or None)``.
+        """
         if value is None:
-            return None
+            return None, None
         if issubclass(value.__class__, TriccNodeBaseModel):
-            return self._questionnaire_item_text(getattr(value, "label", None))
-        if isinstance(value, TriccOperation):
-            rendered = self.get_tricc_operation_expression(value)
-            text = str(rendered).strip() if rendered is not None else ""
-            return text or None
+            return self._display_text_and_operation(getattr(value, "label", None))
         if isinstance(value, dict):
             for locale_value in value.values():
-                text = self._questionnaire_item_text(locale_value)
+                text, operation = self._display_text_and_operation(locale_value)
                 if text:
-                    return text
-            return None
+                    return text, operation
+            return None, None
+        if isinstance(value, TriccOperation):
+            if value.operator != TriccOperator.CONCATENATE:
+                # Not produced by ${REF} injection — no dynamic text to render.
+                logger.warning(
+                    "FHIRStrategy: display text holds a %s operation; only ${REF} "
+                    "injection (CONCATENATE) renders dynamically",
+                    value.operator,
+                )
+                rendered = self.get_tricc_operation_expression(value)
+                text = str(rendered).strip() if rendered is not None else ""
+                return (text or None), None
+            static = serialize_injection_for_js_text(value, self._injection_export_name).strip()
+            return (static or None), value
         text = str(value).strip()
-        return text or None
+        return (text or None), None
+
+    @staticmethod
+    def _injection_export_name(value) -> str:
+        """Export name used for a ``${...}`` token in the static fallback text."""
+        target = value.value if isinstance(value, TriccReference) else value
+        try:
+            return str(get_export_name(target))
+        except Exception:
+            return str(getattr(target, "name", None) or target)
 
     def _attach_help_hint_items(self, item: dict, node) -> None:
         """Nest help-message / hint-message as itemControl help and flyover children."""
@@ -713,16 +776,18 @@ class FHIRStrategy(BaseOutPutStrategy):
             return
         path_len = int(getattr(node, "path_len", 0) or 0)
         children = []
-        help_text = self._questionnaire_item_text(getattr(node, "help", None))
+        help_text, help_operation = self._display_text_and_operation(getattr(node, "help", None))
         if help_text:
-            children.append(
-                build_item_control_display_item(f"{parent_id}-help", help_text, "help")
-            )
-        hint_text = self._questionnaire_item_text(getattr(node, "hint", None))
+            child = build_item_control_display_item(f"{parent_id}-help", help_text, "help")
+            children.append(child)
+            if help_operation is not None:
+                self._pending_text_expressions.append((node, child, help_operation))
+        hint_text, hint_operation = self._display_text_and_operation(getattr(node, "hint", None))
         if hint_text:
-            children.append(
-                build_item_control_display_item(f"{parent_id}-hint", hint_text, "flyover")
-            )
+            child = build_item_control_display_item(f"{parent_id}-hint", hint_text, "flyover")
+            children.append(child)
+            if hint_operation is not None:
+                self._pending_text_expressions.append((node, child, hint_operation))
         if not children:
             return
         nested = item.setdefault("item", [])
@@ -777,6 +842,109 @@ class FHIRStrategy(BaseOutPutStrategy):
     def _leave_serialisation_context(self) -> None:
         self._current_segment = None
         self._current_node_link_id = None
+
+    # ============================================================
+    # DYNAMIC DISPLAY TEXT (${REF} injection)
+    # See fix/20260831-fhir-dynamic-display-text.md
+    # ============================================================
+    def process_display_text(self, start_pages=None, pages=None, **kwargs) -> None:
+        """Attach the ``cqf-expression`` that renders ``${REF}`` text live.
+
+        Runs after every item exists so references resolve to nested
+        ``%resource.item.where(linkId=…)`` paths rather than the ``repeat(item)``
+        fallback.
+
+        Args:
+            start_pages: Unused; kept for pipeline-pass symmetry.
+            pages: Unused; kept for pipeline-pass symmetry.
+        """
+        attached = 0
+        for node, item, operation in self._pending_text_expressions:
+            self._enter_serialisation_context(node)
+            try:
+                expression = self._display_text_fhirpath(item, operation)
+            finally:
+                self._leave_serialisation_context()
+            if expression:
+                set_item_text_expression(item, expression)
+                attached += 1
+        if attached:
+            logger.info(
+                "FHIRStrategy: attached %s dynamic display text expression(s)", attached
+            )
+
+    def _display_text_fhirpath(self, item: dict, operation: TriccOperation) -> Optional[str]:
+        """Build the FHIRPath string expression for one display-text operation.
+
+        Args:
+            item: Questionnaire item the text belongs to (for diagnostics).
+            operation: ``CONCATENATE`` operation built from ``${REF}`` tokens.
+
+        Returns:
+            FHIRPath expression returning a single string, or ``None`` when the
+            text cannot be rendered dynamically (the static fallback then stands).
+        """
+        link_id = item.get("linkId")
+        repeating = sorted(
+            {lid for lid in self._text_reference_link_ids(operation) if self._link_id_repeats(lid)}
+        )
+        if repeating:
+            # The renderer takes singleOrNull() of the result; a repeating answer
+            # (select_multiple) can yield several values and would render nothing.
+            logger.warning(
+                "FHIRStrategy: display text of '%s' references repeating item(s) %s; "
+                "keeping static text only",
+                link_id,
+                ", ".join(repeating),
+            )
+            return None
+        self._in_display_text = True
+        try:
+            expression = self.convert_expression_to_fhirpath(operation)
+        except NotImplementedError as exc:
+            logger.error(
+                "FHIRStrategy: display text of '%s' is not expressible in FHIRPath (%s); "
+                "keeping static text only",
+                link_id,
+                exc,
+            )
+            return None
+        finally:
+            self._in_display_text = False
+        expression = (expression or "").strip()
+        return expression or None
+
+    def _text_reference_link_ids(self, operation) -> List[str]:
+        """Every Questionnaire ``linkId`` a display-text operation reads."""
+        link_ids: List[str] = []
+        for r in getattr(operation, "reference", None) or []:
+            if isinstance(r, list):
+                for sub in r:
+                    link_ids.extend(self._text_reference_link_ids(sub))
+            elif isinstance(r, TriccOperation):
+                link_ids.extend(self._text_reference_link_ids(r))
+            else:
+                link_id = self._operand_link_id(r)
+                if link_id:
+                    link_ids.append(link_id)
+        return link_ids
+
+    @staticmethod
+    def _operand_link_id(operand) -> Optional[str]:
+        """Questionnaire ``linkId`` for a reference operand, or ``None`` for literals."""
+        # TriccReference subclasses TriccStatic, so it must be tested first.
+        if isinstance(operand, TriccReference):
+            target = operand.value
+        elif isinstance(operand, (TriccStatic, TriccNodeSelectOption)):
+            return None
+        elif issubclass(operand.__class__, TriccNodeBaseModel):
+            target = operand
+        else:
+            return None
+        try:
+            return str(get_export_name(target))
+        except Exception:
+            return None
 
     def generate_relevance(
         self, node, processed_nodes=None, stashed_nodes=None, process=None, warn=False, **kwargs
@@ -1312,6 +1480,13 @@ class FHIRStrategy(BaseOutPutStrategy):
                 for nested in ext.get("extension") or []:
                     nested_expr = (nested.get("valueExpression") or {}).get("expression") or ""
                     refs.update(_LINK_ID_IN_EXPRESSION.findall(nested_expr))
+            # Dynamic display text reads items too — a calculate shown only inside
+            # a note's text must not be pruned as unused.
+            for ext in (item.get("_text") or {}).get("extension") or []:
+                if ext.get("url") != CQF_EXT_TEXT_EXPRESSION:
+                    continue
+                expr = (ext.get("valueExpression") or {}).get("expression") or ""
+                refs.update(_LINK_ID_IN_EXPRESSION.findall(expr))
             refs.update(FHIRStrategy._collect_expression_link_ids(item.get("item")))
         return refs
 
@@ -1720,10 +1895,21 @@ class FHIRStrategy(BaseOutPutStrategy):
 
     # Operation methods for CQL
     def tricc_operation_equal(self, ref_expressions, original_references=None):
-        return f"{ref_expressions[0]} = {ref_expressions[1]}"
+        return self._cql_equality("=", ref_expressions, original_references)
 
     def tricc_operation_not_equal(self, ref_expressions, original_references=None):
-        return f"{ref_expressions[0]} != {ref_expressions[1]}"
+        return self._cql_equality("!=", ref_expressions, original_references)
+
+    def _cql_equality(self, operator: str, ref_expressions, original_references=None) -> str:
+        """CQL ``=`` / ``!=``, yes/no-aware.
+
+        A yes/no select is persisted as ``Observation.valueBoolean``, so the
+        authored ``'yes'`` / ``'no'`` code has to become a boolean literal here
+        too. Coded (CodeableConcept) equality is *not* rewritten — see §8 of
+        fix/20260902-select-operand-coded-equality.md.
+        """
+        operands = self._boolean_item_operands(ref_expressions, original_references)
+        return f"{operands[0]} {operator} {operands[1]}"
 
     def tricc_operation_and(self, ref_expressions, original_references=None):
         return " and ".join(ref_expressions)
@@ -1978,8 +2164,132 @@ class FHIRStrategy(BaseOutPutStrategy):
                 return item
         return None
 
+    # Operators that only forward another item's value. The operand they read keeps
+    # its type (a select stays a select through GetRepeatedValue / inheritance), so
+    # type detection has to look through them.
+    # See fix/20260902-select-operand-coded-equality.md.
+    _VALUE_FORWARDING_OPERATORS = frozenset(
+        {
+            TriccOperator.PARENTHESIS,
+            TriccOperator.COALESCE,
+            TriccOperator.GET_REPEATED_VALUE,
+            TriccOperator.GET_INHERITED_VALUE,
+            TriccOperator.GET_HISTORY_VALUE,
+        }
+    )
+
+    def _value_source_reference(self, original_ref, depth: int = 0):
+        """Item a value-forwarding operand ultimately reads.
+
+        ``GetRepeatedValue('FUP')`` and the multi-version inheritance union carry
+        the value of the select they read, so ``question = 'option'`` on them must
+        get the choice treatment. Anything else is returned unchanged.
+
+        Args:
+            original_ref: Operand as collected by the expression walker.
+            depth: Recursion guard for nested forwarding operations.
+
+        Returns:
+            The referenced node / TriccReference, or ``original_ref`` when the
+            operand does not simply forward one item's value.
+        """
+        if not isinstance(original_ref, TriccOperation) or depth >= 4:
+            return original_ref
+        if original_ref.operator not in self._VALUE_FORWARDING_OPERATORS:
+            return original_ref
+        for ref in original_ref.reference or []:
+            # Skip literal arguments (the repeat slot of GetRepeatedValue, …).
+            # TriccReference subclasses TriccStatic, so it must be tested first.
+            if isinstance(ref, TriccStatic) and not isinstance(ref, TriccReference):
+                continue
+            resolved = self._value_source_reference(ref, depth + 1)
+            if resolved is not None and not isinstance(resolved, TriccOperation):
+                return resolved
+        return original_ref
+
+    def _code_literal_operand(self, expr, original_ref) -> Optional[str]:
+        """The quoted option code ``expr`` stands for, or None when it is not one."""
+        # TriccReference subclasses TriccStatic: a reference is never a literal.
+        if isinstance(original_ref, TriccReference):
+            return None
+        if not isinstance(original_ref, (TriccStatic, str, TriccNodeSelectOption)):
+            return None
+        if not isinstance(expr, str) or not _CODE_LITERAL.fullmatch(expr.strip()):
+            return None
+        return expr.strip()
+
+    @classmethod
+    def _yesno_boolean_literal(cls, code_expr: str) -> Optional[str]:
+        """Boolean literal for a yes/no option code (``'yes'`` → ``true``).
+
+        A yes/no select is exported as a native boolean item, so the code the
+        author compares it to has to become ``true`` / ``false``: comparing the
+        boolean answer with the string ``'yes'`` is never true.
+
+        Args:
+            code_expr: Quoted code literal (``"'yes'"``).
+
+        Returns:
+            ``"true"``, ``"false"``, or None when the code is not a yes/no marker.
+        """
+        match = _CODE_LITERAL.fullmatch((code_expr or "").strip())
+        if not match:
+            return None
+        marker = match.group("code").lower()
+        if marker in cls._YESNO_TRUE_MARKERS:
+            return "true"
+        if marker in cls._YESNO_FALSE_MARKERS:
+            return "false"
+        return None
+
+    def _boolean_item_operands(self, ref_expressions, original_references=None):
+        """Operands with a yes/no code literal turned into a boolean literal.
+
+        Returns ``ref_expressions`` unchanged unless one operand is a native
+        boolean item and the other an authored yes/no code.
+        """
+        refs = list(original_references or [])
+        if len(ref_expressions) != 2 or len(refs) != 2:
+            return ref_expressions
+        for item_idx, code_idx in ((0, 1), (1, 0)):
+            code_expr = self._code_literal_operand(ref_expressions[code_idx], refs[code_idx])
+            if code_expr is None or not self._is_boolean_item_reference(refs[item_idx]):
+                continue
+            literal = self._yesno_boolean_literal(code_expr)
+            if literal is None:
+                continue
+            operands = list(ref_expressions)
+            operands[code_idx] = literal
+            return operands
+        return ref_expressions
+
+    def _coded_operand_pair(self, ref_expressions, original_references=None):
+        """``(answer collection, code literal)`` of a coded equality, or None.
+
+        Both orders are accepted (``question = 'code'`` and ``'code' = question``).
+        The choice operand must still be an ``…answer`` collection: an operand
+        already reduced to a code — ``COALESCE`` unions ``.value.code`` members
+        and takes ``.first()`` — compares with a plain ``=`` and would be always
+        false as ``.first().where($this.value.code = …)``.
+        """
+        refs = list(original_references or [])
+        if len(ref_expressions) != 2 or len(refs) != 2:
+            return None
+        for item_idx, code_idx in ((0, 1), (1, 0)):
+            code_expr = self._code_literal_operand(ref_expressions[code_idx], refs[code_idx])
+            if code_expr is None:
+                continue
+            if not self._is_choice_reference(refs[item_idx]):
+                continue
+            item_expr = ref_expressions[item_idx]
+            if not isinstance(item_expr, str) or not _ANSWER_COLLECTION.search(item_expr.strip()):
+                continue
+            return item_expr, code_expr
+        return None
+
     def _is_boolean_item_reference(self, original_ref) -> bool:
         """True when ``original_ref`` is a native boolean Questionnaire item."""
+        original_ref = self._value_source_reference(original_ref)
         if original_ref is None:
             return False
         if isinstance(original_ref, TriccNodeSelectYesNo):
@@ -2002,6 +2312,7 @@ class FHIRStrategy(BaseOutPutStrategy):
 
     def _is_choice_reference(self, original_ref) -> bool:
         """True when ``original_ref`` is a choice / open-choice item (not yes/no boolean)."""
+        original_ref = self._value_source_reference(original_ref)
         if original_ref is None or self._is_boolean_item_reference(original_ref):
             return False
         if isinstance(original_ref, TriccNodeSelect):
@@ -2048,7 +2359,9 @@ class FHIRStrategy(BaseOutPutStrategy):
     def _answer_value_suffix(self, original_ref) -> str:
         """FHIRPath suffix that reads the scalar answer value for ``original_ref``."""
         if self._is_choice_reference(original_ref):
-            return ".value.code"
+            # Display text shows the option label; logic compares the code.
+            # ``_answer_option_coding`` always fills ``display``.
+            return ".value.display" if self._in_display_text else ".value.code"
         return ".value"
 
     def _choice_answer_collection(self, answer_expr: str) -> str:
@@ -2138,7 +2451,10 @@ class FHIRStrategy(BaseOutPutStrategy):
 
     def tricc_operation_selected(self, ref_expressions, original_references=None):
         # ref[0] is the select field, remaining refs are the option values
-
+        operands = self._boolean_item_operands(ref_expressions, original_references)
+        if operands is not ref_expressions:
+            # Native boolean item: 'yes' became a boolean literal, so compare.
+            return f"({operands[0]} = {operands[1]})"
         return f"({ref_expressions[1]} in {ref_expressions[0]})"
 
     def tricc_operation_between(self, ref_expressions, original_references=None):
@@ -2384,12 +2700,27 @@ class FHIRStrategy(BaseOutPutStrategy):
     # FHIRPath variants – delegate to CQL handlers.
     # ============================================================
     def tricc_operation_fhirpath_equal(self, ref_expressions, original_references=None):
-        r_expr = self.tricc_operation_equal(ref_expressions)
-        wrapped = self._wrap_operand_if_needed(r_expr, original_references)
-        return self._rewrite_choice_code_equality(wrapped) or wrapped
+        return self._fhirpath_equality("=", ref_expressions, original_references)
 
     def tricc_operation_fhirpath_not_equal(self, ref_expressions, original_references=None):
-        r_expr = self.tricc_operation_not_equal(ref_expressions)
+        return self._fhirpath_equality("!=", ref_expressions, original_references)
+
+    def _fhirpath_equality(self, operator: str, ref_expressions, original_references=None) -> str:
+        """FHIRPath ``=`` / ``!=``, choice- and yes/no-aware.
+
+        A choice operand compared to a code becomes coded membership — including
+        when the operand only forwards a select's value (``GetRepeatedValue``,
+        inheritance union). A yes/no code literal compared to the boolean item it
+        belongs to becomes a boolean literal. Everything else keeps the scalar
+        ``.where($this.exists()).value`` comparison.
+        See fix/20260902-select-operand-coded-equality.md.
+        """
+        pair = self._coded_operand_pair(ref_expressions, original_references)
+        if pair is not None:
+            membership = self._choice_membership_expr(*pair)
+            return f"{membership}.not()" if operator == "!=" else membership
+        operands = self._boolean_item_operands(ref_expressions, original_references)
+        r_expr = f"{operands[0]} {operator} {operands[1]}"
         wrapped = self._wrap_operand_if_needed(r_expr, original_references)
         return self._rewrite_choice_code_equality(wrapped) or wrapped
 
@@ -2484,9 +2815,10 @@ class FHIRStrategy(BaseOutPutStrategy):
     def tricc_operation_fhirpath_selected(self, ref_expressions, original_references=None):
         select_ref = original_references[0] if original_references else None
         if self._is_boolean_item_reference(select_ref):
-            return (
-                f"({ref_expressions[0]}.where($this.exists()).value = {ref_expressions[1]})"
-            )
+            # Native boolean item: scalar comparison, with the authored 'yes' /
+            # 'no' code mapped to a boolean literal.
+            operands = self._boolean_item_operands(ref_expressions, original_references)
+            return f"({operands[0]}.where($this.exists()).value = {operands[1]})"
         return self._choice_membership_expr(ref_expressions[0], ref_expressions[1])
 
     def tricc_operation_fhirpath_between(self, ref_expressions, original_references=None):
@@ -2751,22 +3083,72 @@ class FHIRStrategy(BaseOutPutStrategy):
     # (X.round(), X.length()) rather than CQL's prefix Round(X)/Length(X),
     # and lowercase no-arg today()/now() rather than CQL's Today()/Now().
     # ============================================================
+    @staticmethod
+    def _fhirpath_single_value_call(expr: str, call: str) -> str:
+        """Emit ``X.<call>`` empty-safely as ``X.select($this.<call>)``.
+
+        HAPI's math functions (round, abs, sqrt, power, …) open with a
+        ``focus.size() != 1`` guard and raise instead of returning empty as
+        FHIRPath requires, so a bare ``X.round()`` crashes
+        ``initializeCalculatedExpressions`` at render time — every answer is
+        still empty then, so the whole Questionnaire fails to render.
+        ``select()`` skips an empty collection and gives the body a single-item
+        focus, without duplicating ``X`` the way ``iif(X.exists(), X.round(), {})``
+        would (``X`` is a long nested-item path).
+        See fix/20260831-fhirpath-empty-safe-math.md.
+        """
+        return f"{expr}.select($this.{call})"
+
     def tricc_operation_fhirpath_round(self, ref_expressions, original_references=None):
-        r_expr = f"{ref_expressions[0]}.round()"
-        return self._wrap_operand_if_needed(r_expr, original_references)
+        refs = list(original_references or [])
+        operand = self._fhirpath_numeric_operand(ref_expressions[0], refs[0] if refs else None)
+        return self._fhirpath_single_value_call(operand, "round()")
 
     def tricc_operation_fhirpath_abs(self, ref_expressions, original_references=None):
-        r_expr = f"{ref_expressions[0]}.abs()"
-        return self._wrap_operand_if_needed(r_expr, original_references)
+        refs = list(original_references or [])
+        operand = self._fhirpath_numeric_operand(ref_expressions[0], refs[0] if refs else None)
+        return self._fhirpath_single_value_call(operand, "abs()")
 
     def tricc_operation_fhirpath_length(self, ref_expressions, original_references=None):
-        r_expr = f"{ref_expressions[0]}.length()"
-        return self._wrap_operand_if_needed(r_expr, original_references)
+        # String operand — no numeric cast, but the same empty-focus guard.
+        operand = self._wrap_operand_if_needed(ref_expressions[0], original_references)
+        return self._fhirpath_single_value_call(operand, "length()")
 
     def tricc_operation_fhirpath_concatenate(self, ref_expressions, original_references=None):
-        # FHIRPath string concatenation uses "&" ("+" is arithmetic-only).
-        r_expr = " & ".join(ref_expressions)
+        # FHIRPath string concatenation uses "&" ("+" is arithmetic-only, and "&"
+        # yields '' for an empty operand so an unanswered question renders blank
+        # instead of collapsing the whole expression).
+        parts = self._fhirpath_string_parts(ref_expressions, original_references)
+        r_expr = " & ".join(parts)
         return self._wrap_operand_if_needed(r_expr, original_references)
+
+    def _fhirpath_string_parts(self, ref_expressions, original_references=None) -> List[str]:
+        """Coerce every concatenation operand to a FHIRPath string."""
+        refs = list(original_references or [])
+        return [
+            self._fhirpath_as_string(expr, refs[i] if i < len(refs) else None)
+            for i, expr in enumerate(ref_expressions)
+        ]
+
+    def _fhirpath_as_string(self, expr, original_ref=None) -> str:
+        """Wrap ``expr`` in ``.toString()`` unless it is already a string.
+
+        ``&`` only concatenates strings, so integer / decimal / date / boolean
+        answers have to be converted. Operands are parenthesised first: bare
+        ``21.toString()`` or ``a + b.toString()`` would parse wrong.
+        """
+        text = expr if isinstance(expr, str) else str(expr)
+        stripped = text.strip()
+        if not stripped:
+            return text
+        if stripped.startswith("'") and stripped.endswith("'"):
+            return text
+        if stripped.endswith(".toString()"):
+            return text
+        if self._in_display_text and self._is_choice_reference(original_ref):
+            # Choice answers read `.value.display` here, already a string.
+            return text
+        return f"({stripped}).toString()"
 
     def tricc_operation_fhirpath_today(self, ref_expressions, original_references=None):
         return "today()"

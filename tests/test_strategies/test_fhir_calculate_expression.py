@@ -15,6 +15,7 @@ Run with:
     python -m pytest tests/test_strategies/test_fhir_calculate_expression.py -v
 """
 
+import re
 import types
 import unittest
 from unittest.mock import MagicMock
@@ -300,6 +301,76 @@ class TestGenerateCalculateExpressionLanguage(unittest.TestCase):
         self.assertIn(".value", expr)
         self.assertNotIn(".answer|0", expr)
         self.assertIn("|0.0", expr)
+
+
+class TestEmptySafeMathCalculatedExpression(unittest.TestCase):
+    """fix/20260831-fhirpath-empty-safe-math.md
+
+    HAPI's math functions raise on an empty focus instead of returning empty,
+    and ``initializeCalculatedExpressions`` runs every calculatedExpression at
+    render time with all answers still empty — so a bare ``.round()`` kills the
+    whole Questionnaire before the first item is drawn.
+    """
+
+    # `.round()` / `.abs()` that is not the body of a select($this. …) projection.
+    _BARE_MATH = re.compile(r"(?<!\$this)\.(?:round|abs)\(\)")
+
+    def _bmi_item(self):
+        strategy = _make_strategy()
+        weight = TriccNodeInteger(id="w1", name="weight", label="Weight")
+        height = TriccNodeInteger(id="h1", name="height", label="Height")
+        height_m = TriccOperation(TriccOperator.DIVIDED, [height, TriccStatic(100)])
+        bmi = TriccNodeCalculate(id="bmi1", name="bmi", label="BMI")
+        bmi.expression_reference = TriccOperation(
+            TriccOperator.ROUND,
+            [
+                TriccOperation(
+                    TriccOperator.DIVIDED,
+                    [weight, TriccOperation(TriccOperator.MULTIPLIED, [height_m, height_m])],
+                )
+            ],
+        )
+        strategy.questionnaires["main"] = {
+            "resourceType": "Questionnaire",
+            "item": [_item("weight", "integer"), _item("height", "integer"), _item("bmi")],
+        }
+
+        strategy.generate_calculate(bmi)
+
+        return strategy.questionnaires["main"]["item"][2]
+
+    def test_round_over_in_form_answers_is_empty_safe(self):
+        item = self._bmi_item()
+        value_expr = item["extension"][0]["valueExpression"]
+        expr = value_expr["expression"]
+        self.assertEqual(value_expr["language"], "text/fhirpath")
+        self.assertIn(".select($this.round())", expr)
+        self.assertIsNone(
+            self._BARE_MATH.search(expr),
+            f"bare math call outside select($this. …): {expr}",
+        )
+        # The operand keeps its answer-value scalar wrap and decimal cast.
+        self.assertIn(".answer.where($this.exists()).value", expr)
+        self.assertIn(".toDecimal()", expr)
+
+    def test_abs_over_in_form_answers_is_empty_safe(self):
+        strategy = _make_strategy()
+        a = TriccNodeInteger(id="a1", name="a", label="A")
+        b = TriccNodeInteger(id="b1", name="b", label="B")
+        delta = TriccNodeCalculate(id="d1", name="delta", label="Delta")
+        delta.expression_reference = TriccOperation(
+            TriccOperator.ABS, [TriccOperation(TriccOperator.MINUS, [a, b])]
+        )
+        strategy.questionnaires["main"] = {
+            "resourceType": "Questionnaire",
+            "item": [_item("a", "integer"), _item("b", "integer"), _item("delta")],
+        }
+
+        strategy.generate_calculate(delta)
+
+        expr = strategy.questionnaires["main"]["item"][2]["extension"][0]["valueExpression"]["expression"]
+        self.assertIn(".select($this.abs())", expr)
+        self.assertIsNone(self._BARE_MATH.search(expr), expr)
 
 
 if __name__ == "__main__":
