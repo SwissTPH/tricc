@@ -184,3 +184,50 @@ Fix options:
 - Prefer Python version with available wheels (commonly 3.12 for this stack).
 - Upgrade `pip`, `setuptools`, `wheel`.
 - Install Visual Studio Build Tools (Desktop development with C++) if source build is unavoidable.
+
+## Conversion hangs after `# Create the graph from the start node`
+
+Symptoms:
+
+- No output, no error, no exit — the process just keeps running.
+- Or, with a recent build, it stops after a few seconds with
+  `CRITICAL - loop guard tripped: get_node_expression made 20001 recursive calls ...`.
+
+Cause:
+
+- Expression generation re-expanded the same sub-graph over and over. Typically a long chain of `goto`
+  steps on one page, each guarded by a rhombus plus its `pnav_rel_*` display bridge: every step doubles
+  the work, so the chain becomes exponentially expensive. A genuine dependency loop between two
+  calculates produces the same failure.
+
+Reading the failure:
+
+- `... path (N levels, M calls)` lists the chain of nodes being expanded, newest last — the tail names
+  where the conversion got stuck.
+- `nodes revisited on that path (likely dependency loop)` names the nodes expanded more than once on the
+  same path. Those are the ones to look at in draw.io.
+- The Python stack trace that follows shows which stage requested the expression.
+
+Fixes / next steps:
+
+- Simplify the offending page: break a very long guarded `goto` chain into separate activities, or move a
+  repeated rhombus condition into a single calculate the steps reference.
+- Remove circular dependencies between calculates (A's condition referencing B and B's referencing A).
+- If the project is genuinely that large and healthy, raise the budget (see below) — a healthy run of the
+  reference projects peaks at ~20 calls and depth ~11, so the defaults leave a wide margin.
+
+Guard budgets (environment variables, see `tricc_oo/visitors/loop_guard.py`):
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `TRICC_MAX_EXPRESSION_CALLS` | 20000 | expression expansions allowed per top-level node |
+| `TRICC_MAX_EXPRESSION_DEPTH` | 100 | nesting depth allowed in expression expansion |
+| `TRICC_MAX_LOOP_ITERATIONS` | 50000 | iterations allowed in the stashed-node loop |
+| `TRICC_LOOP_GUARD_PDB` | unset | set to `1` to drop into `pdb` where the guard trips |
+
+```bash
+# inspect the stuck state interactively
+TRICC_LOOP_GUARD_PDB=1 python tests/build.py -i my_project/ -o out/ -O FHIRStrategy -l d
+```
+
+Related: `fix/20260902-expression-recursion-hang-guard.md`.
