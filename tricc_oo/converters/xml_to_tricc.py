@@ -67,9 +67,9 @@ from tricc_oo.parsers.xml import (
 )
 import hashlib
 from tricc_oo.visitors.tricc import (
-    get_select_yes_no_options, get_select_not_available_options,
+    get_select_yes_no_options,
     set_prev_next_node,  inject_node_before,
-    merge_node, remove_prev_next, get_activity_wait, get_count_terms_details, NO_LABEL
+    merge_node, remove_prev_next, get_activity_wait, get_count_terms_details,
 )
 from tricc_oo.converters.datadictionnary import add_concept
 
@@ -863,9 +863,14 @@ def add_tricc_base_node(
             for o in node.options:
                 nodes[node.options[o].id] = node.options[o]
         elif type == TriccNodeSelectNotAvailable:
-            node.options = get_select_not_available_options(node, group, node.label)
-            node.label = NO_LABEL
-            nodes[node.options[0].id] = node.options[0]
+            # Only authored select_option children. Do not invent a synthetic option named "1".
+            child_options = get_mxcell_parent_list(diagram, node.external_id, TriccNodeType.select_option)
+            if child_options:
+                node.options = get_select_options(diagram, node, nodes)
+                for o in node.options:
+                    nodes[node.options[o].id] = node.options[o]
+            else:
+                node.options = {}
         elif type == TriccNodeSelectYesNo:
             node.list_name = "yes_no"
             node.options = get_select_yes_no_options(node, group)

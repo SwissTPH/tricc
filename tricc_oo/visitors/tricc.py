@@ -3492,7 +3492,7 @@ def get_node_expression(in_node, processed_nodes, get_overall_exp=False, is_prev
             expression = get_selected_option_expression(node, negate)
         # TODO remove that and manage it on the "Save" part
     elif is_prev and isinstance(node, TriccNodeSelectNotAvailable):
-        expression = TriccOperation(TriccOperator.SELECTED, [node, TriccStatic(1)])
+        expression = TriccOperation(TriccOperator.EXISTS, [node])
     elif issubclass(node.__class__, TriccNodeCalculateBase):
         if negate:
             negate_expression = get_calculation_terms(
@@ -3940,8 +3940,7 @@ def get_count_terms_details(prev_node, processed_nodes, get_overall_exp, negate=
             )
             # terms.append(TRICC_SELECT_MULTIPLE_CALC_EXPRESSION.format(get_export_name(prev_node)))
     elif isinstance(prev_node, (TriccNodeSelectNotAvailable)):
-        return TriccOperation(TriccOperator.SELECTED, [prev_node, TriccStatic("1")])
-        # terms.append(TRICC_SELECTED_EXPRESSION.format(get_export_name(prev_node), '1'))
+        return TriccOperation(TriccOperator.EXISTS, [prev_node])
     elif isinstance(prev_node, TriccNodeSelectOption):
         return get_selected_option_expression(prev_node, negate)
     else:
