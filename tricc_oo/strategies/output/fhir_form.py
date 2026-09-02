@@ -146,6 +146,12 @@ _CODE_LITERAL = re.compile(r"^'(?P<code>[^']*)'$")
 # reduced to a code (a COALESCE union of ``.value.code`` members, say) must keep
 # a plain ``=`` comparison instead.
 _ANSWER_COLLECTION = re.compile(r"\.answer\)*$")
+# A suffix call binds to the *last operand* of a bare binary expression:
+# ``A & B.length()`` parses as ``A & (B.length())``, so the operand of the call
+# has to be parenthesised first. See fix/20260902-fhirpath-suffix-precedence.md.
+_FHIRPATH_BINARY_OP = re.compile(
+    r"\s(?:&|\+|-|\*|/|!=|<=|>=|=|<|>|and|or|xor|implies|div|mod|in|contains)\s"
+)
 _DECIMAL_ONE = Decimal("1.0")
 
 
@@ -2807,10 +2813,10 @@ class FHIRStrategy(BaseOutPutStrategy):
     def tricc_operation_fhirpath_isnull(self, ref_expressions, original_references=None):
         # FHIRPath has no "is null"; test the answer collection directly —
         # do not scalar-wrap to .value, we want existence of the collection itself.
-        return f"{ref_expressions[0]}.empty()"
+        return f"{self._fhirpath_atom(ref_expressions[0])}.empty()"
 
     def tricc_operation_fhirpath_isnotnull(self, ref_expressions, original_references=None):
-        return f"{ref_expressions[0]}.exists()"
+        return f"{self._fhirpath_atom(ref_expressions[0])}.exists()"
 
     def tricc_operation_fhirpath_selected(self, ref_expressions, original_references=None):
         select_ref = original_references[0] if original_references else None
@@ -2842,10 +2848,10 @@ class FHIRStrategy(BaseOutPutStrategy):
         return self._choice_membership_expr(ref_expressions[0], ref_expressions[1])
 
     def tricc_operation_fhirpath_exists(self, ref_expressions, original_references=None):
-        return f"{ref_expressions[0]}.exists()"
+        return f"{self._fhirpath_atom(ref_expressions[0])}.exists()"
 
     def tricc_operation_fhirpath_notexists(self, ref_expressions, original_references=None):
-        return f"{ref_expressions[0]}.empty()"
+        return f"{self._fhirpath_atom(ref_expressions[0])}.empty()"
 
     def _fhirpath_is_numeric_operand(self, original_ref, expr: str) -> bool:
         """True when a COALESCE / iif value should be a FHIRPath decimal scalar."""
@@ -3083,8 +3089,40 @@ class FHIRStrategy(BaseOutPutStrategy):
     # (X.round(), X.length()) rather than CQL's prefix Round(X)/Length(X),
     # and lowercase no-arg today()/now() rather than CQL's Today()/Now().
     # ============================================================
-    @staticmethod
-    def _fhirpath_single_value_call(expr: str, call: str) -> str:
+    @classmethod
+    def _fhirpath_has_top_level_operator(cls, expr: str) -> bool:
+        """True when ``expr`` has a binary operator outside any quotes/parens."""
+        depth = 0
+        in_str = False
+        for i, ch in enumerate(expr):
+            if ch == "'":
+                in_str = not in_str
+            elif in_str:
+                continue
+            elif ch in "([":
+                depth += 1
+            elif ch in ")]":
+                depth -= 1
+            elif ch == " " and depth == 0 and _FHIRPATH_BINARY_OP.match(expr, i):
+                return True
+        return False
+
+    @classmethod
+    def _fhirpath_atom(cls, expr: str) -> str:
+        """``expr``, parenthesised when a suffix call would otherwise mis-bind.
+
+        ``Length(a & b)`` must emit ``(a & b).length()``: appending to the bare
+        concatenation gives ``a & b.length()``, i.e. a string concatenated with
+        an integer, which HAPI refuses ("right operand to & has the wrong type
+        integer") and which takes the whole Questionnaire down at render time.
+        """
+        stripped = (expr or "").strip()
+        if not stripped or not cls._fhirpath_has_top_level_operator(stripped):
+            return stripped
+        return f"({stripped})"
+
+    @classmethod
+    def _fhirpath_single_value_call(cls, expr: str, call: str) -> str:
         """Emit ``X.<call>`` empty-safely as ``X.select($this.<call>)``.
 
         HAPI's math functions (round, abs, sqrt, power, …) open with a
@@ -3097,7 +3135,7 @@ class FHIRStrategy(BaseOutPutStrategy):
         would (``X`` is a long nested-item path).
         See fix/20260831-fhirpath-empty-safe-math.md.
         """
-        return f"{expr}.select($this.{call})"
+        return f"{cls._fhirpath_atom(expr)}.select($this.{call})"
 
     def tricc_operation_fhirpath_round(self, ref_expressions, original_references=None):
         refs = list(original_references or [])
