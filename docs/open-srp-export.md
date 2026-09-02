@@ -371,6 +371,13 @@ In-form calculation (e.g. BMI from weight + height both answered in the same Que
   empty collection and gives the body a single-item focus without duplicating the
   (long) operand path. `ROUND` / `ABS` operands also take the numeric wrap above.
   See `fix/20260831-fhirpath-empty-safe-math.md`.
+- A suffix call is only appended to a **single path or a parenthesised group**.
+  FHIRPath navigation binds tighter than the binary operators, so
+  `LENGTH(CONCATENATE(a, b))` has to emit `(a & b).select($this.length())`:
+  emitted as `a & b.select($this.length())` it evaluates `string & integer`,
+  HAPI raises, and the whole Questionnaire fails to render as soon as any answer
+  exists. Same for `ROUND(a + b)`, `ABS(a - b)` and the `exists()` / `empty()`
+  tests. See `fix/20260902-fhirpath-suffix-precedence.md`.
 
 ### Dynamic display text (`${REF}` injection)
 
