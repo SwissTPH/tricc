@@ -10,8 +10,14 @@ Two shapes of runaway work show up when converting large draw.io projects:
 Neither raises on its own: the loop keeps spinning and the recursion stays under
 Python's recursion limit while doing exponential work, so a conversion just never
 finishes. The guards here give every such loop a budget. When the budget is
-exhausted they log the offending path, the repeated nodes on it and the Python
-stack, then raise :class:`TriccLoopError` instead of spinning forever.
+exhausted they raise :class:`TriccLoopError` instead of spinning forever, after
+logging
+
+* the node the recursion looped on, and the segment that repeats around it,
+* the path from the nearest branching node down to that loop -- the stretch of the
+  drawing to look at,
+* every node revisited on the path, most revisited first,
+* the full expansion path (middle elided when deep) and the Python stack.
 
 Budgets are tunable through the environment so a genuinely huge (but healthy)
 project can be pushed through without patching code:
@@ -38,8 +44,30 @@ DEFAULT_MAX_LOOP_ITERATIONS = 50_000
 DEFAULT_MAX_EXPRESSION_CALLS = 20_000
 DEFAULT_MAX_EXPRESSION_DEPTH = 100
 
-# How many entries of the offending path to log on each side of the trip point.
+# How many entries of the offending path to log on each side of an elision.
 PATH_LOG_LIMIT = 60
+# Same, for the repeating segment of a detected loop (kept shorter: it repeats).
+LOOP_SEGMENT_LOG_LIMIT = 20
+
+
+def _node_edges(node, attribute):
+    """``node.prev_nodes`` / ``node.next_nodes`` as a sized collection (never None)."""
+    return getattr(node, attribute, None) or ()
+
+
+def _is_branching(node):
+    """True when the graph forks at ``node``.
+
+    More than one predecessor (the direction expression expansion walks) or more than
+    one next node: either way the node is a decision point an author can recognise in
+    the drawing.
+    """
+    return len(_node_edges(node, "prev_nodes")) > 1 or len(_node_edges(node, "next_nodes")) > 1
+
+
+def _degree(node):
+    """``"<n> prev, <n> next"`` summary of a node's edges."""
+    return f"{len(_node_edges(node, 'prev_nodes'))} prev, {len(_node_edges(node, 'next_nodes'))} next"
 
 
 class TriccLoopError(RuntimeError):
@@ -192,24 +220,129 @@ class RecursionGuard:
             self.calls = 0
 
     def _diagnostics(self):
-        lines = [f"{self.name} path ({len(self.path)} levels, {self.calls} calls):"]
-        path = [self.describe(target) for target in self.path]
-        if len(path) > 2 * PATH_LOG_LIMIT:
-            shown = (
-                [(i, path[i]) for i in range(PATH_LOG_LIMIT)]
-                + [(None, f"... {len(path) - 2 * PATH_LOG_LIMIT} levels omitted ...")]
-                + [(i, path[i]) for i in range(len(path) - PATH_LOG_LIMIT, len(path))]
+        """Build the diagnostic lines logged when this guard trips.
+
+        Reported, in order: the node the recursion looped on, the path from the
+        nearest branching node down to it, the nodes revisited on the path, and the
+        path itself (elided in the middle when very long).
+        """
+        labels = [self.describe(target) for target in self.path]
+        lines = self._loop_lines(labels)
+        lines += self._revisited_lines(labels)
+        lines.append(f"{self.name} full path ({len(labels)} levels, {self.calls} calls):")
+        lines += self._slice_lines(labels, 0, len(labels), PATH_LOG_LIMIT)
+        return lines
+
+    def _loop_lines(self, labels):
+        """Name the looping node and the path from the nearest branching node to it."""
+        if not labels:
+            return ["no path recorded: the guard tripped outside any guarded call"]
+        loop = self._find_loop(labels)
+        if loop is None:
+            # every node on the path is distinct: the recursion fans out (each level
+            # re-expanding several predecessors) instead of coming back to a node
+            deepest = len(labels) - 1
+            lines = [
+                f"no node was revisited on the path: {self.name} fans out rather than looping",
+                f"deepest node: [{deepest}] {labels[deepest]}",
+            ]
+            return lines + self._branching_lines(labels, deepest, "deepest node")
+        first, last, label = loop
+        if last - first == 1:
+            headline = (
+                f"re-entry on node {label}: expanded again immediately, "
+                "so every level of the chain doubles the work"
             )
         else:
-            shown = list(enumerate(path))
-        for index, label in shown:
-            lines.append(f"  {label}" if index is None else f"  [{index}] {label}")
-        repeated = [(label, count) for label, count in Counter(path).most_common(10) if count > 1]
-        if repeated:
-            lines.append("nodes revisited on that path (likely dependency loop):")
-            for label, count in repeated:
-                lines.append(f"  {count}x {label}")
-        return lines
+            headline = f"loop on node {label}"
+        lines = [
+            headline,
+            f"  revisited at depth {first} and depth {last} of {len(labels)}",
+            f"  repeating segment ({last - first} level(s)):",
+        ]
+        lines += [f"  {line}" for line in self._slice_lines(labels, first, last + 1, LOOP_SEGMENT_LOG_LIMIT)]
+        return lines + self._branching_lines(labels, first, "loop")
+
+    def _branching_lines(self, labels, target_index, target_name):
+        """Describe the path from the nearest branching node down to ``target_index``."""
+        lines = []
+        if _is_branching(self.path[target_index]):
+            lines.append(f"the {target_name} itself is on a branching node ({_degree(self.path[target_index])})")
+        # strictly above: a branching loop node is already reported, and the caller
+        # needs the stretch of graph *leading to* it
+        branch_index = self._nearest_branching(target_index - 1)
+        if branch_index is None:
+            lines.append(f"no branching node above the {target_name}: it hangs off the top-level entry")
+            return lines + self._slice_lines(labels, 0, target_index + 1, PATH_LOG_LIMIT)
+        lines.append(
+            f"nearest branching above the {target_name}: "
+            f"[{branch_index}] {labels[branch_index]} ({_degree(self.path[branch_index])})"
+        )
+        lines.append(f"  path from there to the {target_name}:")
+        return lines + [
+            f"  {line}" for line in self._slice_lines(labels, branch_index, target_index + 1, PATH_LOG_LIMIT)
+        ]
+
+    def _revisited_lines(self, labels):
+        repeated = [(label, count) for label, count in Counter(labels).most_common(10) if count > 1]
+        if not repeated:
+            return []
+        lines = ["nodes revisited on that path (likely dependency loop):"]
+        return lines + [f"  {count}x {label}" for label, count in repeated]
+
+    @staticmethod
+    def _find_loop(labels):
+        """Locate the innermost repetition on the path.
+
+        A repetition spanning other nodes (``A -> B -> A``) is a graph loop and is
+        preferred; an immediate repeat (``A -> A``) is the same node being expanded
+        twice in a row, which is reported only when there is no loop to report.
+
+        Args:
+            labels: one diagnostic label per path level, outermost call first.
+
+        Returns:
+            ``(first_index, last_index, label)`` of the repetition whose second
+            occurrence is the deepest — the one the guard actually tripped inside —
+            or None when no node repeats.
+        """
+        last_seen = {}
+        immediate = None
+        spanning = None
+        for index, label in enumerate(labels):
+            previous = last_seen.get(label)
+            if previous is not None:
+                if index - previous > 1 and len(set(labels[previous:index])) > 1:
+                    spanning = (previous, index, label)
+                else:
+                    immediate = (previous, index, label)
+            last_seen[label] = index
+        return spanning or immediate
+
+    def _nearest_branching(self, from_index):
+        """Index of the closest branching node at or above ``from_index``, or None."""
+        for index in range(min(from_index, len(self.path) - 1), -1, -1):
+            if _is_branching(self.path[index]):
+                return index
+        return None
+
+    @staticmethod
+    def _slice_lines(labels, start, end, limit):
+        """Render ``labels[start:end]`` as indented ``[depth] label`` lines.
+
+        Keeps ``limit`` entries at each end and elides the middle, so a very deep
+        path stays readable in the log.
+        """
+        indexes = list(range(start, end))
+        if len(indexes) > 2 * limit:
+            head, tail = indexes[:limit], indexes[-limit:]
+            omitted = len(indexes) - 2 * limit
+            return (
+                [f"  [{i}] {labels[i]}" for i in head]
+                + [f"  ... {omitted} level(s) omitted ..."]
+                + [f"  [{i}] {labels[i]}" for i in tail]
+            )
+        return [f"  [{i}] {labels[i]}" for i in indexes]
 
 
 class _RecursionFrame:

@@ -11,6 +11,7 @@ from tricc_oo.visitors import tricc
 from tricc_oo.visitors.loop_guard import (
     DEFAULT_MAX_EXPRESSION_CALLS,
     DEFAULT_MAX_EXPRESSION_DEPTH,
+    PATH_LOG_LIMIT,
     LoopGuard,
     RecursionGuard,
     TriccLoopError,
@@ -19,11 +20,13 @@ from tricc_oo.visitors.loop_guard import (
 
 
 class FakeNode:
-    """Minimal stand-in for a TRICC node (guards only need get_name / activity)."""
+    """Minimal stand-in for a TRICC node (guards only need get_name / activity / edges)."""
 
-    def __init__(self, name, activity=None):
+    def __init__(self, name, activity=None, prev_nodes=None, next_nodes=None):
         self.name = name
         self.activity = activity
+        self.prev_nodes = prev_nodes or []
+        self.next_nodes = next_nodes or []
 
     def get_name(self):
         return self.name
@@ -142,6 +145,98 @@ class TestRecursionGuard(unittest.TestCase):
         self.assertIn("nodes revisited on that path", logged)
         self.assertIn("looping_node", logged)
         self.assertIn("stack trace at the moment the guard tripped", logged)
+
+
+class TestLoopReport(unittest.TestCase):
+    """The trip report must name the looping node and how the path reaches it."""
+
+    @staticmethod
+    def _report(guard, targets):
+        """Run ``guard`` over ``targets`` (outermost first) and return its diagnostics."""
+        frames = []
+        try:
+            for target in targets:
+                frame = guard(target)
+                frame.__enter__()
+                frames.append(frame)
+            return guard._diagnostics()
+        finally:
+            for frame in reversed(frames):
+                frame.__exit__(None, None, None)
+
+    def test_names_the_loop_node_and_repeating_segment(self):
+        guard = RecursionGuard("expand", max_depth=100, max_calls=100)
+        looping = FakeNode("calc_a")
+        other = FakeNode("calc_b")
+        report = "\n".join(self._report(guard, [FakeNode("entry"), looping, other, looping]))
+        self.assertIn("loop on node FakeNode::calc_a", report)
+        self.assertIn("revisited at depth 1 and depth 3 of 4", report)
+        self.assertIn("repeating segment (2 level(s))", report)
+        self.assertIn("[2] FakeNode::calc_b", report)
+
+    def test_reports_path_from_nearest_branching_node(self):
+        guard = RecursionGuard("expand", max_depth=100, max_calls=100)
+        branching = FakeNode("rhombus", next_nodes=[FakeNode("yes"), FakeNode("no")])
+        plain = FakeNode("bridge")
+        looping = FakeNode("calc_a")
+        report = "\n".join(
+            self._report(guard, [FakeNode("entry"), branching, plain, looping, FakeNode("calc_b"), looping])
+        )
+        self.assertIn("nearest branching above the loop: [1] FakeNode::rhombus (0 prev, 2 next)", report)
+        self.assertIn("path from there to the loop:", report)
+        segment = report.split("path from there to the loop:")[1].split("nodes revisited")[0]
+        self.assertIn("[2] FakeNode::bridge", segment)
+        # the entry node sits above the branching point, so it is not part of the segment
+        self.assertNotIn("[0] FakeNode::entry", segment)
+
+    def test_branching_counts_multiple_predecessors(self):
+        guard = RecursionGuard("expand", max_depth=100, max_calls=100)
+        merge = FakeNode("merge", prev_nodes=[FakeNode("a"), FakeNode("b")])
+        looping = FakeNode("calc_a")
+        report = "\n".join(self._report(guard, [merge, looping, FakeNode("calc_b"), looping]))
+        self.assertIn("nearest branching above the loop: [0] FakeNode::merge (2 prev, 0 next)", report)
+
+    def test_flags_a_loop_node_that_branches_itself(self):
+        guard = RecursionGuard("expand", max_depth=100, max_calls=100)
+        looping = FakeNode("calc_a", next_nodes=[FakeNode("x"), FakeNode("y")])
+        report = "\n".join(self._report(guard, [FakeNode("entry"), looping, FakeNode("calc_b"), looping]))
+        self.assertIn("the loop itself is on a branching node (0 prev, 2 next)", report)
+
+    def test_reports_top_level_entry_when_nothing_branches(self):
+        guard = RecursionGuard("expand", max_depth=100, max_calls=100)
+        looping = FakeNode("calc_a")
+        report = "\n".join(self._report(guard, [FakeNode("entry"), looping, FakeNode("calc_b"), looping]))
+        self.assertIn("no branching node above the loop: it hangs off the top-level entry", report)
+
+    def test_prefers_a_graph_loop_over_an_immediate_re_entry(self):
+        """A -> A is a double expansion; A -> B -> A is the loop worth reporting."""
+        guard = RecursionGuard("expand", max_depth=100, max_calls=100)
+        first = FakeNode("calc_a")
+        second = FakeNode("calc_b")
+        report = "\n".join(self._report(guard, [first, first, second, first]))
+        self.assertIn("loop on node FakeNode::calc_a", report)
+        self.assertIn("revisited at depth 1 and depth 3", report)
+
+    def test_reports_an_immediate_re_entry_when_there_is_no_loop(self):
+        guard = RecursionGuard("expand", max_depth=100, max_calls=100)
+        node = FakeNode("pnav_rel_12")
+        report = "\n".join(self._report(guard, [FakeNode("entry"), node, node]))
+        self.assertIn("re-entry on node FakeNode::pnav_rel_12", report)
+        self.assertIn("every level of the chain doubles the work", report)
+
+    def test_reports_a_fan_out_with_no_repeated_node(self):
+        guard = RecursionGuard("expand", max_depth=100, max_calls=100)
+        report = "\n".join(self._report(guard, [FakeNode(f"calc_{i}") for i in range(4)]))
+        self.assertIn("no node was revisited on the path: expand fans out rather than looping", report)
+        self.assertIn("deepest node: [3] FakeNode::calc_3", report)
+
+    def test_long_path_is_elided_in_the_middle(self):
+        guard = RecursionGuard("expand", max_depth=1000, max_calls=1000)
+        targets = [FakeNode(f"calc_{i}") for i in range(3 * PATH_LOG_LIMIT)]
+        report = "\n".join(self._report(guard, targets))
+        self.assertIn("level(s) omitted", report)
+        self.assertIn("[0] FakeNode::calc_0", report)
+        self.assertIn(f"[{3 * PATH_LOG_LIMIT - 1}] FakeNode::calc_{3 * PATH_LOG_LIMIT - 1}", report)
 
 
 class TestGuardsWiredIntoThePipeline(unittest.TestCase):

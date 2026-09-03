@@ -94,9 +94,39 @@ Two guards plus a shared trip routine:
 Guard targets are stored as-is and only turned into labels (`describe_node`: `Class::activity:instance|name`)
 when a guard trips, so guarding a hot call costs one append and two integer comparisons.
 
-`RecursionGuard` diagnostics list the current expansion path (head and tail, middle elided past 60 entries on
-each side) and the nodes that appear more than once on it, labelled *likely dependency loop* — that is what
-names the offending part of the drawing.
+## 1b. What a `RecursionGuard` trip reports
+
+The point of the report is to name a spot in the drawing, so it is ordered narrowest-first:
+
+1. **The node the recursion looped on**, with the depths it was seen at and the *repeating segment* between
+   those two occurrences. `_find_loop` prefers a repetition that spans other nodes (`A -> B -> A`, a genuine
+   graph loop) over an immediate repeat (`A -> A`); an immediate repeat is reported as a *re-entry*, worded to
+   say that the level doubles the work, because that is what it means. When no node repeats at all, the report
+   says the recursion fans out instead of looping and points at the deepest node.
+2. **The path from the nearest branching node down to that loop.** Branching means the graph forks at the
+   node: more than one predecessor (the direction expression expansion walks) or more than one next node —
+   a rhombus, a merge, a select. The search starts strictly *above* the loop node, so the segment always has
+   somewhere to start from; when the loop node branches too, that is called out separately, and when nothing
+   above it branches the report says it hangs off the top-level entry. This is the stretch of flowchart to
+   open in draw.io.
+3. **Every node revisited on the path**, most revisited first.
+4. **The full expansion path** (60 levels each side, middle elided) and the Python stack.
+
+On `bp_int` step 1 and 2 read:
+
+```
+re-entry on node TriccNodeDisplayBridge::…|pnav_rel_12|…|path: Rhombus|n1462ed8a865ffea5|…: expanded again
+  immediately, so every level of the chain doubles the work
+  revisited at depth 20 and depth 21 of 37
+the loop itself is on a branching node (2 prev, 1 next)
+nearest branching above the loop: [19] TriccNodeRhombus::…|n1462ed8a865ffea5|0|1|BP status is active (1 prev, 2 next)
+  path from there to the loop:
+    [19] TriccNodeRhombus::…|BP status is active
+    [20] TriccNodeDisplayBridge::…|pnav_rel_12|…
+```
+
+i.e. the rhombus *BP status is active* on the Navigation page and its path bridge — which is precisely the
+doubling described in Part I §4.
 
 ## 2. Budgets
 
@@ -132,16 +162,21 @@ No behaviour change on the happy path: the guards only observe.
 * `RecursionGuard`: trips on depth; trips on call count even when depth stays low (the exponential case);
   the call budget resets after the top-level call returns; the path unwinds when an unrelated exception
   passes through; state is reset after a trip; diagnostics report revisited nodes and include a stack trace.
+* Trip report: names the loop node, its depths and the repeating segment; reports the path from the nearest
+  branching node (found via next nodes *or* predecessors) and excludes what sits above it; flags a loop node
+  that branches itself; says "top-level entry" when nothing above branches; prefers a spanning loop over an
+  immediate re-entry and words an immediate re-entry as a doubling; reports a fan-out when no node repeats;
+  elides the middle of a very long path.
 * Wiring: two mutually dependent calculates make `get_node_expression` trip (and leave the guard clean
   afterwards); a callback that never reports a node ready makes `stashed_node_func` trip with the callback
   name in the message.
 
 ## 5. Acceptance criteria
 
-- [x] `python -m pytest tests/` passes (435 tests).
+- [x] `python -m pytest tests/` passes (444 tests).
 - [x] `flake8 tricc_oo` reports nothing new.
 - [x] `demo`, `etat`, `combacal` convert unchanged.
 - [x] `python tests/build_fhir.py -i "<bp_int folder>" -o out/` now exits non-zero after ~5 s with
-      `loop guard tripped: get_node_expression made 20001 recursive calls ...`, the expansion path
-      (`Navigation` -> `pnav_goto_16` -> rhombus -> `pnav_rel_16` ...), the revisited `pnav_rel_*` bridges and
-      a Python stack trace.
+      `loop guard tripped: get_node_expression made 20001 recursive calls ...`, the looping node
+      (`pnav_rel_12`), the path from the rhombus *BP status is active* down to it, the revisited `pnav_rel_*`
+      bridges, the full expansion path and a Python stack trace.
