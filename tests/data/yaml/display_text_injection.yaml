@@ -1,0 +1,66 @@
+# Display text authored with ${REF} injection, exported to FHIR as a
+# cqf-expression on item._text. See fix/20260831-fhir-dynamic-display-text.md.
+
+id: display_text_injection
+title: Display text injection
+process: main
+
+nodes:
+  - id: start
+    type: start
+    label: Start
+    name: start_dti
+    form_id: display-text
+
+  - id: q_age
+    type: integer
+    name: age
+    label: Age
+
+  - id: q_sex
+    type: select_one
+    name: sex
+    label: Sex
+    options:
+      - id: opt_male
+        name: male
+        label: Male
+      - id: opt_female
+        name: female
+        label: Female
+
+  - id: calc_adult
+    type: calculate
+    name: is_adult
+    label: "Is adult?"
+    calculate: "age >= 18"
+
+  - id: q_confirm
+    type: integer
+    name: confirm_age
+    label: Confirm the age
+    help: "Recorded age is ${age}"
+    hint: "e.g. ${age}"
+
+  - id: note_patient
+    type: note
+    name: note_patient
+    label: "Patient is ${age} years old and ${sex}"
+
+  - id: end
+    type: end
+    label: End
+
+edges:
+  - source: start
+    target: q_age
+  - source: q_age
+    target: q_sex
+  - source: q_sex
+    target: calc_adult
+  - source: calc_adult
+    target: q_confirm
+  - source: q_confirm
+    target: note_patient
+  - source: note_patient
+    target: end
