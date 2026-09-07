@@ -38,7 +38,11 @@ This page documents TRICC modeling elements and their meaning based on:
 ## Option and list elements
 
 - `select_option`: answer option under select questions.
-- `not_available`: explicit "not available" option pattern.
+- `not_available`: opt-out next to a measurement (for example weight). Draw it like
+  `select_one`: header text is the question title, stacked `select_option` rows are
+  the reasons (`name` on each row is the stored code). No extra option is invented.
+  ODK/CHT only; parent-empty coupling is unchanged.
+  See `feature/20260902-not-available-title-options.md`.
 
 ## Logic and computation elements
 
