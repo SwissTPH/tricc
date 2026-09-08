@@ -2,9 +2,10 @@
 
 ## 1) Input collection
 
-`tests/build.py` parses CLI args, resolves inputs, and loads file content strings.
+`tests/build.py` and the `tricc` CLI parse inputs and load file content strings.
 
-For URLs (Google Drive), it downloads to temp first, then reads local content.
+Google Drive file/folder URLs (CLI `-i`, or `segment:` in `tricc.yaml`) are
+downloaded first, then read as local files.
 
 ## 2) XML parsing
 

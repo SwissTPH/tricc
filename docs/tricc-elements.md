@@ -95,6 +95,12 @@ Scratchpad includes reusable patterns for:
 - `hint-message` and `help-message`.
 - image-linked enrichment blocks.
 
+A picture attached to a question or option is stored under `media-tmp/images/`.
+Project-level `parameters.image_max_width` / `image_max_height` in `tricc.yaml`
+shrink oversized bitmaps (aspect ratio kept, never upscaled). On the image shape
+itself, `max_width` / `max_height` override that cap for one side (`0` = no cap).
+See `feature/20260907-project-config.md`.
+
 These are attached through edges and enrich target question nodes during conversion.
 
 **FHIR / OpenSRP:** `help-message` becomes a nested `display` item with

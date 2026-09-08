@@ -25,6 +25,7 @@ numpy==2.0.0
 packaging==24.1
 pandas==2.2.2
 pexpect==4.9.0
+Pillow==10.4.0
 pkginfo==1.11.1
 platformdirs==4.2.2
 poetry==1.8.3

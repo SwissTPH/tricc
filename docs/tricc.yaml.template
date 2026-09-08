@@ -1,0 +1,67 @@
+# Copy this file into your clinical project folder (outside the TRICC repo)
+# as tricc.yaml (or tricc.yml), next to common/, child/, …
+#
+# After installing tricc-oo (`pip install tricc-oo` or an editable install):
+#   cd /path/to/your/project
+#   tricc -o ./build
+#
+# -i defaults to the current directory. -o defaults to ./output if omitted.
+# Full spec: feature/20260907-project-config.md
+
+# Name of the whole programme.
+title: My project
+
+# How drawings are read. Default: DrawioStrategy. CLI -I overrides this.
+input_strategy: DrawioStrategy
+
+# One or more exporters, run in this order. CLI -O replaces this list.
+# Examples: XLSFormStrategy, XLSFormCHTStrategy, XLSFormCDSSStrategy, OpenSRPStrategy, FHIRStrategy
+output_strategies:
+  - XLSFormCHTStrategy
+
+# Flat key: value tunables. Unknown keys are kept for later.
+parameters:
+  # Must match the installed tricc-oo version exactly, or the build fails.
+  # Omit this key to skip the check.
+  tricc_version: "1.7.3"
+  # Pixel caps for images extracted from draw.io. 0 or omit = no cap.
+  # A single image shape may set max_width / max_height (Edit Data) to override one side.
+  image_max_width: 0
+  image_max_height: 0
+
+# Each entry is one algorithm. Omit this list to keep today's behaviour
+# (every top-level drawing in -i is one implicit on-demand intervention).
+#
+# Paths are relative to this file. common/* is one folder level only
+# (not common/labs/*.drawio — add common/labs/* for that).
+# Google Drive file or folder URLs may be mixed with local globs:
+#   - https://drive.google.com/drive/folders/…
+#   - https://drive.google.com/file/d/…/view
+# Restricted Drive needs auth/google.json (or TRICC_GOOGLE_AUTH).
+# The same glob may appear on several interventions; each intervention is
+# converted separately (shared files are read once per intervention).
+interventions:
+  - id: pediatrics                    # machine name; used in output folders
+    title: Pediatrics                 # form title
+    kind: both                        # on_demand | task | both
+    # CQL boolean. Attached to the OpenSRP PlanDefinition; CHT/ODK do not evaluate it.
+    applicability: "AgeInMonths() >= 2"
+    description: IMCI for children from 2 months to 5 years
+    activity:
+      - common/*
+      - child/*
+      # Drive file or folder URLs are allowed next to local globs:
+      # - https://drive.google.com/drive/folders/YOUR_FOLDER_ID
+  - id: young_infants
+    title: Young infants
+    kind: both
+    applicability: "AgeInMonths() < 2"
+    description: IMCI for young infants under 2 months
+    activity:
+      - common/*
+      - young_infant/*
+
+# Output directory is still CLI -o (not a key here).
+# With interventions the layout is: { -o }/{strategy}/{intervention_id}/
+#
+# kind: task on OpenSRP is not implemented yet (on-demand PlanDefinition is still emitted).
