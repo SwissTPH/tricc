@@ -1,0 +1,49 @@
+# LENGTH over a CONCATENATE: the call must wrap the whole concatenation,
+# not just its last operand. See fix/20260902-fhirpath-suffix-precedence.md.
+id: len_concat
+title: Length of a concatenation
+process: main
+
+nodes:
+  - id: start
+    type: start
+    label: Start
+    name: start_lc
+    form_id: len-concat
+
+  - id: q_a
+    type: text
+    name: s_one
+    label: First
+  - id: q_b
+    type: text
+    name: s_two
+    label: Second
+
+  - id: calc_len
+    type: calculate
+    name: joined_len
+    label: Joined length
+    calculate: 'Length(Concatenate("s_one", "s_two"))'
+
+  - id: q_gate
+    type: integer
+    name: gated
+    label: Gated
+    relevance: 'Length(Concatenate("s_one", "s_two")) > 0'
+
+  - id: end
+    type: end
+    label: End
+
+edges:
+  - source: start
+    target: q_a
+  - source: q_a
+    target: q_b
+  - source: q_b
+    target: calc_len
+  - source: calc_len
+    target: q_gate
+  - source: q_gate
+    target: end

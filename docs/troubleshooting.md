@@ -184,3 +184,70 @@ Fix options:
 - Prefer Python version with available wheels (commonly 3.12 for this stack).
 - Upgrade `pip`, `setuptools`, `wheel`.
 - Install Visual Studio Build Tools (Desktop development with C++) if source build is unavoidable.
+
+## Conversion hangs after `# Create the graph from the start node`
+
+Symptoms:
+
+- No output, no error, no exit — the process just keeps running.
+- Or, with a recent build, it stops after a few seconds with
+  `CRITICAL - loop guard tripped: get_node_expression made 20001 recursive calls ...`.
+
+Cause:
+
+- Expression generation re-expanded the same sub-graph over and over. Typically a long chain of `goto`
+  steps on one page, each guarded by a rhombus plus its `pnav_rel_*` display bridge: every step doubles
+  the work, so the chain becomes exponentially expensive. A genuine dependency loop between two
+  calculates produces the same failure.
+
+Reading the failure — the report is ordered narrowest first:
+
+- `loop on node X` (or `re-entry on node X`) names the node the recursion came back to, the two depths it
+  was seen at, and the `repeating segment` between them. `re-entry` means the same node was expanded twice
+  in a row, which is what makes a long chain exponential.
+- `nearest branching above the loop: [n] Y (p prev, q next)` plus `path from there to the loop` gives the
+  stretch of flowchart to open in draw.io: from the last fork (a rhombus, a merge, a select) down to the
+  offending node. If the loop node forks too, that is called out on its own line.
+- `nodes revisited on that path (likely dependency loop)` lists every node expanded more than once, most
+  revisited first.
+- `full path (N levels, M calls)` is the whole expansion chain, outermost call first, with the middle
+  elided when it is deep.
+- The Python stack trace that follows shows which stage requested the expression.
+
+Example (a project whose Navigation page chains guarded `goto` steps):
+
+```
+CRITICAL - loop guard tripped: get_node_expression made 20001 recursive calls (limit 20000, ...)
+CRITICAL - re-entry on node TriccNodeDisplayBridge::...|pnav_rel_12|...: expanded again immediately, so
+           every level of the chain doubles the work
+CRITICAL -   revisited at depth 20 and depth 21 of 37
+CRITICAL - the loop itself is on a branching node (2 prev, 1 next)
+CRITICAL - nearest branching above the loop: [19] TriccNodeRhombus::...|BP status is active (1 prev, 2 next)
+CRITICAL -   path from there to the loop:
+CRITICAL -     [19] TriccNodeRhombus::...|BP status is active
+CRITICAL -     [20] TriccNodeDisplayBridge::...|pnav_rel_12|...
+```
+
+Fixes / next steps:
+
+- Simplify the offending page: break a very long guarded `goto` chain into separate activities, or move a
+  repeated rhombus condition into a single calculate the steps reference.
+- Remove circular dependencies between calculates (A's condition referencing B and B's referencing A).
+- If the project is genuinely that large and healthy, raise the budget (see below) — a healthy run of the
+  reference projects peaks at ~20 calls and depth ~11, so the defaults leave a wide margin.
+
+Guard budgets (environment variables, see `tricc_oo/visitors/loop_guard.py`):
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `TRICC_MAX_EXPRESSION_CALLS` | 20000 | expression expansions allowed per top-level node |
+| `TRICC_MAX_EXPRESSION_DEPTH` | 100 | nesting depth allowed in expression expansion |
+| `TRICC_MAX_LOOP_ITERATIONS` | 50000 | iterations allowed in the stashed-node loop |
+| `TRICC_LOOP_GUARD_PDB` | unset | set to `1` to drop into `pdb` where the guard trips |
+
+```bash
+# inspect the stuck state interactively
+TRICC_LOOP_GUARD_PDB=1 python tests/build.py -i my_project/ -o out/ -O FHIRStrategy -l d
+```
+
+Related: `fix/20260902-expression-recursion-hang-guard.md`.

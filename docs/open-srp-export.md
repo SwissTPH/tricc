@@ -321,6 +321,26 @@ In-form calculation (e.g. BMI from weight + height both answered in the same Que
   `fix/20260817-choice-membership-and-group-relevance.md`,
   `fix/20260824-fhirpath-choice-equality.md`, and
   `fix/20260824-fhirpath-select-multiple-membership.md`.
+- The membership form is used whichever way the comparison is written
+  (`question = 'code'` or `'code' = question`) and also when the operand only
+  *forwards* the select's value — `GetRepeatedValue('<concept>')`, the
+  multi-version inheritance union, a parenthesised reference. `NOT_EQUAL` adds
+  `.not()`. See `fix/20260902-select-operand-coded-equality.md`.
+- A **yes/no select is not a choice item**: it exports as a native `boolean`
+  (see "Yes/no selects" above), so an authored code (`'yes'`, `'no'`, `'1'`,
+  `'0'`, `'y'`, `'n'`) is emitted as the `true` / `false` literal —
+  `…answer.where($this.exists()).value = true`, never `value = 'yes'`, which
+  would never match. Same for `SELECTED` on such an item, and same in CQL
+  (`Helper.GetObservationValue('<concept>') = true`).
+- The membership form needs an operand that still yields `…answer` elements. An
+  operand already reduced to a code — `COALESCE` unions `.value.code` members and
+  takes `.first()` — keeps a plain `=`. The inheritance union keeps membership
+  (its members are `.answer` collections).
+- In **CQL** a select answer is an `Observation.value[x]` CodeableConcept, so
+  comparing the Helper accessor with a code string is never true. That is a known
+  gap, *not* yet fixed: see §8 of `fix/20260902-select-operand-coded-equality.md`
+  (the emission has to be validated against the CQL translator first). Only the
+  yes/no case is handled in CQL, where the answer is a `valueBoolean`.
 - Page / activity groups take `enableWhenExpression` from `activity.relevance`
   (XLSForm begin-group relevant), not only the start node's own `relevance`.
 - Boolean / numeric / string items still use `.answer.value`.
@@ -343,6 +363,63 @@ In-form calculation (e.g. BMI from weight + height both answered in the same Que
 - `CASE` / `IFS` become nested FHIRPath `iif()` (same shape as XLSForm nested `if()`),
   so in-form calculates such as `age_in_months` get a live `calculatedExpression`.
   See `fix/20260824-fhirpath-case-iif.md`.
+- Single-value functions (`ROUND`, `ABS`, `LENGTH`) are emitted as
+  `X.select($this.round())`, never as a bare `X.round()`. HAPI's math functions
+  raise on an empty focus instead of returning empty, and openSRP evaluates every
+  `calculatedExpression` at render time while all answers are still empty — one
+  bare `.round()` makes the whole Questionnaire fail to render. `select()` skips an
+  empty collection and gives the body a single-item focus without duplicating the
+  (long) operand path. `ROUND` / `ABS` operands also take the numeric wrap above.
+  See `fix/20260831-fhirpath-empty-safe-math.md`.
+- A suffix call is only appended to a **single path or a parenthesised group**.
+  FHIRPath navigation binds tighter than the binary operators, so
+  `LENGTH(CONCATENATE(a, b))` has to emit `(a & b).select($this.length())`:
+  emitted as `a & b.select($this.length())` it evaluates `string & integer`,
+  HAPI raises, and the whole Questionnaire fails to render as soon as any answer
+  exists. Same for `ROUND(a + b)`, `ABS(a - b)` and the `exists()` / `empty()`
+  tests. See `fix/20260902-fhirpath-suffix-precedence.md`.
+
+### Dynamic display text (`${REF}` injection)
+
+Text authored with `${field}` tokens — note labels, question labels, `hint` and `help`
+(`feature/display-text-injection.md`) — is exported as a **`cqf-expression` on the item's `text`
+element**, which openSRP FHIR Data Capture evaluates against the in-progress QuestionnaireResponse
+and shows instead of the static text:
+
+```json
+{
+  "linkId": "note_age",
+  "type": "display",
+  "text": "Patient is ${age} years old",
+  "_text": {
+    "extension": [
+      {
+        "url": "http://hl7.org/fhir/StructureDefinition/cqf-expression",
+        "valueExpression": {
+          "language": "text/fhirpath",
+          "expression": "'Patient is ' & (%resource.item.where(linkId='age').answer.where($this.exists()).value).toString() & ' years old'"
+        }
+      }
+    ]
+  }
+}
+```
+
+- `item.text` keeps the author's `${…}` tokens as a fallback for renderers without dynamic-text
+  support — it is never the serialized expression.
+- The expression **must be FHIRPath**: the renderer rejects any other language for item text, then
+  takes a single primitive value from the result.
+- Concatenation uses `&`, not `+` (`+` is arithmetic-only, and `&` renders an unanswered question
+  as an empty string instead of failing). Non-string operands are wrapped as
+  `(…).toString()`; `select_one` answers render `.value.display` (the option label) rather than
+  `.value.code`.
+- `select_multiple` (repeating) references are not injectable — several answers cannot collapse to
+  one text value; the static text is kept and a warning is logged.
+- Expressions are built in a pass after calculates, so references use the same nested
+  `%resource.item.where(linkId=…)` paths as `calculatedExpression`, and an otherwise unused hidden
+  calculate that a note displays is not pruned.
+
+See `fix/20260831-fhir-dynamic-display-text.md`.
 
 Out-of-form calculation (depends on data not captured in this Questionnaire, e.g. observation
 history from a prior process) still routes through CQL, but as a one-time `initialExpression`
