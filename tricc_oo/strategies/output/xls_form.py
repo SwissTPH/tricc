@@ -205,6 +205,8 @@ class XLSFormStrategy(BaseOutPutStrategy):
             logger.critical("form id required in the first start node")
             exit(1)
         title = start_pages["main"].root.label
+        if self.project is not None:
+            title = self.project.export_form_title(title)
         file_name = form_id + ".xlsx"
         # make a 'settings' tab
         datetime.datetime.now()

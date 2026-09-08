@@ -69,8 +69,13 @@ class DrawioStrategy(BaseInputStrategy):
                 )
         # refresh the edges (were remove by previous code)
 
-    def execute(self, file_content, media_path):
+    def execute(self, file_content, media_path, project_config=None, intervention=None):
         project = TriccProject()
+        if project_config is not None:
+            project.title = project_config.title
+            project.image_max_width = project_config.image_max_width()
+            project.image_max_height = project_config.image_max_height()
+        project.intervention = intervention
         diagrams = []
         # read all project.pages
         logger.info("# Create the activities from diagram project.pages")

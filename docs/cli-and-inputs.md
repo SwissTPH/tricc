@@ -1,18 +1,85 @@
 # CLI and Inputs
 
-TRICC is commonly executed through `tests/build.py`.
+Local clinical projects should use the **`tricc` command** after installing
+`tricc-oo`. `python tests/build.py` is the development harness (Google Drive,
+launch.json debug matrix).
 
 ## Main flags
 
 - `-i`, `--input`: required input (file, directory, or supported URL).
 - `-o`: output directory.
 - `-I`: input strategy class (default `DrawioStrategy`).
-- `-O`: output strategy class (default `XLSFormCDSSStrategy`).
+- `-O`: output strategy class. Overrides `tricc.yaml` `output_strategies` when passed.
+  Default without a project file: `XLSFormCHTStrategy` (`tests/build.py`).
 - `-T`: test strategy class (optional). Runs after the output strategy and adds test
   material without changing the deployable artifact. See [Test strategies](#test-strategies--t).
 - `-d`: form id.
 - `-l`: log level shortcut (`d`, `i`, `w`).
 - `-D`: download directory.
+
+## Project file (`tricc.yaml`)
+
+If `-i` is a directory (or a file), TRICC looks for `tricc.yaml` / `tricc.yml` in that
+folder. The file is optional. When present it names the project, pins the converter
+version, lists output strategies, optional image pixel caps, and **interventions**
+(each a glob of drawings). See `feature/20260907-project-config.md`.
+
+Copy [docs/tricc.yaml.template](./tricc.yaml.template) **into the clinical project
+folder** (Almanach, etc.) as `tricc.yaml`. That project is not part of this repo.
+
+With `tricc-oo` installed, run from that folder (no `tests/build.py`):
+
+```bash
+tricc -o ./build
+```
+
+`-i` defaults to the current directory. `python tests/build.py` remains the
+Google Drive / debug harness.
+
+Example:
+
+```yaml
+title: Almanach Global
+input_strategy: DrawioStrategy
+output_strategies:
+  - XLSFormStrategy
+  - XLSFormCHTStrategy
+parameters:
+  tricc_version: "1.7.3"
+  image_max_width: 1200
+  image_max_height: 1200
+interventions:
+  - id: pediatrics
+    title: Pediatrics
+    kind: both
+    applicability: "AgeInMonths() >= 2"
+    description: IMCI for children from 2 months to 5 years
+    activity:
+      - common/*
+      - child/*
+```
+
+- **CLI `-I` / `-O` win** when passed; `-O` replaces the YAML list (does not append).
+- **`parameters.tricc_version`** must equal the installed `tricc-oo` version, or the
+  build fails. Omit the key to skip the check.
+- **Image caps** apply when extracting pictures from draw.io (`0` / omitted = no cap).
+  A single image object may set `max_width` / `max_height` (Edit Data) to override
+  one side; `0` means unlimited for that side.
+- **Each intervention is a separate conversion** of its globs. `common/*` listed on
+  two interventions is read twice. `*` is one folder level (`common/labs/x.drawio`
+  needs `common/labs/*`). An `activity` line may also be a Google Drive file or
+  folder URL (mixed with local globs). Downloads go under `{ -o }/.tricc-drive-cache`.
+  Restricted Drive needs `TRICC_GOOGLE_AUTH` or `auth/google.json`.
+- **Output path is still `-o`**, not a YAML key. With interventions:
+
+  `{ -o }/{strategy}/{intervention_id}/`
+
+  Without interventions, a single strategy still writes directly into `-o` (same as
+  today). Several strategies without interventions write `{ -o }/{strategy}/`.
+- **`applicability`** is CQL, attached to the OpenSRP PlanDefinition condition. CHT
+  and ODK forms are still built; they do not evaluate that CQL.
+- **`kind: task` on OpenSRP** is not implemented here (warning, on-demand PD still
+  emitted). CHT still writes the XLSForm.
 
 ## Input behavior
 
@@ -20,11 +87,14 @@ TRICC is commonly executed through `tests/build.py`.
 
 - Local directory: all `.drawio` files inside are added.
 - Local file: accepted only if path exists and ends with `.drawio`.
-- Google Drive URL: file id is extracted and downloaded to temp first.
+- Google Drive file or folder URL: downloaded first (see below). With
+  `interventions` in `tricc.yaml`, put Drive URLs in `activity:` instead of `-i`.
 
 ## Google Drive download flow
 
-1. Try authenticated download via `auth/google.json` and Drive API scope `drive.readonly`.
+1. Try authenticated download via `TRICC_GOOGLE_AUTH`, `{project}/auth/google.json`,
+   `{cwd}/auth/google.json`, or the TRICC checkout `auth/google.json`, using Drive
+   API scope `drive.readonly`.
 2. If auth is unavailable or fails, fallback to direct download.
 
 Important:

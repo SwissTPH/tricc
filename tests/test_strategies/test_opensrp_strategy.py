@@ -398,6 +398,7 @@ class TestOpenSRPStrategyInit(unittest.TestCase):
         project.edges = {}
         project.form_id = "demo"
         project.version = "1.0.0"
+        project.intervention = None
         return project
 
     def test_instantiation(self):
@@ -457,6 +458,37 @@ class TestOpenSRPStrategyInit(unittest.TestCase):
         self.assertIsNone(actions[0].get("transform"))
         self.assertTrue(is_uuid_id(pd["id"]), pd["id"])
         self.assertFalse(pd.get("contained") or [])
+
+    def test_generate_intervention_plandefinition_cql_applicability(self):
+        from tricc_oo.strategies.output.opensrp import OpenSRPStrategy
+        from tricc_oo.models.project_config import TriccInterventionConfig
+
+        project = self._make_mock_project()
+        project.intervention = TriccInterventionConfig(
+            id="pediatrics",
+            title="Pediatrics",
+            kind="on_demand",
+            applicability="AgeInMonths() >= 2",
+            activity=["child/*"],
+        )
+        strategy = OpenSRPStrategy(project, "/tmp/opensrp_test_out")
+        strategy._form_id = "demo"
+        strategy.questionnaires = {
+            "registration": {
+                "id": "questionnaire-registration",
+                "title": "Registration",
+                "item": [{"linkId": "a", "type": "boolean"}],
+            }
+        }
+        strategy.process_chain = ["registration"]
+        pd = strategy.generate_intervention_plandefinition("1.0.0")
+        self.assertEqual(pd["title"], "Pediatrics")
+        wrapper = pd["action"][0]
+        condition = wrapper.get("condition") or []
+        self.assertEqual(len(condition), 1)
+        self.assertEqual(condition[0]["kind"], "applicability")
+        self.assertEqual(condition[0]["expression"]["language"], "text/cql")
+        self.assertEqual(condition[0]["expression"]["expression"], "AgeInMonths() >= 2")
 
     def test_generate_intervention_plandefinition_multi_process(self):
         from tricc_oo.strategies.output.opensrp import OpenSRPStrategy

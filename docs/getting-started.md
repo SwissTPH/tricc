@@ -32,15 +32,21 @@ TRICC loads all `.drawio` files in that directory.
 
 ## Google Drive input
 
-Supported URL patterns are handled in `tests/build.py`:
+Supported URL patterns (CLI `-i` on `tests/build.py`, and `segment:` in `tricc.yaml`):
 
 - `https://drive.google.com/file/d/<FILE_ID>/...`
 - `https://drive.usercontent.google.com/download?id=<FILE_ID>`
+- `https://drive.google.com/drive/folders/<FOLDER_ID>`
+- `https://drive.google.com/open?id=<FOLDER_ID>`
 
-For restricted files:
+For restricted files, a service-account JSON is tried in this order:
 
-- Place credentials at `auth/google.json` (service account JSON format).
-- Share the file with the service account `client_email`.
+- `TRICC_GOOGLE_AUTH` (path to the JSON)
+- `{project}/auth/google.json` (clinical project root)
+- `{cwd}/auth/google.json`
+- TRICC checkout `auth/google.json`
+
+Share the file or folder with the service account `client_email`.
 
 ## Output strategy selection
 

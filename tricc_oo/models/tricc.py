@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Union, Set
+from typing import Any, Dict, List, Optional, Union, Set
 from fhir.resources.codesystem import CodeSystem
 from fhir.resources.valueset import ValueSet
 from pydantic import BaseModel
@@ -504,6 +504,10 @@ class TriccProject(BaseModel):
     segments: Dict[str, List[TriccSegment]] = {}
     images: List[Dict[str, str]] = []
     contexts: Set[triccName] = set()
+    image_max_width: Optional[int] = None
+    image_max_height: Optional[int] = None
+    # Current intervention when building from tricc.yaml (see project_config).
+    intervention: Optional[Any] = None
 
     def register_segment(self, segment: TriccSegment) -> None:
         root = getattr(segment, "root", None)
@@ -515,6 +519,16 @@ class TriccProject(BaseModel):
     # TODO manage trad properly
     def get_keyword_trad(keyword):
         return keyword
+
+    def export_form_title(self, fallback_label: Optional[str] = None) -> str:
+        """Intervention title from tricc.yaml, else the start-node label, else project title."""
+        intervention = getattr(self, "intervention", None)
+        titled = getattr(intervention, "title", None) if intervention is not None else None
+        if titled:
+            return titled
+        if fallback_label:
+            return fallback_label
+        return self.title
 
     # dict of code_system_id: codesystem
     code_systems: Dict[str, CodeSystem] = {}

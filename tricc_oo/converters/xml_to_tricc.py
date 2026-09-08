@@ -3,11 +3,8 @@ import logging
 import base64
 import os
 import re
-
-
-from tricc_oo.converters.utils import remove_html, remove_html_full, clean_str
 from tricc_oo.converters.cql_to_operation import transform_cql_to_operation
-from tricc_oo.converters.utils import generate_id
+from tricc_oo.converters.utils import clean_str, generate_id, remove_html, remove_html_full
 from tricc_oo.models.base import (
     TriccOperator, TriccOperation,
     TriccStatic, TriccReference, TriccNodeType, TriccEdge, OPERATION_LIST
@@ -65,7 +62,6 @@ from tricc_oo.parsers.xml import (
     get_tricc_type,
     get_tricc_type_list,
 )
-import hashlib
 from tricc_oo.visitors.tricc import (
     get_select_yes_no_options,
     set_prev_next_node,  inject_node_before,
@@ -253,7 +249,7 @@ def get_activity_details(diagram, activity, project, media_path):
         activity.groups = groups
     if nodes and len(nodes) > 0:
         activity.nodes = nodes
-    images = process_edges(diagram, media_path, activity, nodes)
+    images = process_edges(diagram, media_path, activity, nodes, project)
     if images:
         project.images += images
     # link back the activity
@@ -367,7 +363,7 @@ def manage_dangling_calculate(activity):
         # activity.nodes.update(dangling)
 
 
-def process_edges(diagram, media_path, activity, nodes):
+def process_edges(diagram, media_path, activity, nodes, project=None):
     end_found = False
     images = []
     for edge in activity.edges:
@@ -375,7 +371,7 @@ def process_edges(diagram, media_path, activity, nodes):
         if edge.target not in nodes:
             activity.unused_edges.append(edge)
         elif edge.source not in nodes and edge.target in nodes:
-            enriched, image = enrich_node(diagram, media_path, edge, nodes[edge.target], activity)
+            enriched, image = enrich_node(diagram, media_path, edge, nodes[edge.target], activity, project=project)
             if enriched is None:
                 activity.unused_edges.append(edge)
             if image is not None:
@@ -768,7 +764,7 @@ def inject_bridge_path(node, nodes):
     return calc
 
 
-def enrich_node(diagram, media_path, edge, node, activity, help_before=False):
+def enrich_node(diagram, media_path, edge, node, activity, help_before=False, project=None):
     if edge.target == node.id:
         # get node and process type
         type, message = get_message(diagram, edge.source_external_id)
@@ -805,7 +801,7 @@ def enrich_node(diagram, media_path, edge, node, activity, help_before=False):
                 )
                 return False, None
         else:
-            image, payload = get_image(diagram, media_path, edge.source_external_id)
+            image, payload = get_image(diagram, media_path, edge.source_external_id, project=project)
             if image is not None:
                 if hasattr(node, "image"):
                     node.image = image
@@ -1074,38 +1070,44 @@ def add_group_to_child(group, diagram, list_child, nodes, groups, parent_group):
                 nodes[child_id].group = group
 
 
-def get_image(diagram, path, id):
+def get_image(diagram, path, id, project=None):
     elm = get_mxcell(diagram, id)
+    obj = get_elm(diagram, id)
     if elm is not None:
         style = elm.attrib.get("style")
-        file_name, payload = add_image_from_style(style, path)
+        file_name, payload = add_image_from_style(style, path, project=project, object_elm=obj)
         if file_name is not None:
             return file_name, payload
     return None, None
 
 
-def add_image_from_style(style, path):
-    image_attrib = None
-    if style is not None and "image=data:image/" in style:
-        style_parts = style.split(";")
-        for p in style_parts:
-            if "image=data:image/" in p:
-                image_attrib=p.split("image=data:image/")
-    if image_attrib is not None and len(image_attrib) == 2:
-        image_parts = image_attrib[1].split(",")
-        if len(image_parts) == 2:
-            payload = image_parts[1]
-            image_name = hashlib.md5(payload.encode("utf-8")).hexdigest()
-            path = os.path.join(path, "images")
-            file_name = os.path.join(path, image_name + "." + image_parts[0])
-            if not (os.path.isdir(path)):  # check if it exists, because if it does, error will be raised
-                # (later change to make folder complaint to CHT)
-                os.makedirs(path, exist_ok=True)
-            with open(file_name, "wb") as fh:
-                fh.write(base64.decodebytes(payload.encode("ascii")))
-                image_path = os.path.basename(file_name)
-                return image_path, payload
-    return None, None
+def add_image_from_style(style, path, project=None, object_elm=None):
+    from tricc_oo.converters.image_media import (
+        effective_caps,
+        maybe_resize_image,
+        object_image_caps,
+        parse_embedded_image,
+        write_image_file,
+    )
+
+    parsed = parse_embedded_image(style)
+    if parsed is None:
+        return None, None
+    type_token, payload = parsed
+    try:
+        raw = base64.decodebytes(payload.encode("ascii"))
+    except Exception:
+        logger.warning("Could not decode embedded image payload")
+        return None, None
+    obj_w, obj_h = object_image_caps(object_elm)
+    max_w, max_h = effective_caps(
+        getattr(project, "image_max_width", None) if project is not None else None,
+        getattr(project, "image_max_height", None) if project is not None else None,
+        obj_w,
+        obj_h,
+    )
+    written = maybe_resize_image(raw, type_token, max_w, max_h)
+    return write_image_file(path, type_token, written)
 
 
 def get_message(diagram, id):

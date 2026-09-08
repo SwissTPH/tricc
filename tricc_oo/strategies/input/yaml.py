@@ -258,8 +258,19 @@ class YamlStrategy(BaseInputStrategy):
     # ------------------------------------------------------------------
     # Main entry point (matches DrawioStrategy contract)
     # ------------------------------------------------------------------
-    def execute(self, file_content: List[str], media_path: str) -> Optional[TriccProject]:
+    def execute(
+        self,
+        file_content: List[str],
+        media_path: str,
+        project_config=None,
+        intervention=None,
+    ) -> Optional[TriccProject]:
         project = TriccProject()
+        if project_config is not None:
+            project.title = project_config.title
+            project.image_max_width = project_config.image_max_width()
+            project.image_max_height = project_config.image_max_height()
+        project.intervention = intervention
 
         for raw_content in file_content:
             if not raw_content or not raw_content.strip():

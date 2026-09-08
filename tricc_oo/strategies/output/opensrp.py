@@ -448,7 +448,9 @@ class OpenSRPStrategy(FHIRStrategy):
         unlike the old wrapping catalog PD (removed 2026-08-12) whose cross-resource
         ``definitionCanonical`` link caused every child to be resolved unconditionally.
 
-        No applicability/eligibility ``condition`` is emitted yet.
+        No applicability/eligibility ``condition`` is emitted unless the project
+        was built from ``tricc.yaml`` with an intervention ``applicability`` CQL
+        expression (see ``feature/20260907-project-config.md``).
 
         Args:
             version: Build version string.
@@ -520,6 +522,27 @@ class OpenSRPStrategy(FHIRStrategy):
             ],
             "action": child_actions,
         }
+        intervention = getattr(self.project, "intervention", None)
+        applicability = getattr(intervention, "applicability", None) if intervention is not None else None
+        if applicability:
+            wrapper_action["condition"] = [
+                {
+                    "kind": "applicability",
+                    "expression": {
+                        "language": "text/cql",
+                        "expression": applicability,
+                    },
+                }
+            ]
+        kind = getattr(intervention, "kind", None) if intervention is not None else None
+        if kind == "task":
+            logger.warning(
+                "OpenSRP Task launch is not implemented; emitting on-demand PlanDefinition for %s",
+                getattr(intervention, "id", form_label),
+            )
+        pd_title = f"{form_label} – Intervention"
+        if intervention is not None and getattr(intervention, "title", None):
+            pd_title = intervention.title
 
         return {
             "resourceType": "PlanDefinition",
@@ -527,7 +550,7 @@ class OpenSRPStrategy(FHIRStrategy):
             "meta": {"profile": [OPENSRP_PLANDEFINITION_PROFILE]},
             "url": f"{self.base_url}/PlanDefinition/{pd_id}",
             "name": ids["pd_name"],
-            "title": f"{form_label} – Intervention",
+            "title": pd_title,
             "version": version or "1.0.0",
             # active: Android named-event discovery loads local PDs after tag-sync
             "status": "active",
