@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Annotated, Dict, ForwardRef, List, Optional, Union
 
-from pydantic import BaseModel, StringConstraints
+from pydantic import BaseModel, PrivateAttr, StringConstraints
 from strenum import StrEnum
 
 from tricc_oo.converters.utils import generate_id, get_rand_name
@@ -566,33 +566,48 @@ class TriccOperation(BaseModel):
             ],
         ]
     ] = []
-    origin: Optional["TriccOperation"] = None
+    _struct_hash: Optional[int] = PrivateAttr(default=None)
+    _origin_sig: Optional[int] = PrivateAttr(default=None)
 
     def __str__(self):
         str_ref = map(str, self.reference)
         return f"{self.operator}({', '.join(map(str, str_ref))})"
 
     def __hash__(self):
-        return hash(self.__repr__())
+        cached = self._struct_hash
+        if cached is None:
+            cached = hash(expression_structural_key(self, name_only=False))
+            object.__setattr__(self, "_struct_hash", cached)
+        return cached
 
     def __repr__(self):
         str_ref = map(repr, self.reference)
         return f"TriccOperation:{self.operator}({', '.join(map(str, str_ref))})"
 
     def __eq__(self, other):
-        return self.__str__() == str(other)
+        if other is self:
+            return True
+        if not isinstance(other, TriccOperation):
+            return False
+        if self.operator != other.operator:
+            return False
+        refs = self.reference or []
+        orefs = other.reference or []
+        if len(refs) != len(orefs):
+            return False
+        return all(a == b for a, b in zip(refs, orefs))
 
     def __init__(self, operator, reference=None, **kwargs):
         if reference is None:
             reference = []
-        # _bypass_origin prevents auto update_origin during internal cleaned construction
-        bypass = kwargs.pop("_bypass_origin", False)
+        # Kept for call-site compatibility; origin is now a lazy name-only hash.
+        kwargs.pop("_bypass_origin", False)
         provided_origin = kwargs.pop("origin", None)
         super().__init__(operator=operator, reference=reference, **kwargs)
+        object.__setattr__(self, "_struct_hash", None)
+        object.__setattr__(self, "_origin_sig", None)
         if provided_origin is not None:
             self.origin = provided_origin
-        elif not bypass:
-            self.update_origin()
 
     def get_datatype(self):
         if self.operator in RETURNS_BOOLEAN:
@@ -621,6 +636,33 @@ class TriccOperation(BaseModel):
                 return rtype.pop()
         else:
             return self.get_reference_datatype(self.reference)
+
+    def _invalidate_identity_cache(self):
+        object.__setattr__(self, "_struct_hash", None)
+        object.__setattr__(self, "_origin_sig", None)
+
+    @property
+    def origin_signature(self):
+        """Name-only structural hash used for calculate inheritance grouping."""
+        cached = self._origin_sig
+        if cached is None:
+            cached = hash(expression_structural_key(self, name_only=True))
+            object.__setattr__(self, "_origin_sig", cached)
+        return cached
+
+    @property
+    def origin(self):
+        """Backward-compatible alias of origin_signature (an int, not a cloned tree)."""
+        return self.origin_signature
+
+    @origin.setter
+    def origin(self, value):
+        if value is None:
+            object.__setattr__(self, "_origin_sig", None)
+        elif isinstance(value, int):
+            object.__setattr__(self, "_origin_sig", value)
+        else:
+            object.__setattr__(self, "_origin_sig", hash(expression_structural_key(value, name_only=True)))
 
     def get_reference_datatype(self, references):
         rtype = set()
@@ -659,6 +701,7 @@ class TriccOperation(BaseModel):
 
     def append(self, value):
         self.reference.append(value)
+        self._invalidate_identity_cache()
 
     def replace_node(self, old_node, new_node):
         if isinstance(self.reference, list):
@@ -666,6 +709,7 @@ class TriccOperation(BaseModel):
                 self.reference[key] = self._replace_reference(self.reference[key], new_node, old_node)
         elif self.reference is not None:
             raise NotImplementedError(f"cannot manage {self.reference.__class__}")
+        self._invalidate_identity_cache()
 
     def _replace_reference(self, reference, new_node, old_node):
         if isinstance(reference, list):
@@ -712,35 +756,47 @@ class TriccOperation(BaseModel):
         return self.__copy__(keep_node, **kwargs)
 
     def update_origin(self):
-        """Populate (or refresh) self.origin with the cleaned, reference-only version
-        (no TriccNode* instances). Node references are replaced by TriccReference(name)
-        via copy(keep_node=False). Call explicitly after mutating .reference.
+        """Invalidate and refresh the name-only origin signature after mutating .reference.
 
-        The origin (and its nested operations) is used as a stable signature key
-        (typically via repr()) for calculate inheritance grouping.
+        Call explicitly after assigning or appending to ``.reference`` outside
+        ``append`` / ``replace_node``.
         """
-        # Build cleaned list directly (avoid public .copy() to prevent recursion
-        # through __copy__ -> type(self)(...) -> __init__ -> update_origin).
-        reference = [
-            (
-                e.copy(_bypass_origin=True)
-                if isinstance(e,  TriccOperation)
-                else (
-                    e.copy() if isinstance(e, TriccReference) 
-                    else (
-                        TriccReference(e.name) if hasattr(e, "name") else e
-                    )
-                )
-            )
-            for e in (self.reference or [])
-        ]
-        # Construct the cleaned op with bypass so it does not immediately re-enter update
-        new_instance = type(self)(self.operator, reference, _bypass_origin=True)
-        # For the cleaned origin itself, its .origin can safely be itself (or None).
-        # Setting it makes recursive .origin walks terminate and reprs stable.
-        new_instance.origin = new_instance
-        self.origin = new_instance
-        return self.origin
+        self._invalidate_identity_cache()
+        return self.origin_signature
+
+
+def expression_structural_key(obj, name_only=False):
+    """Hashable structural identity for expression trees.
+
+    Live identity (``name_only=False``) keys graph nodes by ``id``. Origin
+    identity (``name_only=True``) keys them by ``name``, matching the old
+    cleaned ``TriccReference`` clone used for inheritance grouping.
+    """
+    if obj is None:
+        return ("none",)
+    if isinstance(obj, bool):
+        return ("bool", obj)
+    if isinstance(obj, (int, float)):
+        return ("num", obj)
+    if isinstance(obj, str):
+        return ("str", obj)
+    if isinstance(obj, TriccOperation):
+        return (
+            "op",
+            str(obj.operator),
+            tuple(expression_structural_key(c, name_only) for c in (obj.reference or [])),
+        )
+    if isinstance(obj, TriccReference):
+        return ("ref", obj.value)
+    if isinstance(obj, TriccStatic):
+        return ("static", expression_structural_key(obj.value, name_only))
+    if isinstance(obj, (list, tuple, OrderedSet)):
+        return ("list", tuple(expression_structural_key(c, name_only) for c in obj))
+    if issubclass(obj.__class__, TriccNodeBaseModel):
+        if name_only:
+            return ("ref", getattr(obj, "name", None) or obj.id)
+        return ("node", obj.id)
+    return ("other", type(obj).__name__, repr(obj))
 
 
 # function that make multipat  and
@@ -837,14 +893,29 @@ def clean_or_list(list_or, elm_and=None):
     return sorted(list(set(list_or)), key=repr)
 
 
+_AND_JOIN_CACHE = {}
+_OR_JOIN_CACHE = {}
+
+
+def clear_operation_join_cache():
+    """Drop memoized AND/OR joins (call at the start of each conversion walk)."""
+    _AND_JOIN_CACHE.clear()
+    _OR_JOIN_CACHE.clear()
+
+
 def and_join(argv):
     argv = clean_and_list(argv)
     if len(argv) == 0:
         return ""
     elif len(argv) == 1:
         return argv[0]
-    else:
-        return TriccOperation(TriccOperator.AND, argv)
+    key = tuple(id(a) for a in argv)
+    cached = _AND_JOIN_CACHE.get(key)
+    if cached is not None:
+        return cached
+    op = TriccOperation(TriccOperator.AND, argv)
+    _AND_JOIN_CACHE[key] = op
+    return op
 
 
 def string_join(left: Union[str, TriccOperation], right: Union[str, TriccOperation]) -> TriccOperation:
@@ -904,7 +975,13 @@ def or_join(list_or, elm_and=None):
     if len(cleaned_list) == 1:
         return cleaned_list[0]
     elif len(cleaned_list) > 1:
-        return TriccOperation(TriccOperator.OR, cleaned_list)
+        key = (elm_and is not None, tuple(id(a) for a in cleaned_list))
+        cached = _OR_JOIN_CACHE.get(key)
+        if cached is not None:
+            return cached
+        op = TriccOperation(TriccOperator.OR, cleaned_list)
+        _OR_JOIN_CACHE[key] = op
+        return op
     else:
         logger.error("empty or list")
 

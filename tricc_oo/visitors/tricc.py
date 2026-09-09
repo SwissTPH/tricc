@@ -11,7 +11,8 @@ from tricc_oo.converters.utils import generate_id
 from tricc_oo.models.base import (
     TriccBaseModel, TriccNodeType, TriccGroup,
     TriccOperator, TriccOperation, TriccStatic, TriccReference, not_clean,
-    and_join, or_join, clean_or_list, nand_join, TriccEdge
+    and_join, or_join, clean_or_list, nand_join, TriccEdge,
+    expression_structural_key, clear_operation_join_cache,
 )
 from tricc_oo.models.ordered_set import OrderedSet
 from tricc_oo.models.calculate import (
@@ -138,9 +139,19 @@ def _get_defining_expression_op(expr):
     return current
 
 
+def _expression_origin_signature(expr, fallback):
+    """Name-only structural hash for inheritance grouping."""
+    if expr is None:
+        return hash(fallback)
+    sig = getattr(expr, "origin_signature", None)
+    if sig is not None and not callable(sig):
+        return sig
+    return hash(expression_structural_key(expr, name_only=True))
+
+
 def group_prev_versions_by_origin_signature(name, expression, prev_versions):
     """Group previous versions (same name + repeat) by the origin signature
-    (cleaned reference-only repr) of their *defining* expression.
+    (name-only structural hash) of their *defining* expression.
 
     Elements in each list bucket will later contribute via
     TriccOperation(GET_INHERITED_VALUE, bucket_list).
@@ -149,16 +160,12 @@ def group_prev_versions_by_origin_signature(name, expression, prev_versions):
     datatype-aware merge_expressions so that "values of the dict" still
     follow the old boolean/number/etc merge rules.
     """
-    expression_sig = hash(repr(expression.origin if expression.origin else name))
+    expression_sig = _expression_origin_signature(expression, name)
     sibling = []
     groups = defaultdict(list)
     for pv in (prev_versions or []):
         expr = getattr(pv, "expression", None) or getattr(pv, "expression_reference", None)
-        if expr:
-            
-            sig = hash(repr(getattr(expr, "origin", expr)))
-        else:
-            sig = hash(repr(expr.origin) if expr.origin else name)
+        sig = _expression_origin_signature(expr, name)
         if sig == expression_sig:
             sibling.append(pv)
         else:
@@ -1625,7 +1632,11 @@ def stash_next_nodes(stashed_nodes, next_nodes):
     """
     if not next_nodes:
         return
-    for nn in reversed(list(next_nodes)):
+    if isinstance(next_nodes, (OrderedSet, list, tuple)):
+        siblings = reversed(next_nodes)
+    else:
+        siblings = reversed(list(next_nodes))
+    for nn in siblings:
         if nn not in stashed_nodes:
             stashed_nodes.insert_at_top(nn)
 
@@ -1931,6 +1942,7 @@ def get_data_for_log(node):
 
 
 def stashed_node_func(node, callback, recursive=False, **kwargs):
+    clear_expression_walk_caches()
     processed_nodes = kwargs.pop("processed_nodes", OrderedSet())
     stashed_nodes = kwargs.pop("stashed_nodes", OrderedSet())
     process = kwargs.pop("process", ["main"])
@@ -2432,7 +2444,7 @@ def check_stashed_loop(stashed_nodes, prev_stashed_nodes, processed_nodes, len_p
 
     if (
         len(stashed_nodes) == len(prev_stashed_nodes)
-        and set(stashed_nodes) == set(prev_stashed_nodes)
+        and stashed_nodes == prev_stashed_nodes
         and len(processed_nodes) == len_prev_processed_nodes
     ):
         loop_count += 1
@@ -3399,17 +3411,49 @@ def has_loop(
 
 def get_extended_next_nodes(node):
 
-    nodes = node.next_nodes if hasattr(node, "next_nodes") else set()
+    nodes = OrderedSet(getattr(node, "next_nodes", ()))
     if issubclass(node.__class__, TriccNodeSelect):
         for o in node.options.values():
-            nodes = nodes | o.next_nodes
+            if o.next_nodes:
+                nodes |= o.next_nodes
     if isinstance(node, (TriccNodeActivity)):
-        nodes = nodes | node.root.next_nodes
+        nodes |= node.root.next_nodes
     return nodes
 
 
 # calculate or retrieve a node expression
+_GNE_CACHE = {}
+_GNE_MISS = object()
+
+
+def clear_expression_walk_caches():
+    """Drop memoized get_node_expression / join results for a new conversion walk."""
+    _GNE_CACHE.clear()
+    clear_operation_join_cache()
+
+
+def _gne_cache_key(in_node, get_overall_exp, is_prev, negate, process):
+    proc = None
+    if process:
+        proc = process[0] if isinstance(process, (list, tuple)) else id(process)
+    return (id(in_node), getattr(in_node, "id", None), get_overall_exp, is_prev, negate, proc)
+
+
 def get_node_expression(in_node, processed_nodes, get_overall_exp=False, is_prev=False, negate=False, process=None):
+    cache_key = _gne_cache_key(in_node, get_overall_exp, is_prev, negate, process)
+    cached = _GNE_CACHE.get(cache_key, _GNE_MISS)
+    if cached is not _GNE_MISS:
+        return cached
+    expression = _get_node_expression_uncached(
+        in_node, processed_nodes, get_overall_exp=get_overall_exp, is_prev=is_prev, negate=negate, process=process
+    )
+    _GNE_CACHE[cache_key] = expression
+    return expression
+
+
+def _get_node_expression_uncached(
+    in_node, processed_nodes, get_overall_exp=False, is_prev=False, negate=False, process=None
+):
     # in case of calculate we only use the select multiple if none is not selected
     expression = None
     negate_expression = None
