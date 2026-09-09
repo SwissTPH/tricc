@@ -1,0 +1,92 @@
+# Note labels with draw.io-style HTML. After conversion, ODK labels should keep
+# authored bold, line breaks, lists, and ${REF} injection.
+# See feature/20260909-display-message-ast.md.
+
+id: note_display_formatting
+title: Note display formatting
+process: main
+
+nodes:
+  - id: start
+    type: start
+    label: Start
+    name: start_note_fmt
+    form_id: note-display-formatting
+
+  - id: note_plain
+    type: note
+    name: note_plain
+    label: "Take the child to the emergency room."
+
+  - id: note_bold
+    type: note
+    name: note_bold
+    label: "<b>Hello world</b>"
+
+  - id: note_italic
+    type: note
+    name: note_italic
+    label: "<i>italic text</i>"
+
+  - id: note_inline_bold
+    type: note
+    name: note_inline_bold
+    label: "Give <b>dose</b> now"
+
+  - id: note_br
+    type: note
+    name: note_br
+    label: "Line one<br>Line two"
+
+  - id: note_list
+    type: note
+    name: note_list
+    label: "<ul><li>First item</li><li>Second item</li></ul>"
+
+  - id: age
+    type: integer
+    name: age
+    label: Age
+
+  - id: note_inject
+    type: note
+    name: note_inject
+    label: "Patient is ${age} years old"
+
+  - id: note_inject_bold
+    type: note
+    name: note_inject_bold
+    label: "Age is <b>${age}</b> years"
+
+  - id: note_bold_phrase_with_ref
+    type: note
+    name: note_bold_phrase_with_ref
+    label: "<b>Give ${age} mg</b> of amoxicillin."
+
+  - id: end
+    type: end
+    label: End
+
+edges:
+  - source: start
+    target: note_plain
+  - source: note_plain
+    target: note_bold
+  - source: note_bold
+    target: note_italic
+  - source: note_italic
+    target: note_inline_bold
+  - source: note_inline_bold
+    target: note_br
+  - source: note_br
+    target: note_list
+  - source: note_list
+    target: age
+  - source: age
+    target: note_inject
+  - source: note_inject
+    target: note_inject_bold
+  - source: note_inject_bold
+    target: note_bold_phrase_with_ref
+  - source: note_bold_phrase_with_ref
+    target: end
