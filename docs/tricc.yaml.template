@@ -6,7 +6,7 @@
 #   tricc -o ./build
 #
 # -i defaults to the current directory. -o defaults to ./output if omitted.
-# Full spec: feature/20260907-project-config.md
+# Specs: feature/20260907-project-config.md, feature/20260907-intervention-start.md
 
 # Name of the whole programme.
 title: My project
@@ -40,28 +40,50 @@ parameters:
 # Restricted Drive needs auth/google.json (or TRICC_GOOGLE_AUTH).
 # The same glob may appear on several interventions; each intervention is
 # converted separately (shared files are read once per intervention).
+#
+# start: when a health worker can open this intervention.
+#   on: demand     — app button, available whenever condition is true
+#   on: follow_up  — task due after another intervention is submitted
+# condition is CQL (same dialect as rhombus / calculate labels).
+# due / window use UCUM time units only: s, min, h, d, wk, mo (mo = 30 d).
+# start may be a list if one intervention is both on demand and a follow-up.
+# kind and applicability are gone; use start instead.
 interventions:
   - id: pediatrics                    # machine name; used in output folders
     title: Pediatrics                 # form title
-    kind: both                        # on_demand | task | both
-    # CQL boolean. Attached to the OpenSRP PlanDefinition; CHT/ODK do not evaluate it.
-    applicability: "AgeInMonths() >= 2"
     description: IMCI for children from 2 months to 5 years
     activity:
       - common/*
       - child/*
       # Drive file or folder URLs are allowed next to local globs:
       # - https://drive.google.com/drive/folders/YOUR_FOLDER_ID
+    start:
+      on: demand
+      condition: "AgeInMonths() >= 2 and AgeInMonths() < 60"
+  - id: pediatrics_followup
+    title: Pediatrics follow-up
+    description: Revisit after a pneumonia classification
+    activity:
+      - common/*
+      - followup/*
+    start:
+      on: follow_up
+      intervention: pediatrics        # parent id; clock starts on its submission
+      condition: "classification = 'pneumonia'"
+      due: 3 d                        # when the task is due
+      window:
+        before: 0 d                   # how long before due it appears
+        after: 4 d                    # how long after due it stays
   - id: young_infants
     title: Young infants
-    kind: both
-    applicability: "AgeInMonths() < 2"
     description: IMCI for young infants under 2 months
     activity:
       - common/*
       - young_infant/*
+    start:
+      on: demand
+      condition: "AgeInMonths() < 2"
 
 # Output directory is still CLI -o (not a key here).
 # With interventions the layout is: { -o }/{strategy}/{intervention_id}/
-#
-# kind: task on OpenSRP is not implemented yet (on-demand PlanDefinition is still emitted).
+
