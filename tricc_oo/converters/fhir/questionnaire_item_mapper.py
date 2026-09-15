@@ -45,6 +45,10 @@ SDC_EXT_ITEM_ANSWER_MEDIA = "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-
 SDC_EXT_HIDDEN = "http://hl7.org/fhir/StructureDefinition/questionnaire-hidden"
 SDC_EXT_CHOICE_ORIENTATION = "http://hl7.org/fhir/StructureDefinition/questionnaire-choiceOrientation"
 SDC_EXT_ITEM_CONTROL = "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl"
+# Dynamic display text: evaluated by the renderer against the in-progress
+# QuestionnaireResponse and shown instead of the static ``item.text``.
+# Android FHIR Data Capture reads it from ``Questionnaire.item._text``.
+CQF_EXT_TEXT_EXPRESSION = "http://hl7.org/fhir/StructureDefinition/cqf-expression"
 OPENSRP_EXT_POPULATE = "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-itemPopulationContext"
 
 # ---------------------------------------------------------------------------
@@ -360,6 +364,44 @@ def build_item_control_display_item(link_id: str, text: str, control_code: str) 
         "text": text,
         "extension": [build_item_control_extension(control_code)],
     }
+
+
+def build_text_expression_extension(fhirpath: str) -> dict:
+    """Build the ``cqf-expression`` extension that computes an item's text.
+
+    Args:
+        fhirpath: FHIRPath expression returning a single string.
+
+    Returns:
+        FHIR extension dict for ``Questionnaire.item._text``.
+    """
+    return {
+        "url": CQF_EXT_TEXT_EXPRESSION,
+        "valueExpression": {"language": "text/fhirpath", "expression": fhirpath},
+    }
+
+
+def set_item_text_expression(item: dict, fhirpath: str) -> None:
+    """Attach (or replace) the dynamic-text expression on ``item._text``.
+
+    ``_text`` carries at most one ``cqf-expression``: renderers read the first
+    match, and a duplicate 0..1 expression is the class of defect described in
+    ``fix/20260821-sdc-singleton-expressions.md``.
+
+    Args:
+        item: Questionnaire item dict to mutate.
+        fhirpath: FHIRPath expression returning a single string.
+    """
+    if not fhirpath:
+        return
+    text_element = item.setdefault("_text", {})
+    extensions = [
+        ext
+        for ext in text_element.get("extension") or []
+        if ext.get("url") != CQF_EXT_TEXT_EXPRESSION
+    ]
+    extensions.append(build_text_expression_extension(fhirpath))
+    text_element["extension"] = extensions
 
 
 def build_hidden_extension() -> dict:
