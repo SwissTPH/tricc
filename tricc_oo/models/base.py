@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Annotated, Dict, ForwardRef, List, Optional, Union
+from typing import Annotated, Any, Dict, ForwardRef, List, Optional, Union
 
 from pydantic import BaseModel, PrivateAttr, StringConstraints
 from strenum import StrEnum
@@ -115,7 +115,15 @@ class TriccBaseModel(BaseModel):
         for attr, value in attr_dict.items():
             if not attr.startswith("_") and value is not None:
                 try:
-                    if hasattr(value, "copy"):
+                    if isinstance(value, dict) and any(
+                        type(v).__name__ == "TriccMessage" for v in value.values()
+                    ):
+                        setattr(
+                            instance,
+                            attr,
+                            {k: (v.copy() if hasattr(v, "copy") else v) for k, v in value.items()},
+                        )
+                    elif hasattr(value, "copy"):
                         setattr(instance, attr, value.copy())
                     else:
                         setattr(instance, attr, value)
@@ -220,12 +228,21 @@ def get_repeat(node) -> int:
     return int(value)
 
 
-# Display text after input load may be plain str, multi-lang dict, or injection op
-DisplayText = Union[
-    str,
-    Dict[str, Union[str, "TriccOperation"]],
-    "TriccOperation",
-]
+def get_repeat_authored(node) -> int:
+    """Return the drawing/YAML repeat slot, ignoring activity-level override. Default 1."""
+    if node is None:
+        return 1
+    value = getattr(node, "repeat_authored", None)
+    if value is None:
+        value = getattr(node, "repeat", None)
+    if value is None:
+        return 1
+    return int(value)
+
+
+# Display text after input load: plain str, multi-lang dict, or TriccMessage AST.
+# ``Any`` avoids a forward-ref to ``TriccMessage`` (defined in models.message).
+DisplayText = Union[str, Dict[str, Any], Any]
 
 
 def label_text_for_name(label) -> Optional[str]:
@@ -233,8 +250,8 @@ def label_text_for_name(label) -> Optional[str]:
 
     - plain str: as-is
     - multi-lang dict: first locale value (recursively)
-    - CONCATENATE: first plain string / TriccStatic segment only
-    - TriccReference, node refs, or concat without a static segment: skip (None)
+    - TriccMessage: first text leaf (skip interpolations)
+    - TriccReference / concat without a static segment: skip (None)
     """
     if label is None:
         return None
@@ -246,6 +263,13 @@ def label_text_for_name(label) -> Optional[str]:
         return label_text_for_name(next(iter(label.values())))
 
     cls_name = type(label).__name__
+    if cls_name == "TriccMessage":
+        first = getattr(label, "first_text", None)
+        if callable(first):
+            return first()
+        return None
+    if cls_name == "TriccMessageText":
+        return label_text_for_name(getattr(label, "value", None))
     # Bare reference / node is not useful in super()/log ids
     if cls_name == "TriccReference":
         return None
@@ -275,6 +299,9 @@ class TriccNodeBaseModel(TriccBaseModel):
     group: Optional[Union[TriccGroup, FwTriccNodeBaseModel]] = None
     name: Optional[str] = None
     repeat: Optional[int] = None
+    # Authored slot before activity_start.repeat override. Same-page recapture
+    # skip is keyed on this, not effective get_repeat() (fix/20260914-skip-display-not-path.md).
+    repeat_authored: Optional[int] = None
     export_name: Optional[str] = None
     label: Optional[DisplayText] = None
     next_nodes: OrderedSet[TriccNodeBaseModel] = OrderedSet()

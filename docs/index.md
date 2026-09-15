@@ -23,8 +23,10 @@ This documentation is organized for two audiences:
 - For Google Drive URLs, authenticated download is attempted first, then fallback to direct download.
 - Pages whose root node has `status="experimental"` are intentionally limited during processing.
 - **Concept repeat:** nodes and activities may set `repeat=<integer>` for multiple independent
-  captures of the same concept name (`repeat=-1` = local-only); see
-  [TRICC Elements](./tricc-elements.md#concept-repeat).
+  captures of the same concept name (`repeat=-1` = local-only). Same slot is not re-asked on the
+  **widget** (print-time); the path after it still runs. See
+  [TRICC Elements](./tricc-elements.md#concept-repeat) and
+  `fix/20260914-skip-display-not-path.md`.
 - **Advanced merge:** same-name versions in one repeat slot merge via `GET_INHERITED_VALUE`
   (all priors, not only last) — `feature/advanced-merge-calc.md`, [Pipeline](./pipeline.md).
 - **Goto snippet / display `${ref}`:** see [TRICC Elements](./tricc-elements.md) (`goto`, `note`).

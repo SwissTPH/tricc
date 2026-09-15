@@ -15,6 +15,7 @@ from tricc_oo.visitors.tricc import (
     load_calculate,
     set_prev_next_node,
     get_version_inheritance,
+    get_already_captured_expression,
 )
 
 from tests.helpers import load_yaml_project
@@ -196,7 +197,7 @@ class TestPropagateActivityRepeat(unittest.TestCase):
 
 
 class TestLoadCalculateRepeatSkip(unittest.TestCase):
-    """Verify skip relevance is scoped to (name, repeat)."""
+    """Skip is print-time: graph relevance must not NAND already-captured."""
 
     def _run_chain(self, first, second):
         start = TriccNodeActivityStart(id="s0", name="s", label="Start", process="main")
@@ -214,27 +215,29 @@ class TestLoadCalculateRepeatSkip(unittest.TestCase):
                 processed.add(node)
         return second, processed
 
-    def test_same_repeat_gets_skip_relevance(self):
+    def test_same_repeat_gets_print_skip_not_graph(self):
         first = TriccNodeInteger(id="w1", name="weight", label="W1", repeat=1)
         second = TriccNodeInteger(id="w2", name="weight", label="W2", repeat=1)
-        second, _ = self._run_chain(first, second)
-        self.assertIsInstance(second.relevance, TriccOperation)
+        second, processed = self._run_chain(first, second)
+        already = get_already_captured_expression(second, processed)
+        self.assertIsNotNone(already)
+        if isinstance(second.relevance, TriccOperation):
+            self.assertNotEqual(second.relevance.operator, TriccOperator.NOT)
 
     def test_different_repeat_no_skip_relevance(self):
         first = TriccNodeInteger(id="w1b", name="weight", label="W1", repeat=1)
         second = TriccNodeInteger(id="w2b", name="weight", label="W2", repeat=2)
         second, processed = self._run_chain(first, second)
-        self.assertNotIsInstance(second.relevance, TriccOperation)
+        self.assertIsNone(get_already_captured_expression(second, processed))
         self.assertEqual(get_versions("weight", processed, repeat=2), [second])
 
     def test_repeat_minus_one_no_skip_relevance(self):
         """repeat=-1 is local-only: a second occurrence of the same concept must not
-        be skip-suppressed because an earlier repeat=-1 occurrence was captured -
-        unlike repeat=1/2/... slots, which do dedupe (test_same_repeat_gets_skip_relevance)."""
+        be skip-suppressed because an earlier repeat=-1 occurrence was captured."""
         first = TriccNodeInteger(id="w1c", name="weight", label="W1", repeat=-1)
         second = TriccNodeInteger(id="w2c", name="weight", label="W2", repeat=-1)
-        second, _ = self._run_chain(first, second)
-        self.assertNotIsInstance(second.relevance, TriccOperation)
+        second, processed = self._run_chain(first, second)
+        self.assertIsNone(get_already_captured_expression(second, processed))
 
 
 class TestConceptRepeatYamlIntegration(unittest.TestCase):

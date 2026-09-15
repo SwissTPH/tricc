@@ -1,0 +1,163 @@
+# Cross-activity same-name capture: later widget is skip-suppressed; successors are not.
+#
+# See fix/20260914-skip-display-not-path.md
+
+id: skip_first
+title: First capture
+process: main
+
+nodes:
+  - id: s1
+    type: start
+    label: Start
+    form_id: skip-display-not-path
+
+  - id: ivio1
+    type: integer
+    name: ivio
+    label: IV or IO already?
+    required: true
+
+  - id: age1
+    type: integer
+    name: age_weeks
+    label: Age in weeks
+    required: true
+
+  - id: go_second
+    type: goto
+    name: go_second
+    label: Go to second capture
+    link: skip_second
+    instance: 1
+
+  - id: e1
+    type: end
+    label: End
+
+edges:
+  - source: s1
+    target: ivio1
+  - source: ivio1
+    target: age1
+  - source: age1
+    target: go_second
+  - source: go_second
+    target: e1
+
+---
+id: skip_second
+title: Second capture
+process: second
+
+nodes:
+  - id: s2
+    type: activity_start
+    label: Start 2
+    name: skip_second
+
+  - id: ivio2
+    type: integer
+    name: ivio
+    label: IV or IO already?
+    required: true
+
+  - id: age2
+    type: integer
+    name: age_weeks
+    label: Age in weeks
+    required: true
+    repeat: 2
+
+  - id: note_after
+    type: note
+    name: note_after
+    label: After IVIO
+
+  - id: e2
+    type: end
+    label: End
+
+edges:
+  - source: s2
+    target: ivio2
+  - source: ivio2
+    target: age2
+  - source: age2
+    target: note_after
+  - source: note_after
+    target: e2
+
+---
+id: skip_same_page
+title: Same page recapture
+process: same_page
+
+nodes:
+  - id: s3
+    type: activity_start
+    label: Start 3
+    name: skip_same_page
+
+  - id: w1
+    type: integer
+    name: recapture_w
+    label: Weight slot 1
+    repeat: 1
+    required: true
+
+  - id: w2
+    type: integer
+    name: recapture_w
+    label: Weight slot 2
+    repeat: 2
+    required: true
+
+  - id: e3
+    type: end
+    label: End
+
+edges:
+  - source: s3
+    target: w1
+  - source: w1
+    target: w2
+  - source: w2
+    target: e3
+
+---
+id: skip_local
+title: Local-only recapture
+process: local
+
+nodes:
+  - id: s4
+    type: activity_start
+    label: Start 4
+    name: skip_local
+
+  - id: loc1
+    type: integer
+    name: local_w
+    label: Local 1
+    repeat: -1
+    required: true
+
+  - id: loc2
+    type: integer
+    name: local_w
+    label: Local 2
+    repeat: -1
+    required: true
+
+  - id: e4
+    type: end
+    label: End
+
+edges:
+  - source: s4
+    target: loc1
+  - source: loc1
+    target: loc2
+  - source: loc2
+    target: e4

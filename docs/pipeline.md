@@ -40,8 +40,9 @@ This allows draft pages to stay in the model without entering full downstream ge
 - `link_out` to `link_in` resolution
 - loop warnings and edge validation
 
-Display text with `${field}` tokens is converted to concatenate operations at **input load**
-for display models only (see `feature/display-text-injection.md`).
+Display text with `${field}` tokens is parsed to a `TriccMessage` tree at **input load**
+for display models only (see `feature/display-text-injection.md` and
+`feature/20260909-display-message-ast.md`).
 
 ## 6) Calculate load, versioning, and inheritance
 
@@ -57,7 +58,17 @@ Core walk in `tricc_oo/visitors/tricc.py` (`load_calculate` and related):
    - origin-signature grouping when calculate formulas differ
    - `repeat=-1` excluded as source and receiver of value inheritance
    - `populate` with `context=history` skips value inheritance
-4. **Relevance / skip** — same-slot prior captures can suppress re-asking; different `repeat` slots do not.
+4. **Relevance / skip (three layers)** — see `fix/20260914-skip-display-not-path.md`:
+   - Graph `node.relevance` is **arrival / flowchart only**. `load_calculate` does **not**
+     NAND “already captured” onto it (that used to hide everything after a skipped widget).
+   - Printed question/note `relevant` (XLSForm) and FHIR `enableWhen` NAND skip:
+     arrival **and not** already captured in the **same author slot**. Calculate/bridge
+     **rows** do not get this NAND. Helpers: `serialize_display_relevance`,
+     `get_already_captured_expression` in `visitors/tricc.py`.
+   - Path/bridge calculates (`TriccNodeDisplayBridge` / `TriccNodeBridge`, e.g. `pFPb…`)
+     use arrival **or** already captured (`pass_skipped` on `get_node_expression`).
+   - Same slot (omitted `repeat` = 1) suppresses re-asking; `repeat=2` does not.
+     Cross-activity skip also requires the earlier activity was entered (`gcalc_…`).
 5. **`process_reference` / `process_operation_reference`** — resolve refs; for value expressions,
    multi-version display models expand to `GET_INHERITED_VALUE` (newer-first). Relevance keeps a
    single last-version ref. `GET_REPEATED_VALUE` (authored as `GetRepeatedValue`) pins resolution
