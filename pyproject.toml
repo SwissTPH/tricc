@@ -46,3 +46,9 @@ exclude = ["locales"]
 
 [project.scripts]
 tricc = "tricc_oo.cli:main"
+
+# hydra_pytest pulls in OmegaConf grammars built for an older ANTLR ATN than
+# antlr4-python3-runtime==4.13.2 (CQL). Loading it crashes pytest with
+# "Could not deserialize ATN with version 3 (expected 4)".
+[tool.pytest.ini_options]
+addopts = "-p no:hydra_pytest"
