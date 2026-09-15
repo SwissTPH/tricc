@@ -2,10 +2,10 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft |
-| **Related** | `feature/display-text-injection.md` (Implemented — `${REF}` authoring stays; **Concatenate as the in-memory message type is replaced by this spec**), `docs/tricc-elements.md`, `docs/pipeline.md` |
+| **Status** | Implemented |
+| **Related** | `feature/display-text-injection.md` (Implemented — `${REF}` authoring stays; Concatenate as the in-memory message type is replaced by this spec), `docs/tricc-elements.md`, `docs/pipeline.md` |
 | **Strategy** | All strategies that emit display text: `XLSFormStrategy` (+ CHT variants), `FHIRStrategy` / `OpenSRPStrategy`, `HTMLStrategy`, test-spec. `TriccOperator.CONCATENATE` is unchanged for **calculate** expressions. |
-| **Approval** | — |
+| **Approval** | Approved 2026-09-14 |
 
 Valid status values: `Draft` → `Approved` → `Implemented` → `Superseded`.
 
@@ -308,43 +308,43 @@ editor is not required to write Pydantic objects.
 
 ## 3. Code checklist
 
-- [ ] `TriccMessage` (+ node types) with `get_references`, `replace_node`, `copy`
-- [ ] `DisplayText` / `label_text_for_name` / test-spec `label_text`
-- [ ] HTML parse + `${REF}` split in `text_injection.py` (replace Concatenate builder)
-- [ ] Markdown (and optional XHTML) serializers; ODK path uses markdown + `${export}`
-- [ ] `process_reference` + `iter_node_dependencies` accept `TriccMessage`
-- [ ] FHIR `item.text`: do not call `get_tricc_operation_expression` on a message
-- [ ] `extract_help_title`, instance copy
-- [ ] Docs: `display-text-injection.md` (intermediate type), `pipeline.md`, `tricc-elements.md`
-- [ ] Tests (below)
+- [x] `TriccMessage` (+ node types) with `get_references`, `replace_node`, `copy`
+- [x] `DisplayText` / `label_text_for_name` / test-spec `label_text`
+- [x] HTML parse + `${REF}` split in `text_injection.py` (replace Concatenate builder)
+- [x] Markdown (and optional XHTML) serializers; ODK path uses markdown + `${export}`
+- [x] `process_reference` + `iter_node_dependencies` accept `TriccMessage`
+- [x] FHIR `item.text`: do not call `get_tricc_operation_expression` on a message
+- [x] `extract_help_title`, instance copy
+- [x] Docs: `display-text-injection.md` (intermediate type), `pipeline.md`, `tricc-elements.md`
+- [x] Tests (below)
 
 ## 4. Tests
 
 Unit (tree, no full export):
 
-- [ ] `test_plain_string_unchanged` — no tokens, no tags → `str`
-- [ ] `test_ref_only` / `test_text_and_ref` — leaves are `TriccReference` + `TriccMessageText`,
+- [x] `test_plain_string_unchanged` — no tokens, no tags → `str`
+- [x] `test_ref_only` / `test_text_and_ref` — leaves are `TriccReference` + `TriccMessageText`,
       not `TriccOperation`
-- [ ] `test_strong_wraps_ref` — `<b>Give ${dose} mg</b>` → one `strong` whose children are
+- [x] `test_strong_wraps_ref` — `<b>Give ${dose} mg</b>` → one `strong` whose children are
       text + ref + text; markdown is `**Give ${dose} mg**` (or the chosen strong markers),
       not `**Give ` + ref + ` mg**` as separate concatenands
-- [ ] `test_html_not_markdownified_before_split` — `${age}` inside `<b>` is still a reference
+- [x] `test_html_not_markdownified_before_split` — `${age}` inside `<b>` is still a reference
       (token not destroyed by markdownify)
-- [ ] `test_no_space_short_label` — `<b>Yes</b>` becomes strong text, not leftover HTML
+- [x] `test_no_space_short_label` — `<b>Yes</b>` becomes strong text, not leftover HTML
       (`remove_html`’s space guard)
-- [ ] `test_get_references_walks_marks` — `message.get_references()` includes nested refs
-- [ ] `test_replace_node_updates_interp`
-- [ ] `test_locale_dict` — `{en: TriccMessage, fr: TriccMessage}`
-- [ ] `test_markdown_no_trailing_newline` unless the tree has a break
-- [ ] `test_rhombus_label_not_parsed_as_message_ast` — same scope as today (display models only)
+- [x] `test_get_references_walks_marks` — `message.get_references()` includes nested refs
+- [x] `test_replace_node_updates_interp`
+- [x] `test_locale_dict` — `{en: TriccMessage, fr: TriccMessage}`
+- [x] `test_markdown_no_trailing_newline` unless the tree has a break
+- [x] `test_rhombus_label_not_parsed_as_message_ast` — same scope as today (display models only)
 
 Integration:
 
-- [ ] Existing `note_text_injection.yaml` / `tests/test_text_injection.py` updated; ODK label
+- [x] Existing `note_text_injection.yaml` / `tests/test_text_injection.py` updated; ODK label
       still `Patient is ${<export>} years old`
-- [ ] Formatted + injection YAML: bold around `${age}` survives XLSForm TRAD as one markdown
+- [x] Formatted + injection YAML: bold around `${age}` survives XLSForm TRAD as one markdown
       span
-- [ ] Processing still waits on the referenced question (stashed-loop / `iter_node_dependencies`)
+- [x] Processing still waits on the referenced question (stashed-loop / `iter_node_dependencies`)
 
 ## 5. Acceptance criteria
 

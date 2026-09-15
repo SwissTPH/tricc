@@ -13,7 +13,8 @@ from tricc_oo.converters.fhir.questionnaire_item_mapper import (
     CQF_EXT_TEXT_EXPRESSION,
     SDC_EXT_ITEM_CONTROL,
 )
-from tricc_oo.models.base import TriccOperation, TriccOperator, TriccReference, TriccStatic
+from tricc_oo.models.base import TriccReference
+from tricc_oo.models.message import TriccMessage, TriccMessageText
 from tricc_oo.models.calculate import TriccNodeCalculate
 from tricc_oo.models.tricc import TriccNodeInteger, TriccNodeNote
 from tricc_oo.strategies.output.fhir_form import FHIRStrategy
@@ -28,11 +29,11 @@ def _make_strategy():
 
 
 def _injection(*parts):
-    """Build the CONCATENATE a ``${REF}`` label is loaded as."""
-    operands = [
-        TriccReference(p[1]) if isinstance(p, tuple) else TriccStatic(p) for p in parts
+    """Build the TriccMessage a ``${REF}`` label is loaded as."""
+    children = [
+        TriccReference(p[1]) if isinstance(p, tuple) else TriccMessageText(value=p) for p in parts
     ]
-    return TriccOperation(operator=TriccOperator.CONCATENATE, reference=operands)
+    return TriccMessage(children=children)
 
 
 def _find(items, link_id):

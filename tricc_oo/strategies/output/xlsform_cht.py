@@ -24,6 +24,7 @@ from tricc_oo.strategies.registry import register_output_strategy
 from tricc_oo.strategies.output.xls_form import XLSFormStrategy
 from tricc_oo.converters.tricc_to_xls_form import get_export_name
 from tricc_oo.converters.utils import clean_name, remove_html
+from tricc_oo.visitors.text_injection import serialize_injection_for_js_text
 from tricc_oo.visitors.xform_pd import make_breakpoints, get_task_js
 
 langs = SingletonLangClass()
@@ -675,7 +676,11 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
         else:
             logger.critical("form id required in the first start node")
             exit(1)
-        title = remove_html(start_pages[self.processes[0]].root.label)
+        root_label = start_pages[self.processes[0]].root.label
+        if isinstance(root_label, str):
+            title = remove_html(root_label)
+        else:
+            title = serialize_injection_for_js_text(root_label)
         if self.project is not None:
             title = self.project.export_form_title(title)
         kind = getattr(getattr(self.project, "intervention", None), "kind", None)

@@ -502,11 +502,10 @@ class YamlStrategy(BaseInputStrategy):
         # re-apply if node was built without going through load_expressions fully)
         from tricc_oo.models.tricc import TriccNodeDisplayModel
         from tricc_oo.visitors.text_injection import apply_display_text_injections
-        from tricc_oo.converters.utils import remove_html
 
         if isinstance(node, TriccNodeDisplayModel):
             try:
-                apply_display_text_injections(node, clean_fn=remove_html)
+                apply_display_text_injections(node)
             except Exception:
                 pass
 

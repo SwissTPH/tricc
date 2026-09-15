@@ -4,7 +4,7 @@
 |-------|-------|
 | **Status** | Implemented |
 | **Branch target** | `feature/adv_merge_calc` / `develop` |
-| **Related** | ODK/CHT label injection; FHIR CONCATENATE export; multi-version refs via `feature/advanced-merge-calc.md` |
+| **Related** | ODK/CHT label injection; `feature/20260909-display-message-ast.md` (message AST); FHIR dynamic text; multi-version refs via `feature/advanced-merge-calc.md` |
 | **Authoring surface** | draw.io attributes + YAML fixtures |
 
 Valid status values: `Draft` → `Approved` → `Implemented` → `Superseded`.
@@ -33,10 +33,15 @@ Supported on **display** nodes only (notes, questions, options, and other `Tricc
 
 ## Behaviour
 
-1. At form load, TRICC cleans HTML on the full string, then converts tokens into a structured concatenate expression.
-2. During processing, referenced fields are resolved (including versioned names).
-3. **ODK / CHT** export rewrites the text to `…${export_field_name}…` so the form engine injects values at display time.
-4. **FHIR and other strategies** use the structured concatenate expression (they do not rely on `${}` in labels).
+1. At form load, TRICC parses HTML into a **message tree** (`TriccMessage`) and splits `${REF}`
+   tokens as interpolation leaves. Markdown is produced from that tree at export — HTML is never
+   markdownified before the split. See `feature/20260909-display-message-ast.md`.
+2. During processing, referenced fields are resolved (including versioned names) via
+   `get_references()` / `replace_node` on the tree.
+3. **ODK / CHT** export walks the tree to Markdown with `…${export_field_name}…` so the form
+   engine injects values at display time. Bold/italic wrap the whole phrase, including the token.
+4. **FHIR** keeps the same static Markdown in `item.text` and emits a concatenate FHIRPath
+   expression at serialize time from complete literal runs (the in-memory type is never Concatenate).
 
 ## Benefits
 
@@ -47,7 +52,8 @@ Supported on **display** nodes only (notes, questions, options, and other `Tricc
 ## Limitations
 
 - Tokens are bare field names (`${age}`), not full expressions (`${age + 1}`).
-- HTML is cleaned on the **whole** attribute before tokens are split (required for balanced markup).
+- Formatting is a small HTML subset (bold, italic, breaks, lists). See
+  `feature/20260909-display-message-ast.md`.
 
 ---
 
@@ -59,15 +65,15 @@ Supported on **display** nodes only (notes, questions, options, and other `Tricc
 |----------|--------------|
 | `TriccNodeDisplayModel` and subclasses | `TriccNodeCalculateBase`, rhombus, factor, wait, etc. |
 | Parse at **input load** only | Re-parse in `process_reference` / `is_ready_to_process` |
-| Intermediate: `TriccOperator.CONCATENATE` | Per-segment HTML clean |
+| Intermediate: `TriccMessage` AST (`feature/20260909-display-message-ast.md`) | Per-segment HTML clean; Concatenate as the stored message type |
 | Resolve via `process_operation_reference` | Full JS template evaluation |
 
 ## Pipeline
 
 ```text
-raw display text → remove_html(full) → parse ${REF} → CONCATENATE
+raw display HTML/text → TriccMessage (HTML parse + ${REF})
   → process_reference resolves refs
-  → ODK: serialize to ${export}  |  FHIR: tricc_operation_concatenate
+  → ODK: Markdown + ${export}  |  FHIR: static Markdown + serialize-time concatenate
 ```
 
 ## Code checklist
@@ -81,7 +87,7 @@ raw display text → remove_html(full) → parse ${REF} → CONCATENATE
 
 ## Acceptance criteria
 
-1. Note label `Age is ${age}` becomes CONCATENATE at load after HTML clean.
+1. Note label `Age is ${age}` becomes a `TriccMessage` at load.
 2. Processing resolves `age` to the node; ODK label is `Age is ${<export_name>}`.
-3. Calculates/rhombus labels are not converted to injection CONCATENATE.
+3. Calculates/rhombus labels are not converted to a message AST.
 4. Existing tests still pass.
