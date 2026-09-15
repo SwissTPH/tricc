@@ -98,7 +98,7 @@ PASSING_AUTHORED_CASES = [
     ),
     ("bold", "<b>Hello world</b>", "**Hello world**"),
     ("strong", "<strong>Hello world</strong>", "**Hello world**"),
-    ("italic", "<i>italic text</i>", "*italic text*"),
+    ("italic", "<i>italic text</i>", "_italic text_"),
     ("inline_bold", "Give <b>dose</b> now", "Give **dose** now"),
     ("br_newline", "Line one<br>Line two", "Line one\nLine two"),
     (
@@ -158,12 +158,8 @@ class TestNoteAuthoredLook(unittest.TestCase):
 
 
 class TestNoteAuthoredLookKnownGaps(unittest.TestCase):
-    """Desired look that convert incorrectly today (space-guard / stripped divs).
+    """Look that remove_html used to get wrong (space-guard / stripped divs)."""
 
-    Remove ``expectedFailure`` when feature/20260909-display-message-ast.md lands.
-    """
-
-    @unittest.expectedFailure
     def test_short_bold_without_space_is_markdown_not_html(self):
         for actual in (
             odk_label_from_authored("<b>Yes</b>"),
@@ -173,7 +169,6 @@ class TestNoteAuthoredLookKnownGaps(unittest.TestCase):
                 self.assertEqual(actual, "**Yes**")
                 self.assertNotIn("<b>", actual)
 
-    @unittest.expectedFailure
     def test_div_line_break_is_kept(self):
         # draw.io uses <div> when the author presses Enter in a note.
         authored = "Line one<div>Line two</div>"
@@ -185,7 +180,6 @@ class TestNoteAuthoredLookKnownGaps(unittest.TestCase):
                 self.assertEqual(actual, "Line one\nLine two")
                 self.assertNotEqual(actual, "Line oneLine two")
 
-    @unittest.expectedFailure
     def test_nbsp_becomes_a_space(self):
         for actual in (
             odk_label_from_authored("Hello&nbsp;world"),
@@ -195,7 +189,6 @@ class TestNoteAuthoredLookKnownGaps(unittest.TestCase):
                 self.assertEqual(actual, "Hello world")
                 self.assertNotIn("&nbsp;", actual)
 
-    @unittest.expectedFailure
     def test_short_list_items_become_markdown(self):
         authored = "<ul><li>First</li><li>Second</li></ul>"
         for actual in (
@@ -206,7 +199,6 @@ class TestNoteAuthoredLookKnownGaps(unittest.TestCase):
                 self.assertEqual(actual, "- First\n- Second")
                 self.assertNotIn("<li>", actual)
 
-    @unittest.expectedFailure
     def test_div_after_bold_sentence_starts_a_new_line(self):
         authored = (
             "<b>Emergency case</b>: Child needs "
@@ -255,7 +247,7 @@ class TestNoteXlsFormSurveyLabels(unittest.TestCase):
         expected = {
             "note_plain": "Take the child to the emergency room.",
             "note_bold": "**Hello world**",
-            "note_italic": "*italic text*",
+            "note_italic": "_italic text_",
             "note_inline_bold": "Give **dose** now",
             "note_br": "Line one\nLine two",
             "note_list": "- First item\n- Second item",
@@ -276,7 +268,7 @@ class TestNoteXlsFormSurveyLabels(unittest.TestCase):
         cases = {
             "note_plain": "Take the child to the emergency room.",
             "note_bold": "**Hello world**",
-            "note_italic": "*italic text*",
+            "note_italic": "_italic text_",
             "note_br": "Line one\nLine two",
             "note_inject": "Patient is ${age} years old",
         }

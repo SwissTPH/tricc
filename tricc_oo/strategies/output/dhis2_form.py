@@ -150,12 +150,16 @@ class DHIS2Strategy(BaseOutPutStrategy):
             )
 
     def get_display(self, node):
+        from tricc_oo.visitors.text_injection import serialize_injection_for_js_text
+
         if hasattr(node, 'label') and node.label:
             ret = node.label
         elif hasattr(node, 'name') and node.name:
             ret = node.name
         else:
             ret = str(node.id)
+        if not isinstance(ret, str):
+            ret = serialize_injection_for_js_text(ret)
         return ret.replace('\u00a0', ' ').strip()
 
     def execute(self):
