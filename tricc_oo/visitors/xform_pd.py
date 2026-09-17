@@ -176,9 +176,24 @@ def get_task_js(
     df_survey,
     repalce_dots=False,
     task_title="id: '+getField(report, 'g_registration.p_id')+';age: '+getField(report, 'p_age')+getField(report, 'g_registration.p_gender')+' months; '+getField(report, 'p_weight') + 'kg; ' + getField(report, 'g_fever.p_temp')+'°'",  # noqa: E501
+    applies_field=None,
+    always_applies=False,
+    days=0,
+    start=1,
+    end=0,
 ):
     task_name = f"{form_id}"
     task_name_upper = task_name.upper()
+
+    if applies_field:
+        applies_body = f'return getField(report, "{applies_field}") === "true"'
+    elif always_applies:
+        applies_body = "return true"
+    else:
+        applies_body = (
+            'return getField(report, "source_id") === "" &&\n'
+            '    getField(report, "pause_test") === "1"'
+        )
 
     return f"""
 /* eslint-disable no-use-before-define */
@@ -220,8 +235,7 @@ function {task_name}ResolveIf(contact, report, event, dueDate) {{
 }}
 
 function {task_name}AppliesIf(contact, report, event, dueDate) {{
-    return getField(report, "source_id") === "" &&
-    getField(report, "pause_test") === "1"
+    {applies_body}
 
 }}
 
@@ -264,9 +278,9 @@ module.exports = {{
 //        events: [
 //            {{
 //                id: '{task_name}',
-//                days: 0,
-//                start: 1,
-//                end: 0
+//                days: {days},
+//                start: {start},
+//                end: {end}
 //            }}
 //        ],
 //        resolvedIf: {task_name}ResolveIf

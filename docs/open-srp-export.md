@@ -542,10 +542,14 @@ path/bridge expressions OR “already captured” so later items still enable. S
 
 ## PlanDefinition
 
-**One** `PlanDefinition` resource is exported per project — see
-`feature/careplan-intervention-plandefinition.md` for the full rationale and scope. Today
-**one project = one Intervention**; multi-Intervention / multi-CarePlan orchestration and
-applicability/eligibility gating are future work (`feature/careplan-claude.md`).
+**One** `PlanDefinition` resource is exported per intervention — see
+`feature/careplan-intervention-plandefinition.md` for the nesting rationale. With
+`tricc.yaml` `interventions`, each intervention is its own package. On-demand
+eligibility (`start.condition`, `on: demand`) is a CQL applicability `condition` on
+the wrapper action. Follow-up (`on: follow_up`) adds a nested action with
+`relatedAction` + an ActivityDefinition (`kind: Task`). See
+`feature/20260915-intervention-start.md`. Drawing-level CarePlan orchestration in
+`feature/careplan.md` is superseded.
 
 An earlier revision also exported a second, wrapping `{form_id}-available-care-catalog`
 PlanDefinition (top action triggered by `available-care`, single child action linking down to
@@ -576,17 +580,23 @@ once, nested with **one child `action` per non-empty process**
     PlanDefinitions, so a client juggling several selected Interventions can pick "whichever
     unlocked action has the lowest order."
   - **definitionCanonical**: **Questionnaire** absolute URL (launch form **now**)
-- **No** contained Task ActivityDefinition / **no** `transform`, and no applicability
-  `condition` yet (every action is unconditionally listed)
+- **condition** on the wrapper: CQL from `start.condition` when `on: demand` (omitted = always)
+- **No** contained Task ActivityDefinition / **no** `transform` on the Start-care path
+
+Follow-up interventions (`start.on: follow_up`) append a nested action with
+`relatedAction` (`after-end` + `offsetDuration` = `due`), optional CQL `condition`,
+timing bounds from `window`, and `definitionCanonical` → `ActivityDefinition/{…}`
+written under `activity-definition/`. Start-care actions still must point at a
+Questionnaire; only follow-up actions may point at an ActivityDefinition.
 
 Empty questionnaires (`"item": []`) are **removed** from the package (no action, no library
 entry for that process).
 
 ### Task-wrapped Questionnaire (planning — not due now)
 
-**Upcoming planning feature only.** When a form is scheduled but **not due now**, export may
-use ActivityDefinition (`kind: Task`) + StructureMap so the client holds a Task
-(`reasonReference` → Questionnaire) until due. That path is **not** used for Start care.
+**Follow-up tasks** use ActivityDefinition (`kind: Task`) as above. A separate
+**planning** path (form not due now, StructureMap → Task) remains available for
+experiments; it is **not** used for Start care.
 
 Optional Task StructureMaps may still be written under `structure-map/` for multi-process
 experiments; they are **not** wired as the Intervention PD's `definitionCanonical` for

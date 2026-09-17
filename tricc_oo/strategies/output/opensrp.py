@@ -21,7 +21,8 @@ Output folder structure (matches fhircore expected layout)::
 
     output/<form_id>/
     ├── Composition.json
-    ├── plan-definition/   # single Intervention PD
+    ├── plan-definition/   # Intervention PD (on-demand + follow-up actions)
+    ├── activity-definition/  # follow-up Task ActivityDefinitions (start.on: follow_up)
     ├── structure-map/     # extraction maps (QR → Observation/Condition) + optional Task maps
     ├── binary/
     ├── contract/          # related-person-contract.json
@@ -42,6 +43,7 @@ import stat
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from tricc_oo.converters.duration import to_fhir_duration
 from tricc_oo.converters.fhir.ids import (
     fhir_resource_id,
     readable_resource_filename,
@@ -131,6 +133,7 @@ class OpenSRPStrategy(FHIRStrategy):
         """
         super().__init__(project, output_path, base_url)
         self.plan_definitions: Dict[str, dict] = {}
+        self.activity_definitions: Dict[str, dict] = {}
         self.composition: Optional[dict] = None
         self.process_chain: List[str] = []
         # App id for meta.tag (content delivery) — not the package Composition identifier.
@@ -199,6 +202,7 @@ class OpenSRPStrategy(FHIRStrategy):
 
         # Write openSRP-specific resources (JSON only — no FSH)
         self._write_plan_definitions(base, version)
+        self._write_activity_definitions(base)
         self._write_structure_maps(base)
         self._write_composition(base)
         self._write_image_binaries(base)
@@ -248,6 +252,16 @@ class OpenSRPStrategy(FHIRStrategy):
             for action in child_actions:
                 process = action.get("id") or "?"
                 def_can = action.get("definitionCanonical") or ""
+                is_follow_up = bool(action.get("relatedAction"))
+                if is_follow_up:
+                    if "ActivityDefinition/" not in def_can:
+                        logger.warning(
+                            "Intervention PlanDefinition follow-up action '%s' "
+                            "definitionCanonical should reference an ActivityDefinition (got %r)",
+                            process,
+                            def_can,
+                        )
+                    continue
                 # Start care / openSRP: launch Questionnaire directly
                 if "Questionnaire/" not in def_can:
                     logger.warning(
@@ -449,8 +463,8 @@ class OpenSRPStrategy(FHIRStrategy):
         ``definitionCanonical`` link caused every child to be resolved unconditionally.
 
         No applicability/eligibility ``condition`` is emitted unless the project
-        was built from ``tricc.yaml`` with an intervention ``applicability`` CQL
-        expression (see ``feature/20260907-project-config.md``).
+        was built from ``tricc.yaml`` with an intervention ``start.condition``
+        (``on: demand``). See ``feature/20260915-intervention-start.md``.
 
         Args:
             version: Build version string.
@@ -523,23 +537,19 @@ class OpenSRPStrategy(FHIRStrategy):
             "action": child_actions,
         }
         intervention = getattr(self.project, "intervention", None)
-        applicability = getattr(intervention, "applicability", None) if intervention is not None else None
-        if applicability:
+        demand_cql = None
+        if intervention is not None:
+            demand_cql = intervention.demand_condition()
+        if demand_cql:
             wrapper_action["condition"] = [
                 {
                     "kind": "applicability",
                     "expression": {
                         "language": "text/cql",
-                        "expression": applicability,
+                        "expression": demand_cql,
                     },
                 }
             ]
-        kind = getattr(intervention, "kind", None) if intervention is not None else None
-        if kind == "task":
-            logger.warning(
-                "OpenSRP Task launch is not implemented; emitting on-demand PlanDefinition for %s",
-                getattr(intervention, "id", form_label),
-            )
         pd_title = f"{form_label} – Intervention"
         if intervention is not None and getattr(intervention, "title", None):
             pd_title = intervention.title
@@ -566,6 +576,134 @@ class OpenSRPStrategy(FHIRStrategy):
             "library": lib_urls,
             "action": [wrapper_action],
         }
+
+    def link_follow_up(self, child_strategy, start) -> None:
+        """Attach a follow-up action + ActivityDefinition to this parent PlanDefinition."""
+        child_intervention = getattr(getattr(child_strategy, "project", None), "intervention", None)
+        child_id = getattr(child_intervention, "id", None)
+        if not child_id:
+            raise ValueError("follow-up intervention is missing an id")
+        pd = self.plan_definitions.get("intervention")
+        if not pd:
+            logger.warning("No Intervention PlanDefinition to attach follow-up %s", child_id)
+            return
+        wrapper = (pd.get("action") or [{}])[0]
+        process_actions = wrapper.get("action") or []
+        parent_action_id = process_actions[-1]["id"] if process_actions else "available-care"
+        parent_form = getattr(self, "_form_id", None) or self.fhir_form_id
+        ad_id = fhir_resource_id(parent_form, "ActivityDefinition", child_id, "task")
+        q_id, q_url = self._first_questionnaire_ref(child_strategy)
+        due_duration = to_fhir_duration(start.due or 0)
+        window = start.window_or_default()
+        bounds = to_fhir_duration((start.due or 0) + window.after)
+        follow_action = {
+            "id": fhir_resource_id(parent_form, "action", child_id),
+            "title": getattr(child_intervention, "title", None) or child_id,
+            "relatedAction": [
+                {
+                    "actionId": parent_action_id,
+                    "relationship": "after-end",
+                    "offsetDuration": due_duration,
+                }
+            ],
+            "timingTiming": {
+                "repeat": {
+                    "boundsDuration": bounds,
+                }
+            },
+            "definitionCanonical": f"{self.base_url}/ActivityDefinition/{ad_id}",
+        }
+        if window.before:
+            follow_action["extension"] = [
+                {
+                    "url": f"{self.base_url}/StructureDefinition/tricc-window-before",
+                    "valueDuration": to_fhir_duration(window.before),
+                }
+            ]
+        if start.condition:
+            follow_action["condition"] = [
+                {
+                    "kind": "applicability",
+                    "expression": {
+                        "language": "text/cql",
+                        "expression": start.condition,
+                    },
+                }
+            ]
+        process_actions.append(follow_action)
+        wrapper["action"] = process_actions
+        ad = {
+            "resourceType": "ActivityDefinition",
+            "id": ad_id,
+            "url": f"{self.base_url}/ActivityDefinition/{ad_id}",
+            "name": to_fhir_id(self.fhir_form_id, child_id, "task-activity"),
+            "title": getattr(child_intervention, "title", None) or child_id,
+            "status": "active",
+            "kind": "Task",
+            "code": {"text": child_id},
+            "dynamicValue": [
+                {
+                    "path": "focus",
+                    "expression": {
+                        "language": "text/fhirpath",
+                        "expression": f"'{q_url}'",
+                    },
+                },
+                {
+                    "path": "reasonReference",
+                    "expression": {
+                        "language": "text/fhirpath",
+                        "expression": "%questionnaire-response",
+                    },
+                },
+            ],
+        }
+        self.activity_definitions[child_id] = ad
+        self._rewrite_follow_up_artifacts()
+
+    def _first_questionnaire_ref(self, child_strategy) -> tuple:
+        questionnaires = getattr(child_strategy, "questionnaires", None) or {}
+        for process in getattr(child_strategy, "process_chain", None) or list(questionnaires):
+            q = questionnaires.get(process) or {}
+            q_id = q.get("id")
+            if q_id:
+                q_url = q.get("url") or f"{self.base_url}/Questionnaire/{q_id}"
+                return q_id, q_url
+        child_form = getattr(child_strategy, "_form_id", None) or getattr(child_strategy, "fhir_form_id", "form")
+        q_id = fhir_resource_id(child_form, "Questionnaire", "main")
+        return q_id, f"{self.base_url}/Questionnaire/{q_id}"
+
+    def _rewrite_follow_up_artifacts(self) -> None:
+        base = Path(self.output_path)
+        self._write_plan_definitions(base, "")
+        self._write_activity_definitions(base)
+        if self.composition is not None:
+            ad_entries = [
+                {"reference": f"ActivityDefinition/{ad['id']}"}
+                for ad in self.activity_definitions.values()
+                if isinstance(ad, dict) and ad.get("id")
+            ]
+            if ad_entries:
+                sections = self.composition.setdefault("section", [])
+                existing = next((s for s in sections if s.get("title") == "ActivityDefinitions"), None)
+                if existing is None:
+                    sections.append(
+                        {
+                            "title": "ActivityDefinitions",
+                            "code": {
+                                "coding": [
+                                    {
+                                        "system": "http://hl7.org/fhir/resource-types",
+                                        "code": "ActivityDefinition",
+                                    }
+                                ]
+                            },
+                            "entry": ad_entries,
+                        }
+                    )
+                else:
+                    existing["entry"] = ad_entries
+                self._write_composition(base)
 
     def generate_task_structuremap(self, process: str, version: str) -> Optional[dict]:
         """Build a StructureMap that creates Tasks wrapping Questionnaires.
@@ -1016,6 +1154,19 @@ class OpenSRPStrategy(FHIRStrategy):
             path = pd_dir / fname
             path.write_text(json.dumps(pd, indent=2, ensure_ascii=False))
             logger.debug(f"Wrote PlanDefinition: {path} (id={pd.get('id')})")
+
+    def _write_activity_definitions(self, base: Path):
+        if not self.activity_definitions:
+            return
+        ad_dir = base / "activity-definition"
+        ad_dir.mkdir(parents=True, exist_ok=True)
+        for key, ad in self.activity_definitions.items():
+            fname = readable_resource_filename(
+                ad, prefix="ActivityDefinition", fallback=f"{key}-AD"
+            )
+            path = ad_dir / fname
+            path.write_text(json.dumps(ad, indent=2, ensure_ascii=False))
+            logger.debug("Wrote ActivityDefinition: %s (id=%s)", path, ad.get("id"))
 
     def _write_structure_maps(self, base: Path):
         """Write Task StructureMap JSON (+ companion .map FML) under structure-map/.

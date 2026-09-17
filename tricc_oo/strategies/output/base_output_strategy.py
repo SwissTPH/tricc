@@ -240,3 +240,13 @@ class BaseOutPutStrategy(abc.ABC):
 
     def get_kwargs(self):
         return {}
+
+    def link_follow_up(self, child_strategy, start) -> None:
+        """Wire a follow-up intervention onto this (parent) export. Default: ignore."""
+        child_id = getattr(getattr(child_strategy, "project", None), "intervention", None)
+        child_id = getattr(child_id, "id", None) or "?"
+        logger.info(
+            "%s ignores start.on=follow_up for intervention %s",
+            self.__class__.__name__,
+            child_id,
+        )

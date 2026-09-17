@@ -6,7 +6,7 @@
 #   tricc -o ./build
 #
 # -i defaults to the current directory. -o defaults to ./output if omitted.
-# Specs: feature/20260907-project-config.md, feature/20260907-intervention-start.md
+# Specs: feature/20260907-project-config.md, feature/20260915-intervention-start.md
 
 # Name of the whole programme.
 title: My project

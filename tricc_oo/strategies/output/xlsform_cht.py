@@ -1,4 +1,5 @@
 import datetime
+import json
 import logging
 import os
 import shutil
@@ -12,6 +13,7 @@ from pyxform.xls2xform import convert
 from tricc_oo.models.lang import SingletonLangClass
 from tricc_oo.converters.fhir.populate_helper import populate_uses_inputs_group
 from tricc_oo.models.calculate import TriccNodeEnd
+from tricc_oo.models.base import TriccOperation, TriccReference
 from tricc_oo.models.tricc import TriccNodeDisplayModel
 from tricc_oo.serializers.xls_form import (
     SURVEY_MAP,
@@ -22,13 +24,29 @@ from tricc_oo.serializers.xls_form import (
 from tricc_oo.strategies.output.xlsform_cdss import XLSFormCDSSStrategy
 from tricc_oo.strategies.registry import register_output_strategy
 from tricc_oo.strategies.output.xls_form import XLSFormStrategy
+from tricc_oo.converters.cql_to_operation import transform_cql_to_operation
+from tricc_oo.converters.duration import to_days
 from tricc_oo.converters.tricc_to_xls_form import get_export_name
 from tricc_oo.converters.utils import clean_name, remove_html
+from tricc_oo.serializers.js_expression import render_cht_js_expression
 from tricc_oo.visitors.text_injection import serialize_injection_for_js_text
 from tricc_oo.visitors.xform_pd import make_breakpoints, get_task_js
 
 langs = SingletonLangClass()
 logger = logging.getLogger("default")
+
+
+def _cht_condition_reference_names(node):
+    names = []
+    if isinstance(node, TriccReference):
+        names.append(str(node.value))
+    elif isinstance(node, TriccOperation):
+        for item in node.reference or []:
+            names.extend(_cht_condition_reference_names(item))
+    elif isinstance(node, list):
+        for item in node:
+            names.extend(_cht_condition_reference_names(item))
+    return names
 
 
 @register_output_strategy("XLSFormCHTStrategy")
@@ -683,12 +701,8 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             title = serialize_injection_for_js_text(root_label)
         if self.project is not None:
             title = self.project.export_form_title(title)
-        kind = getattr(getattr(self.project, "intervention", None), "kind", None)
-        if kind == "task":
-            logger.warning(
-                "CHT intervention kind=task still writes the XLSForm (the form a task would open); "
-                "a dedicated CHT appliesIf from CQL is out of scope"
-            )
+        self._form_id = form_id
+        self._cht_title = title
         file_name = form_id + ".xlsx"
         # make a 'settings' tab
         now = datetime.datetime.now()
@@ -718,6 +732,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
         self.df_choice.to_excel(writer, sheet_name="choices", index=False)
         df_settings.to_excel(writer, sheet_name="settings", index=False)
         writer.close()
+        self._write_demand_properties(form_id, title)
         # pause
         logger.info("generating the task and after pause questionnaires")
         ends = []
@@ -826,6 +841,130 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
         if not self.validate(generated_files):
             logger.error("CHT validation failed - aborting build")
             exit(1)
+
+    def _write_demand_properties(self, form_id, title):
+        intervention = getattr(self.project, "intervention", None)
+        condition = intervention.demand_condition() if intervention is not None else None
+        if not condition:
+            return
+        parsed = transform_cql_to_operation(condition, context=f"start.condition for {form_id}")
+        if parsed is None:
+            raise ValueError(f"start.condition is not valid CQL: {condition}")
+        expression = render_cht_js_expression(parsed)
+        payload = {
+            "title": title,
+            "context": {
+                "person": True,
+                "place": False,
+                "expression": expression,
+            },
+        }
+        path = os.path.join(self.output_path, f"{form_id}.properties.json")
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle, indent=2, ensure_ascii=False)
+            handle.write("\n")
+        logger.info("Wrote CHT properties.json: %s", path)
+
+    def _rewrite_xlsx(self, form_id, title):
+        path = os.path.join(self.output_path, f"{form_id}.xlsx")
+        version = datetime.datetime.now().strftime("%Y%m%d%H%M")
+        settings = {
+            "form_title": title,
+            "form_id": form_id,
+            "version": version,
+            "default_language": "English (en)",
+            "style": "pages",
+        }
+        df_settings = pd.DataFrame(settings, index=[[1]])
+        writer = pd.ExcelWriter(path, engine="xlsxwriter")
+        self.df_survey.to_excel(writer, sheet_name="survey", index=False)
+        self.df_choice.to_excel(writer, sheet_name="choices", index=False)
+        df_settings.to_excel(writer, sheet_name="settings", index=False)
+        writer.close()
+
+    def _append_start_calculate(self, child_id, xpath):
+        name = f"start_{child_id}"
+        row = {column: "" for column in self.df_survey.columns}
+        row["type"] = "calculate"
+        row["name"] = name
+        if "calculation" in row:
+            row["calculation"] = xpath
+        self.df_survey = pd.concat([self.df_survey, pd.DataFrame([row])], ignore_index=True)
+        return name
+
+    def _follow_up_hidden_names(self, child_strategy):
+        parent_names = {
+            str(name)
+            for name in self.df_survey.get("name", pd.Series(dtype=str)).dropna().astype(str)
+        }
+        hidden = []
+        child_df = getattr(child_strategy, "df_survey", None)
+        if child_df is None or child_df.empty:
+            return hidden
+        skip_types = {"begin group", "end group", "note", "calculate"}
+        for _, row in child_df.iterrows():
+            name = str(row.get("name") or "")
+            row_type = str(row.get("type") or "")
+            if not name or row_type in skip_types:
+                continue
+            if name in parent_names:
+                hidden.append(name)
+        return hidden
+
+    def link_follow_up(self, child_strategy, start) -> None:
+        child_intervention = getattr(getattr(child_strategy, "project", None), "intervention", None)
+        child_id = getattr(child_intervention, "id", None)
+        if not child_id:
+            raise ValueError("follow-up intervention is missing an id")
+        parent_form_id = getattr(self, "_form_id", None)
+        child_form_id = getattr(child_strategy, "_form_id", None)
+        if not parent_form_id or not child_form_id:
+            raise ValueError("CHT follow-up requires form_id on parent and child start nodes")
+        applies_field = None
+        if start.condition:
+            parsed = transform_cql_to_operation(
+                start.condition, context=f"start.condition for {child_id}"
+            )
+            if parsed is None:
+                raise ValueError(f"start.condition is not valid CQL: {start.condition}")
+            xpath = self.get_tricc_operation_expression(parsed)
+            parent_names = set(self.df_survey["name"].dropna().astype(str))
+            missing = [
+                name
+                for name in _cht_condition_reference_names(parsed)
+                if name not in parent_names
+            ]
+            if missing:
+                raise ValueError(
+                    f"follow-up condition references {missing} which are not in parent form {parent_form_id}"
+                )
+            applies_field = self._append_start_calculate(child_id, xpath)
+            self._rewrite_xlsx(parent_form_id, getattr(self, "_cht_title", parent_form_id))
+        hidden_names = self._follow_up_hidden_names(child_strategy)
+        window = start.window_or_default()
+        days = to_days(start.due or 0)
+        start_days = to_days(window.before)
+        end_days = to_days(window.after)
+        js_path = os.path.join(child_strategy.output_path, f"{child_form_id}.js")
+        with open(js_path, "w", encoding="utf-8") as handle:
+            handle.write(
+                get_task_js(
+                    child_form_id,
+                    applies_field or "",
+                    getattr(child_intervention, "title", child_id),
+                    [parent_form_id],
+                    hidden_names,
+                    self.df_survey,
+                    repalce_dots=False,
+                    task_title=getattr(child_intervention, "title", child_id),
+                    applies_field=applies_field,
+                    always_applies=not applies_field,
+                    days=days,
+                    start=start_days,
+                    end=end_days,
+                )
+            )
+        logger.info("Wrote CHT follow-up task module: %s", js_path)
 
     def validate(self, generated_files=None):
         """Validate the generated XLS form(s) using pyxform conversion and ODK Validate JAR."""

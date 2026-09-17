@@ -49,12 +49,13 @@ def test_load_valid_config(tmp_path):
                 "interventions:",
                 "  - id: pediatrics",
                 "    title: Pediatrics",
-                "    kind: both",
-                "    applicability: AgeInMonths() >= 2",
                 "    description: IMCI child",
                 "    activity:",
                 "      - common/*",
                 "      - child/*",
+                "    start:",
+                "      on: demand",
+                "      condition: AgeInMonths() >= 2",
             ]
         ),
         encoding="utf-8",
@@ -66,7 +67,8 @@ def test_load_valid_config(tmp_path):
     assert config.image_max_height() is None
     assert config.parameters["extra_flag"] == "keep-me"
     assert config.interventions[0].id == "pediatrics"
-    assert config.interventions[0].kind == "both"
+    assert config.interventions[0].demand_condition() == "AgeInMonths() >= 2"
+    assert config.interventions[0].start[0].on == "demand"
 
 
 def test_broken_yaml_fails(tmp_path):
@@ -107,6 +109,137 @@ def test_legacy_segment_key_fails():
         TriccProjectConfig.model_validate(
             {"interventions": [{"id": "a", "title": "A", "segment": ["a/*"]}]}
         )
+
+
+def test_legacy_kind_fails():
+    with pytest.raises(ValidationError, match="replaced by start"):
+        TriccProjectConfig.model_validate(
+            {
+                "interventions": [
+                    {"id": "a", "title": "A", "activity": ["a/*"], "kind": "task"}
+                ]
+            }
+        )
+
+
+def test_start_scalar_and_list():
+    scalar = TriccProjectConfig.model_validate(
+        {
+            "interventions": [
+                {
+                    "id": "a",
+                    "title": "A",
+                    "activity": ["a/*"],
+                    "start": {"on": "demand", "condition": "AgeInMonths() < 60"},
+                }
+            ]
+        }
+    )
+    assert len(scalar.interventions[0].start) == 1
+    listed = TriccProjectConfig.model_validate(
+        {
+            "interventions": [
+                {
+                    "id": "a",
+                    "title": "A",
+                    "activity": ["a/*"],
+                    "start": [{"on": "demand"}],
+                }
+            ]
+        }
+    )
+    assert listed.interventions[0].start[0].on == "demand"
+
+
+def test_demand_with_due_fails():
+    with pytest.raises(ValidationError, match="due"):
+        TriccProjectConfig.model_validate(
+            {
+                "interventions": [
+                    {
+                        "id": "a",
+                        "title": "A",
+                        "activity": ["a/*"],
+                        "start": {"on": "demand", "due": "3 d"},
+                    }
+                ]
+            }
+        )
+
+
+def test_follow_up_requires_parent_and_due():
+    with pytest.raises(ValidationError, match="intervention"):
+        TriccProjectConfig.model_validate(
+            {
+                "interventions": [
+                    {
+                        "id": "a",
+                        "title": "A",
+                        "activity": ["a/*"],
+                        "start": {"on": "follow_up", "due": "3 d"},
+                    }
+                ]
+            }
+        )
+    with pytest.raises(ValidationError, match="due"):
+        TriccProjectConfig.model_validate(
+            {
+                "interventions": [
+                    {
+                        "id": "a",
+                        "title": "A",
+                        "activity": ["a/*"],
+                        "start": {"on": "follow_up", "intervention": "b"},
+                    },
+                    {"id": "b", "title": "B", "activity": ["b/*"]},
+                ]
+            }
+        )
+
+
+def test_follow_up_unknown_parent_fails():
+    with pytest.raises(ValidationError, match="not an intervention id"):
+        TriccProjectConfig.model_validate(
+            {
+                "interventions": [
+                    {
+                        "id": "child",
+                        "title": "Child",
+                        "activity": ["c/*"],
+                        "start": {
+                            "on": "follow_up",
+                            "intervention": "missing",
+                            "due": "3 d",
+                        },
+                    }
+                ]
+            }
+        )
+
+
+def test_follow_up_parses_due_and_window():
+    config = TriccProjectConfig.model_validate(
+        {
+            "interventions": [
+                {"id": "parent", "title": "P", "activity": ["p/*"]},
+                {
+                    "id": "child",
+                    "title": "C",
+                    "activity": ["c/*"],
+                    "start": {
+                        "on": "follow_up",
+                        "intervention": "parent",
+                        "condition": "classification = 'pneumonia'",
+                        "due": "3 d",
+                        "window": {"before": "0 d", "after": "4 d"},
+                    },
+                },
+            ]
+        }
+    )
+    start = config.interventions[1].start[0]
+    assert start.due == 3 * 86400
+    assert start.window.after == 4 * 86400
 
 
 def test_version_gate_exact_match():
