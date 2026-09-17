@@ -1,0 +1,3733 @@
+{
+    "resourceType": "CodeSystem",
+    "id": "tricc",
+    "url": "http://example.com/fhir/CodeSystem/tricc",
+    "version": "1.0.0",
+    "name": "tricc",
+    "title": "tricc",
+    "status": "draft",
+    "description": "Code system for tricc",
+    "content": "complete",
+    "concept": [
+        {
+            "id": "9d9f40c1-bd54-52f3-8a7a-c1896d57c8fd",
+            "code": "tricc_end_diagram_1nav_end",
+            "display": "end",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "05497ca5-e075-59f0-ac83-1c259c774eff",
+            "code": "t_date_clin_ev",
+            "display": "t_date_clin_ev",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "e7bc57c6-a6cd-54bb-8b14-3df392b7a8c8",
+            "code": "t_aht_tx_cat",
+            "display": "t_aht_tx_cat",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "adea2fc7-0f27-508f-961a-86a5b1a4a76f",
+            "code": "t_date_cervical_cancer",
+            "display": "t_date_cervical_cancer",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "f405d61a-c777-5c41-9b29-ea2927cdc5c9",
+            "code": "t_cvd_risk",
+            "display": "t_cvd_risk",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "51705727-084a-53d9-8db5-80e691ee3d72",
+            "code": "t_hysterectomy",
+            "display": "t_hysterectomy",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "b1e3b70b-a806-5410-8f6f-1e94d4aa0186",
+            "code": "t_date_warn_symp",
+            "display": "t_date_warn_symp",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "5afdd226-9b35-50d3-8c8b-fad41280ed99",
+            "code": "t_date_blindness",
+            "display": "t_date_blindness",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "875a744b-28aa-5570-9796-c91dad22e2dc",
+            "code": "t_date_heart_failure",
+            "display": "t_date_heart_failure",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "4cb857cb-abaa-5f43-a19c-ca431917cf55",
+            "code": "t_stroke_stat",
+            "display": "t_stroke_stat",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "7b005d1a-cd87-5692-a22e-463a4f9627f8",
+            "code": "t_date_last_vis",
+            "display": "t_date_last_vis",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "666460c1-1dc0-5a47-bdce-36049037d6f5",
+            "code": "t_sce_type",
+            "display": "t_sce_type",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "5d16f1a5-5791-5b1b-b72d-2f1ed5e49c71",
+            "code": "t_dm_txs",
+            "display": "t_dm_txs",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "6047a1c7-061b-573c-809b-305311190452",
+            "code": "t_date_mi",
+            "display": "t_date_mi",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "0c49a7c4-1248-5236-a228-afc8ab6ecc85",
+            "code": "age",
+            "display": "age",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "ebe2d484-e173-5d52-a206-687140d0adc2",
+            "code": "t_weight",
+            "display": "t_weight",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "7c670881-0f79-5f37-8c37-c1c5a3871d19",
+            "code": "t_aht_dxs",
+            "display": "t_aht_dxs",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "21378f2a-de11-5fbf-a3f7-7338a2aa8d38",
+            "code": "t_hiv_stat",
+            "display": "t_hiv_stat",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "0cf394a7-1743-5c95-912a-c9367637f920",
+            "code": "t_breastfeeding",
+            "display": "t_breastfeeding",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "316118ec-3583-5309-a609-217486529320",
+            "code": "t_date_clin_ev_rep",
+            "display": "t_date_clin_ev_rep",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "ee0eac93-451c-546e-aade-ccb481600e29",
+            "code": "t_pregnant",
+            "display": "t_pregnant",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "c115bc51-a2b4-5998-ae30-708923b7117a",
+            "code": "t_bp_status",
+            "display": "t_bp_status",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "7253dda5-3fe9-5aa7-93f2-b15de3272827",
+            "code": "t_date_cohort_bsl",
+            "display": "t_date_cohort_bsl",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "15b79024-9ca4-5607-a0fc-3c03058eea83",
+            "code": "dob3",
+            "display": "dob3",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "f946f149-5da2-5e40-97ed-3e6aa54c9a66",
+            "code": "t_cesi_type",
+            "display": "t_cesi_type",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "80d74338-c7ac-55b0-89d7-9bb0f956eb53",
+            "code": "t_tb_history",
+            "display": "t_tb_history",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "7a90647f-6710-5818-bb41-fc344c8ffcda",
+            "code": "t_other_drugs",
+            "display": "t_other_drugs",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "e2a185e3-c15b-50d8-9592-8da30b69faeb",
+            "code": "t_thrombosis",
+            "display": "t_thrombosis",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "d5f59dd2-4117-546e-b13d-f81758e41eba",
+            "code": "t_drug_reaction",
+            "display": "t_drug_reaction",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "f55b1720-a60c-5587-9e6a-08bf6b76cfd1",
+            "code": "t_peripheral_arterial_disease",
+            "display": "t_peripheral_arterial_disease",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "fb9b5bbb-b85e-516d-91aa-c7b9473ed0c8",
+            "code": "t_smok_stat",
+            "display": "t_smok_stat",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "b548cdc5-d948-51e8-af49-f572d5904248",
+            "code": "t_rbg",
+            "display": "t_rbg",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "49996015-a250-5c57-a1b8-fff52ae15b84",
+            "code": "t_ckd",
+            "display": "t_ckd",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "92219eb6-3583-5065-b265-00d378efc302",
+            "code": "t_hiv_care_status",
+            "display": "t_hiv_care_status",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "25085c70-9a54-52f6-81a4-1c26097c6d21",
+            "code": "t_other_dx",
+            "display": "t_other_dx",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "6e3f84cf-1d6a-50a2-978f-dc317313cf27",
+            "code": "t_bg_cat",
+            "display": "t_bg_cat",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "414b185f-91c6-50cb-b2b4-ff404349e49c",
+            "code": "t_dm_tx",
+            "display": "t_dm_tx",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "bc6dfdc8-8099-5de5-8bab-e447a3fb6b01",
+            "code": "t_clin_ev_details",
+            "display": "t_clin_ev_details",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "29417cd4-7e47-5a66-bec9-d324dd0c1996",
+            "code": "t_mi_stat",
+            "display": "t_mi_stat",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "47b952c4-ec70-5ea8-a3b4-6f00cc208c23",
+            "code": "dob1",
+            "display": "dob1",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "dbbf8f7a-9287-5bb2-adf5-a42dadfc4bbb",
+            "code": "t_date_weight",
+            "display": "t_date_weight",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "c79a9852-e25d-5fa3-8348-4ca9a226b623",
+            "code": "t_aht_tx",
+            "display": "t_aht_tx",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "c279224e-d5d2-5271-a0ee-22137d22d3a2",
+            "code": "dob2",
+            "display": "dob2",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "05ff0145-e8d3-50ad-bd90-8ce56e245231",
+            "code": "t_date_stroke",
+            "display": "t_date_stroke",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "7b6ee8a3-d709-5325-b2a0-34aa973383ec",
+            "code": "t_chronic_liver_disease",
+            "display": "t_chronic_liver_disease",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "3bc09ab1-25d3-5b80-ae96-92b43eae47ad",
+            "code": "t_sterilized",
+            "display": "t_sterilized",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "cd51873b-90ae-5227-b3d4-f350acbe1837",
+            "code": "t_aht_drugs",
+            "display": "t_aht_drugs",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "3b08744b-0e61-583c-993c-11a86759393d",
+            "code": "t_date_menarche_gr",
+            "display": "t_date_menarche_gr",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "8b4e6e9e-8483-5407-af47-fee5749b349b",
+            "code": "t_date_height",
+            "display": "t_date_height",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "83cf6db8-a607-5ae2-90f3-cf9360d35dfe",
+            "code": "t_atorva_stat",
+            "display": "t_atorva_stat",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "ea9ccd61-db51-59fe-aee8-a798a4551691",
+            "code": "t_date_art_stat",
+            "display": "t_date_art_stat",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "747440a3-22f8-502f-b2cf-8b7152aaf01c",
+            "code": "t_bg_status",
+            "display": "t_bg_status",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "0a3829a1-4f58-5d93-8455-073d17990277",
+            "code": "t_aht_txs",
+            "display": "t_aht_txs",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "782af41f-6139-55be-8586-fccd1e19a987",
+            "code": "t_other_tx",
+            "display": "t_other_tx",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "8e723e49-45cc-5ded-b6d8-88226d678ca4",
+            "code": "t_height",
+            "display": "t_height",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "7d69fa64-64b6-50e7-96c1-7dc343e23028",
+            "code": "t_date_hiv_stat",
+            "display": "t_date_hiv_stat",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "d0d92c8b-5571-5cca-892a-482e350d0ee8",
+            "code": "t_bmi",
+            "display": "t_bmi",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "852634dd-cd9c-5fd7-84aa-96e88fbe3c5e",
+            "code": "t_aht_diag_cat",
+            "display": "t_aht_diag_cat",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "535dadf8-59a0-5a24-aa17-a410b766d262",
+            "code": "t_date_smok_stat",
+            "display": "t_date_smok_stat",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "565b9f3d-55af-5ed7-af2b-c7166bc5ae4d",
+            "code": "t_art",
+            "display": "t_art",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "e6a6483b-c2fd-52d4-9075-679d2c1ce913",
+            "code": "t_clin_ev_type",
+            "display": "t_clin_ev_type",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "4f7371f3-08a7-593a-a49a-4557cfb7c17c",
+            "code": "t_blindness",
+            "display": "t_blindness",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "5f7cac32-bd9e-542b-9403-df8b25855847",
+            "code": "t_ass_stat",
+            "display": "t_ass_stat",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "6ac6bdc8-ebe1-5cb3-b6d0-728aea4f83fe",
+            "code": "t_date_initial_symp",
+            "display": "t_date_initial_symp",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "be5fe60a-76f8-5eed-af38-afe4d3f4a949",
+            "code": "t_cervical_cancer",
+            "display": "t_cervical_cancer",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "243e996e-1a3b-525a-b42c-4812c5d4ef6c",
+            "code": "t_dm_drugs",
+            "display": "t_dm_drugs",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "c64789db-6c23-50ac-9161-2f5eed6fd344",
+            "code": "t_menarche",
+            "display": "t_menarche",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "6347c999-3a12-589a-91bb-3c5c7b38b75b",
+            "code": "t_date_preg_bf",
+            "display": "t_date_preg_bf",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "d357c4b9-c96e-5e55-8efd-7cabf0d70bed",
+            "code": "t_date_cesi_gr",
+            "display": "t_date_cesi_gr",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "ed723e0c-9852-5ade-a26f-9f132e5e8bb1",
+            "code": "t_heart_failure",
+            "display": "t_heart_failure",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "abce9860-6049-535d-ab12-6338a6ec903d",
+            "code": "t_date_drug_reaction",
+            "display": "t_date_drug_reaction",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "127c8af0-31fb-5ace-b522-1593717041f4",
+            "code": "t_date_thrombosis",
+            "display": "t_date_thrombosis",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "807aaf4c-4c49-5c88-b54b-2f72df1e1f60",
+            "code": "t_aht_fc_rsn",
+            "display": "t_aht_fc_rsn",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "b72d1ab8-527e-5a61-8d6f-db7781835889",
+            "code": "t_metfin_dose",
+            "display": "t_metfin_dose",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "0927caae-3881-509a-a9b5-e9f52efa80f3",
+            "code": "t_ref_arm",
+            "display": "t_ref_arm",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "650db859-9fcf-5561-a3d3-4b4f11200b2e",
+            "code": "t_date_chronic_liver_disease",
+            "display": "t_date_chronic_liver_disease",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "01af1085-7719-5c00-954c-e9ca69c07962",
+            "code": "t_date_ckd",
+            "display": "t_date_ckd",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "1bffe742-3719-5f73-93d5-d1907c3a3354",
+            "code": "t_dm_dxs",
+            "display": "t_dm_dxs",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "2a1715e0-2e54-5a12-aae8-c8b1089af4ae",
+            "code": "t_date_neuropathy",
+            "display": "t_date_neuropathy",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "634af5ce-fad0-544a-90a3-f72a66e26230",
+            "code": "t_warn_symp",
+            "display": "t_warn_symp",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "c65e0e7d-2047-5891-874b-8519cccbcd75",
+            "code": "t_lung_disease",
+            "display": "t_lung_disease",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "20f5a889-4ce3-5d99-ba40-6e5c314f0459",
+            "code": "t_date_peripheral_arterial_disease",
+            "display": "t_date_peripheral_arterial_disease",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "71c1e227-6e8a-5ba5-bba4-6ac75bf52d1f",
+            "code": "t_fbg",
+            "display": "t_fbg",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "e6228020-6a2c-5e0e-880c-23ebeace70ba",
+            "code": "t_date_lung_disease",
+            "display": "t_date_lung_disease",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "e7d5f20e-6908-548c-8386-c100bdb4e2ae",
+            "code": "t_diabetic_foot",
+            "display": "t_diabetic_foot",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "69f8ed3b-35d0-534e-b6d2-fb1b175ddbfd",
+            "code": "t_neuropathy",
+            "display": "t_neuropathy",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "a4a6ef78-6121-5a7a-8f38-97e1e0f28bba",
+            "code": "t_date_diabetic_foot",
+            "display": "t_date_diabetic_foot",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "24d1b6f2-0c1b-5d5c-8d9e-cfa44e2961ca",
+            "code": "t_clin_ev",
+            "display": "t_clin_ev",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "2173b0a1-60ea-5dc2-b79a-2ec4f56f0e24",
+            "code": "t_dm_fc_rsn",
+            "display": "t_dm_fc_rsn",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "8e3de217-b564-57e4-aed4-f0394cb683cf",
+            "code": "t_dia_avg",
+            "display": "t_dia_avg",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "a6e0a7a0-6f8c-52e8-ba3e-6f8fd3484219",
+            "code": "t_amlohct_dose",
+            "display": "t_amlohct_dose",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "e930c0b7-e476-5b52-9631-191c2f163cf8",
+            "code": "t_date_sce_gr",
+            "display": "t_date_sce_gr",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "d734bbfa-6e82-510d-a11c-2efae4fc5ef1",
+            "code": "t_sys_avg",
+            "display": "t_sys_avg",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "7421f4b2-c00e-5de9-9f3b-5285d23683a5",
+            "code": "sex",
+            "display": "sex",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "1a3f827b-8992-5abc-9eb2-40c165101117",
+            "code": "preg_warn_n",
+            "display": "You marked the participant as pregnant. Please make sure this is correct before continuing",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "InteractSet"
+                }
+            ]
+        },
+        {
+            "id": "87ead6c3-9f04-5ff0-958b-e2abde8af620",
+            "code": "no",
+            "display": "No",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Value"
+                }
+            ]
+        },
+        {
+            "id": "cb9ba0f2-4a2e-54e3-a6d1-ae4ae64ff3af",
+            "code": "refused",
+            "display": "Refused to say / O sitiloe ho araba",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Value"
+                }
+            ]
+        },
+        {
+            "id": "05cf2896-6c90-5b21-b4a1-b078a43d541c",
+            "code": "yes",
+            "display": "Yes",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Value"
+                }
+            ]
+        },
+        {
+            "id": "f6fd18a3-6eb4-5235-a341-a4e48f2a4d47",
+            "code": "last_preg_stat",
+            "display": "According to previous forms, the participant is *currently pregnant*. Is this still correct?",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Coded"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "a48e9d91-6ee2-5acd-8352-c86487d16c04",
+            "code": "cur_breastfeeding",
+            "display": "Is the participant currently breastfeeding?",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Coded"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "5f1c706c-42b6-591a-b527-8e50c45208e3",
+            "code": "unknown",
+            "display": "Unknown / Ha ho tsebahale",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Value"
+                }
+            ]
+        },
+        {
+            "id": "7ca889f5-f2b6-5ae5-83de-dc60cf224f49",
+            "code": "cur_pregnant",
+            "display": "Is the participant currently pregnant?",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Coded"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "f70308fa-ceb7-51b3-bd0a-a034e8ae0416",
+            "code": "last_breastfeeding_stat",
+            "display": "According to previous forms, the participant is *currently breastfeeding*. Is this still correct?",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Coded"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "7ed91a14-c6dd-5b6c-af5d-bc3a0cd790d0",
+            "code": "date_last_vis",
+            "display": "NO_LABEL",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "a061f093-3b9a-518c-b26d-51abb91368ae",
+            "code": "breastfeeding",
+            "display": "Breastfreeding status",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "1261e8f3-e0c3-543a-9264-43872e620fab",
+            "code": "preg_text",
+            "display": "Symptoms (choice filter)",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "cd1d798e-7265-5fba-968a-15811eba5185",
+            "code": "date_preg_bf",
+            "display": "Date pregnancy and breastfeeding status assessed",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "35a3aafd-e115-5a1b-9926-0b8bbc1d4fb4",
+            "code": "pregnant",
+            "display": "Pregnancy status",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "83395dc8-1b0f-5023-8afc-5c8a7805051f",
+            "code": "sex_text",
+            "display": "Sex (choice filter)",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "66c82671-7432-5eda-abc7-037cd36b3fa5",
+            "code": "date_cohort_bsl",
+            "display": "NO_LABEL",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "6b97cc94-f18d-57c4-856a-f9224aa6c2a5",
+            "code": "date_of_birth",
+            "display": "Date of birth",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "a727d7d9-9a48-5a54-b2e9-7ef93b4eb5e9",
+            "code": "symp_warn_preg_n",
+            "display": "The reported symptom is a danger sign during pregnancy",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "InteractSet"
+                }
+            ]
+        },
+        {
+            "id": "4f20ac50-7b2c-5927-b0a6-d3525ddeaf7c",
+            "code": "symp_warn_n",
+            "display": "The reported symptom is a danger sign",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "InteractSet"
+                }
+            ]
+        },
+        {
+            "id": "3dd41fda-1615-5151-9d8a-85fc0fc5b108",
+            "code": "call_sup_warn_n",
+            "display": "*Call your supervisor to discuss the case. If the supervisor cannot be called, refer the participant to the health facility*",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "InteractSet"
+                }
+            ]
+        },
+        {
+            "id": "46157bd0-54a8-5bbb-bbc3-2a4736cf10fc",
+            "code": "symp_yn",
+            "display": "Does the participant currently have any medical complaint?",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Coded"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "10b04009-9db0-55de-80af-10756614fec5",
+            "code": "considering",
+            "display": "Considering",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Value"
+                }
+            ]
+        },
+        {
+            "id": "a322f776-0cc3-50bf-809c-4e95ab083763",
+            "code": "symp_ref",
+            "display": "Does the participant agree to go to the Health Center?",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Coded"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "63b744af-2198-5f47-a0d6-b4ad32b85f3f",
+            "code": "sev_symp_yn",
+            "display": "Is the symptom acute and severe?",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Coded"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "8dc87dda-24b3-5f7d-a5f5-5dacceb8a6bf",
+            "code": "no_concern",
+            "display": "Does not believe the condition is dangerous / Ha lumele lefu lena lele kotsi.",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "fb8c36b6-6a7a-5d03-938e-89f6793fa98f",
+            "code": "no_money",
+            "display": "No money for transport / Ha ho chelete ea ho palama",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "bc155ea0-ecbf-548a-8a33-fb27bff20260",
+            "code": "no_time",
+            "display": "No time / Haa na nako",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "68fd6c84-ca45-567e-a78c-955436cb4c5e",
+            "code": "no_trust_in_diagnosis",
+            "display": "Does not trust the measurements made / Ha a ts'epe sephetho tse entsoeng",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "68841024-fe9f-500c-b016-63af7ddad9bb",
+            "code": "no_trust_in_health_center",
+            "display": "Does not believe to get good care at the HC/ Hospital / Ha a lumele hore o tla fumana tlhokomelo kapa kalafo setsing/ sepetlele",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "2089affb-e4fb-5771-ac5e-c6bc33246451",
+            "code": "other",
+            "display": "Other / Tse ling",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "3a6a6c5a-9692-5e5d-9390-a6100fd246b2",
+            "code": "symp_ref_refuse",
+            "display": "Why does the participant refuse to go to the Health Center / Hospital?",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Question"
+                }
+            ]
+        },
+        {
+            "id": "6c55c224-a4f7-5636-9ae6-ee6f3aad2cb5",
+            "code": "breathing_problem",
+            "display": "Difficulty in breathing / Bothata ba ho hema",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "87311933-bad7-5784-a7f6-b0653d2d888d",
+            "code": "chest_pain",
+            "display": "Persistent pain or pressure in the chest / Bohloko bo sa feleng kapa khatello ea sefuba",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "47629f69-9123-5757-a208-5adcff27c997",
+            "code": "new_confusion",
+            "display": "New confusion defined as new episode of irrelevant speech / Pherekano e ncha e hlalosoang e le karolo e ncha ea puo e sa amaneng",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "a2cf37a7-47d0-5e18-ba4f-87fc196121e0",
+            "code": "diarrhea",
+            "display": "Persistent diarrhea / Lets'ollo le sa eeng moriting",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "7c983b2b-ab28-580b-b599-0e3a3567d502",
+            "code": "fatigue",
+            "display": "New pronounced tiredness defined as inability to stay awake / Mokhathala o mocha o hlalosoang o sa khone ho lula o falimehile",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "39436543-5d35-507c-8997-955af9f44435",
+            "code": "fever",
+            "display": "Prolonged fever / Mocheso o phahameng oa nako e telele",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "b88e217b-a4aa-55b7-ba12-7b004e807e22",
+            "code": "leg_pain",
+            "display": "New severe leg pain with swelling and redness / Bohloko bo matla ba maoto ho tsamaeang le ho rurha mmoho le ho retela ho ho cha",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "b3d8f284-a52c-52c0-b2cf-e0f2f5e32f09",
+            "code": "paresis",
+            "display": "New-onset numbness or sudden weakness in one or more extremities / Ho shoa bohatsu kapa ho tsérema hoa maoto le matsoho ho ho cha",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "7ab6fcb6-753a-56b6-9bf7-028163e2a7af",
+            "code": "reduced_no_fetal_mov",
+            "display": "Reduced or no fetal movements (baby moving less or not moving at all in the belly, but it has moved before) / Ho se bapale hantle (ho fokotsehileng) kapa ho sieo hoa ngoana ka popelong.",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "c6c8ad01-3fa4-5863-a0eb-34830008655e",
+            "code": "seizures",
+            "display": "Seizures (fits/jerks) / Ho tia le ho thakhinya hoa mesifa",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "70cf857f-632d-5b76-b0e4-3d725e3ac903",
+            "code": "severe_abdominal_pain",
+            "display": "Severe and persistent abdominal pain / Bohloko bo sekhahla, bo sa eeng moriting ba ka mpeng",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "ba5163ec-71fb-5f4e-a823-61fbb12859b6",
+            "code": "severe_headache",
+            "display": "Severe headache / Ho opeloa ke hlooho haholo",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "7d67c3a2-340e-5b82-885d-a6df38f89e8c",
+            "code": "swelling",
+            "display": "Swelling of face and hands / Ho ruruha sefahleho le matsoho",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "a21da121-fccd-56dd-b0a8-a546e1915006",
+            "code": "uti_symp",
+            "display": "Pain/burning while urinatating / Ho utloa bohloko ha o sesa kapa mosese o chesang.",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "503375e0-d4f9-52cc-9702-40dbb57735d3",
+            "code": "vaginal_bleeding",
+            "display": "Vaginal bleeding / Ho tsoa mali ka lesotho/bothong",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "c4328e8d-011b-5a57-8aa4-6e0532502c9e",
+            "code": "vaginal_discharge",
+            "display": "Abnormal (bad smeeling and plenty) vaginal discharge / Seso se sa tloaelehang (se sengata ebile se na le monko)",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "11234f14-ddda-570e-bf26-7132863d9155",
+            "code": "very_ill",
+            "display": "Looking very ill / Ho shebahala o kula haholo",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "bad5ac32-84f5-52ba-9d06-aeca0f179207",
+            "code": "very_pale",
+            "display": "Very pale skin or gums / Ho fifala hoa letlalo kapa marenene",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "8ecb3e1e-ab9d-5758-ae09-1beebf05ad64",
+            "code": "water_breaking",
+            "display": "Breaking of water / Ho phumuoa nkho",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "2d2e497b-f4ce-5964-bd15-237a52b7b6cf",
+            "code": "other_symptom",
+            "display": "Other symptom / Seso se sa tloaelehang (se sengata ebile se na le monko)",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "4df88a8b-a487-5c32-b322-5f613109d3b1",
+            "code": "symptom",
+            "display": "What symptom does the client have?",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Question"
+                }
+            ]
+        },
+        {
+            "id": "4a3c5815-d016-59bc-868a-1a6473ace169",
+            "code": "initial_symp_details",
+            "display": "Explain relevant circumstances of the event:",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Text"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "bfcf9561-aefa-5072-96b4-991aa217eae9",
+            "code": "no_sup_call_warn_rs",
+            "display": "Why was the supervisor not called?",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Text"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "4a9a1c7d-4d6c-5e50-aacf-8840aaba032b",
+            "code": "symp_ref_refuse_spec",
+            "display": "Specifiy the other reason for refusing to go to the Health Center / Hospital:",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Text"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "9f8c33d7-46ca-52aa-83bb-4301347fb061",
+            "code": "non_sev_symp",
+            "display": "Describe main symptom:",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Text"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "fddfc795-0d79-5bb7-91a0-3a407908a3f6",
+            "code": "other_symp",
+            "display": "Specify the symptom:",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Text"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "b116f1fa-ff15-54c5-980f-dea5192c7eb3",
+            "code": "clin_ev",
+            "display": "Clinical event present",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "01128ec9-eef8-5f0f-8c03-3eacece20624",
+            "code": "initial_symp",
+            "display": "Warning symptoms",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "c4488b3d-c329-5238-89e5-ca2b6f07fd5e",
+            "code": "clin_ev_type",
+            "display": "Type of clinical event",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "ac7cbcdf-50a1-56fb-854f-580e44782089",
+            "code": "date_initial_symp",
+            "display": "Date warning symptoms assessed",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "dccfed57-74c0-5ee3-9fe3-e3d9a9102f2a",
+            "code": "warn_symp",
+            "display": "Warning symptoms",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "7646226c-0ac1-5f73-b02a-9e2144372b09",
+            "code": "date_clin_ev_rep",
+            "display": "Date clinical event was reported",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "9d368a85-c754-5bde-904b-62e5e90979f6",
+            "code": "symptom_l",
+            "display": "Warning symptoms (label)",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "973f0126-f067-5f5f-a81c-4c081221feb6",
+            "code": "date_clin_ev",
+            "display": "Date clinical event happened",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "2bbab0b1-0d75-50b2-bde5-f32aecc5dcdd",
+            "code": "clin_ev_details",
+            "display": "Details of clinical event",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "093dd47e-005e-53b0-a3e2-ffae19996a01",
+            "code": "date_warn_symp",
+            "display": "Date warning symptoms reported",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "9e8a6b98-f082-5859-ad1c-73a316e4e94a",
+            "code": "true",
+            "display": "Yes",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Value"
+                }
+            ]
+        },
+        {
+            "id": "726c4481-d9d5-530b-a969-3f4d666eefed",
+            "code": "false",
+            "display": "No",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Value"
+                }
+            ]
+        },
+        {
+            "id": "fd08ccfa-95dd-5b6e-81e7-8de0968a0cc0",
+            "code": "sup_call_warn_yn",
+            "display": "Has the supervisor been called?",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Coded"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "08740828-004e-5e29-8fa7-dec50ae6b025",
+            "code": "oth_symp_ref",
+            "display": "Is the symptom so severe that you want to refer the participant to the health center?",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Coded"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "e2b12cdf-9d8f-5e44-a06a-b14f6731ad74",
+            "code": "marstat_tr",
+            "display": "You selected the following relationship status: ${marstat_l}. Please verify your selection",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "InteractSet"
+                }
+            ]
+        },
+        {
+            "id": "b6cdbd09-8435-55b5-9683-f24b4b4a1a2d",
+            "code": "1",
+            "display": "Working for pay / Ho sebeletsa moputso",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Value"
+                }
+            ]
+        },
+        {
+            "id": "febc3d48-54f2-5e28-b7c4-be0c64a762d7",
+            "code": "10",
+            "display": "Unemployed but not actively searching for a job in the last four weeks / Ha a sebetse empa a sa batle mosebetsi ka mafolofolo libekeng tse 'ne tse fetileng",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Value"
+                }
+            ]
+        },
+        {
+            "id": "f193b07f-540d-54ce-8eb3-46b5eecfdc42",
+            "code": "2",
+            "display": "Self-employed / Oa itsebetsa",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Value"
+                }
+            ]
+        },
+        {
+            "id": "f0090b4a-53ad-527a-91f5-122711e68fbf",
+            "code": "3",
+            "display": "Working on own plot or looking after livestock /Ho sebetsa jareteng ea hae kapa ho alosa mehlape",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Value"
+                }
+            ]
+        },
+        {
+            "id": "cab5502c-f734-5821-bc0f-a302674573d4",
+            "code": "4",
+            "display": "Helping another family member with their business, without pay /Ho thusa setho se seng sa lelapa ka khoebo ea bona, ntle le tefo",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Value"
+                }
+            ]
+        },
+        {
+            "id": "695b4b64-f2bc-5548-9142-60b719cbac86",
+            "code": "5",
+            "display": "Full-time scholar or student at school, university, college or another educational institution /Moithuti oa nako eo tle kapa moithuti sekolong, univesithing, kolecheng kapa setsing se seng sa thuto",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Value"
+                }
+            ]
+        },
+        {
+            "id": "a249cb87-ec4c-55cd-a92b-f08f3a990be6",
+            "code": "6",
+            "display": "Homemaker (looking after children / others / home) / Mohlokomeli oa malapa ( ke hlokomela bana/ba bang/ malapa)",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Value"
+                }
+            ]
+        },
+        {
+            "id": "2fba6def-c2e5-5f67-b306-5dd94af80830",
+            "code": "7",
+            "display": "Long term sick or disabled / Ho kula kapa ho holofala ka nako e telele",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Value"
+                }
+            ]
+        },
+        {
+            "id": "e1924dde-3cdb-562a-9641-bb1d10d1d5e5",
+            "code": "8",
+            "display": "Retired /tlohetse mosebetsi, osale phomolong ea molao",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Value"
+                }
+            ]
+        },
+        {
+            "id": "8ff157eb-f30b-582c-ac8a-3d3ffa788263",
+            "code": "9",
+            "display": "Unemployed and searching for a job in the last four weeks /Ha ba sebetse mme esale ba batla mosebetsi libekeng tse 'ne tse fetileng",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Value"
+                }
+            ]
+        },
+        {
+            "id": "5b42ef9e-8e22-544b-a301-302b1b38406a",
+            "code": "97",
+            "display": "Refused to say / O hana ho bua",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Value"
+                }
+            ]
+        },
+        {
+            "id": "37c015b9-7405-5dbd-834d-5e9bfa5dd733",
+            "code": "98",
+            "display": "Unknown / Hali tsejoe",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Value"
+                }
+            ]
+        },
+        {
+            "id": "e2e0d72d-26f7-5859-9217-e3b2e6c0c348",
+            "code": "employ",
+            "display": "Main work status over the past 12 months:",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Coded"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "67b3ddf2-8503-514b-99c0-66aedb64fadb",
+            "code": "educ",
+            "display": "Highest level of education completed:",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Coded"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "e493bcd5-26f7-51dd-9713-475f96273bf9",
+            "code": "marstat",
+            "display": "What is your relationship status?",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Coded"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "f805ad2e-7c63-56f8-9900-fa2835f9ebd8",
+            "code": "educ_l",
+            "display": "Education (label)",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "5968d4dc-d5f9-5c4b-a009-4b5d1d92837c",
+            "code": "employ_l",
+            "display": "Employment (label)",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "f64ae11f-636b-5822-a0ac-b47ba4349719",
+            "code": "marstat_l",
+            "display": "Relationship status (label)",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "b2b4216b-0727-5e32-93cf-e246a15d517d",
+            "code": "hiv_stat_n",
+            "display": "You have selected the current HIV status: ${hiv_stat_l}. Please make sure this is correct before continuing",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "InteractSet"
+                }
+            ]
+        },
+        {
+            "id": "92c04c60-6f08-5a4c-bf3c-0e55a9000aff",
+            "code": "art_trig",
+            "display": "This participant is HIV positive and does not receive ART. Refer him/her to the health center to receive treatment",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "InteractSet"
+                }
+            ]
+        },
+        {
+            "id": "a52399c4-1660-5a4d-b0b7-9763911e6eba",
+            "code": "hiv_stat_cur",
+            "display": "What is the participant's current HIV status?",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Coded"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "9d60b6bb-67aa-530d-b542-0ae1c405bded",
+            "code": "art",
+            "display": "Is the participant currently taking ART (HIV medication)?",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Coded"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "336e1a5e-53b0-5cb1-80e8-f41b80b1e30c",
+            "code": "date_art_stat",
+            "display": "Date ART (HIV medication) assessed",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "03365acc-5b85-5aa5-bcc6-94bc839c5c85",
+            "code": "date_hiv_stat",
+            "display": "Date HIV status assessed",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "7bd0944b-1eb2-5039-9cd5-7e5dd60fed52",
+            "code": "hiv_stat",
+            "display": "HIV status",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "e11b8dab-0076-590b-9edb-9443f9d21a7c",
+            "code": "hiv_stat_l",
+            "display": "HIV status (label)",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "5ba67b71-3525-59b2-880f-380005408512",
+            "code": "tb_history",
+            "display": "Has the participant ever been diagnosed or recently diagnosed with tuberculosis?",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Coded"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "eb6e2dee-1ca6-50b7-90ee-c28677bbcaeb",
+            "code": "any_comor_n",
+            "display": "Is the participant suffering from any of the following:",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "InteractSet"
+                }
+            ]
+        },
+        {
+            "id": "05bf3525-4138-52a4-bbe1-8b9a583e8549",
+            "code": "ceca_dx_tx_sup_n",
+            "display": "Call your supervisor to discuss the case and see how you can support the participant if they have difficulty accessing cervical cancer treatment",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "InteractSet"
+                }
+            ]
+        },
+        {
+            "id": "b317f8fd-1f7a-5b66-ae99-2b49dd4e62a5",
+            "code": "ceca_dx_tx_yes_n",
+            "display": "Emphasize to the participant the importance of attending all scheduled medical appointments and following the recommended care plan to ensure proper treatment and monitoring. Inform her that you will no longer be conducting follow-up visits regarding cervical cancer screening",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "InteractSet"
+                }
+            ]
+        },
+        {
+            "id": "0a1b5c79-52af-58ef-b22a-a1bd5e1cfea1",
+            "code": "ceca_dx_tx_no_n",
+            "display": "Encourage the participant to attend all scheduled medical appointments and follow the recommended care plan. Explain that receiving proper treatment and regular medical follow-up is very important to control the disease, prevent complications, and improve recovery and quality of life. Emphasize that cervical cancer is a serious disease athat can be deadly if not treated. Inform her that you will no longer conduct follow-up visits regarding cervical cancer screening",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "InteractSet"
+                }
+            ]
+        },
+        {
+            "id": "843b786a-b0d9-5eda-9a72-4068f1cfc9fd",
+            "code": "thrombosis",
+            "display": "Thrombotic disorders (deep vein thrombosis/pulmonary embolism/coagulation disorders)",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Coded"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "fb96d3f9-8b8f-57bd-b281-e247e4cd951c",
+            "code": "ckd",
+            "display": "Chronic kidney disease (CKD)",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Coded"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "42b7dacf-64b1-5ebb-b1f9-351f7358fbf3",
+            "code": "blindness",
+            "display": "Blindness/severe vision impairment",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Coded"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "8f722a2c-51b4-5880-a344-2dccae410776",
+            "code": "stroke",
+            "display": "Stroke",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Coded"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "f10ab450-a48b-5c7a-8be5-b0a8e1d520c3",
+            "code": "diabetic_foot",
+            "display": "Diabetic foot syndrom",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Coded"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "7bef2380-3230-521e-9226-aebb8fd52546",
+            "code": "chronic_liver_disease",
+            "display": "Chronic liver disease (cirrhosis or non-malignant liver tumors)",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Coded"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "ed5f02e2-c6c4-51f7-943b-83c9ae6dea5c",
+            "code": "heart_failure",
+            "display": "Heart failure",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Coded"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "8bb93560-0993-5451-aa21-43c344bd0cca",
+            "code": "mi",
+            "display": "Myocardial infarction (heart attack)",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Coded"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "7f54a9bb-a36d-5aa2-838f-ca0f303a7f89",
+            "code": "lung_disease",
+            "display": "Chronic lung disease (asthma/COPD/bronchitis)",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Coded"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "6eafe245-8e00-5fe3-a4e4-73ed98377220",
+            "code": "cervical_cancer_tx",
+            "display": "Is the participant currently receiving treatment or care for cervical cancer?",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Coded"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "b13c0093-8313-5790-8b67-574533319fd0",
+            "code": "cervical_cancer",
+            "display": "Cervical cancer",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Coded"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "0b333720-6f3b-5981-85e1-32449da56f2b",
+            "code": "peripheral_arterial_disease",
+            "display": "Peripheral arterial disease",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Coded"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "e6a28975-3546-5d6a-b748-cc6405b8e526",
+            "code": "neuropathy",
+            "display": "Peripheral neuropathy",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Coded"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "a6be1d32-26d7-53b3-b429-ecb6ecb94086",
+            "code": "any_comor",
+            "display": "Does the participant have any CHRONIC DISEASE OF INTEREST or has the participant ever been diagnosed with a STROKE or a MYOCARDIAL INFARCTION?",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Coded"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "68404918-9be8-50d6-99f2-64ad516af066",
+            "code": "date_cervical_cancer",
+            "display": "Date cervical cancer diagnosis (leave the field empty if unknown)",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Date"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "e4ba78ba-b451-513e-a2d0-fb5e8352c2a0",
+            "code": "date_blindness",
+            "display": "Date of onset of blindness/vision impairment diagnosis (leave the field empty if unknown)",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Date"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "10aa29dd-74b2-5521-8bff-56b37a7755fd",
+            "code": "date_stroke",
+            "display": "Date of last stroke episode (leave the field empty if unknown)",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Date"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "5f5122c6-f015-5556-b2ca-dac7b48798c4",
+            "code": "date_neuropathy",
+            "display": "Date of neuropathy diagnosis (leave the field empty if unknown)",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Date"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "0a25fab1-7cec-5ac9-9cdc-7b4e14f7854d",
+            "code": "date_diabetic_foot",
+            "display": "Date of diabetic foot syndrom diagnosis (leave the field empty if unknown)",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Date"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "e0a01831-6b27-5f8d-9597-da7b95ec3494",
+            "code": "date_chronic_liver_disease",
+            "display": "Date chronic liver disease diagnosis (leave the field empty if unknown)",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Date"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "76e2f2a5-f8a9-5db5-bec0-b3af31da7c53",
+            "code": "date_mi",
+            "display": "Date of last myocardial infarction episode (leave the field empty if unknown)",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Date"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "2dab09d3-e6ac-5d05-a539-2a281a9fa84b",
+            "code": "date_lung_disease",
+            "display": "Date chronic lung disease diagnosis (leave the field empty if unknown)",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Date"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "f79bcba7-4ec5-5abe-91fb-dc24adc50e1c",
+            "code": "date_thrombosis",
+            "display": "Date of last thrombotic disorder episode (leave the filed empty if unknown)",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Date"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "ff0fd17f-1f33-53d6-a0dc-e9d5d0254bac",
+            "code": "date_peripheral_arterial_disease",
+            "display": "Date of peripheral arterial disease diagnosis (leave the field empty if unknown)",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Date"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "a060524c-9770-5f1d-99a8-a4374b1baee7",
+            "code": "date_ckd",
+            "display": "Date CKD diagnosis (leave the field empty if unknown)",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Date"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "45664b41-5c73-5aad-9788-1ebb625062b5",
+            "code": "date_heart_failure",
+            "display": "Date heart failure diagnosis (leave the field empty if unknown)",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Date"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "450e529a-a029-5f20-abb5-629b75e15944",
+            "code": "stroke_stat",
+            "display": "Stroke status",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "58ee1bc5-4f6c-5116-af7f-e56b86164988",
+            "code": "mi_stat",
+            "display": "Myocardial infarction status",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "f656037a-09b9-5ed2-8977-3343ef62d270",
+            "code": "smok_stat",
+            "display": "What is the current smoking status of the participant?",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Coded"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "e3559db8-f620-5cff-8453-c34866840f35",
+            "code": "date_smok_stat",
+            "display": "Date smoking status assessed",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "cf2b6597-7904-5bef-a6cd-ec4a33618fa6",
+            "code": "menarche_yn",
+            "display": "Has the participant already had her first menstrual period?",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Coded"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "efbef40c-99b9-5083-b709-71231b2e9924",
+            "code": "date_menarche_gr",
+            "display": "Date menarche assessed",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "8e24bf66-ec93-5420-8c02-a25b22700a67",
+            "code": "menarche",
+            "display": "Menarche (first menstruation)",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "89872e66-c608-51eb-8fdf-77b13b33c70f",
+            "code": "sterilized",
+            "display": "History of sterilization (vasectomy, hysterectomy, or tubal ligation)",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "407a6187-2cd1-57de-9069-bc33e9bb1f21",
+            "code": "hysterectomy",
+            "display": "Hysterectomy (yes or no)",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "38404ba7-70ac-54f2-bab2-d342b3f7e61f",
+            "code": "tubal_ligation",
+            "display": "Has the participant had her fallopian tubes tied (tubal ligation) to prevent pregnancy? Explain that this means the tubes that carry eggs from the ovaries to the womb have been tied or blocked, so she cannot become pregnant",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Coded"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "b5071447-07bd-556a-88cd-1a1ab3403464",
+            "code": "hysterectomy_yn",
+            "display": "Has the participant had her uterus surgically removed (hysterectomy)? Tell the participant that this means the womb (the organ where a baby grows) has been removed. After this, she cannot become pregnant",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Coded"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "0515e860-bd41-5597-99d5-c12842ec57b6",
+            "code": "vasectomy",
+            "display": "Has the participant’s partner had a vasectomy (tubes tied) to prevent pregnancy? Explain that this means the tubes that carry sperm from the man’s testicles have been cut or blocked, so the partner cannot make a woman pregnant",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Coded"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "6db186cf-7d9d-5c50-bc7a-92e8f30b2443",
+            "code": "height_war_n",
+            "display": "The height recorded is outside the expected range of 100-200. Please make sure you enter the correct value",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "InteractSet"
+                }
+            ]
+        },
+        {
+            "id": "429ef2b7-853f-51ee-944f-3087e3e00904",
+            "code": "bmi_n",
+            "display": "BMI: ${bmi}",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "InteractSet"
+                }
+            ]
+        },
+        {
+            "id": "db213508-d6b2-5cf0-a201-690589d91c2f",
+            "code": "weight_warn_n",
+            "display": "The weight recorded is outside the expected range of 30-100 kg. Please make sure you enter the correct value",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "InteractSet"
+                }
+            ]
+        },
+        {
+            "id": "470ee01a-ba5c-5845-be30-816dc7db1bb7",
+            "code": "bmi_warn_n",
+            "display": "The BMI recorded is outside the expected range of 14-40. Please make sure you enter the correct weight and height",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "InteractSet"
+                }
+            ]
+        },
+        {
+            "id": "14014f9e-1c06-58f4-bb3e-9a88a9ae1451",
+            "code": "weight",
+            "display": "Weight (kg)",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Numeric"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "85ea1d7e-3996-55fc-ac71-c084be119fd8",
+            "code": "height",
+            "display": "Height (cm)",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Numeric"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Symptom-Finding"
+                }
+            ]
+        },
+        {
+            "id": "049eeec1-b0f8-5eec-9285-ca7c411c7cce",
+            "code": "date_height",
+            "display": "Date height measured",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "3c3c281c-6ea2-5729-9bd1-8ffc690b6ce2",
+            "code": "bmi",
+            "display": "BMI",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "7212a87c-bfa4-5606-bfe5-34c81fe273ed",
+            "code": "date_weight",
+            "display": "Date weight measured",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "99726e27-6564-5967-9955-055b7849e1ac",
+            "code": "bk_today_n",
+            "display": "Date today: ${date_last_vis}",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "InteractSet"
+                }
+            ]
+        },
+        {
+            "id": "d1a6e5a4-e3e6-5360-b1a1-5bd3fcb26497",
+            "code": "bk_preg_n",
+            "display": "Currently pregnant",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "InteractSet"
+                }
+            ]
+        },
+        {
+            "id": "e7f9202d-dc6f-552b-9f07-72a37dc95a46",
+            "code": "bk_n",
+            "display": "VHW Visit",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "InteractSet"
+                }
+            ]
+        },
+        {
+            "id": "336dde55-2d6d-5420-8770-46decfc37c1c",
+            "code": "bk_warn_symp_n",
+            "display": "Referral to health facility due to warning symptoms: ${symptom_l}",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "N/A"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "InteractSet"
+                }
+            ]
+        }
+    ]
+}

@@ -1,5 +1,6 @@
 """Tests for FHIR / CQL concept repeat export (phase 4)."""
 
+import re
 import unittest
 
 from tricc_oo.models.tricc import TriccNodeInteger
@@ -134,6 +135,96 @@ class TestFHIRStrategyRepeatCQL(unittest.TestCase):
         ]
         self.assertEqual(len(repeat_exts), 1)
         self.assertEqual(repeat_exts[0]["valueInteger"], 2)
+
+
+class TestHelperCQLConceptRetrieval(unittest.TestCase):
+    """Concept retrieval must match the code the extraction StructureMap writes.
+
+    See fix/20260914-cql-retrieve-codesystem.md: the retrieves used to filter on a
+    hardcoded SNOMED code system while extraction stamps the project CodeSystem that
+    owns the concept, and ``"http://snomed.info/sct"`` / ``"active"`` were quoted CQL
+    identifiers that no declaration in the library resolved.
+    """
+
+    RETRIEVES = (
+        ("GetObservations", "ObservationHasCode"),
+        ("GetHistoryObservation", "ObservationHasCode"),
+        ("GetConditions", "ConditionHasCode"),
+        ("GetHistoryCondition", "ConditionHasCode"),
+    )
+
+    def setUp(self):
+        self.block = cql_helper_repeat_block()
+        self.helper = CQL_HELPER_TEMPLATE.format(
+            library_id="demo-Helper",
+            fhir_version=FHIR_VERSION,
+            repeat_helpers=cql_helper_repeat_block(FHIR_VERSION),
+            populate_helpers=cql_helper_populate_block(),
+        )
+
+    def test_no_hardcoded_code_system(self):
+        self.assertNotIn("snomed.info/sct", self.helper)
+        self.assertNotIn("Code code from", self.helper)
+        self.assertNotIn('from "', self.helper)
+
+    def test_no_undeclared_quoted_identifier(self):
+        # The library declares no codesystem / code / valueset, so the only quoted
+        # identifier left may be its own name.
+        quoted = set(re.findall(r'"[^"]+"', self.helper))
+        self.assertEqual(quoted, {'"demo-Helper"'})
+        self.assertNotIn('~ "active"', self.helper)
+
+    def test_code_matching_helpers_defined(self):
+        self.assertIn(
+            "define function ObservationHasCode(O Observation, conceptCode String):",
+            self.block,
+        )
+        self.assertIn(
+            "define function ConditionHasCode(C Condition, conceptCode String):",
+            self.block,
+        )
+
+    def test_every_retrieve_filters_on_concept_code(self):
+        for fn, matcher in self.RETRIEVES:
+            with self.subTest(function=fn):
+                body = self._function_body(self.helper, fn)
+                self.assertRegex(body, r"\[(Observation|Condition)\]")
+                self.assertIn(f"{matcher}(", body)
+
+    def test_has_condition_matches_clinical_status_by_code(self):
+        body = self._function_body(self.helper, "HasCondition")
+        self.assertIn("ConditionHasCode(C, code)", body)
+        self.assertIn("C.clinicalStatus.coding CS where CS.code = 'active'", body)
+
+    def test_extraction_code_is_what_the_helper_looks_up(self):
+        """The Helper filters on the bare concept code the extraction rule writes.
+
+        The rule's ``code_system_url`` is resolved per concept, so it deliberately
+        does *not* have to appear anywhere in the Helper CQL — this guards against a
+        hardcoded code system being reintroduced on the read side.
+        """
+        from tricc_oo.converters.fhir.structuremap import build_extraction_rule
+
+        node = TriccNodeInteger(id="w1", name="weight_c", label="Weight (kg)")
+        rule = build_extraction_rule(node, codesystems=None)
+        self.assertEqual(rule.concept_code, "weight_c")
+        self.assertNotIn(rule.code_system_url, self.helper)
+        self.assertEqual(
+            get_observation_cql_accessor(rule.concept_code),
+            "Helper.GetObservationValue('weight_c')",
+        )
+
+    def test_encounter_scoping_and_status_filter_kept(self):
+        block = self.block
+        self.assertIn("O.encounter.reference = 'Encounter/' + encounterid", block)
+        self.assertIn("C.encounter.reference = 'Encounter/' + encounterid", block)
+        self.assertIn("O.status in {'final', 'amended', 'corrected'}", block)
+
+    @staticmethod
+    def _function_body(cql: str, name: str) -> str:
+        start = cql.index(f"define function {name}(")
+        nxt = cql.find("\ndefine ", start + 1)
+        return cql[start:nxt if nxt != -1 else len(cql)]
 
 
 if __name__ == "__main__":

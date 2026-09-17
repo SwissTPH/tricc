@@ -99,16 +99,33 @@ def cql_helper_repeat_block(fhir_version: str = "4.0.1") -> str:
     encounter). ``GetHistoryObservation*``/``GetHistoryCondition*`` are the deliberate
     any-time/"outside the encounter" lookback, unscoped by ``encounterid``, used by the
     ``history`` populate context. See feature/20260812-intervention-order-and-dedup.md.
+
+    Concepts are matched by **code alone, across any system**: the write side resolves a
+    concept's system per concept (``structuremap._concept_system_url``), so one project
+    spreads codes over several CodeSystems and a single declared code system on the read
+    side matches nothing. See fix/20260914-cql-retrieve-codesystem.md.
     """
     return f"""\
 // ── Repeat / current-encounter helpers ────────────────────────────────────────
 // Extension URL: {TRICC_OBSERVATION_REPEAT_EXT}
 
+// Concept codes are matched across any code system: a project's concepts are spread
+// over several CodeSystems (tricc, sym, calculate, …) and extraction stamps whichever
+// one owns the concept, so filtering the retrieve on one declared system matches
+// nothing. See fix/20260914-cql-retrieve-codesystem.md.
+
+define function ObservationHasCode(O Observation, conceptCode String):
+  exists(O.code.coding C where C.code = conceptCode)
+
+define function ConditionHasCode(C Condition, conceptCode String):
+  exists(C.code.coding CC where CC.code = conceptCode)
+
 define function GetObservations(code String):
   if encounterid is null then {{}} as List<Observation>
   else
-    [Observation: Code code from "http://snomed.info/sct"] O
-      where O.status in {{'final', 'amended', 'corrected'}}
+    [Observation] O
+      where ObservationHasCode(O, code)
+        and O.status in {{'final', 'amended', 'corrected'}}
         and O.encounter.reference = 'Encounter/' + encounterid
 
 define function ObservationRepeatIndex(O Observation):
@@ -152,8 +169,9 @@ define function GetHistoryObservation(
 ):
   First(
     (
-      [Observation: Code code from "http://snomed.info/sct"] O
-        where O.status in {{'final', 'amended', 'corrected'}}
+      [Observation] O
+        where ObservationHasCode(O, code)
+        and O.status in {{'final', 'amended', 'corrected'}}
         and (
           repeatIndex is null
           or ObservationRepeatIndex(O) = repeatIndex
@@ -179,8 +197,9 @@ define function GetHistoryObservationValue(
 define function GetConditions(code String):
   if encounterid is null then {{}} as List<Condition>
   else
-    [Condition: Code code from "http://snomed.info/sct"] C
-      where C.encounter.reference = 'Encounter/' + encounterid
+    [Condition] C
+      where ConditionHasCode(C, code)
+        and C.encounter.reference = 'Encounter/' + encounterid
 
 define function ConditionVerificationCode(C Condition):
   First(C.verificationStatus.coding.code)
@@ -207,8 +226,9 @@ define function HasRefutedCondition(code String):
 
 define function GetHistoryCondition(code String):
   First(
-    [Condition: Code code from "http://snomed.info/sct"] C
-      where First(C.verificationStatus.coding.code) != 'refuted'
+    [Condition] C
+      where ConditionHasCode(C, code)
+        and First(C.verificationStatus.coding.code) != 'refuted'
         and First(C.verificationStatus.coding.code) != 'entered-in-error'
       sort by recordedDate desc
   )
