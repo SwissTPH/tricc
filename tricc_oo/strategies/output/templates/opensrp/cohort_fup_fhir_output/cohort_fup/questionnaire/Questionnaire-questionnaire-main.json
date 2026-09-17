@@ -1,0 +1,18 @@
+{
+  "resourceType": "Questionnaire",
+  "id": "6104acd7-09b7-526f-98e0-6238fac7101e",
+  "url": "https://fhir.tricc.io/Questionnaire/6104acd7-09b7-526f-98e0-6238fac7101e",
+  "name": "questionnaire-main",
+  "title": "Cohort FUP",
+  "status": "draft",
+  "subjectType": [
+    "Patient"
+  ],
+  "item": [
+    {
+      "linkId": "nc07d18be042f3041",
+      "text": "Cohort FUP",
+      "type": "group"
+    }
+  ]
+}

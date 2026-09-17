@@ -123,7 +123,7 @@ execute()
   └── export()
         ├── [FHIRStrategy] write questionnaire/, library/, structure-map/, ValueSet/, binary/
         └── [OpenSRPStrategy]
-              ├── _prune_empty_questionnaires()     → drop item: []
+              ├── _prune_empty_questionnaires()     → drop Q with no answerable item
               ├── generate_intervention_plandefinition() → single PD, 1 action/process
               ├── generate_task_structuremap()      → Task map + next Task on done
               ├── _wire_questionnaire_extensions()  → cqlInputResources + planDefinitions on Q
@@ -132,6 +132,18 @@ execute()
 ```
 
 See `feature/20260824-output-walk-context.md`.
+
+### Empty questionnaires are never emitted
+
+A Questionnaire is **empty** when it holds no answerable item *at any depth*: `group` and
+`display` items are structural, so a tree built only from them renders nothing. A page that
+is just a start node produces exactly that shape — a single childless `group` — which also
+violates FHIR invariant `que-1` ("Group items must have nested items").
+
+`_prune_empty_questionnaires()` drops such a process before PlanDefinition, StructureMap and
+Composition generation, together with its per-process CQL defines, Library, extraction map
+and StructureMaps, and logs a warning naming the process. Nothing downstream can then
+reference it. See `fix/20260909-opensrp-empty-main-questionnaire-dangling-library.md`.
 
 ---
 
@@ -440,6 +452,23 @@ populate/calculate expression, so a later process in the same visit doesn't re-a
 earlier one already captured. For an any-time/cross-encounter lookback, use
 `GetHistoryObservationValue`/`GetHistoryConditionValue` instead (see "Concept repeat" below).
 
+**Updated 2026-09-14** (`fix/20260914-cql-retrieve-codesystem.md`): the Helper retrieves match a
+concept **by code, across any code system** — `[Observation] O where ObservationHasCode(O, code)`,
+not `[Observation: Code code from "…"]`. The write side resolves a concept's system per concept
+(whichever project CodeSystem holds it, else `{base_url}/CodeSystem/tricc`), so one form's
+extraction map stamps several systems and a single declared code system on the read side matched
+nothing — while `"http://snomed.info/sct"` and `~ "active"` were quoted CQL identifiers that no
+declaration in the library resolved, so the Helper did not even translate. Consequences:
+
+- the only quoted identifier in a generated `*-Helper.cql` is now the library's own name — no
+  `codesystem` / `code` / `valueset` declaration is emitted, and none is needed;
+- concept codes are assumed unique project-wide, which is what `lookup_codesystems_code` (the
+  read path everywhere else in TRICC) already assumes;
+- `HasCondition` tests clinical status as
+  `exists(C.clinicalStatus.coding CS where CS.code = 'active')`;
+- no public Helper function name or signature changed, so previously generated segment libraries
+  keep resolving.
+
 ```json
 {
   "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression",
@@ -639,13 +668,18 @@ Points to the CQL Library for this process:
 
 ```json
 {
-  "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-launchContext",
-  "extension": [
-    { "url": "name", "valueId": "<form_id>-<process>" },
-    { "url": "type", "valueCode": "Library" }
-  ]
+  "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-cqlInputResources",
+  "valueReference": { "reference": "https://fhir.tricc.io/Library/<process-library-id>" }
 }
 ```
+
+**Emitted only when that Library exists.** The per-process Library is generated only when
+the process has calculates, so the reference is resolved from the assembled libraries — it
+is never computed from the process name as a fallback. A process with no CQL simply gets no
+`cqlInputResources`; pointing at a never-generated Library would leave fhircore with a
+reference that is absent from disk, from `Composition`, and from anything `push-to-fhir.sh`
+uploads. `PlanDefinition.library` is filtered the same way. See
+`fix/20260909-opensrp-empty-main-questionnaire-dangling-library.md`.
 
 ### `planDefinitions`
 

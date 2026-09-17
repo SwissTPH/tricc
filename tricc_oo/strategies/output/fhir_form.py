@@ -222,10 +222,14 @@ context Patient
 
 // ── Condition helpers ─────────────────────────────────────────────────────────
 
+// Matched by code across any system, and by clinical-status code rather than a
+// declared concept: neither a `codesystem` nor a `code` declaration exists in this
+// library. See fix/20260914-cql-retrieve-codesystem.md.
 define function HasCondition(code String):
   exists(
-    [Condition: Code code from "http://snomed.info/sct"] C
-      where C.clinicalStatus ~ "active"
+    [Condition] C
+      where ConditionHasCode(C, code)
+        and exists(C.clinicalStatus.coding CS where CS.code = 'active')
   )
 
 // ── Age helpers ───────────────────────────────────────────────────────────────

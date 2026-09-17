@@ -95,6 +95,10 @@ FHIRCORE_EXT_PLAN_DEFINITIONS = (
 APP_ID_TAG_SYSTEM = "https://smartregister.org/app-id"
 DEFAULT_OPENSRP_APP_ID = "cdss"
 
+# Questionnaire.item types that hold no answer. A tree built only from these renders
+# nothing, so it does not make a questionnaire worth emitting.
+STRUCTURAL_ITEM_TYPES = frozenset({"group", "display"})
+
 
 @register_output_strategy("OpenSRPStrategy")
 class OpenSRPStrategy(FHIRStrategy):
@@ -291,21 +295,38 @@ class OpenSRPStrategy(FHIRStrategy):
 
     @staticmethod
     def is_questionnaire_empty(q: Optional[dict]) -> bool:
-        """Return True when the questionnaire has no items (``item: []`` or missing).
+        """Return True when the questionnaire holds no answerable item at any depth.
+
+        ``group`` and ``display`` items are structural — they carry no answer — so a tree
+        built only from them has nothing to render. A single childless ``group`` also
+        violates FHIR invariant ``que-1`` ("Group items must have nested items"), so such
+        a questionnaire must never be emitted. See
+        ``fix/20260909-opensrp-empty-main-questionnaire-dangling-library.md``.
 
         Args:
             q: Questionnaire resource dict, or None.
 
         Returns:
-            True if empty / missing; False if at least one top-level item exists.
+            True if missing / itemless / structural-only; False as soon as one item of an
+            answerable type is found anywhere in the tree.
         """
         if not isinstance(q, dict):
             return True
-        items = q.get("item")
-        return not items
+
+        def has_answerable(items) -> bool:
+            for item in items or []:
+                if not isinstance(item, dict):
+                    continue
+                if item.get("type") not in STRUCTURAL_ITEM_TYPES:
+                    return True
+                if has_answerable(item.get("item")):
+                    return True
+            return False
+
+        return not has_answerable(q.get("item"))
 
     def _prune_empty_questionnaires(self) -> None:
-        """Remove questionnaires with ``item: []`` and drop orphan per-process assets."""
+        """Drop questionnaires with no answerable item, plus their per-process assets."""
         empty_processes = [
             process
             for process, q in list(self.questionnaires.items())
@@ -313,7 +334,8 @@ class OpenSRPStrategy(FHIRStrategy):
         ]
         for process in empty_processes:
             logger.warning(
-                "OpenSRPStrategy: dropping empty Questionnaire for process '%s' (item: [])",
+                "OpenSRPStrategy: dropping Questionnaire for process '%s' "
+                "(no answerable item — only groups/displays or item: [])",
                 process,
             )
             del self.questionnaires[process]
@@ -364,6 +386,27 @@ class OpenSRPStrategy(FHIRStrategy):
         if "example.com" in q_url or not q_url.startswith("http"):
             q_url = f"{self.base_url}/Questionnaire/{q_id}"
         return q_id, q_url
+
+    def _process_library_url(self, process: str) -> Optional[str]:
+        """Return the canonical Library URL for a process, or None when none exists.
+
+        Deliberately has **no** uuid5 fallback: the per-process CQL Library is only
+        generated when the process has calculates, and a computed id for a Library that
+        was never generated is exactly the dangling reference this guards against — it is
+        absent from disk, from ``Composition``, and from anything ``push-to-fhir.sh``
+        uploads. See ``fix/20260909-opensrp-empty-main-questionnaire-dangling-library.md``.
+
+        Args:
+            process: Process name from the graph.
+
+        Returns:
+            Absolute Library URL, or None when this process has no generated Library.
+        """
+        libs = getattr(self, "libraries", None) or {}
+        lib = libs.get(process) or libs.get(to_fhir_id(process))
+        if not isinstance(lib, dict) or not lib.get("id"):
+            return None
+        return f"{self.base_url}/Library/{lib['id']}"
 
     def _process_resource_ids(self, process: str) -> dict:
         """Return UUID FHIR ids for a process's openSRP resources (stable uuid5).
@@ -466,14 +509,8 @@ class OpenSRPStrategy(FHIRStrategy):
         lib_urls: List[str] = []
         custom_orders: Dict[str, int] = {}
         for process in self.process_chain:
-            proc_ids = self._process_resource_ids(process)
-            lib_id = proc_ids["lib_id"]
-            libs = getattr(self, "libraries", None) or {}
-            lib = libs.get(process) or libs.get(to_fhir_id(process))
-            if isinstance(lib, dict) and lib.get("id"):
-                lib_id = lib["id"]
-            lib_url = f"{self.base_url}/Library/{lib_id}"
-            if lib_url not in lib_urls:
+            lib_url = self._process_library_url(process)
+            if lib_url and lib_url not in lib_urls:
                 lib_urls.append(lib_url)
 
             q_id, q_url = self._questionnaire_ref(process)
@@ -913,6 +950,10 @@ class OpenSRPStrategy(FHIRStrategy):
     def _wire_questionnaire_extensions(self, process: str, pd: dict, version: str):
         """Add cqlInputResources and planDefinitions extensions to a Questionnaire.
 
+        ``cqlInputResources`` is emitted only when this process actually has a generated
+        CQL Library — pointing it at a Library that was never generated leaves fhircore
+        with an unresolvable reference.
+
         Args:
             process: The cpg-common-process name.
             pd: The PlanDefinition resource dict for this process.
@@ -922,17 +963,23 @@ class OpenSRPStrategy(FHIRStrategy):
         if q is None:
             return
 
-        lib_id = self._process_resource_ids(process)["lib_id"]
-        lib_url = f"{self.base_url}/Library/{lib_id}"
+        lib_url = self._process_library_url(process)
         pd_url = f"{self.base_url}/PlanDefinition/{pd['id']}"
 
         extensions = q.setdefault("extension", [])
 
-        # cqlInputResources
-        extensions.append({
-            "url": FHIRCORE_EXT_CQL_INPUT,
-            "valueReference": {"reference": lib_url},
-        })
+        # cqlInputResources — only when the Library exists in this package
+        if lib_url:
+            extensions.append({
+                "url": FHIRCORE_EXT_CQL_INPUT,
+                "valueReference": {"reference": lib_url},
+            })
+        else:
+            logger.info(
+                "OpenSRPStrategy: no CQL Library for process '%s'; "
+                "omitting cqlInputResources on its Questionnaire",
+                process,
+            )
 
         # planDefinitions
         extensions.append({

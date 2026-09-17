@@ -568,6 +568,34 @@ class TestOpenSRPStrategyInit(unittest.TestCase):
         self.assertIn("main", strategy.questionnaires)
         self.assertNotIn("registration", strategy.cql_defines)
 
+    def test_prune_drops_questionnaire_whose_only_item_is_an_empty_group(self):
+        """A start-node-only page renders nothing and violates que-1 — never emit it.
+
+        See fix/20260909-opensrp-empty-main-questionnaire-dangling-library.md.
+        """
+        from tricc_oo.strategies.output.opensrp import OpenSRPStrategy
+        project = self._make_mock_project()
+        strategy = OpenSRPStrategy(project, "/tmp/opensrp_test_out")
+        strategy._form_id = "demo"
+        strategy.questionnaires = {
+            "main": {
+                "id": "q-main",
+                # Exactly what a "Main Start" page produced before this fix
+                "item": [{"linkId": "nstart", "text": "Main Start", "type": "group"}],
+            },
+            "registration": {
+                "id": "q-reg",
+                "item": [{"linkId": "grp", "type": "group", "item": [
+                    {"linkId": "age", "type": "integer"},
+                ]}],
+            },
+        }
+        strategy.cql_defines = {"main": ["define Y: true"]}
+        strategy._prune_empty_questionnaires()
+        self.assertNotIn("main", strategy.questionnaires)
+        self.assertNotIn("main", strategy.cql_defines)
+        self.assertIn("registration", strategy.questionnaires)
+
     def test_task_structuremap_chains_next_process(self):
         from tricc_oo.strategies.output.opensrp import OpenSRPStrategy
         project = self._make_mock_project()
@@ -611,6 +639,81 @@ class TestOpenSRPStrategyInit(unittest.TestCase):
             OpenSRPStrategy.is_questionnaire_empty(
                 {"item": [{"linkId": "x", "type": "boolean"}]}
             )
+        )
+
+    def test_is_questionnaire_empty_is_recursive(self):
+        """Only group/display items anywhere in the tree == nothing to render."""
+        from tricc_oo.strategies.output.opensrp import OpenSRPStrategy
+        # single childless group (the "Main Start" shape)
+        self.assertTrue(
+            OpenSRPStrategy.is_questionnaire_empty(
+                {"item": [{"linkId": "g", "type": "group"}]}
+            )
+        )
+        # nested groups + a display, still no answer anywhere
+        self.assertTrue(
+            OpenSRPStrategy.is_questionnaire_empty({"item": [
+                {"linkId": "g1", "type": "group", "item": [
+                    {"linkId": "g2", "type": "group", "item": [
+                        {"linkId": "note", "type": "display", "text": "hello"},
+                    ]},
+                ]},
+            ]})
+        )
+        # one answerable item deep in the tree is enough to keep it
+        self.assertFalse(
+            OpenSRPStrategy.is_questionnaire_empty({"item": [
+                {"linkId": "g1", "type": "group", "item": [
+                    {"linkId": "g2", "type": "group", "item": [
+                        {"linkId": "q", "type": "string"},
+                    ]},
+                ]},
+            ]})
+        )
+
+    def test_no_cql_input_extension_when_library_missing(self):
+        """cqlInputResources must not point at a Library that was never generated."""
+        from tricc_oo.strategies.output.opensrp import (
+            OpenSRPStrategy,
+            FHIRCORE_EXT_CQL_INPUT,
+            FHIRCORE_EXT_PLAN_DEFINITIONS,
+        )
+        project = self._make_mock_project()
+        strategy = OpenSRPStrategy(project, "/tmp/opensrp_test_out")
+        strategy._form_id = "demo"
+        strategy.questionnaires = {
+            "main": {"id": "q-main", "item": [{"linkId": "a", "type": "string"}]},
+            "registration": {"id": "q-reg", "item": [{"linkId": "b", "type": "string"}]},
+        }
+        # only 'registration' produced CQL
+        strategy.libraries = {"registration": {"id": "lib-reg"}}
+        pd = {"id": "pd-1"}
+
+        strategy._wire_questionnaire_extensions("main", pd, "1.0.0")
+        main_urls = [e["url"] for e in strategy.questionnaires["main"]["extension"]]
+        self.assertNotIn(FHIRCORE_EXT_CQL_INPUT, main_urls)
+        self.assertIn(FHIRCORE_EXT_PLAN_DEFINITIONS, main_urls)
+
+        strategy._wire_questionnaire_extensions("registration", pd, "1.0.0")
+        reg_exts = strategy.questionnaires["registration"]["extension"]
+        cql = [e for e in reg_exts if e["url"] == FHIRCORE_EXT_CQL_INPUT]
+        self.assertEqual(len(cql), 1)
+        self.assertTrue(cql[0]["valueReference"]["reference"].endswith("/Library/lib-reg"))
+
+    def test_plandefinition_library_lists_only_generated_libraries(self):
+        from tricc_oo.strategies.output.opensrp import OpenSRPStrategy
+        project = self._make_mock_project()
+        strategy = OpenSRPStrategy(project, "/tmp/opensrp_test_out")
+        strategy._form_id = "demo"
+        strategy.questionnaires = {
+            "registration": {"id": "q-reg", "item": [{"linkId": "b", "type": "string"}]},
+            "main": {"id": "q-main", "item": [{"linkId": "a", "type": "string"}]},
+        }
+        strategy.process_chain = ["registration", "main"]
+        strategy.libraries = {"registration": {"id": "lib-reg"}}
+        pd = strategy.generate_intervention_plandefinition("1.0.0")
+        self.assertEqual(
+            pd["library"], [f"{strategy.base_url}/Library/lib-reg"]
         )
 
     def test_generate_composition_structure(self):
