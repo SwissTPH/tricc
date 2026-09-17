@@ -2,10 +2,10 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft |
-| **Related** | `feature/20260907-project-config.md` (Implemented — adds `interventions`; this spec replaces its `kind` / `applicability` keys), `feature/careplan.md` (Draft — **superseded by this spec on approval**), `feature/careplan-intervention-plandefinition.md`, `feature/opensrp-register.md`, `feature/populate-context.md`, `docs/open-srp-export.md`, `docs/cli-and-inputs.md` |
+| **Status** | Implemented |
+| **Related** | `feature/20260907-project-config.md` (Implemented — adds `interventions`; this spec replaces its `kind` / `applicability` keys), `feature/careplan.md` (Superseded), `feature/careplan-intervention-plandefinition.md`, `feature/opensrp-register.md`, `feature/populate-context.md`, `docs/open-srp-export.md`, `docs/cli-and-inputs.md` |
 | **Strategy** | `XLSFormCHTStrategy` (+ `XLSFormCHTHFStrategy`), `OpenSRPStrategy`. Other strategies build the forms and ignore `start`. |
-| **Approval** | — |
+| **Approval** | Approved 2026-09-15 |
 
 Valid status values: `Draft` → `Approved` → `Implemented` → `Superseded`.
 
@@ -154,7 +154,8 @@ Validation (all build errors):
 - `on: demand` with `intervention` / `due` / `window` set.
 - `on: follow_up` without `intervention` or `due`.
 - `intervention` not an id in the same `tricc.yaml`, or equal to its own id.
-- `kind` / `applicability` present → `"kind/applicability were replaced by start: — see feature/20260907-intervention-start.md"`.
+- `kind` / `applicability` present → `"kind/applicability were replaced by start: — see feature/20260915-intervention-start.md"`.
+- YAML 1.1 parses the key `on` as boolean `true`; the loader maps that back to `on`.
 - Duration: negative, unit not in UCUM set, or unparsable.
 - `condition` must parse with `transform_cql_to_operation` (fail early, at config load).
 
@@ -240,25 +241,24 @@ with the first `start` entry whose `on == "demand"`; same `condition` emission.
    follow-up actions (not on the Start-care path). Keep the existing guard for others.
 4. Remove the `kind == "task"` warning.
 
-Verification item (before Approved → Implemented): confirm on a fhircore build that
-`$apply` of this PD creates a Task with `executionPeriod` derived from `relatedAction`
-+ `timing`, and that the Task launches the child Questionnaire. If fhircore needs a
-different shape (e.g. Task via StructureMap as `generate_task_structuremap` does today),
-adapt step 2 and record the decision here.
+Verification: live fhircore `$apply` of this PD (Task `executionPeriod` from
+`relatedAction` + `timing`, Task launches the child Questionnaire) was **not** run in
+this pass. If fhircore needs a different shape (e.g. Task via StructureMap as
+`generate_task_structuremap` does today), adapt step 2 and record the decision here.
 
 ## 7. Code checklist
 
-- [ ] Schema + validators; remove `kind` / `applicability` with migration error.
-- [ ] `tricc_oo/converters/duration.py` UCUM → seconds, days, FHIR Duration.
-- [ ] CQL parse at config load.
-- [ ] `BaseOutputStrategy.link_follow_up` no-op + runner second pass.
-- [ ] CHT: `properties.json` context expression; JS renderer subset.
-- [ ] CHT: parent calculate, hidden inputs, `{child}.js` from `get_task_js` with new params.
-- [ ] OpenSRP: PD follow-up action + ActivityDefinition + validate relaxation.
-- [ ] Docs: `docs/cli-and-inputs.md`, `docs/tricc.yaml.template`, `docs/open-srp-export.md`;
+- [x] Schema + validators; remove `kind` / `applicability` with migration error.
+- [x] `tricc_oo/converters/duration.py` UCUM → seconds, days, FHIR Duration.
+- [x] CQL parse at config load.
+- [x] `BaseOutputStrategy.link_follow_up` no-op + runner second pass.
+- [x] CHT: `properties.json` context expression; JS renderer subset.
+- [x] CHT: parent calculate, hidden inputs, `{child}.js` from `get_task_js` with new params.
+- [x] OpenSRP: PD follow-up action + ActivityDefinition + validate relaxation.
+- [x] Docs: `docs/cli-and-inputs.md`, `docs/tricc.yaml.template`, `docs/open-srp-export.md`;
       amend `feature/20260907-project-config.md` (in place) to point here; mark
       `feature/careplan.md` Superseded.
-- [ ] Tests (see §8).
+- [x] Tests (see §8).
 
 ## 8. Tests
 
@@ -281,7 +281,8 @@ adapt step 2 and record the decision here.
 1. Schema, duration parser, CQL-at-load, on-demand `condition` on CHT (`properties.json`)
    and OpenSRP (replaces `applicability`). Remove `kind`.
 2. CHT follow-up: runner second pass, parent calculate, `{child}.js`, hidden inputs.
-3. OpenSRP follow-up: PD action + ActivityDefinition, after the fhircore verification.
+3. OpenSRP follow-up: PD action + ActivityDefinition (emission as specified; fhircore
+   `$apply` Task/`executionPeriod` shape not verified on a live build in this pass).
 
 ## 10. Acceptance criteria
 

@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|-------|
 | **Status** | Implemented |
-| **Related** | `docs/cli-and-inputs.md`, `docs/tricc-elements.md` (image enrichment), `feature/tricc-segment.md`, `feature/careplan.md`, `feature/opensrp-register.md` |
+| **Related** | `docs/cli-and-inputs.md`, `docs/tricc-elements.md` (image enrichment), `feature/tricc-segment.md`, `feature/20260915-intervention-start.md` (replaces `kind` / `applicability`), `feature/careplan.md` (Superseded), `feature/opensrp-register.md` |
 | **Strategy** | Project load + all output strategies |
 | **Approval** | Approved 2026-09-07 |
 
@@ -47,16 +47,18 @@ parameters:
 interventions:
   - id: pediatrics
     title: Pediatrics
-    kind: both
-    applicability: "AgeInMonths() >= 2"
+    start:
+      on: demand
+      condition: "AgeInMonths() >= 2"
     description: IMCI for children from 2 months to 5 years
     activity:
       - common/*
       - child/*
   - id: young_infants
     title: Young infants
-    kind: both
-    applicability: "AgeInMonths() < 2"
+    start:
+      on: demand
+      condition: "AgeInMonths() < 2"
     description: IMCI for young infants under 2 months
     activity:
       - common/*
@@ -113,18 +115,9 @@ Each entry is one exportable algorithm.
 |-------|---------|
 | `id` | Stable machine name (`pediatrics`). Unique in the project. Used in output paths / form ids. |
 | `title` | Short form title. |
-| `kind` | `on_demand` \| `task` \| `both`. |
-| `applicability` | CQL **boolean expression** (who this intervention is for). Optional. |
+| `start` | When a health worker can open this intervention. See `feature/20260915-intervention-start.md`. Replaces `kind` / `applicability` (those keys now fail with a pointer). |
 | `description` | Longer text. Optional. |
 | `activity` | List of path globs (relative to the project root) and/or Google Drive file or folder URLs. Required when interventions are listed. Pages inside those files already declare `start` vs `activity_start`; one list covers both. Renamed from `segment` on 2026-09-07; the old key fails with a pointer. |
-
-**`kind`** is launch style, not FHIR extraction `kind`:
-
-| Value | CHT (this feature) | OpenSRP (this feature) |
-|-------|--------------------|------------------------|
-| `on_demand` | Contact / app form | Today’s Start care PlanDefinition |
-| `task` | Task form + `tasks.js` | **Not implemented here** — warn and skip (separate piece of work) |
-| `both` | Both CHT artifacts | Same as `on_demand` for OpenSRP, plus CHT task artifacts |
 
 **Paths.** Globs are relative to the folder that contains `tricc.yaml`.
 `common/*` means every `.drawio` sitting **directly** in `common/`
@@ -156,30 +149,16 @@ under `-i` (current non-recursive rule) are one implicit on-demand intervention.
 
 ## 8. Applicability (CQL)
 
-`applicability` is a CQL boolean expression, evaluated by the **runtime that
-understands CQL** (OpenSRP / FHIR PlanDefinition condition). Example:
-
-```cql
-AgeInMonths() >= 2
-```
-
-It is the outer “does this algorithm apply to this patient”, not a replacement
-for rhombus / start-node relevance inside the drawings.
-
-XLSForm / generic ODK cannot run CQL. CHT tasks decide “show this task?” with a
-JavaScript `appliesIf`, not CQL. This feature therefore:
-
-- writes `applicability` onto the **OpenSRP** PlanDefinition condition;
-- still **builds** the CHT/ODK forms for that intervention;
-- does **not** hide those CHT/ODK forms from the wrong age group.
-
-Who sees the CHT form/task stays an app/config concern until a later feature
-translates or duplicates this expression for CHT.
+**Moved.** Eligibility and follow-up timing live on `start:` (`on`, `condition`,
+`due`, `window`). See `feature/20260915-intervention-start.md`. The old
+`kind` / `applicability` keys fail at load.
 
 ## 9. Limitations
 
-- Not the CarePlan scheduler (`feature/careplan.md`).
-- OpenSRP Task / planning launch is **out of scope** (separate work).
+- Not the drawing-level CarePlan scheduler (`feature/careplan.md`, superseded by
+  `feature/20260915-intervention-start.md`).
+- Generic OpenSRP planning StructureMap (form not due now) is still separate work;
+  follow-up Task ActivityDefinition is in the later spec.
 - No `tricc.yaml` → no behaviour change.
 - Google Drive `-i` (no `tricc.yaml`) still has no local globs unless a local
   project root is also passed. Drive URLs **inside** `activity:` are supported.
@@ -234,8 +213,7 @@ TriccProjectConfig
 TriccInterventionConfig
   id: str
   title: str
-  kind: Literal["on_demand", "task", "both"] = "on_demand"
-  applicability: Optional[str] = None   # CQL boolean expression
+  start: List[TriccInterventionStart]   # see feature/20260915-intervention-start.md
   description: Optional[str] = None
   activity: List[str]                   # local globs and/or Google Drive URLs, at least one
 ```
@@ -264,10 +242,11 @@ TriccInterventionConfig
      intervention `title`.
    - For each output strategy, `execute()` into
      `{cli -o}/{strategy}/{intervention_id}/`.
-     OpenSRP: emit on-demand PlanDefinition; if `kind` is `task` only, log a
-     warning (task launch is other work). CHT: honour `kind`.
-   - OpenSRP PlanDefinition wrapper `condition`: CQL from `applicability`
-     when present (`text/cql`). Not applied to CHT/ODK form relevance.
+     Then a second pass wires `start.on: follow_up` (CHT parent calculate +
+     `{child}.js`; OpenSRP relatedAction + ActivityDefinition). See
+     `feature/20260915-intervention-start.md`.
+   - OpenSRP PlanDefinition wrapper `condition`: CQL from `start.condition`
+     when `on: demand`. CHT on-demand writes `properties.json`.
 
 Image bytes are per intervention parse (same source file may resize once per
 build; result is identical if caps match).
@@ -301,7 +280,8 @@ written bytes, Pillow dependency.
 - [x] Strategy resolution + multi-output + per-intervention dirs.
 - [x] Glob file collection per intervention; independent parse.
 - [x] Image caps + per-object override.
-- [x] CHT `kind`; OpenSRP on-demand only + CQL `condition`.
+- [x] CHT / OpenSRP on-demand + follow-up: see `feature/20260915-intervention-start.md`
+      (this spec no longer owns `kind` / `applicability`).
 - [x] Docs: `docs/cli-and-inputs.md`.
 - [x] Tests: no file; version mismatch; glob union (`common/*` + `child/*`);
       two interventions sharing `common/*`; image cap; empty glob fails;
@@ -312,7 +292,10 @@ written bytes, Pillow dependency.
 1. Config load, `title`, `parameters` (version gate + image caps).
 2. Multi-strategy export dirs.
 3. Per-intervention glob builds (independent `TriccProject`).
-4. CHT `kind` + OpenSRP CQL applicability on the existing on-demand PD.
-5. OpenSRP Task launch — **not this feature**.
+4. CHT `kind` + OpenSRP CQL applicability on the existing on-demand PD —
+   **superseded** by `feature/20260915-intervention-start.md`.
+5. OpenSRP Task launch — **not this feature**; follow-up tasks are in
+   `feature/20260915-intervention-start.md`.
 
-Implementation follows this spec (Implemented 2026-09-07). OpenSRP Task launch remains out of scope.
+Implementation follows this spec (Implemented 2026-09-07) for project identity
+and per-intervention globs. Launch / follow-up is the later spec.

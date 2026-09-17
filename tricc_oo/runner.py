@@ -158,6 +158,7 @@ def run_one_export(
             TestStrategyCls(project, out_dir, output_strategy).execute()
         except Exception as exc:
             logger.error("Test strategy %s failed: %s", TestStrategyCls.__name__, exc)
+    return output_strategy
 
 
 def run_project_build(
@@ -193,14 +194,15 @@ def run_project_build(
     n_strategies = len(output_strategies)
     has_interventions = bool(project_config.interventions)
     any_loaded = False
-    for intervention, job_files in jobs:
-        contents = read_input_file_contents(job_files)
-        if not contents:
-            logger.critical("No valid input files found or loaded")
-            return 1
-        any_loaded = True
-        intervention_id = intervention.id if intervention is not None else None
-        for strategy_name in output_strategies:
+    for strategy_name in output_strategies:
+        built = {}
+        for intervention, job_files in jobs:
+            contents = read_input_file_contents(job_files)
+            if not contents:
+                logger.critical("No valid input files found or loaded")
+                return 1
+            any_loaded = True
+            intervention_id = intervention.id if intervention is not None else None
             out_dir = resolve_output_dir(
                 out_path,
                 strategy_name,
@@ -208,7 +210,7 @@ def run_project_build(
                 has_interventions=has_interventions,
                 n_strategies=n_strategies,
             )
-            run_one_export(
+            output_strategy = run_one_export(
                 job_files,
                 contents,
                 out_dir,
@@ -218,8 +220,31 @@ def run_project_build(
                 intervention,
                 test_strategy_name=test_strategy_name,
             )
+            if intervention is not None:
+                built[intervention.id] = output_strategy
+        try:
+            _link_follow_ups(project_config, built)
+        except Exception as exc:
+            logger.critical("%s", exc)
+            return 1
     if not any_loaded:
         logger.critical("No valid drawio files found or loaded")
         return 1
     logger.info("Conversion completed successfully")
     return 0
+
+
+def _link_follow_ups(project_config: TriccProjectConfig, built) -> None:
+    if not project_config.interventions:
+        return
+    for intervention in project_config.interventions:
+        child = built.get(intervention.id)
+        if child is None:
+            continue
+        for start in intervention.follow_up_starts():
+            parent = built.get(start.intervention)
+            if parent is None:
+                raise ValueError(
+                    f"follow-up {intervention.id!r} parent {start.intervention!r} was not built"
+                )
+            parent.link_follow_up(child, start)

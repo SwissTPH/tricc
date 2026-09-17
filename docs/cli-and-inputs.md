@@ -51,8 +51,9 @@ parameters:
 interventions:
   - id: pediatrics
     title: Pediatrics
-    kind: both
-    applicability: "AgeInMonths() >= 2"
+    start:
+      on: demand
+      condition: "AgeInMonths() >= 2"
     description: IMCI for children from 2 months to 5 years
     activity:
       - common/*
@@ -76,10 +77,9 @@ interventions:
 
   Without interventions, a single strategy still writes directly into `-o` (same as
   today). Several strategies without interventions write `{ -o }/{strategy}/`.
-- **`applicability`** is CQL, attached to the OpenSRP PlanDefinition condition. CHT
-  and ODK forms are still built; they do not evaluate that CQL.
-- **`kind: task` on OpenSRP** is not implemented here (warning, on-demand PD still
-  emitted). CHT still writes the XLSForm.
+- **`start`** says when the intervention can be opened (`on: demand` or
+  `on: follow_up`). `condition` is CQL. See `feature/20260915-intervention-start.md`.
+  `kind` and `applicability` are no longer valid keys.
 
 ## Input behavior
 

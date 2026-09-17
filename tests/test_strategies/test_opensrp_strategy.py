@@ -467,9 +467,8 @@ class TestOpenSRPStrategyInit(unittest.TestCase):
         project.intervention = TriccInterventionConfig(
             id="pediatrics",
             title="Pediatrics",
-            kind="on_demand",
-            applicability="AgeInMonths() >= 2",
             activity=["child/*"],
+            start=[{"on": "demand", "condition": "AgeInMonths() >= 2"}],
         )
         strategy = OpenSRPStrategy(project, "/tmp/opensrp_test_out")
         strategy._form_id = "demo"
@@ -489,6 +488,68 @@ class TestOpenSRPStrategyInit(unittest.TestCase):
         self.assertEqual(condition[0]["kind"], "applicability")
         self.assertEqual(condition[0]["expression"]["language"], "text/cql")
         self.assertEqual(condition[0]["expression"]["expression"], "AgeInMonths() >= 2")
+
+    def test_link_follow_up_related_action(self):
+        import tempfile
+        from tricc_oo.models.project_config import TriccInterventionConfig
+        from tricc_oo.strategies.output.opensrp import OpenSRPStrategy
+
+        with tempfile.TemporaryDirectory() as tmp:
+            parent_project = self._make_mock_project()
+            parent_project.intervention = TriccInterventionConfig(
+                id="pediatrics", title="Pediatrics", activity=["a/*"]
+            )
+            parent = OpenSRPStrategy(parent_project, tmp)
+            parent._form_id = "demo"
+            parent.questionnaires = {
+                "registration": {
+                    "id": "demo-registration",
+                    "title": "Registration",
+                    "item": [{"linkId": "a", "type": "boolean"}],
+                }
+            }
+            parent.process_chain = ["registration"]
+            parent.plan_definitions["intervention"] = parent.generate_intervention_plandefinition("1.0.0")
+            child_cfg = TriccInterventionConfig(
+                id="pediatrics_followup",
+                title="Pediatrics follow-up",
+                activity=["b/*"],
+                start=[
+                    {
+                        "on": "follow_up",
+                        "intervention": "pediatrics",
+                        "condition": "classification = 'pneumonia'",
+                        "due": "3 d",
+                        "window": {"after": "4 d"},
+                    }
+                ],
+            )
+            child_project = self._make_mock_project()
+            child_project.intervention = child_cfg
+            child = OpenSRPStrategy(child_project, tmp)
+            child._form_id = "fup"
+            child.questionnaires = {
+                "registration": {
+                    "id": "fup-q",
+                    "url": "https://fhir.tricc.io/Questionnaire/fup-q",
+                }
+            }
+            child.process_chain = ["registration"]
+            parent.link_follow_up(child, child_cfg.start[0])
+            follow = parent.plan_definitions["intervention"]["action"][0]["action"][-1]
+            self.assertEqual(follow["relatedAction"][0]["relationship"], "after-end")
+            self.assertEqual(follow["relatedAction"][0]["offsetDuration"]["value"], 3)
+            self.assertEqual(follow["relatedAction"][0]["offsetDuration"]["code"], "d")
+            self.assertIn("ActivityDefinition/", follow["definitionCanonical"])
+            self.assertEqual(
+                follow["condition"][0]["expression"]["expression"],
+                "classification = 'pneumonia'",
+            )
+            self.assertTrue(parent.activity_definitions)
+            from pathlib import Path
+            ad_files = list(Path(tmp).glob("activity-definition/*.json"))
+            self.assertTrue(ad_files, "ActivityDefinition JSON should be written")
+            parent.validate()
 
     def test_generate_intervention_plandefinition_multi_process(self):
         from tricc_oo.strategies.output.opensrp import OpenSRPStrategy
