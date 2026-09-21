@@ -157,6 +157,26 @@ Checks:
 
 See [TRICC Elements — Edge labels](./tricc-elements.md#edge-labels-conditional-flow).
 
+## Option with relevance missing from choices
+
+Symptoms:
+
+- A `select_one` / `select_multiple` option has a `relevance` (for example
+  `"etat.drops.rounded_fl" <= 180`) and that option is **absent from the XLSForm
+  `choices` sheet**, not merely hidden in the running form.
+
+Cause:
+
+- Export used to mark the option processed even when its relevance still named a
+  later calculate, so the choice row was never written. Fixed in
+  `fix/20260921-option-relevance-dropped-choice.md`.
+
+Expected:
+
+- The option is listed. `choice_filter` on the question shows it only when the
+  condition is true. Quoted dotted names (`"etat.drops.rounded_fl"`) are the
+  correct TRICC spelling.
+
 ## `Unknown output strategy`
 
 Symptom:

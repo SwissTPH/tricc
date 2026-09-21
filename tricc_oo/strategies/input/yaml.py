@@ -36,6 +36,7 @@ from tricc_oo.models.tricc import (
     TriccNodeMainStart,
     node_container_for_root,
     TriccNodeNote,
+    TriccNodeSelect,
     TriccNodeSelectOne,
     TriccNodeSelectMultiple,
     TriccNodeSelectYesNo,
@@ -370,6 +371,10 @@ class YamlStrategy(BaseInputStrategy):
         for node in nodes.values():
             node.activity = activity
             node.group = activity
+            if issubclass(node.__class__, TriccNodeSelect):
+                for opt in node.options.values():
+                    opt.activity = activity
+                    opt.group = activity
 
         # 4. Post-process expressions (relevance, calculate, etc.)
         for node in nodes.values():

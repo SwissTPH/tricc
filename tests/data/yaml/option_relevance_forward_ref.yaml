@@ -1,0 +1,45 @@
+# Select_one is walked before a calculate that an option relevance names.
+# The filtered option must still appear on the XLSForm choices sheet.
+# See fix/20260921-option-relevance-dropped-choice.md.
+
+id: option_relevance_forward_ref
+title: Option relevance forward reference
+process: main
+
+nodes:
+  - id: start
+    type: start
+    label: Start
+    name: start_opt_rel
+    form_id: option-relevance-forward-ref
+
+  - id: q_rate
+    type: select_one
+    name: drip_rate
+    label: Drip rate category
+    options:
+      - id: opt_slow
+        name: slow
+        label: Slow
+        relevance: '"later_calc" <= 180'
+      - id: opt_fast
+        name: fast
+        label: Fast
+
+  - id: calc
+    type: calculate
+    name: later_calc
+    label: Later calc
+    calculate: "200"
+
+  - id: end
+    type: end
+    label: End
+
+edges:
+  - source: start
+    target: q_rate
+  - source: q_rate
+    target: calc
+  - source: calc
+    target: end

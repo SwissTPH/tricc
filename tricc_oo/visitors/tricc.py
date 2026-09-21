@@ -1746,7 +1746,7 @@ def walktrhough_tricc_node_processed_stached(
         elif issubclass(node.__class__, TriccNodeSelect):
             for option in node.options.values():
                 option.path_len = max(path_len, option.path_len)
-                callback(
+                if callback(
                     option,
                     processed_nodes=processed_nodes,
                     stashed_nodes=stashed_nodes,
@@ -1754,12 +1754,25 @@ def walktrhough_tricc_node_processed_stached(
                     node_path=node_path,
                     process=process,
                     **kwargs,
-                )
-                if option not in processed_nodes:
-                    processed_nodes.add(option)
+                ):
+                    if option not in processed_nodes:
+                        processed_nodes.add(option)
+                        if warn:
+                            logger.debug(
+                                "{}::{}: processed ({})".format(
+                                    callback.__name__, option.get_name(), len(processed_nodes)
+                                )
+                            )
+                elif option not in processed_nodes and option not in stashed_nodes:
+                    # Option relevance often names a later calculate. Marking the
+                    # option processed on a failed callback drops the choice row
+                    # (fix/20260921-option-relevance-dropped-choice.md).
+                    stashed_nodes.insert_at_bottom(option)
                     if warn:
                         logger.debug(
-                            "{}::{}: processed ({})".format(callback.__name__, option.get_name(), len(processed_nodes))
+                            "{}::{}: stashed({})".format(
+                                callback.__name__, option.get_name(), len(stashed_nodes)
+                            )
                         )
                 walkthrough_tricc_option(
                     node,

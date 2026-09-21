@@ -37,7 +37,10 @@ This page documents TRICC modeling elements and their meaning based on:
 
 ## Option and list elements
 
-- `select_option`: answer option under select questions.
+- `select_option`: answer option under select questions. Optional `relevance` is a
+  **choice filter** (show this answer only when the condition is true). The option
+  always stays in the list definition; it is not removed from the choices sheet.
+  See `fix/20260921-option-relevance-dropped-choice.md`.
 - `not_available`: opt-out next to a measurement (for example weight). Draw it like
   `select_one`: header text is the question title, stacked `select_option` rows are
   the reasons (`name` on each row is the stored code). No extra option is invented.
