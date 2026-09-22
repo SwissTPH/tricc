@@ -1,0 +1,69 @@
+# Two copies of the same select share one choice list. Option relevance names
+# the same calculate, which is versioned. The choice-row tag must match both
+# questions; each question still filters on its own version.
+# See fix/20260921-option-relevance-dropped-choice.md.
+
+id: option_relevance_shared_list
+title: Shared list option relevance
+process: main
+
+nodes:
+  - id: start
+    type: start
+    label: Start
+    name: start_shared
+    form_id: option-relevance-shared-list
+
+  - id: calc1
+    type: calculate
+    name: later_calc
+    label: First calc
+    calculate: "50"
+
+  - id: q1
+    type: select_one
+    name: drip_rate
+    label: First set
+    options:
+      - id: slow1
+        name: slow
+        label: Slow
+        relevance: '"later_calc" <= 180'
+      - id: fast1
+        name: fast
+        label: Fast
+
+  - id: calc2
+    type: calculate
+    name: later_calc
+    label: Second calc
+    calculate: "50"
+
+  - id: q2
+    type: select_one
+    name: drip_rate
+    label: Second set
+    options:
+      - id: slow2
+        name: slow
+        label: Slow
+        relevance: '"later_calc" <= 180'
+      - id: fast2
+        name: fast
+        label: Fast
+
+  - id: end
+    type: end
+    label: End
+
+edges:
+  - source: start
+    target: calc1
+  - source: calc1
+    target: q1
+  - source: q1
+    target: calc2
+  - source: calc2
+    target: q2
+  - source: q2
+    target: end

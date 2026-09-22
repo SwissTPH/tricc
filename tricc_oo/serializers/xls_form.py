@@ -381,10 +381,30 @@ def get_xfrom_trad(strategy, node, column, mapping, clean_html=False):
     return value
 
 
+def _choice_filter_key_text(value):
+    """Version-stable text for a shared choice-list tag.
+
+    ``str(node)`` includes id and version. A choice list is written once, so a
+    tag that changes per ``_Vv_`` copy never matches later questions.
+    """
+    if isinstance(value, TriccOperation):
+        parts = ", ".join(_choice_filter_key_text(item) for item in value.reference)
+        return f"{value.operator}({parts})"
+    if isinstance(value, (list, tuple)):
+        return ", ".join(_choice_filter_key_text(item) for item in value)
+    if isinstance(value, TriccReference):
+        return str(value.value)
+    if isinstance(value, TriccStatic):
+        return _choice_filter_key_text(value.value)
+    if isinstance(value, TriccNodeBaseModel):
+        return getattr(value, "name", None) or value.get_name()
+    return str(value)
+
+
 def gen_operation_hash(op):
     if op:
         h = hashlib.blake2b(digest_size=6)
-        h.update(str(op).encode("utf-8"))
+        h.update(_choice_filter_key_text(op).encode("utf-8"))
         return h.hexdigest()
 
 

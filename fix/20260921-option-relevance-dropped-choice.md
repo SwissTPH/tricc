@@ -108,6 +108,12 @@ Assert:
 - Options without relevance are unchanged.
 - Existing XLSForm / skip / not_available tests still pass.
 
+## 7. Follow-on — shared choice list across versions
+
+The same `select_one` name is one choice list, written once. The choice-row tag used to be a hash of `str(relevance)`, which includes the node id and `_Vv_` version. Copy 1 stored its tag; maintenance fluids (`_Vv_10`) looked for a different tag, so the option stayed hidden even when `<= 180` was true.
+
+The tag is now the concept name (`etat.drops.rounded_fl_ped`), stable across versions. Each question's `choice_filter` still ANDs that shared tag with its own version (`${etat_drops_rounded_fl_ped_Vv_10}<=180`).
+
 ## 6. Docs (after Implemented)
 
 - `docs/tricc-elements.md` — option `relevance` is a choice filter; the option always remains in the list definition.

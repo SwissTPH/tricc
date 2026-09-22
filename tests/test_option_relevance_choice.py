@@ -15,6 +15,7 @@ from tricc_oo.strategies.output.xls_form import XLSFormStrategy
 from tricc_oo.strategies.registry import get_output_strategy
 
 FIXTURE = os.path.join(os.path.dirname(__file__), "data", "yaml", "option_relevance_forward_ref.yaml")
+SHARED = os.path.join(os.path.dirname(__file__), "data", "yaml", "option_relevance_shared_list.yaml")
 CONTROL = os.path.join(os.path.dirname(__file__), "data", "yaml", "select_with_options.yaml")
 
 
@@ -54,6 +55,22 @@ class TestOptionRelevanceChoice(unittest.TestCase):
         choice_filter = str(question.iloc[0]["choice_filter"])
         self.assertIn(str(slow["choice_filter"]), choice_filter)
         self.assertIn("${later_calc}", choice_filter)
+
+    def test_shared_list_uses_one_tag_for_every_version(self):
+        choices, survey = _export_xlsx(SHARED, "option-relevance-shared-list")
+        listed = choices[choices["list_name"] == "drip_rate"]
+        slow_rows = listed[listed["value"].astype(str) == "slow"]
+        self.assertEqual(len(slow_rows), 1)
+        tag = str(slow_rows.iloc[0]["choice_filter"]).strip()
+        self.assertTrue(tag)
+
+        questions = survey[survey["type"].astype(str).str.startswith("select_one drip_rate")]
+        self.assertGreaterEqual(len(questions), 2)
+        filters = [str(row["choice_filter"]) for _, row in questions.iterrows()]
+        for choice_filter in filters:
+            self.assertIn(tag, choice_filter)
+            self.assertIn("<=180", choice_filter.replace(" ", ""))
+        self.assertGreater(len(set(filters)), 1)
 
     def test_options_without_relevance_still_list_both(self):
         choices, _survey = _export_xlsx(CONTROL, "select_example")

@@ -176,6 +176,9 @@ Expected:
 - The option is listed. `choice_filter` on the question shows it only when the
   condition is true. Quoted dotted names (`"etat.drops.rounded_fl"`) are the
   correct TRICC spelling.
+- Copies of the same question share one choice list. The tag on the choice row
+  is the concept, not `_Vv_n`. Each question still checks its own version. A
+  tag that only matches the first copy hides the option on later pages.
 
 ## `Unknown output strategy`
 
