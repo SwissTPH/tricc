@@ -157,6 +157,8 @@ def propagate_activity_repeat(activity):
         if not in_scope:
             continue
         node_repeat = getattr(node, "repeat", None)
+        if getattr(node, "repeat_authored", None) is None:
+            node.repeat_authored = int(node_repeat) if node_repeat is not None else 1
         if node_repeat is not None and int(node_repeat) == -1:
             logger.debug(
                 f"Preserving local-only repeat=-1 on {node.get_name()} "
@@ -792,6 +794,8 @@ def enrich_node(diagram, media_path, edge, node, activity, help_before=False, pr
             elif hasattr(node, type):
                 if message is not None:
                     setattr(node, type, message)
+                    if isinstance(node, TriccNodeDisplayModel):
+                        apply_display_text_injections(node)
                     return True, None
             else:
                 logger.warning(
@@ -902,19 +906,31 @@ def load_expressions(node):
     if getattr(node, "reference", None):
         if isinstance(node, TriccNodeRhombus):
             # Rhombus is not TriccNodeDisplayModel — no ${REF} injection; clean for CQL only
-            node.label = remove_html(node.label) if isinstance(node.label, str) else node.label
+            node.label = remove_html(node.label) if isinstance(node.label, str) else (
+                remove_html(str(node.label)) if node.label is not None else node.label
+            )
             node.expression_reference = parse_expression(node.label, node.reference)
         else:
             node.expression_reference = parse_expression("", node.reference)
 
         node.reference = node.expression_reference.get_references()
 
-    # Display-model only: clean full string then extract ${REF} → CONCATENATE (input load only)
+    # Display-model only: HTML + ${REF} → TriccMessage (input load only)
     if isinstance(node, TriccNodeDisplayModel):
-        apply_display_text_injections(node, clean_fn=remove_html)
+        apply_display_text_injections(node)
+    else:
+        for field in ("label", "hint", "help"):
+            raw = getattr(node, field, None)
+            if isinstance(raw, str):
+                cleaned = remove_html_full(raw) if field == "hint" else remove_html(raw)
+                setattr(node, field, cleaned)
 
 
 def parse_expression(label=None, expression=None):
+    if label is not None and not isinstance(label, str):
+        from tricc_oo.visitors.text_injection import serialize_injection_for_js_text
+
+        label = serialize_injection_for_js_text(label)
     if expression:
         ref_pattern = r"(\$\{[^\}]+\})"
         # only if simple ref
@@ -1006,7 +1022,8 @@ def set_mandatory_attribute(elm, mandatory_attributes, diagram=None):
 
         elif attribute_value is not None:
             if attributes in DISPLAY_ATTRIBUTES:
-                param[attributes] = remove_html(attribute_value.strip())
+                # Keep raw HTML; display models parse it to TriccMessage in load_expressions.
+                param[attributes] = attribute_value.strip()
             else:
                 param[attributes] = attribute_value.strip() if isinstance(attribute_value, str) else attribute_value
     return param
@@ -1118,8 +1135,6 @@ def get_message(diagram, id):
             if type.endswith("-message"):
                 type = type[:-8]
             label = elm.attrib.get("label")
-            if label and type == "hint":
-                label = remove_html_full(label)
             return type, label
         # use only the first one
     return None, None

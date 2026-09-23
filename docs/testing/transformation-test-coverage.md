@@ -72,13 +72,13 @@ This is the most important area for regression testing.
 | `merge_expressions`                | `visitors/tricc.py`       | Datatype-aware combine (boolean OR, numeric coalesce/plus, …) | inheritance YAML |
 | `get_versions` / `version_filter`  | `visitors/tricc.py`       | Prior versions scoped by `(name, repeat)` | `test_concept_repeat.py` |
 | `_filter_inheritable_versions`     | `visitors/tricc.py`       | Drops `repeat=-1` from inheritance operands | `test_concept_repeat.py` |
-| `get_repeat` / `propagate_activity_repeat` | `models/base.py`, `xml_to_tricc.py` | Concept repeat slot resolution and activity propagation | `test_concept_repeat.py`, `concept_repeat_activity_inherit.yaml` |
+| `get_repeat` / `get_repeat_authored` / `propagate_activity_repeat` | `models/base.py`, `xml_to_tricc.py` | Concept slot; author slot survives activity override | `test_concept_repeat.py`, `test_skip_display_not_path.py` |
 | `process_operation_reference` (`inherit_display_versions`) | `visitors/tricc.py` | Multi-version DisplayModel → `GET_INHERITED_VALUE` in value expressions only | `test_display_reference_inheritance.py` |
 | `get_repeat_index_arg` / `process_operation_reference` (`GET_REPEATED_VALUE`) | `visitors/tricc.py` | `GetRepeatedValue(code[, slot])` → slot-scoped or any-slot latest capture | `test_get_repeated_value.py`, `repeat_value_reference.yaml`, `get_repeated_value_*.yaml` |
 | `as_concept_reference` | `converters/cql_to_operation.py` | Normalizes a concept-code argument to `TriccReference` whatever the quoting | `test_get_repeated_value.py` |
 | `is_factor_edge_label` / `process_factor_edge` / `get_factor_terms` | `xml_to_tricc.py`, `visitors/tricc.py` | Rhombus/select factor edges → `TriccNodeFactor` | `test_rhombus_factor_edge.py` |
 | `get_last_version`                 | `visitors/tricc.py`       | Most recent prior version | Same as version_filter |
-| Display text injection             | `visitors/text_injection.py` | `${ref}` → CONCATENATE on DisplayModel fields | `test_text_injection.py`, `note_text_injection.yaml` |
+| Display text injection             | `visitors/text_injection.py` | `${ref}` → `TriccMessage` on DisplayModel fields | `test_text_injection.py`, `test_note_display_formatting.py`, `note_text_injection.yaml`, `note_display_formatting.yaml` |
 | Goto snippet injection             | `visitors/tricc.py`, drawio/yaml | `goto.instance=-1` inlines activity | `test_goto_snippet.py` |
 
 **Recommended test approach**:
@@ -96,7 +96,10 @@ Feature specs: `feature/advanced-merge-calc.md`, `feature/concept-repeat.md`.
 | `get_prev_instance_skip_expression`        | `visitors/tricc.py:2168` | Handles multi-instance activity skipping | Multi-instance activity tests |
 | `get_process_skip_expression`              | `visitors/tricc.py:2187` | Process-level skip conditions | Multi-process diagrams |
 | `get_end_expression`                       | `visitors/tricc.py:2221` | End-of-process expressions | Any fixture with `end` nodes of different processes |
-| `get_prev_node_expression`                 | `visitors/tricc.py:2379` | Core relevance builder from prev_nodes | Every fixture with conditional flow |
+| `get_prev_node_expression`                 | `visitors/tricc.py` | Core relevance builder from prev_nodes | Every fixture with conditional flow |
+| `get_already_captured_expression` / `serialize_display_relevance` | `visitors/tricc.py` | Same-slot skip predicate; NAND on printed widgets only | `test_skip_display_not_path.py` |
+| `or_already_captured_expression` / `pass_skipped` | `visitors/tricc.py` | Path/bridge: arrival OR already captured | `test_skip_display_not_path.py` |
+| `_printed_relevance_string`                | `serializers/xls_form.py` | Survey `relevant` for questions/notes | `test_skip_display_not_path.py` |
 
 ---
 
@@ -147,6 +150,7 @@ These are usually exercised indirectly by the higher-level methods above.
 
 ### Existing Python Tests
 - `tests/test_concept_repeat.py` — Concept repeat versioning, skip logic, activity propagation, export suffixes, `repeat=-1`
+- `tests/test_skip_display_not_path.py` — skip hides the later **widget**, not graph path / successors; same-slot vs `repeat=2`; `repeat=-1`
 - `tests/test_display_reference_inheritance.py` — multi-version DisplayModel → `GET_INHERITED_VALUE`
 - `tests/test_text_injection.py` — display `${ref}` parse / ODK serialize
 - `tests/test_goto_snippet.py` — goto `instance=-1` snippet injection
@@ -182,7 +186,7 @@ These are usually exercised indirectly by the higher-level methods above.
 
 ---
 
-**Last updated**: 2026-06 (concept repeat, rhombus factor edges, strategy registry, FHIR repeat helpers)
+**Last updated**: 2026-09 (skip-if-already-asked is print-time / same-slot; path/bridges OR already captured — `fix/20260914-skip-display-not-path.md`)
 
 **Owner**: Core engine maintainers
 

@@ -17,10 +17,11 @@ This page documents TRICC modeling elements and their meaning based on:
 - `note`: informational text shown to users. Display fields (`label`, `hint`,
   `help`, `constraint_message`, `required_message`) on **display models only**
   may embed ODK/JS-style value injection with `${field_name}` (e.g.
-  `Patient is ${age} years`). Parsed at input load into concatenate operations,
-  resolved during processing, re-exported as `${export_name}` for ODK/CHT and as
-  concatenate expressions for FHIR. Not applied to calculates or rhombus.
-  See `feature/display-text-injection.md`.
+  `Patient is ${age} years`). Parsed at input load into a message tree (`TriccMessage`)
+  that keeps bold/italic/lists around live values, resolved during processing,
+  re-exported as Markdown with `${export_name}` for ODK/CHT and as static Markdown plus
+  a serialize-time concatenate FHIRPath for FHIR. Not applied to calculates or rhombus.
+  See `feature/display-text-injection.md` and `feature/20260909-display-message-ast.md`.
 - `select_one`: single-choice question.
 - `select_multiple`: multiple-choice question.
 - `select_yesno`: yes/no convenience selection. In FHIR output this typically becomes a native `boolean` item type (preferred over `choice` for simple yes/no questions). OpenSRP export also attaches `questionnaire-choiceOrientation` = `horizontal` on visible boolean/yes-no items so Yes/No render side by side; hidden booleans (calculates, diagnoses, waits) do not.
@@ -132,7 +133,17 @@ integer `repeat` on a capture node or on `activity_start`.
 **Defaults and rules:**
 
 - Omitted `repeat` behaves as **`repeat=1`** (backward compatible with existing diagrams).
-- Same `name` + same `repeat` in a later activity is skipped if already captured (encounter-wide).
+- Same `name` + same `repeat` in a later activity is **not re-asked** if already captured
+  (encounter-wide). Different `repeat` values (e.g. `1` then `2`) **are** re-asked — that is
+  how ETAT re-enters age after “estimated weight does not make sense?” = No.
+- That hide applies when the **widget is printed** (`relevant` / FHIR `enableWhen`), not on
+  graph `node.relevance`. Path/bridge calculates (`pFPb…`) stay true if you arrived **or** the
+  earlier slot already has a value, so glucose and treatments still follow the inherited Yes/No.
+  Issue write-up: `fix/20260914-skip-display-not-path.md`.
+- Skip keys on the **author slot** (`repeat_authored`): omitted/`1` vs `2` on the node, not on
+  `instance` (second page instance) and not only on the export `_Rr_` suffix. An activity-level
+  `repeat` still overrides effective `repeat` for export names; skip keeps the drawing’s slot.
+- `repeat=-1` is never skip-suppressed and is never a skip source.
 - **No cross-repeat inheritance** — a value at `repeat=1` is not merged into logic at `repeat=2`.
 - Export suffix **`_Rr_<n>` only when `repeat > 1`** (alongside `_Vv_<n>` version and `_Ii_<n>` instance suffixes). Values `0` and `-1` do not get `_Rr_`.
 - `repeat=0` on `populate` / pre-filled nodes forces in-form collection even when pre-encounter data exists.

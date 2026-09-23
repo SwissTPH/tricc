@@ -394,9 +394,10 @@ In-form calculation (e.g. BMI from weight + height both answered in the same Que
 ### Dynamic display text (`${REF}` injection)
 
 Text authored with `${field}` tokens — note labels, question labels, `hint` and `help`
-(`feature/display-text-injection.md`) — is exported as a **`cqf-expression` on the item's `text`
-element**, which openSRP FHIR Data Capture evaluates against the in-progress QuestionnaireResponse
-and shows instead of the static text:
+(`feature/display-text-injection.md`, `feature/20260909-display-message-ast.md`) — is stored as a
+message tree, exported as Markdown in `item.text`, and as a **`cqf-expression` on the item's
+`text` element**, which openSRP FHIR Data Capture evaluates against the in-progress
+QuestionnaireResponse and shows instead of the static text:
 
 ```json
 {
@@ -561,7 +562,10 @@ CQL references to repeated concepts use `Helper.GetRepeatedValue("code", n)` whe
 default slot (`repeat=1`) uses `Helper.GetObservationValue("code")`.
 
 Authoring surface: `repeat` on capture nodes or `activity_start` in draw.io / YAML.
-See [TRICC Elements — Concept repeat](./tricc-elements.md#concept-repeat).
+Same-slot skip-if-already-asked is applied on display **enableWhen** (not on calculate items);
+path/bridge expressions OR “already captured” so later items still enable. See
+[TRICC Elements — Concept repeat](./tricc-elements.md#concept-repeat) and
+`fix/20260914-skip-display-not-path.md`.
 
 ---
 

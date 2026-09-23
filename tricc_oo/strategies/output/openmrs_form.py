@@ -368,7 +368,8 @@ class OpenMRSStrategy(BaseOutPutStrategy):
         if hasattr(self.project.start_pages["main"], 'label') and self.project.start_pages["main"].label:
             self.form_data["name"] = self.project.start_pages["main"].label.strip()
         elif hasattr(node, 'label') and node.label:
-            self.form_data["name"] = node.label.strip()
+            name = node.label if isinstance(node.label, str) else str(node.label)
+            self.form_data["name"] = name.strip()
         return True
 
     def export(self, start_pages, version):
