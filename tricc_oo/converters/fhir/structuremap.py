@@ -256,7 +256,16 @@ def build_extraction_rule(
     codesystems=None,
     default_code_system: str = DEFAULT_CODE_SYSTEM,
 ) -> Optional[ExtractionRule]:
-    """Build an extraction rule for ``node``, or None when it should not be persisted."""
+    """Build an extraction rule for ``node``, or None when it should not be persisted.
+
+    Populate nodes are never persisted: their value was received, not captured, and
+    writing it back re-recorded a carried-over value as a new Observation dated today.
+    See feature/20260929-cql-populate-wiring.md §6.
+    """
+    from tricc_oo.models.calculate import TriccNodePopulate
+
+    if isinstance(node, TriccNodePopulate):
+        return None
     kind = classify_extraction(node, codesystems)
     if kind is None:
         return None

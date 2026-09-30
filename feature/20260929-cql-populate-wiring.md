@@ -2,10 +2,10 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft |
+| **Status** | Approved |
 | **Branch target** | `feature/project-level-config` |
-| **Related** | `fix/20260914-cql-retrieve-codesystem.md` (Implemented — made the retrieves match the extracted code; prerequisite for this), `feature/20260812-intervention-order-and-dedup.md` (introduced `encounterid` and the dedup `initialExpression`), `fix/20260821-merge-input-into-populate.md` (the populate accessors), `feature/20260826-concept-persistence-mapping.md` (Draft — concept→resource/element declarations), `docs/desing/FHIRcore.md`, `docs/open-srp-export.md`, `tests/output/demo_prepopulate/README.md` (the config-level alternative, working today) |
-| **Origin** | 2026-09-14. A weight captured in the Diabetes questionnaire never appears in the Hypertension Followup questionnaire on a live openSRP install, with the retrieve fix already deployed. |
+| **Related** | `fix/20260929-cql-initial-expression-on-device.md` (Approved — makes the libraries this spec points at compile and return item-typed values), `fix/20260914-cql-retrieve-codesystem.md` (Implemented — made the retrieves match the extracted code; prerequisite for this), `feature/20260812-intervention-order-and-dedup.md` (introduced `encounterid` and the dedup `initialExpression`), `fix/20260821-merge-input-into-populate.md` (the populate accessors), `feature/20260826-concept-persistence-mapping.md` (Draft — concept→resource/element declarations), `docs/desing/FHIRcore.md`, `docs/open-srp-export.md`, `tests/output/demo_prepopulate/README.md` (the config-level alternative, working today) |
+| **Origin** | 2026-09-14. A weight captured in the Diabetes questionnaire never appears in the Hypertension Followup questionnaire on a live openSRP install, with the retrieve fix already deployed. Revised 2026-09-29 after the on-device validation below; approved by the user in session the same day. |
 
 Valid status values: `Draft` → `Approved` → `Implemented` → `Superseded`.
 
@@ -103,34 +103,58 @@ return, exported forms stop re-asking what the record already holds.
 3. **`encounterid` hand-off.** The Helper keeps the parameter and its null-safe behaviour.
    The package additionally declares it so a client knows to supply it:
    `Library.parameter` = `{name: "encounterid", use: "in", min: 0, max: "1", type: "string"}`
-   on the Helper *and* each segment library. **Open question (decide before Approved):**
-   whether the app is expected to pass it via the SDC launch context
-   (`sdc-questionnaire-launchContext` `encounter`, from which a `cqf-library`-aware renderer
-   derives the parameter) or via an openSRP config param; the answer determines whether an
-   `encounter` launchContext extension is also emitted. This needs one confirmation against
-   the deployed fhircore build — see "Validation" below.
-4. **History populate reaches across visits, unchanged.** `context=history` already emits
-   `GetHistoryObservationValue(code, period, 1, repeat)`, which is not encounter-scoped. No
-   code change; the `period` argument stays advisory (it is accepted and ignored by the
-   Helper today — **listed as a known gap**, out of scope here).
-5. **Populate concept alignment.** A populate node reads the concept it names. Authoring
-   fix, with an exporter guard: when a populate node's concept is persisted by **no**
-   extraction rule anywhere in the project, log a warning naming the node and the concept —
-   the silent case that produced this issue.
+   on the Helper *and* each segment library. **Resolved 2026-09-29:** fhircore's CQL
+   `initialExpression` path passes `encounterid` itself, as the logical id of the Encounter
+   in the launch context (`QuestionnaireViewModel.evaluateCqlInitialExpressions`); the
+   start-care session supplies that Encounter from the second form of a visit onward. No
+   launchContext extension is emitted.
+4. **History populate reaches across visits, within its period.** `context=history` emits
+   `Helper.GetHistoryObservationValueSince('<code>', Now() - <period>, 1, <repeat>)`, which
+   is not encounter-scoped and only considers Observations effective on or after the start
+   of the window. `period` is an ISO 8601 duration (`P3M`, `P1Y`, `P2W`, `P10D`, `P1Y6M`),
+   defaulting to `P1Y` as before; a period with a time part or an explicit start/end is
+   not translated and reads without a window (warning). *Revised 2026-09-29:* the period
+   used to be accepted and ignored.
+5. **Populate source concept (`source`).** *Added 2026-09-29, approved by the user in
+   session.* A populate node reads the concept it names, unless it declares
+   `source="<concept>"`, in which case it reads that concept and keeps its own name for
+   every in-form reference. This is what lets a flow keep a "previous value" node
+   (`t_weight`, read by the `weight` calculate) distinct from the question that records
+   the value (`weight_c`): renaming the node to the question's name would make them two
+   versions of one concept, which TRICC merges. `source` applies to the FHIR / openSRP
+   export; other outputs keep reading by name.
+6. **Populate nodes are not extracted.** A populate value was received, not captured: the
+   extraction map no longer writes it back, which previously re-recorded a carried-over
+   value as a new Observation dated today (and, with `source`, would have created one under
+   the node's own name on every save).
+7. **Unpersisted populate concept warning.** When a populate node's concept (its `source`,
+   else its name) is persisted by **no** extraction rule in the project, log a warning naming
+   the node and the concept — the silent case that produced this issue. (Only this
+   project's extraction is visible to the exporter; a concept recorded by another project
+   still warns, so the message says so.)
 
 ### Code checklist
 
-- [ ] `tricc_oo/strategies/output/fhir_form.py` — emit `cqf-library` per Questionnaire with
+- [x] `tricc_oo/strategies/output/fhir_form.py` — emit `cqf-library` per Questionnaire with
       CQL expressions; emit `Library.parameter` for `encounterid`; add
       `relatedArtifact: depends-on` to segment libraries.
-- [ ] `tricc_oo/strategies/output/opensrp.py` — reuse `_process_library_url`; keep the
+- [x] `tricc_oo/strategies/output/opensrp.py` — reuse `_process_library_url`; keep the
       "no Library → no extension" rule; emit the launch context if §3 resolves that way.
-- [ ] `tricc_oo/strategies/output/fhir_form.py` (or the populate pass) — warning for a
+- [x] `source` on populate nodes: `drawio_type_map.py`, `TriccNodePopulate`,
+      `populate_helper.resolve_populate_reference` (§5).
+- [x] Helper `GetHistoryObservationValueSince` + ISO duration → CQL quantity (§4).
+- [x] `structuremap.build_extraction_rule` skips populate nodes (§6).
+- [x] `tricc_oo/strategies/output/fhir_form.py` (or the populate pass) — warning for a
       populate concept that no extraction rule persists.
-- [ ] `docs/open-srp-export.md` — the populate path end to end: who supplies `encounterid`,
+- [x] `docs/open-srp-export.md` — the populate path end to end: who supplies `encounterid`,
       when `cqf-library` appears, encounter vs history scope.
-- [ ] `docs/tricc-elements.md` — `context=history` as *the* cross-visit mechanism, with the
+- [x] `docs/tricc-elements.md` — `context=history` as *the* cross-visit mechanism, with the
       concept-naming rule.
+
+
+_2026-09-29: `cqf-library` is emitted by `OpenSRPStrategy._wire_questionnaire_extensions` (next to
+`cqlInputResources`); `Library.parameter` / `depends-on` by `FHIRStrategy._make_library_resource`.
+All items done; status stays Approved until the on-device acceptance run._
 
 ### Tests
 
@@ -146,13 +170,23 @@ return, exported forms stop re-asking what the record already holds.
   `GetHistoryObservationValue('weight_c', …)` and no `GetEncounter*` accessor.
 - A populate node naming a concept that no extraction rule persists logs a warning.
 
-### Validation (must happen before `Implemented`)
+### Validation (done 2026-09-29)
 
-The one thing this repo cannot settle on its own: whether the deployed fhircore build
-evaluates a CQL `initialExpression` off `cqf-library`, and how it expects `encounterid` to
-arrive. Confirm against `android/feature/cql-initial-expression.md` in the fhircore repo and
-one on-device run before flipping status. Until then the config-level `PREPOPULATE` route
-stays the supported answer for cross-form values.
+On a tablet running the fhircore 2.2.2 debug build (commit `1a5bb44c3`, CQL
+`initialExpression` support), with the Hypertension Followup package patched by hand to the
+shape this spec and `fix/20260929-cql-initial-expression-on-device.md` describe, a weight
+entered in the Diabetes form (63.4 kg) appeared in the Hypertension Followup weight field.
+Findings that shaped the spec:
+
+- `cqf-library` (`valueCanonical`) is the only trigger; `cqlInputResources` is read by
+  nothing. `valueReference` is not accepted by fhircore's `cqfLibraryUrls()`.
+- The CQL engine resolves the library by the **last segment of its canonical URL**, which
+  must therefore be the CQL library name (fix §1).
+- Libraries reach the CQL engine only through the app manifest (`Composition?identifier=<app
+  id>`); a Library downloaded by data sync alone is not evaluable. This is deployment, not
+  export, and is documented in `docs/open-srp-export.md`.
+- fhircore does not re-index a changed Library on re-login when the data sync already
+  stored it; *Settings → Sync configuration* does. fhircore issue, documented.
 
 ### Acceptance criteria
 

@@ -35,6 +35,17 @@ This page documents TRICC modeling elements and their meaning based on:
   optional `period` (ISO Duration/Period; default `P1Y` for `history` only),
   optional `repeat` (read slot). Excluded from activity `repeat` propagation.
   See `feature/populate-context.md`.
+  - **Carrying a value across forms / visits** (FHIR / openSRP): use `context=history`. It
+    reads the most recent stored value within `period` (e.g. `P3M` = last 3 months), from
+    any earlier form or visit; `encounter` only sees the current visit.
+  - optional `source`: the concept to read, when it differs from the node's `name` — e.g. a
+    "previous weight" node `t_weight` with `source="weight_c"` reads what the Weight question
+    `weight_c` recorded, while flows keep referring to `t_weight`. Do not rename the node to
+    the question's name instead: two nodes with one name are merged as versions of one
+    concept. (FHIR / openSRP export only.)
+  - populate values are never written back on submit; the export warns when a populate node
+    reads a concept no form of the project records.
+  See `feature/20260929-cql-populate-wiring.md`.
 
 ## Option and list elements
 
