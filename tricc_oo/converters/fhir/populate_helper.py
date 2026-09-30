@@ -122,10 +122,49 @@ def populate_fhir_target(node) -> str:
     return resource
 
 
+_CQL_DURATION_UNITS = (("year", "years"), ("month", "months"), ("week", "weeks"), ("day", "days"))
+
+
+def cql_lookback_start(period: Optional[str]) -> Optional[str]:
+    """CQL DateTime for the start of an ISO 8601 duration window ending now.
+
+    ``P3M`` → ``Now() - 3 months``; ``P1Y6M`` → ``Now() - 1 year - 6 months``. Returns None
+    for durations with a time part, explicit start/end periods, and unparseable values — the
+    lookup then has no window.
+
+    Args:
+        period: ISO 8601 duration such as ``P3M``.
+
+    Returns:
+        CQL expression, or None.
+    """
+    match = _ISO_DURATION_RE.match(str(period or "").strip())
+    if not match or any(match.groups()[4:]):
+        return None
+    parts = []
+    for amount, (singular, plural) in zip(match.groups()[:4], _CQL_DURATION_UNITS):
+        if amount and int(amount):
+            parts.append(f"{int(amount)} {singular if int(amount) == 1 else plural}")
+    if not parts:
+        return None
+    return "Now() - " + " - ".join(parts)
+
+
+def populate_source_concept(node: "TriccNodePopulate") -> str:
+    """Concept a populate node reads: its ``source`` attribute, else its own name.
+
+    ``source`` lets a "previous value" node (``t_weight``) read the concept the question
+    records (``weight_c``) while keeping its own name for in-form references — the same
+    name would make the two nodes versions of one concept.
+    See feature/20260929-cql-populate-wiring.md §5.
+    """
+    return (getattr(node, "source", None) or node.name or "").strip()
+
+
 def resolve_populate_reference(node: "TriccNodePopulate", qualified: bool = False) -> str:
     """Return author-facing CQL accessor for a populate node (*Value helpers only)."""
     prefix = "Helper." if qualified else ""
-    code = (node.name or "").replace("'", "\\'")
+    code = populate_source_concept(node).replace("'", "\\'")
     ctx = node.context
     repeat_arg = _repeat_cql_arg(node)
 
@@ -149,9 +188,16 @@ def resolve_populate_reference(node: "TriccNodePopulate", qualified: bool = Fals
         period = node.period or DEFAULT_HISTORY_PERIOD
         if target == "Condition":
             return f"{prefix}GetHistoryConditionValue('{code}')"
+        since = cql_lookback_start(period)
+        if since is None:
+            logger.warning(
+                "populate %s: period '%s' is not a date-only ISO duration; reading without a window",
+                node.get_name(),
+                period,
+            )
         return (
-            f"{prefix}GetHistoryObservationValue("
-            f"'{code}', {_cql_string_literal(period)}, 1, {repeat_arg})"
+            f"{prefix}GetHistoryObservationValueSince("
+            f"'{code}', {since or 'null'}, 1, {repeat_arg})"
         )
     return f"{prefix}GetPatientValue('{code}')"
 

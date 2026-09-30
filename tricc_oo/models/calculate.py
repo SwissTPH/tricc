@@ -70,6 +70,8 @@ class TriccNodePopulate(TriccNodeFakeCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.populate
     context: str = "patient"
     period: Optional[str] = None
+    # Concept read instead of ``name`` (FHIR export; feature/20260929-cql-populate-wiring.md §5)
+    source: Optional[str] = None
     data_type: Optional[str] = None
     concept_type: Optional[str] = None
     repeat: Optional[int] = None

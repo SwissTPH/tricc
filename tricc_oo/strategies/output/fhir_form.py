@@ -41,8 +41,15 @@ from tricc_oo.converters.fhir.ids import (
     readable_resource_filename,
     to_fhir_id,
 )
+from tricc_oo.converters.fhir.cql_value import (
+    cql_helper_value_block,
+    wrap_cql_for_item_type,
+)
 from tricc_oo.converters.fhir.populate_helper import (
+    ENCOUNTER_CONTEXT,
+    HISTORY_CONTEXT,
     cql_helper_populate_block,
+    populate_source_concept,
     resolve_populate_reference,
 )
 from tricc_oo.converters.fhir.repeat_helper import (
@@ -230,6 +237,8 @@ context Patient
 
 {populate_helpers}
 
+{value_helpers}
+
 // ── Condition helpers ─────────────────────────────────────────────────────────
 
 // Matched by code across any system, and by clinical-status code rather than a
@@ -305,6 +314,8 @@ class FHIRStrategy(BaseOutPutStrategy):
         self.use_value_sets = use_value_sets
         self.questionnaires: Dict[str, dict] = {}
         self.cql_defines: Dict[str, List[str]] = {}
+        # populate concept read -> linkIds reading it (unpersisted-concept warning)
+        self._populate_reads: Dict[str, set] = {}
         self.structuremaps: Dict[str, dict] = {}
         self.extraction_maps: Dict[str, dict] = {}
         self.extraction_rules: Dict[str, list] = {}
@@ -428,6 +439,8 @@ class FHIRStrategy(BaseOutPutStrategy):
         # StructureMaps and CQL libraries must see the pruned Questionnaire
         # (fix/20260824-prune-unused-initial-calculates.md).
         self._assemble_extraction_maps()
+        self._warn_unpersisted_populate_concepts()
+        self._drop_undefined_cql_initial_expressions()
         self._assemble_cql_libraries()
         self.export(self.project.start_pages, version=version)
         logger.info("FHIRStrategy: validating")
@@ -598,7 +611,10 @@ class FHIRStrategy(BaseOutPutStrategy):
             # "main" is the project's single root process (1 project = 1 Intervention):
             # its human title is the root node's authored label (same source other
             # output strategies use, e.g. xls_form.py/html_form.py), not the segment slug.
-            q_title = q_name
+            # Every project has a "registration" process: the bare slug made the Start
+            # care chooser list identical "questionnaire-registration" entries.
+            process_title = segment.replace("-", " ").replace("_", " ").title()
+            q_title = f"{form_key} – {process_title}"
             if segment == "main":
                 main_page = self.project.start_pages.get("main")
                 root_label = getattr(getattr(main_page, "root", None), "label", None)
@@ -1174,10 +1190,10 @@ class FHIRStrategy(BaseOutPutStrategy):
 
             if isinstance(node, TriccNodePopulate):
                 cql_expr = resolve_populate_reference(node, qualified=True)
-                self._record_cql_define(segment, calc_name, cql_expr)
+                if node.context in (ENCOUNTER_CONTEXT, HISTORY_CONTEXT):
+                    self._populate_reads.setdefault(populate_source_concept(node), set()).add(link_id)
                 item = self._find_item_by_link_id(q.get("item", []), link_id)
-                if item is not None and item_allows_initial(item):
-                    set_item_extension(item, build_initial_expression(calc_name))
+                self._attach_cql_initial_expression(segment, item, calc_name, cql_expr)
                 return True
 
             expression = getattr(node, "expression_reference", None) or getattr(node, "reference", None)
@@ -1249,16 +1265,79 @@ class FHIRStrategy(BaseOutPutStrategy):
                 logger.debug(f"Could not convert calculate expression for {link_id}: {e}")
                 return True
 
-            self._record_cql_define(segment, calc_name, cql_expr)
-
             if item is not None:
                 self._apply_calculate_item_type(item, expression)
-                if item_allows_initial(item):
-                    set_item_extension(item, build_initial_expression(calc_name))
+            self._attach_cql_initial_expression(
+                segment, item, calc_name, cql_expr, source_type=self._cql_expression_type(expression)
+            )
 
             return True
         finally:
             self._leave_serialisation_context()
+
+    def _attach_cql_initial_expression(
+        self,
+        segment: str,
+        item: Optional[dict],
+        name: str,
+        cql_expr: str,
+        source_type: Optional[str] = None,
+    ) -> bool:
+        """Record define ``name`` and point ``item``'s CQL ``initialExpression`` at it.
+
+        fhircore copies the result into ``item.initial`` unchanged, so the define is
+        converted to the item's answer type (a mismatch makes the whole form fail to
+        load). Items with ``answerOption`` get no CQL ``initialExpression``: ``initial``
+        next to ``answerOption`` breaks que-11 and the SDK throws. The define is still
+        recorded (unconverted) when not attached, so other defines can reference it.
+        See fix/20260929-cql-initial-expression-on-device.md §4-5.
+
+        Args:
+            segment: Library / Questionnaire key.
+            item: Questionnaire item receiving the expression (may be None).
+            name: CQL define name (``Calc_*`` / ``Dedup_*``).
+            cql_expr: CQL expression of the define.
+            source_type: Known result type of ``cql_expr`` when it is not a Helper
+                Observation-value accessor (see ``_cql_expression_type``).
+
+        Returns:
+            True when the ``initialExpression`` was attached.
+        """
+        attach = item is not None and item_allows_initial(item) and not item.get("answerOption")
+        if not attach:
+            if item is not None and item.get("answerOption"):
+                logger.debug(
+                    "FHIRStrategy: no CQL initialExpression on %s (answerOption forbids initial)",
+                    item.get("linkId"),
+                )
+            self._record_cql_define(segment, name, cql_expr)
+            return False
+        self._record_cql_define(
+            segment, name, wrap_cql_for_item_type(cql_expr, item.get("type"), source_type=source_type)
+        )
+        set_item_extension(item, build_initial_expression(name))
+        return True
+
+    def _cql_expression_type(self, expression) -> Optional[str]:
+        """``boolean`` / ``integer`` / ``decimal`` / ``date`` when a TRICC expression's
+        CQL result type is known, else None (treated as possibly text)."""
+        literal = expression.value if isinstance(expression, TriccStatic) else expression
+        if isinstance(literal, bool):
+            return "boolean"
+        if isinstance(literal, (int, float)):
+            return "integer" if isinstance(literal, int) else "decimal"
+        if self._expression_returns_boolean(expression):
+            return "boolean"
+        number_type = self._expression_fhir_number_type(expression)
+        if number_type:
+            return number_type
+        operation = self._unwrap_operation(expression)
+        if isinstance(operation, TriccOperation) and operation.operator in (
+            TriccOperator.TODAY,
+            TriccOperator.CAST_DATE,
+        ):
+            return "date"
+        return None
 
     def _record_cql_define(self, segment: str, name: str, expression: str) -> None:
         """Store one CQL define, replacing any earlier definition of the same name.
@@ -1420,9 +1499,13 @@ class FHIRStrategy(BaseOutPutStrategy):
             code = (getattr(node, "name", None) or link_id).replace("'", "\\'")
             cql_expr = f"Helper.GetConditionValue('{code}')"
 
-        calc_name = f"Dedup_{link_id}"
-        self._record_cql_define(segment, calc_name, cql_expr)
-        set_item_extension(item, build_initial_expression(calc_name))
+        self._attach_cql_initial_expression(
+            segment,
+            item,
+            f"Dedup_{link_id}",
+            cql_expr,
+            source_type="boolean" if fhir_resource == "Condition" else None,
+        )
 
     def _sanitize_questionnaires(self) -> None:
         """Strip SDC-illegal ``initial`` / ``initialExpression`` before write.
@@ -1550,12 +1633,88 @@ class FHIRStrategy(BaseOutPutStrategy):
             names.update(FHIRStrategy._collect_initial_expression_names(item.get("item")))
         return names
 
+    def _warn_unpersisted_populate_concepts(self) -> None:
+        """Warn when a populate node reads a concept no extraction rule here records.
+
+        Such a node can only ever be empty unless another project records the concept —
+        the silent case behind feature/20260929-cql-populate-wiring.md §7.
+        """
+        extracted = {
+            rule.concept_code
+            for rules in (self.extraction_rules or {}).values()
+            for rule in rules
+        }
+        for concept, link_ids in sorted(self._populate_reads.items()):
+            if concept not in extracted:
+                logger.warning(
+                    "FHIRStrategy: populate %s reads concept '%s', which no form of this project "
+                    "records; it stays empty unless another project records it (set `source`?)",
+                    ", ".join(sorted(link_ids)),
+                    concept,
+                )
+
+    def _drop_undefined_cql_initial_expressions(self) -> None:
+        """Remove CQL ``initialExpression``s naming no define of their form's library.
+
+        fhircore evaluates all of a Questionnaire's CQL expressions in one call, and one
+        unknown name fails the call — every other prefill in the form is lost with it.
+        See fix/20260929-cql-initial-expression-on-device.md §7.
+        """
+        for segment, q in (self.questionnaires or {}).items():
+            defined = {
+                statement.split(":", 1)[0].replace("define", "", 1).strip()
+                for statement in self.cql_defines.get(segment) or []
+            }
+            self._drop_undefined_in_items(segment, q.get("item"), defined)
+
+    @classmethod
+    def _drop_undefined_in_items(cls, segment: str, items, defined: set) -> None:
+        for item in items or []:
+            extensions = item.get("extension") or []
+            kept = []
+            for ext in extensions:
+                value = ext.get("valueExpression") or {}
+                if (
+                    ext.get("url") == SDC_EXT_INITIAL_EXPR
+                    and (value.get("language") or "").startswith("text/cql")
+                    and (value.get("expression") or "").strip() not in defined
+                ):
+                    logger.warning(
+                        "FHIRStrategy: %s: initialExpression '%s' on item '%s' has no define; removed",
+                        segment,
+                        value.get("expression"),
+                        item.get("linkId"),
+                    )
+                    continue
+                kept.append(ext)
+            if len(kept) != len(extensions):
+                if kept:
+                    item["extension"] = kept
+                else:
+                    item.pop("extension", None)
+            cls._drop_undefined_in_items(segment, item.get("item"), defined)
+
     def _drop_orphan_cql_defines(self, segment: str, items) -> None:
-        """Drop ``Calc_*`` / ``Dedup_*`` defines no remaining item names."""
+        """Drop ``Calc_*`` / ``Dedup_*`` defines no remaining item or kept define names.
+
+        A define can read another node's ``Calc_*`` define (``_cql_node_reference``), so
+        the kept set is closed over references between defines.
+        """
         used = self._collect_initial_expression_names(items)
         defines = self.cql_defines.get(segment) or []
         if not defines:
             return
+        bodies = {
+            statement.split(":", 1)[0].replace("define", "", 1).strip(): statement.split(":", 1)[1]
+            for statement in defines
+        }
+        pending = [name for name in bodies if name in used or not name.startswith(("Calc_", "Dedup_"))]
+        while pending:
+            body = bodies[pending.pop()]
+            for name in bodies:
+                if name not in used and re.search(rf"\b{re.escape(name)}\b", body):
+                    used.add(name)
+                    pending.append(name)
         kept = []
         for statement in defines:
             name = statement.split(":", 1)[0].replace("define", "", 1).strip()
@@ -1689,12 +1848,55 @@ class FHIRStrategy(BaseOutPutStrategy):
             return f"'{r.name}'"
         elif isinstance(r, TriccNodePopulate):
             return resolve_populate_reference(r, qualified=True)
-        elif issubclass(r.__class__, TriccNodeInputModel):
-            return get_export_name(r)
         elif issubclass(r.__class__, TriccNodeBaseModel):
-            return get_export_name(r)
+            return self._cql_node_reference(r)
         else:
             raise NotImplementedError(f"This type of node {r.__class__} is not supported within an operation")
+
+    def _cql_node_reference(self, node) -> str:
+        """CQL for a reference to another node's value — never its bare item name.
+
+        A bare ``linkId`` is not a CQL identifier: one such define made the whole library
+        fail to translate, blanking every ``initialExpression`` in the form. The node's own
+        define is used when this library already has one; otherwise the value it recorded
+        is read through the Helper, converted to the node's answer type so comparisons
+        and arithmetic type-check (a select compares by code). See
+        fix/20260929-cql-initial-expression-on-device.md §6.
+
+        Args:
+            node: Referenced TRICC node.
+
+        Returns:
+            CQL expression for the node's value.
+        """
+        from tricc_oo.converters.fhir.concept_mapper import resolve_concept_type
+
+        name = get_export_name(node)
+        calc_name = f"Calc_{name}"
+        segment = getattr(self, "_current_segment", None)
+        if segment and any(
+            statement.startswith(f"define {calc_name}:") for statement in self.cql_defines.get(segment, [])
+        ):
+            return calc_name
+        concept_type = resolve_concept_type(node, getattr(self.project, "code_systems", None))
+        resource, _, _ = get_fhir_resource(concept_type, getattr(node, "tricc_type", None))
+        if resource == "Condition":
+            code = (getattr(node, "name", None) or name).replace("'", "\\'")
+            return f"Helper.GetConditionValue('{code}')"
+        return wrap_cql_for_item_type(
+            get_observation_cql_accessor_for_node(node), self._cql_reference_item_type(node)
+        )
+
+    def _cql_reference_item_type(self, node) -> str:
+        """Answer type a referenced node's recorded value is read as in CQL."""
+        if self._is_yesno_boolean_select(node):
+            return "boolean"
+        item = self._find_item_anywhere(get_export_name(node))
+        item_type = (item or {}).get("type") or get_fhir_item_type(getattr(node, "tricc_type", None))
+        if item_type in (None, "choice", "open-choice", "text"):
+            # choice answers are compared with option codes, i.e. strings
+            return "string"
+        return item_type
 
     def convert_expression_to_cql(self, expression):
         if isinstance(expression, TriccOperation):
@@ -1723,13 +1925,15 @@ class FHIRStrategy(BaseOutPutStrategy):
             fhir_version=FHIR_VERSION,
             repeat_helpers=cql_helper_repeat_block(FHIR_VERSION),
             populate_helpers=cql_helper_populate_block(),
+            value_helpers=cql_helper_value_block(),
         )
         self.cql_libraries[helper_key] = helper_cql
 
         # Create FHIR Library resource for helper
-        self.libraries[helper_key] = self._make_library_resource(
+        helper_resource = self._make_library_resource(
             helper_id, helper_cql, form_id, name=helper_cql_name
         )
+        self.libraries[helper_key] = helper_resource
 
         # Build one child library per segment/process
         for segment, defines in self.cql_defines.items():
@@ -1748,19 +1952,33 @@ class FHIRStrategy(BaseOutPutStrategy):
 
             # Create FHIR Library resource
             self.libraries[segment] = self._make_library_resource(
-                lib_id, child_cql, form_id, name=cql_name
+                lib_id, child_cql, form_id, name=cql_name, depends_on=[helper_resource["url"]]
             )
 
     def _make_library_resource(
-        self, lib_id: str, cql_text: str, form_id: str, name: Optional[str] = None
+        self,
+        lib_id: str,
+        cql_text: str,
+        form_id: str,
+        name: Optional[str] = None,
+        depends_on: Optional[List[str]] = None,
     ) -> dict:
         """Create a FHIR Library resource with embedded CQL.
+
+        The canonical ``url`` ends in the CQL library name, not the id: CQL engines
+        (cqf-fhir-cr, on HAPI and on device) derive the library identifier from the last
+        URL segment, so a UUID there leaves the library unresolvable. ``id`` stays the
+        UUID used for REST addressing. See fix/20260929-cql-initial-expression-on-device.md.
 
         Args:
             lib_id: Server resource id (UUID preferred).
             cql_text: CQL source text.
             form_id: Human form id for titles.
             name: Optional human-readable ``name`` (CQL library token).
+            depends_on: Canonical URLs of included libraries (``relatedArtifact``).
+
+        Returns:
+            Library resource dict.
         """
         import base64
 
@@ -1769,10 +1987,10 @@ class FHIRStrategy(BaseOutPutStrategy):
         lib_name = name or to_fhir_id(lib_id)
         encoded = base64.b64encode(cql_text.encode("utf-8")).decode("ascii")
 
-        return {
+        library = {
             "resourceType": "Library",
             "id": resource_id,
-            "url": f"{self.base_url}/Library/{resource_id}",
+            "url": f"{self.base_url}/Library/{lib_name}",
             "version": "1.0.0",
             "name": lib_name,
             "title": f"{form_id} - {lib_name} CQL Library",
@@ -1785,6 +2003,11 @@ class FHIRStrategy(BaseOutPutStrategy):
                     }
                 ]
             },
+            # Supplied by fhircore from the Encounter in the launch context
+            # (feature/20260929-cql-populate-wiring.md §3).
+            "parameter": [
+                {"name": "encounterid", "use": "in", "min": 0, "max": "1", "type": "string"}
+            ],
             "content": [
                 {
                     "contentType": "text/cql",
@@ -1792,6 +2015,11 @@ class FHIRStrategy(BaseOutPutStrategy):
                 }
             ],
         }
+        if depends_on:
+            library["relatedArtifact"] = [
+                {"type": "depends-on", "resource": url} for url in depends_on
+            ]
+        return library
 
     def convert_expression_to_fhirpath(self, expression):
         # For FHIRPath, similar to CQL but in FHIR context
@@ -2465,18 +2693,34 @@ class FHIRStrategy(BaseOutPutStrategy):
     # ============================================================
     # BOOLEAN / LOGICAL OPERATORS
     # ============================================================
+    def _cql_boolean_operand(self, ref_expressions, original_references=None) -> str:
+        """Operand of ``is [not] true/false`` as a CQL Boolean.
+
+        A node read as text (a hidden string calculate holding 'true' / 'yes' / '1') is
+        converted with ``ToBoolean(String)`` — ``String is true`` does not translate.
+        CQL has no ``ToBoolean(Boolean)``, so anything else is passed through.
+        """
+        operand = (original_references or [None])[0]
+        expr = ref_expressions[0]
+        if (
+            isinstance(operand, TriccNodeBaseModel)
+            and not isinstance(operand, TriccNodePopulate)
+            and self._cql_reference_item_type(operand) == "string"
+        ):
+            return f"ToBoolean({expr})"
+        return expr
+
     def tricc_operation_istrue(self, ref_expressions, original_references=None):
-        # CQL: treat as identity or explicit comparison
-        return f"({ref_expressions[0]} is true)"
+        return f"({self._cql_boolean_operand(ref_expressions, original_references)} is true)"
 
     def tricc_operation_isnottrue(self, ref_expressions, original_references=None):
-        return f"({ref_expressions[0]} is not true)"
+        return f"({self._cql_boolean_operand(ref_expressions, original_references)} is not true)"
 
     def tricc_operation_isfalse(self, ref_expressions, original_references=None):
-        return f"({ref_expressions[0]} is false)"
+        return f"({self._cql_boolean_operand(ref_expressions, original_references)} is false)"
 
     def tricc_operation_isnotfalse(self, ref_expressions, original_references=None):
-        return f"({ref_expressions[0]} is not false)"
+        return f"({self._cql_boolean_operand(ref_expressions, original_references)} is not false)"
 
     def tricc_operation_isnull(self, ref_expressions, original_references=None):
         return f"({ref_expressions[0]} is null)"
@@ -2556,6 +2800,14 @@ class FHIRStrategy(BaseOutPutStrategy):
         return f"ToInteger({ref_expressions[0]})"
 
     def tricc_operation_cast_date(self, ref_expressions, original_references=None):
+        # A number here is the XLSForm "days since 1970-01-01" date (decimal-date-time);
+        # CQL has no ToDate(Decimal), so it is added to the epoch as a day quantity.
+        operand = (original_references or [None])[0]
+        if self._operand_fhir_number_type(operand) is not None:
+            return (
+                "@1970-01-01 + System.Quantity { value: "
+                f"ToDecimal(Truncate({ref_expressions[0]})), unit: 'day' }}"
+            )
         return f"ToDate({ref_expressions[0]})"
 
     def tricc_operation_cast_string(self, ref_expressions, original_references=None):
@@ -2565,7 +2817,8 @@ class FHIRStrategy(BaseOutPutStrategy):
         return f"ToBoolean({ref_expressions[0]})"
 
     def tricc_operation_datetime_to_decimal(self, ref_expressions, original_references=None):
-        return f"ToDecimal({ref_expressions[0]})"
+        # XLSForm decimal-date-time: days since 1970-01-01 (ToDecimal(Date) is not CQL).
+        return f"ToDecimal(difference in days between @1970-01-01 and ToDate({ref_expressions[0]}))"
 
     # ============================================================
     # STRING OPERATORS
@@ -2599,9 +2852,9 @@ class FHIRStrategy(BaseOutPutStrategy):
         return f"AgeInYears({ref_expressions[0]})"
 
     def tricc_operation_format_date(self, ref_expressions, original_references=None):
-        # ref[0] = date, ref[1] = format string (optional)
-        if len(ref_expressions) > 1:
-            return f"ToString({ref_expressions[0]}, {ref_expressions[1]})"
+        # ref[0] = date, ref[1] = XLSForm format string (optional). CQL has no
+        # ToString(Date, format); ToString(Date) is already ISO yyyy-MM-dd, the only
+        # format TRICC flows use, so the format argument is dropped.
         return f"ToString({ref_expressions[0]})"
 
     # ============================================================

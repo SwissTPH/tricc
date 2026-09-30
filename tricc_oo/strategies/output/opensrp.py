@@ -88,6 +88,9 @@ FHIRCORE_EXT_CQL_INPUT = (
 FHIRCORE_EXT_PLAN_DEFINITIONS = (
     "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-planDefinitions"
 )
+# The only extension fhircore reads to evaluate CQL initialExpressions
+# (feature/20260929-cql-populate-wiring.md §1).
+CQF_EXT_LIBRARY = "http://hl7.org/fhir/StructureDefinition/cqf-library"
 
 # App package tag — Android/cdss shell sync pulls content with:
 #   ResourceType?_tag=https://smartregister.org/app-id|{app_id}
@@ -406,7 +409,9 @@ class OpenSRPStrategy(FHIRStrategy):
         lib = libs.get(process) or libs.get(to_fhir_id(process))
         if not isinstance(lib, dict) or not lib.get("id"):
             return None
-        return f"{self.base_url}/Library/{lib['id']}"
+        # The Library's own canonical (ends in its CQL name), never rebuilt from the id:
+        # CQL engines resolve the library from the last URL segment.
+        return lib.get("url") or f"{self.base_url}/Library/{lib['id']}"
 
     def _process_resource_ids(self, process: str) -> dict:
         """Return UUID FHIR ids for a process's openSRP resources (stable uuid5).
@@ -948,11 +953,13 @@ class OpenSRPStrategy(FHIRStrategy):
     # ── Questionnaire wiring ──────────────────────────────────────────────────
 
     def _wire_questionnaire_extensions(self, process: str, pd: dict, version: str):
-        """Add cqlInputResources and planDefinitions extensions to a Questionnaire.
+        """Add cqf-library, cqlInputResources and planDefinitions extensions to a Questionnaire.
 
         ``cqlInputResources`` is emitted only when this process actually has a generated
         CQL Library — pointing it at a Library that was never generated leaves fhircore
-        with an unresolvable reference.
+        with an unresolvable reference. ``cqf-library`` follows the same rule and is
+        additionally emitted only when an item carries a CQL expression: it is what makes
+        fhircore evaluate ``text/cql-identifier`` initialExpressions.
 
         Args:
             process: The cpg-common-process name.
@@ -967,6 +974,10 @@ class OpenSRPStrategy(FHIRStrategy):
         pd_url = f"{self.base_url}/PlanDefinition/{pd['id']}"
 
         extensions = q.setdefault("extension", [])
+
+        # cqf-library — the canonical fhircore evaluates CQL initialExpressions against
+        if lib_url and self._questionnaire_has_cql(q.get("item")):
+            extensions.append({"url": CQF_EXT_LIBRARY, "valueCanonical": lib_url})
 
         # cqlInputResources — only when the Library exists in this package
         if lib_url:
@@ -990,6 +1001,18 @@ class OpenSRPStrategy(FHIRStrategy):
         extract_sm = (self.extraction_maps or {}).get(process)
         if isinstance(extract_sm, dict) and extract_sm.get("url"):
             extensions.append(target_structuremap_extension(extract_sm["url"]))
+
+    @classmethod
+    def _questionnaire_has_cql(cls, items) -> bool:
+        """True when any item (at any depth) carries a ``text/cql*`` expression."""
+        for item in items or []:
+            for ext in item.get("extension") or []:
+                language = (ext.get("valueExpression") or {}).get("language") or ""
+                if language.startswith("text/cql"):
+                    return True
+            if cls._questionnaire_has_cql(item.get("item")):
+                return True
+        return False
 
     # ── File writers ──────────────────────────────────────────────────────────
 

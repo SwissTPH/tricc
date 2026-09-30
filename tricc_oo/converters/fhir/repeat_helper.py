@@ -104,6 +104,11 @@ def cql_helper_repeat_block(fhir_version: str = "4.0.1") -> str:
     concept's system per concept (``structuremap._concept_system_url``), so one project
     spreads codes over several CodeSystems and a single declared code system on the read
     side matches nothing. See fix/20260914-cql-retrieve-codesystem.md.
+
+    Every construct must be accepted by cql-to-elm 3.12.0 (the translator fhircore ships):
+    function-call query sources are parenthesised, sorts use comparable system values,
+    and "Nth most recent" is ``First(Skip(...))``. See
+    fix/20260929-cql-initial-expression-on-device.md.
     """
     return f"""\
 // ── Repeat / current-encounter helpers ────────────────────────────────────────
@@ -130,21 +135,23 @@ define function GetObservations(code String):
 
 define function ObservationRepeatIndex(O Observation):
   singleton from (
-    O.extension.where(url = '{TRICC_OBSERVATION_REPEAT_EXT}').value as Integer
+    O.extension E
+      where E.url = '{TRICC_OBSERVATION_REPEAT_EXT}'
+      return FHIRHelpers.ToInteger(E.value as FHIR.integer)
   )
 
 define function GetObservation(code String):
   First(
-    GetObservations(code) O
+    (GetObservations(code)) O
       where ObservationRepeatIndex(O) is null or ObservationRepeatIndex(O) = 1
-      sort by effective desc
+      sort by (effective as FHIR.dateTime).value desc
   )
 
 define function GetRepeated(code String, repeatIndex Integer):
   First(
-    GetObservations(code) O
+    (GetObservations(code)) O
       where ObservationRepeatIndex(O) = repeatIndex
-      sort by effective desc
+      sort by (effective as FHIR.dateTime).value desc
   )
 
 define function GetObservationValue(code String):
@@ -156,7 +163,7 @@ define function GetRepeatedValue(code String, repeatIndex Integer):
 define function GetNumberOfRepeat(code String):
   Count(
     distinct(
-      GetObservations(code) O
+      (GetObservations(code)) O
         return ObservationRepeatIndex(O)
     )
   )
@@ -168,19 +175,20 @@ define function GetHistoryObservation(
   repeatIndex Integer
 ):
   First(
-    (
-      [Observation] O
-        where ObservationHasCode(O, code)
-        and O.status in {{'final', 'amended', 'corrected'}}
-        and (
-          repeatIndex is null
-          or ObservationRepeatIndex(O) = repeatIndex
-          or (repeatIndex = 1 and ObservationRepeatIndex(O) is null)
-        )
-        sort by effective desc
-    ) O
-      skip reverseOrderPosition - 1
-      take 1
+    Skip(
+      (
+        [Observation] O
+          where ObservationHasCode(O, code)
+          and O.status in {{'final', 'amended', 'corrected'}}
+          and (
+            repeatIndex is null
+            or ObservationRepeatIndex(O) = repeatIndex
+            or (repeatIndex = 1 and ObservationRepeatIndex(O) is null)
+          )
+          sort by (effective as FHIR.dateTime).value desc
+      ),
+      reverseOrderPosition - 1
+    )
   )
 
 define function GetHistoryObservationValue(
@@ -190,6 +198,41 @@ define function GetHistoryObservationValue(
   repeatIndex Integer
 ):
   GetHistoryObservation(code, period, reverseOrderPosition, repeatIndex).value
+
+// Same lookback, restricted to Observations effective on or after `since` (null: no
+// window). `period` above is kept for previously generated libraries and is ignored.
+// See feature/20260929-cql-populate-wiring.md §4.
+define function GetHistoryObservationSince(
+  code String,
+  since DateTime,
+  reverseOrderPosition Integer,
+  repeatIndex Integer
+):
+  First(
+    Skip(
+      (
+        [Observation] O
+          where ObservationHasCode(O, code)
+          and O.status in {{'final', 'amended', 'corrected'}}
+          and (since is null or (O.effective as FHIR.dateTime).value >= since)
+          and (
+            repeatIndex is null
+            or ObservationRepeatIndex(O) = repeatIndex
+            or (repeatIndex = 1 and ObservationRepeatIndex(O) is null)
+          )
+          sort by (effective as FHIR.dateTime).value desc
+      ),
+      reverseOrderPosition - 1
+    )
+  )
+
+define function GetHistoryObservationValueSince(
+  code String,
+  since DateTime,
+  reverseOrderPosition Integer,
+  repeatIndex Integer
+):
+  GetHistoryObservationSince(code, since, reverseOrderPosition, repeatIndex).value
 
 // ── Condition family (same current-encounter / history split; no repeat index —
 // Condition entries aren't repeated within one encounter the way vitals are) ──
@@ -205,24 +248,24 @@ define function ConditionVerificationCode(C Condition):
   First(C.verificationStatus.coding.code)
 
 define function GetActiveConditions(code String):
-  GetConditions(code) C
+  (GetConditions(code)) C
     where ConditionVerificationCode(C) != 'refuted'
       and ConditionVerificationCode(C) != 'entered-in-error'
 
 define function GetCondition(code String):
-  First(GetActiveConditions(code) C sort by recordedDate desc)
+  First((GetActiveConditions(code)) C sort by recordedDate.value desc)
 
 define function GetConditionValue(code String):
   exists(GetActiveConditions(code))
 
 define function HasProvisionalCondition(code String):
-  exists(GetConditions(code) C where ConditionVerificationCode(C) = 'provisional')
+  exists((GetConditions(code)) C where ConditionVerificationCode(C) = 'provisional')
 
 define function HasConfirmedCondition(code String):
-  exists(GetConditions(code) C where ConditionVerificationCode(C) = 'confirmed')
+  exists((GetConditions(code)) C where ConditionVerificationCode(C) = 'confirmed')
 
 define function HasRefutedCondition(code String):
-  exists(GetConditions(code) C where ConditionVerificationCode(C) = 'refuted')
+  exists((GetConditions(code)) C where ConditionVerificationCode(C) = 'refuted')
 
 define function GetHistoryCondition(code String):
   First(
@@ -230,9 +273,9 @@ define function GetHistoryCondition(code String):
       where ConditionHasCode(C, code)
         and First(C.verificationStatus.coding.code) != 'refuted'
         and First(C.verificationStatus.coding.code) != 'entered-in-error'
-      sort by recordedDate desc
+      sort by recordedDate.value desc
   )
 
 define function GetHistoryConditionValue(code String):
-  exists(GetHistoryCondition(code))
+  GetHistoryCondition(code) is not null
 """

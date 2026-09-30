@@ -663,8 +663,47 @@ See **`feature/opensrp-register.md`** §2.1 and **`feature/opensrp-export-hygien
 
 ## Questionnaire Extensions (openSRP wiring)
 
-The `_wire_questionnaire_extensions()` method adds two openSRP-specific
+The `_wire_questionnaire_extensions()` method adds these openSRP-specific
 extensions to each Questionnaire:
+
+### `cqf-library`
+
+**Updated 2026-09-29** (`feature/20260929-cql-populate-wiring.md`,
+`fix/20260929-cql-initial-expression-on-device.md`). The only extension fhircore reads to
+evaluate the Questionnaire's `text/cql-identifier` `initialExpression`s — nothing reads
+`cqlInputResources`. Emitted when the process has a generated Library **and** at least one
+item carries a CQL expression:
+
+```json
+{
+  "url": "http://hl7.org/fhir/StructureDefinition/cqf-library",
+  "valueCanonical": "https://fhir.tricc.io/Library/<project>-<process>"
+}
+```
+
+Library canonicals end in the **CQL library name**, not the UUID `id`: the CQL engine
+(cqf-fhir-cr, on HAPI and on device) derives the library identifier from the last URL
+segment. `id` stays the UUID used for REST addressing. Segment Libraries declare
+`relatedArtifact: depends-on` the Helper, and every Library declares the `encounterid`
+input parameter, which fhircore fills from the Encounter in the launch context.
+
+Every define an item's `initialExpression` names returns **that item's type** — fhircore
+copies the result into `item.initial` unchanged and the SDK refuses a mismatch ("Unable to
+load form"). Helper accessors return `Observation.value[x]`, so they are wrapped in
+`Helper.ValueAsString / ValueAsDecimal / ValueAsInteger / ValueAsBoolean / ValueAsDate /
+ValueAsCoding` (null when the stored value cannot be that type). Items with `answerOption`
+get no CQL `initialExpression` (`initial` next to `answerOption` breaks que-11), and an
+`initialExpression` naming no define is removed at export — one unknown name fails every
+prefill of the form.
+
+**Deployment, not export** — for fhircore to evaluate a Library:
+
+- it must be listed in the **app manifest** (`Composition?identifier=<app id>`, e.g. a
+  "Libraries" section with `focus: Library/<id>`); a Library downloaded by the data sync
+  alone is not loaded into the CQL engine. The package `Composition.json` TRICC writes is not
+  that manifest;
+- after a Library changes on the server, run **Settings → Sync configuration** on the device:
+  re-login does not refresh it when the data sync already stored the new version.
 
 ### `cqlInputResources`
 
