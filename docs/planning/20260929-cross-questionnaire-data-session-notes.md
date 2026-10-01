@@ -240,3 +240,116 @@ Ids:
 
 Device knowledge-store check (debug build only):
 `adb shell run-as org.smartregister.opensrp ls -l files/km/Library/`
+
+---
+
+## 7. Update 2026-09-30
+
+- **fhircore null-result fix** made on a new branch `fix/cql-initial-null-results` of
+  `~/Documents/code/opensrp-fhircore` (uncommitted): a primitive CQL result with no value
+  (data-absent-reason) is no longer applied as `initial`. Built
+  (`./gradlew :quest:assembleOpensrpDebug`). **Not installed:** the build was signed with
+  `~/.config/.android/debug.keystore`, the installed app with `~/.android/debug.keystore`
+  (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`). Re-sign with the latter and `adb install -r` keeps the
+  app data; uninstalling would wipe un-synced data.
+- **Concept alignment across Diabetes and Hypertension.** Names already match between the two
+  diagram sets for every shared concept (`weight_c`, `height_c`, `aht_dxs`, …) — nothing to
+  rename. 42 `t_*` nodes are actually read by the flows; the rest are declared but unused.
+  Applied to both diagrams (backups `*.drawio.bak-20260930`):
+  - `t_X` read by a flow, `X` present in either project → `context="history" source="X"`,
+    `period` = `P3M` (weight, BMI), `P5Y` (height), `P10Y` (statuses, dates) — to be reviewed
+    clinically. Diabetes 28 nodes, Hypertension 29.
+  - Status calculates `X` read back by a `t_X` → `concept_type="observation"` (saved at every
+    visit). Diabetes 17 calculates, Hypertension 18 (20 nodes).
+  - TRICC fix: `concept_type` added to the calculate model (was accepted by the drawio type map
+    but crashed the load). Spec §8.
+- Clean exports of both: 0 cql-to-elm 3.12 errors, 0 type mismatches (86 / 122 CQL
+  expressions); statuses extracted (15/17, 18/18 — the 2 missing are not in the Diabetes
+  form); tests 543 pass (+2), same 2 unrelated failures.
+- **Blockers** (no source in either project, or not implemented):
+  - `sex`, `age` (read by both flows): come from registration / Patient; the Helper's
+    `GetPatientValue` returns null (not implemented) and the codes differ (`sex = '1'` vs
+    `Patient.gender = 'female'`).
+  - `t_ckd`, `t_mi_stat`, `t_stroke_stat`, `t_sterilized`, `t_date_cohort_bsl`, `t_bg_cat`,
+    `t_aht_se_conf`, `t_dm_se_conf`: no node computes them in either project (another form,
+    e.g. CESI / cohort).
+  - Multi-selects (`aht_drugs`, `dm_drugs`, `cesi_type`): saved as one Observation per option,
+    so a history read returns one option only. Not wired.
+  - Value conventions: flows compare carried values with XLSForm-style codes (`'1'`, `'yes'`);
+    booleans come back as `'true'`/`'false'`. Checks such as `"t_warn_symp" = '1'` may not match.
+
+### 7.1 On-device result (2026-09-30, 11:05)
+
+- Fixed fhircore installed (re-signed with `~/.android/debug.keystore`, `adb install -r`, user
+  approved; no production data on the tablet). Both projects re-exported and pushed
+  (7 resources each; Diabetes Subscriptions 403 as before). Sync configuration refreshed all 4
+  libraries.
+- **Diabetes, new session, nothing typed:** "Update participant's history" is shown again
+  (null-result fix works); the out-of-range weight warning appears — `weight` fell back to
+  `t_weight` = 120 kg saved yesterday; "registered as Current Smoker previously" appears
+  (`t_smok_stat = '1'` carried). No CQL errors in logcat.
+- Not caused by carry-over (already there before): `recent_warn_symp_n` has no condition in the
+  export (always shown); `last_hiv_stat_n` inherits the smoker note's condition from the flow and
+  shows an empty value (no HIV status ever recorded).
+- **Hypertension, new session:** opens without errors, but "Update participant's history" (with
+  the weight) is hidden. Its condition is `warn_symp … value = false`, while `warn_symp` is exported
+  as a **string** item holding a boolean from `initial_symp` or the carried `t_warn_symp` — a
+  FHIRPath typing problem in the export (same class as the `'1'`/`'yes'`/`'true'` convention
+  blocker). Needs its own `fix/` spec: type calculates such as `warn_symp` boolean and compare
+  carried text values consistently.
+
+### 7.2 Sex / age from the Patient record (2026-09-30)
+
+- Diagrams (backups `*.drawio.bak-20260930-sex`): `("sex" = 'female' or "sex" = '1')` →
+  `("sex" = 'female')` (FHIR `Patient.gender` code) in `relevance_2` / `relevance_3` of both
+  projects; `sex` and `age` nodes got `context="patient"`.
+- TRICC (spec §9): `context=patient` now reads the Patient: `sex`/`gender` → `Helper.PatientGender`
+  (`Patient.gender.value`), `age` → `Helper.AgeInYears`, `birthdate`/`dob` → `Helper.PatientBirthDate`;
+  typed results (`ToString(AgeInYears)` for the text item). Other names stay null with a warning.
+- Verified: both exports 0 errors / 0 type mismatches; local HAPI with a female patient born
+  1970: `Calc_sex = female`, `Calc_age = "56"`, `'female'` test true. Tests 547 pass.
+- Note: test patient "Ruky R" on the tablet is 5 days old, so the menarche / pregnancy sections
+  (age ≥ 10) stay hidden for her regardless; an adult female test patient is needed to see them.
+
+### 7.3 Multi-select carry (2026-09-30)
+
+- Each ticked option is already extracted as its own Observation (`heart_failure`, `stroke`, …);
+  the flows read options that way (`t_heart_failure`), already wired.
+- Added whole-list carry (spec §10): Helper `GetHistoryObservationCodesSince(code, since)`
+  returns all option codes of the latest answer, space-separated; used automatically when a
+  history populate's `source` is a select_multiple (or `data_type="select_multiple"`).
+  Verified on local HAPI: two drugs on 09-25 + one older → `"metformin glibenclamide"`.
+- Diagrams (backups `*.drawio.bak-20260930-multi`): `t_aht_drugs` / `t_dm_drugs` (`P1Y`),
+  `t_cesi_type` (`P10Y`) wired in both. No flow reads these three yet, so the export drops them
+  as unused; they become active as soon as a condition uses them.
+- Tests 551 pass; both exports 0 errors.
+
+### 7.4 `warn_symp` as a boolean (2026-09-30)
+
+- Diagrams (backups `*.drawio.bak-20260930-warn`): every comparison of `warn_symp` /
+  `initial_symp` rewritten from XLSForm codes to booleans (`= '1'` → `is true`, `!= '1'` →
+  `is not true`, `= '2'` → `is false`, `= ''` → `is null`, `!= ''` → `is not null`) — 78 in
+  Diabetes, 63 in Hypertension; the carried text `t_warn_symp` is compared with `= 'true'`;
+  `warn_symp = if "initial_symp" is not null then "initial_symp" else ("t_warn_symp" = 'true')`.
+- TRICC (fix spec §8): an `if`/`ifs`/`case` calculate whose every branch is boolean is exported as
+  a `boolean` item (it stayed `string`, so `value = false` never matched and hid "Update
+  participant's history"). A status calculate declared `concept_type="observation"` is saved
+  whether true or false (hidden boolean flags were saved only when true, so a resolved status
+  would have been read back as active). Option flags keep "only when true".
+- Result: `initial_symp`, `warn_symp`, `recent_warn_symp` are boolean items in both forms;
+  conditions read `…warn_symp…value = false`; `warn_symp` extracted with its value. Both exports
+  0 cql-to-elm errors; tests 553 pass; both projects pushed. **Tablet check pending** (not connected):
+  Sync configuration, then open Hypertension — "Update participant's history" should show.
+
+### 7.5 On-device result after the `warn_symp` fix (2026-09-30, 14:03)
+
+- First run: "Update participant's history" shown in Hypertension, but every CQL prefill failed:
+  `InvalidOperatorArgument: Expected a list with at most one element` — the new `sex`/`age`
+  accessors used the implicit `Patient` singleton, and fhircore passes the patient in its data
+  bundle while it is also in the local DB (duplicate). Reproduced on HAPI by passing the patient in
+  `data`. Fixed: Helper `PatientRecord = First([Patient])`; `PatientGender` / `PatientBirthDate`
+  from it; `AgeInDays/Months/Years = CalculateAgeIn*(PatientBirthDate)`. Guard test added
+  (no implicit `Patient.` in the Helper). All 122 HTN expressions evaluate with the duplicate.
+- Second run (tablet, PIN 1234): Hypertension opens with no CQL errors; "Update participant's
+  history" shown; **"BMI: 20" displayed with Weight and Height empty** — computed from carried
+  values. Tests 554 pass; both projects pushed.

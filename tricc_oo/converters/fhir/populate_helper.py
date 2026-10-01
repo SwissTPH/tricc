@@ -161,14 +161,66 @@ def populate_source_concept(node: "TriccNodePopulate") -> str:
     return (getattr(node, "source", None) or node.name or "").strip()
 
 
-def resolve_populate_reference(node: "TriccNodePopulate", qualified: bool = False) -> str:
-    """Return author-facing CQL accessor for a populate node (*Value helpers only)."""
+# context=patient: concept name -> (Helper define, CQL result type).
+# See feature/20260929-cql-populate-wiring.md §9.
+PATIENT_FIELDS = {
+    "sex": ("PatientGender", "string"),
+    "gender": ("PatientGender", "string"),
+    "age": ("AgeInYears", "integer"),
+    "birthdate": ("PatientBirthDate", "date"),
+    "dob": ("PatientBirthDate", "date"),
+    "date_of_birth": ("PatientBirthDate", "date"),
+}
+
+
+def patient_field(node: "TriccNodePopulate") -> Optional[tuple]:
+    """(Helper define, result type) a ``context=patient`` node reads, or None if unsupported."""
+    if (getattr(node, "context", None) or "").strip().lower() != "patient":
+        return None
+    return PATIENT_FIELDS.get(populate_source_concept(node).lower())
+
+
+def populate_value_type(node: "TriccNodePopulate") -> Optional[str]:
+    """Known CQL result type of a populate node's accessor (None: Observation value / unknown)."""
+    field = patient_field(node)
+    return field[1] if field else None
+
+
+def populate_reads_multiple(node: "TriccNodePopulate", select_multiple_concepts=None) -> bool:
+    """True when a populate node reads a select_multiple concept (a list of option codes).
+
+    Declared with ``data_type="select_multiple"`` or detected from the project's
+    select_multiple questions. See feature/20260929-cql-populate-wiring.md §10.
+    """
+    if (getattr(node, "data_type", None) or "").strip().lower() == "select_multiple":
+        return True
+    return populate_source_concept(node) in (select_multiple_concepts or ())
+
+
+def resolve_populate_reference(
+    node: "TriccNodePopulate", qualified: bool = False, multiple: bool = False
+) -> str:
+    """Return author-facing CQL accessor for a populate node (*Value helpers only).
+
+    ``multiple``: the concept is a select_multiple, read as the space-separated option codes
+    of its latest answer (``context=history`` only).
+    """
     prefix = "Helper." if qualified else ""
     code = populate_source_concept(node).replace("'", "\\'")
     ctx = node.context
     repeat_arg = _repeat_cql_arg(node)
 
     if ctx == "patient":
+        field = patient_field(node)
+        if field:
+            return f"{prefix}{field[0]}"
+        logger.warning(
+            "populate %s: context=patient concept '%s' is not a supported Patient field (%s); "
+            "it stays empty",
+            node.get_name(),
+            code,
+            ", ".join(sorted(PATIENT_FIELDS)),
+        )
         return f"{prefix}GetPatientValue('{code}')"
     if ctx == "facility":
         return f"{prefix}GetFacilityValue('{code}')"
@@ -189,6 +241,8 @@ def resolve_populate_reference(node: "TriccNodePopulate", qualified: bool = Fals
         if target == "Condition":
             return f"{prefix}GetHistoryConditionValue('{code}')"
         since = cql_lookback_start(period)
+        if multiple and target == "Observation":
+            return f"{prefix}GetHistoryObservationCodesSince('{code}', {since or 'null'})"
         if since is None:
             logger.warning(
                 "populate %s: period '%s' is not a date-only ISO duration; reading without a window",
@@ -227,6 +281,20 @@ def cql_helper_populate_block() -> str:
 
 define function GetPatientValue(code String):
   null
+
+// Patient demographics for context=patient populate nodes (sex / gender, birth date; age is
+// AgeInYears below). Gender is the FHIR code: female | male | other | unknown.
+// Read with First([Patient]), not the implicit `Patient` (a singleton): fhircore passes the
+// patient in its data bundle while it is also in the local database, and the duplicate made
+// every expression of the form fail. See feature/20260929-cql-populate-wiring.md §9.
+define PatientRecord:
+  First([Patient])
+
+define PatientGender:
+  PatientRecord.gender.value
+
+define PatientBirthDate:
+  PatientRecord.birthDate.value
 
 define function GetFacilityValue(code String):
   null

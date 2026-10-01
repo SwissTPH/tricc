@@ -49,7 +49,9 @@ from tricc_oo.converters.fhir.populate_helper import (
     ENCOUNTER_CONTEXT,
     HISTORY_CONTEXT,
     cql_helper_populate_block,
+    populate_reads_multiple,
     populate_source_concept,
+    populate_value_type,
     resolve_populate_reference,
 )
 from tricc_oo.converters.fhir.repeat_helper import (
@@ -252,15 +254,16 @@ define function HasCondition(code String):
   )
 
 // ── Age helpers ───────────────────────────────────────────────────────────────
+// From PatientBirthDate (First([Patient])), not the implicit Patient singleton.
 
 define AgeInDays:
-  duration in days between Patient.birthDate and Today()
+  CalculateAgeInDays(PatientBirthDate)
 
 define AgeInMonths:
-  duration in months between Patient.birthDate and Today()
+  CalculateAgeInMonths(PatientBirthDate)
 
 define AgeInYears:
-  AgeInYears()
+  CalculateAgeInYears(PatientBirthDate)
 """
 
 # CQL child library template (per Questionnaire / PlanDefinition)
@@ -316,6 +319,8 @@ class FHIRStrategy(BaseOutPutStrategy):
         self.cql_defines: Dict[str, List[str]] = {}
         # populate concept read -> linkIds reading it (unpersisted-concept warning)
         self._populate_reads: Dict[str, set] = {}
+        # select_multiple concept names (populate list carry, feature/20260929-cql-populate-wiring.md §10)
+        self._select_multiple_concepts: set = set()
         self.structuremaps: Dict[str, dict] = {}
         self.extraction_maps: Dict[str, dict] = {}
         self.extraction_rules: Dict[str, list] = {}
@@ -581,6 +586,9 @@ class FHIRStrategy(BaseOutPutStrategy):
         tricc_type = getattr(node, 'tricc_type', None)
         if tricc_type is None:
             tricc_type = getattr(node, 'type', None) or str(getattr(node, '__class__', '')).lower()
+        if tricc_type == TriccNodeType.select_multiple and getattr(node, "name", None):
+            # populate nodes reading this concept get the whole option list (§10)
+            self._select_multiple_concepts.add(node.name)
 
         if should_skip(tricc_type) or isinstance(node, TriccNodeSelectOption):
             return True
@@ -1189,11 +1197,17 @@ class FHIRStrategy(BaseOutPutStrategy):
                 return True
 
             if isinstance(node, TriccNodePopulate):
-                cql_expr = resolve_populate_reference(node, qualified=True)
+                cql_expr = self._populate_reference(node)
                 if node.context in (ENCOUNTER_CONTEXT, HISTORY_CONTEXT):
                     self._populate_reads.setdefault(populate_source_concept(node), set()).add(link_id)
                 item = self._find_item_by_link_id(q.get("item", []), link_id)
-                self._attach_cql_initial_expression(segment, item, calc_name, cql_expr)
+                self._attach_cql_initial_expression(
+                    segment,
+                    item,
+                    calc_name,
+                    cql_expr,
+                    source_type="string" if self._populate_is_multiple(node) else populate_value_type(node),
+                )
                 return True
 
             expression = getattr(node, "expression_reference", None) or getattr(node, "reference", None)
@@ -1847,11 +1861,19 @@ class FHIRStrategy(BaseOutPutStrategy):
         elif isinstance(r, TriccNodeSelectOption):
             return f"'{r.name}'"
         elif isinstance(r, TriccNodePopulate):
-            return resolve_populate_reference(r, qualified=True)
+            return self._populate_reference(r)
         elif issubclass(r.__class__, TriccNodeBaseModel):
             return self._cql_node_reference(r)
         else:
             raise NotImplementedError(f"This type of node {r.__class__} is not supported within an operation")
+
+    def _populate_is_multiple(self, node) -> bool:
+        """True when a populate node reads a select_multiple concept (§10)."""
+        return populate_reads_multiple(node, self._select_multiple_concepts)
+
+    def _populate_reference(self, node) -> str:
+        """Qualified CQL accessor for a populate node (whole option list for a multi-select)."""
+        return resolve_populate_reference(node, qualified=True, multiple=self._populate_is_multiple(node))
 
     def _cql_node_reference(self, node) -> str:
         """CQL for a reference to another node's value — never its bare item name.
@@ -2309,15 +2331,48 @@ class FHIRStrategy(BaseOutPutStrategy):
             return getattr(node, "name", None) or ""
         return text
 
-    def _expression_returns_boolean(self, node_or_expression) -> bool:
-        """True when a calculate node's value is a boolean operation."""
+    def _expression_returns_boolean(self, node_or_expression, _seen=None) -> bool:
+        """True when a calculate node's value is a boolean operation.
+
+        A conditional (``if`` / ``ifs`` / ``case``) is boolean when every value branch is
+        (fix/20260929-cql-initial-expression-on-device.md §8).
+        """
         expr = node_or_expression
         if not isinstance(expr, TriccOperation):
             expr = getattr(node_or_expression, "expression_reference", None) or getattr(
                 node_or_expression, "expression", None
             )
+        expr = self._unwrap_operation(expr) if isinstance(expr, TriccOperation) else expr
         if isinstance(expr, TriccOperation):
+            if expr.operator in (TriccOperator.IF, TriccOperator.IFS, TriccOperator.CASE):
+                return self._conditional_returns_boolean(expr, _seen)
             return self._operation_returns_boolean(expr)
+        return False
+
+    def _conditional_returns_boolean(self, expr: TriccOperation, _seen=None) -> bool:
+        """True when every then/else / CASE value of ``expr`` is boolean."""
+        values = self._conditional_branch_values(expr)
+        return bool(values) and all(self._operand_returns_boolean(v, _seen) for v in values)
+
+    def _operand_returns_boolean(self, operand, _seen=None) -> bool:
+        """Boolean literal, boolean operation, or reference to a boolean calculate."""
+        if isinstance(operand, bool):
+            return True
+        if isinstance(operand, TriccStatic):
+            return isinstance(operand.value, bool)
+        if isinstance(operand, TriccOperation):
+            return self._expression_returns_boolean(operand, _seen)
+        if isinstance(operand, TriccNodeBaseModel) and not isinstance(operand, TriccNodePopulate):
+            seen = set(_seen or ())
+            if id(operand) in seen:
+                return False
+            seen.add(id(operand))
+            if self._is_yesno_boolean_select(operand):
+                return True
+            item = self._find_item_anywhere(get_export_name(operand))
+            if item is not None and item.get("type") == "boolean":
+                return True
+            return self._expression_returns_boolean(operand, seen)
         return False
 
     def _unwrap_operation(self, expr):

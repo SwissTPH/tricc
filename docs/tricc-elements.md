@@ -43,6 +43,16 @@ This page documents TRICC modeling elements and their meaning based on:
     `weight_c` recorded, while flows keep referring to `t_weight`. Do not rename the node to
     the question's name instead: two nodes with one name are merged as versions of one
     concept. (FHIR / openSRP export only.)
+  - to carry a **computed status** (`X` calculated from today's answers and `t_X`), mark the
+    calculate `X` with `concept_type="observation"` so it is saved, and give `t_X`
+    `context=history source="X"`.
+  - `context=patient` reads the Patient record (FHIR / openSRP): `sex` / `gender` →
+    `Patient.gender` as the FHIR code (`female`, `male`, `other`, `unknown` — compare with these,
+    not `'1'`), `age` → whole years from `Patient.birthDate`, `birthdate` / `dob` → the birth
+    date. Other names stay empty (warning at export).
+  - a `context=history` node whose `source` is a **select_multiple** gets every option code of
+    the latest answer, space-separated (`metformin glibenclamide`); individual options can
+    also be carried on their own (`t_heart_failure` with `source="heart_failure"`).
   - populate values are never written back on submit; the export warns when a populate node
     reads a concept no form of the project records.
   See `feature/20260929-cql-populate-wiring.md`.

@@ -234,6 +234,27 @@ define function GetHistoryObservationValueSince(
 ):
   GetHistoryObservationSince(code, since, reverseOrderPosition, repeatIndex).value
 
+// Multi-select carry: a select_multiple answer is extracted as one Observation per ticked
+// option (same code, same effective time). Returns all option codes of the most recent
+// answer within the window, space-separated like an XLSForm select_multiple; null if none.
+// See feature/20260929-cql-populate-wiring.md §10.
+define function LatestObservationTime(code String, since DateTime):
+  (GetHistoryObservationSince(code, since, 1, null).effective as FHIR.dateTime).value
+
+define function GetHistoryObservationCodesSince(code String, since DateTime):
+  Combine(
+    distinct(
+      (
+        [Observation] O
+          where ObservationHasCode(O, code)
+            and O.status in {{'final', 'amended', 'corrected'}}
+            and (O.effective as FHIR.dateTime).value = LatestObservationTime(code, since)
+          return First((O.value as FHIR.CodeableConcept).coding.code).value
+      )
+    ),
+    ' '
+  )
+
 // ── Condition family (same current-encounter / history split; no repeat index —
 // Condition entries aren't repeated within one encounter the way vitals are) ──
 
