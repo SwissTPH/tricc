@@ -73,6 +73,8 @@ class ExtractionRule:
     code_system_url: str
     group_name: str
     only_when_true: bool = False
+    # a status carried to later forms: saved whether true or false (never only_when_true)
+    carried_status: bool = False
     link_ids: List[str] = field(default_factory=list)
     version: int = 1
     path_len: int = 0
@@ -294,7 +296,14 @@ def build_extraction_rule(
     if kind in ("proposed_condition", "accept_condition"):
         item_type = "boolean"
 
-    only_when_true = kind == "observation" and _is_hidden_boolean_flag(node, item_type)
+    # A calculate explicitly declared concept_type="observation" is a status carried to later
+    # forms (feature/20260929-cql-populate-wiring.md §8): false must be saved too, or the next
+    # visit keeps reading the last true.
+    carried_status = (
+        is_calculate_type(getattr(node, "tricc_type", None))
+        and str(getattr(node, "concept_type", None) or "").strip().lower() == "observation"
+    )
+    only_when_true = kind == "observation" and _is_hidden_boolean_flag(node, item_type) and not carried_status
 
     repeat = get_repeat(node) if should_emit_repeat_metadata(node) and kind == "observation" else None
     export_id = str(link_id)
@@ -310,6 +319,7 @@ def build_extraction_rule(
         code_system_url=_concept_system_url(codesystems, concept_code, default_code_system),
         group_name=_extract_group_name(str(concept_code), repeat),
         only_when_true=only_when_true,
+        carried_status=carried_status,
         link_ids=[export_id],
         version=int(getattr(node, "version", None) or 1),
         path_len=int(getattr(node, "path_len", None) or 0),
@@ -334,7 +344,7 @@ def apply_questionnaire_item_to_rule(rule: ExtractionRule, item: Optional[dict])
             (ext or {}).get("url") == SDC_QUESTIONNAIRE_HIDDEN
             for ext in (item.get("extension") or [])
         )
-        if hidden:
+        if hidden and not rule.carried_status:
             rule.only_when_true = True
     return rule
 

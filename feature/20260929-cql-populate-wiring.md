@@ -133,6 +133,44 @@ return, exported forms stop re-asking what the record already holds.
    project's extraction is visible to the exporter; a concept recorded by another project
    still warns, so the message says so.)
 
+8. **Persisting a computed status.** *Added 2026-09-30, approved by the user in session.*
+   The flows carry state from visit to visit: `X = f(today's answers, t_X)` (e.g. `aht_dxs`,
+   `dm_txs`, `warn_symp`, `date_last_vis`). For the loop to work, `X` is saved at every visit
+   and `t_X` reads it back (`context=history source=X`). A calculate is saved when it declares
+   `concept_type="observation"` (the explicit concept type wins over the default
+   `Calculation`, which is not extracted). `concept_type` was already accepted on calculates by
+   `drawio_type_map.py` but missing from the model, so any diagram using it failed to load —
+   fixed. Concept names are shared across projects, so a status computed and saved by one
+   project is read by the other. A boolean status declared this way (exactly `observation`) is saved whether true or
+   false (hidden boolean flags such as option flags are otherwise saved only when true), so a resolved status is not
+   read back as still active.
+
+9. **Patient demographics (`context=patient`).** *Added 2026-09-30, approved by the user in
+   session.* A populate node with `context="patient"` reads the Patient resource of the launch
+   subject instead of an Observation. Its concept (`source`, else its name) selects the field:
+   - `sex` / `gender` → `Patient.gender` as its FHIR code (`female`, `male`, `other`,
+     `unknown`) — flows compare with those codes, not with local codes such as `'1'`;
+   - `age` → age in whole years from `Patient.birthDate` (Helper `AgeInYears`);
+   - `birthdate` / `dob` / `date_of_birth` → `Patient.birthDate`.
+   Other names keep `GetPatientValue(code)` (null) and log a warning at export. The Helper
+   reads the patient as `First([Patient])`, never the implicit `Patient` singleton: fhircore
+   passes the patient in its data bundle while it is also in the local database, and the
+   duplicate failed every expression of the form (verified on device 2026-09-30, reproduced
+   on HAPI by passing the patient in `data`). Ages use `CalculateAgeIn*(PatientBirthDate)`. The value is
+   converted to the item's type like any other define (fix §4); the patient accessors are
+   known-typed (`String`, `Integer`, `Date`), so a text item gets `ToString(…)` for age and
+   birth date.
+
+10. **Multi-select carry (`select_multiple`).** *Added 2026-09-30, approved by the user in
+    session.* A select_multiple answer is extracted as one Observation per ticked option (same
+    concept code, same effective time). A `context=history` populate node whose concept is a
+    select_multiple — detected from the project's questions, or declared
+    `data_type="select_multiple"` — reads `Helper.GetHistoryObservationCodesSince('<code>',
+    <window start>)`: every option code of the **most recent** answer within the window,
+    space-separated like an XLSForm select_multiple (`metformin glibenclamide`); null when
+    none. Individual options keep being carried as their own concepts (`t_heart_failure` from
+    the `heart_failure` option), which is what the current flows read.
+
 ### Code checklist
 
 - [x] `tricc_oo/strategies/output/fhir_form.py` — emit `cqf-library` per Questionnaire with
@@ -148,6 +186,9 @@ return, exported forms stop re-asking what the record already holds.
       populate concept that no extraction rule persists.
 - [x] `docs/open-srp-export.md` — the populate path end to end: who supplies `encounterid`,
       when `cqf-library` appears, encounter vs history scope.
+- [x] `concept_type` on calculates (`models/calculate.py`), extraction test (§8).
+- [x] Patient demographics accessors (§9): `populate_helper.py`, Helper block, tests.
+- [x] Multi-select carry (§10): Helper, populate, detection, tests.
 - [x] `docs/tricc-elements.md` — `context=history` as *the* cross-visit mechanism, with the
       concept-naming rule.
 
