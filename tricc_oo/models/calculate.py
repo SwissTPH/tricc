@@ -17,6 +17,9 @@ ACTIVITY_END_NODE_FORMAT = "aend_{}"
 
 class TriccNodeDisplayCalculateBase(TriccNodeCalculateBase):
     save: Optional[str] = None  # contribute to another calculate
+    # Declared by drawio_type_map for calculates; e.g. "observation" persists a computed
+    # status so a later form can read it (feature/20260929-cql-populate-wiring.md §8).
+    concept_type: Optional[str] = None
     hint: Optional[str] = None  # for diagnostic display
     help: Optional[str] = None  # for diagnostic display
     trigger: Optional[Union[Expression, TriccOperation, TriccReference]] = None
@@ -70,6 +73,8 @@ class TriccNodePopulate(TriccNodeFakeCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.populate
     context: str = "patient"
     period: Optional[str] = None
+    # Concept read instead of ``name`` (FHIR export; feature/20260929-cql-populate-wiring.md §5)
+    source: Optional[str] = None
     data_type: Optional[str] = None
     concept_type: Optional[str] = None
     repeat: Optional[int] = None

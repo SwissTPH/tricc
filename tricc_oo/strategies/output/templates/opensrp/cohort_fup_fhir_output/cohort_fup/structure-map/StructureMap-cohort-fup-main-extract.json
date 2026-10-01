@@ -1,0 +1,87 @@
+{
+  "resourceType": "StructureMap",
+  "id": "45c80721-8c5f-5760-87d6-e0df470265d4",
+  "url": "https://fhir.tricc.io/StructureMap/45c80721-8c5f-5760-87d6-e0df470265d4",
+  "name": "cohort_fup_main_extract",
+  "title": "Extract main QuestionnaireResponse",
+  "version": "1.0.0",
+  "status": "active",
+  "description": "QuestionnaireResponse → transaction Bundle for process 'main'. conceptType Symptom-Finding/Question → Observation; proposed_diagnosis → Condition (provisional); AcceptDiag → Condition confirmed or refuted. Repeat != 1 writes the observation-repeat-index extension.",
+  "structure": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/QuestionnaireResponse",
+      "mode": "source"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/Bundle",
+      "mode": "target"
+    }
+  ],
+  "group": [
+    {
+      "name": "extract",
+      "typeMode": "none",
+      "input": [
+        {
+          "name": "src",
+          "type": "QuestionnaireResponse",
+          "mode": "source"
+        },
+        {
+          "name": "bundle",
+          "type": "Bundle",
+          "mode": "target"
+        }
+      ],
+      "rule": [
+        {
+          "name": "bundleType",
+          "source": [
+            {
+              "context": "src"
+            }
+          ],
+          "target": [
+            {
+              "context": "bundle",
+              "contextType": "variable",
+              "element": "type",
+              "transform": "copy",
+              "parameter": [
+                {
+                  "valueString": "transaction"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "documentation": "Create a transaction Bundle and walk QuestionnaireResponse items."
+    },
+    {
+      "name": "extractItems",
+      "typeMode": "none",
+      "input": [
+        {
+          "name": "item",
+          "mode": "source"
+        },
+        {
+          "name": "src",
+          "type": "QuestionnaireResponse",
+          "mode": "source"
+        },
+        {
+          "name": "bundle",
+          "type": "Bundle",
+          "mode": "target"
+        }
+      ],
+      "rule": []
+    }
+  ],
+  "text": {
+    "status": "generated",
+    "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><pre>map &quot;https://fhir.tricc.io/StructureMap/45c80721-8c5f-5760-87d6-e0df470265d4&quot; = '45c80721-8c5f-5760-87d6-e0df470265d4'\n\nuses &quot;http://hl7.org/fhir/StructureDefinition/QuestionnaireResponse&quot; as source\nuses &quot;http://hl7.org/fhir/StructureDefinition/Bundle&quot; as target\nuses &quot;http://hl7.org/fhir/StructureDefinition/Observation&quot; as target\nuses &quot;http://hl7.org/fhir/StructureDefinition/Condition&quot; as target\n\n// Extraction driven by CodeSystem conceptType (Symptom-Finding → Observation,\n// Diagnosis / proposed_diagnosis → Condition provisional, AcceptDiag → confirmed/refuted).\n// Repeat slot (when repeat != 1) is written to https://fhir.tricc.io/StructureDefinition/observation-repeat-index.\n\ngroup extract(source src : QuestionnaireResponse, target bundle : Bundle) {\n  src -&gt; bundle.type = 'transaction' &quot;type&quot;;\n  src.item as item then extractItems(item, src, bundle) &quot;walkItems&quot;;\n}\n\ngroup extractItems(source item, source src : QuestionnaireResponse, target bundle : Bundle) {\n  item.item as child then extractItems(child, src, bundle) &quot;walkChildren&quot;;\n}\n\n</pre></div>"
+  }
+}
