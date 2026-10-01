@@ -5,6 +5,7 @@ import unittest
 
 from tricc_oo.models.tricc import TriccNodeInteger
 from tricc_oo.models.calculate import TriccNodePopulate
+from tricc_oo.converters.fhir.cql_value import cql_helper_value_block
 from tricc_oo.converters.fhir.populate_helper import cql_helper_populate_block
 from tricc_oo.converters.fhir.repeat_helper import (
     TRICC_OBSERVATION_REPEAT_EXT,
@@ -96,6 +97,7 @@ class TestFHIRStrategyRepeatCQL(unittest.TestCase):
             fhir_version=FHIR_VERSION,
             repeat_helpers=cql_helper_repeat_block(FHIR_VERSION),
             populate_helpers=cql_helper_populate_block(),
+            value_helpers=cql_helper_value_block(),
         )
         self.assertIn("define function GetRepeated", helper)
         self.assertIn("define function GetNumberOfRepeat", helper)
@@ -160,6 +162,7 @@ class TestHelperCQLConceptRetrieval(unittest.TestCase):
             fhir_version=FHIR_VERSION,
             repeat_helpers=cql_helper_repeat_block(FHIR_VERSION),
             populate_helpers=cql_helper_populate_block(),
+            value_helpers=cql_helper_value_block(),
         )
 
     def test_no_hardcoded_code_system(self):

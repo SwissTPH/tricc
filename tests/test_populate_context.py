@@ -60,7 +60,8 @@ class TestPopulateReferences(unittest.TestCase):
         normalize_populate_node(node)
         self.assertEqual(
             resolve_populate_reference(node, qualified=True),
-            "Helper.GetHistoryObservationValue('bp', 'P14D', 1, null)",
+            # the period is a window (feature/20260929-cql-populate-wiring.md §4)
+            "Helper.GetHistoryObservationValueSince('bp', Now() - 14 days, 1, null)",
         )
 
     def test_encounter_reference_qualified(self):
