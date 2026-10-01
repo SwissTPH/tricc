@@ -1152,7 +1152,7 @@ class OpenSRPStrategy(FHIRStrategy):
                 pd, prefix="PlanDefinition", fallback=f"{process}-PD"
             )
             path = pd_dir / fname
-            path.write_text(json.dumps(pd, indent=2, ensure_ascii=False))
+            path.write_text(json.dumps(pd, indent=2, ensure_ascii=False), encoding="utf-8")
             logger.debug(f"Wrote PlanDefinition: {path} (id={pd.get('id')})")
 
     def _write_activity_definitions(self, base: Path):
@@ -1165,7 +1165,7 @@ class OpenSRPStrategy(FHIRStrategy):
                 ad, prefix="ActivityDefinition", fallback=f"{key}-AD"
             )
             path = ad_dir / fname
-            path.write_text(json.dumps(ad, indent=2, ensure_ascii=False))
+            path.write_text(json.dumps(ad, indent=2, ensure_ascii=False), encoding="utf-8")
             logger.debug("Wrote ActivityDefinition: %s (id=%s)", path, ad.get("id"))
 
     def _write_structure_maps(self, base: Path):
@@ -1187,13 +1187,13 @@ class OpenSRPStrategy(FHIRStrategy):
                 sm, prefix="StructureMap", fallback=f"{process}-task"
             )
             path = sm_dir / fname
-            path.write_text(json.dumps(payload, indent=2, ensure_ascii=False))
+            path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
             logger.debug(f"Wrote StructureMap: {path} (id={sm.get('id')})")
             fml = sm.get("_fml")
             if fml:
                 map_stem = fname[: -len(".json")] if fname.endswith(".json") else fname
                 map_path = sm_dir / f"{map_stem}.map"
-                map_path.write_text(fml)
+                map_path.write_text(fml, encoding="utf-8")
                 logger.debug(f"Wrote StructureMap FML: {map_path}")
 
     def _copy_push_scripts(self, base: Path):
@@ -1277,7 +1277,7 @@ class OpenSRPStrategy(FHIRStrategy):
             },
         }
         path = out_dir / "related-person-contract.json"
-        path.write_text(json.dumps(plain, indent=2, ensure_ascii=False))
+        path.write_text(json.dumps(plain, indent=2, ensure_ascii=False), encoding="utf-8")
         logger.debug(f"Wrote RelatedPerson contract: {path}")
 
     def _write_composition(self, base: Path):
@@ -1293,7 +1293,8 @@ class OpenSRPStrategy(FHIRStrategy):
             # Prefer stable package-root name for the manifest
             path = base / "Composition.json"
             path.write_text(
-                json.dumps(self.composition, indent=2, ensure_ascii=False)
+                json.dumps(self.composition, indent=2, ensure_ascii=False),
+                encoding="utf-8",
             )
             logger.debug(
                 "Wrote Composition: %s (id=%s, logical=%s)",
@@ -1321,7 +1322,7 @@ class OpenSRPStrategy(FHIRStrategy):
                 binary, prefix="Binary", fallback=binary.get("id", "image")
             )
             path = bin_dir / fname
-            path.write_text(json.dumps(binary, indent=2, ensure_ascii=False))
+            path.write_text(json.dumps(binary, indent=2, ensure_ascii=False), encoding="utf-8")
             logger.debug("Wrote image Binary: %s (id=%s)", path, binary.get("id"))
 
     # ── Utilities ─────────────────────────────────────────────────────────────
