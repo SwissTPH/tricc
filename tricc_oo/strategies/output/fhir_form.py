@@ -112,6 +112,7 @@ from tricc_oo.models.tricc import (
     TriccNodeSelectOption,
     TriccNodeSelectYesNo,
     TriccNodeDisplayModel,
+    TriccNodeTrigger,
 )
 from tricc_oo.models.calculate import TriccNodeDisplayCalculateBase, TriccNodePopulate
 from tricc_oo.strategies.output.base_output_strategy import BaseOutPutStrategy
@@ -688,6 +689,15 @@ class FHIRStrategy(BaseOutPutStrategy):
             "type": fhir_type,
         }
 
+        # A hidden item cannot be answered, so it must never be required: SDC
+        # renderers refuse to submit while a required item they do not show is empty.
+        if (
+            not hidden
+            and fhir_type not in ("group", "display")
+            and self._is_required_input(node)
+        ):
+            item["required"] = True
+
         if is_repeating(tricc_type):
             item["repeats"] = True
 
@@ -758,6 +768,36 @@ class FHIRStrategy(BaseOutPutStrategy):
             self._attach_help_hint_items(item, node)
 
         return True
+
+    @staticmethod
+    def _is_required_input(node) -> bool:
+        """Whether the drawing marks this input as always required.
+
+        TRICC inputs are required by default (``required = "1"``), as in the XLSForm
+        export. A conditional requirement (an expression) has no Questionnaire
+        equivalent, so only a static true value maps to ``item.required``. Triggers are
+        exported as plain string items, which the user is not expected to fill in.
+        """
+        if not isinstance(node, TriccNodeInputModel) or isinstance(node, TriccNodeTrigger):
+            return False
+        required = getattr(node, "required", None)
+        # TriccReference subclasses TriccStatic, but a reference is not a static value.
+        if isinstance(required, TriccReference):
+            return False
+        if isinstance(required, TriccStatic):
+            required = required.value
+        if isinstance(required, bool):
+            return required
+        if isinstance(required, (int, float)):
+            return required == 1
+        if isinstance(required, str):
+            return required.strip().lower() in ("1", "true", "yes")
+        if required is not None:
+            logger.debug(
+                "FHIRStrategy: conditional required on %s is not exported",
+                get_export_name(node),
+            )
+        return False
 
     def _questionnaire_item_text(self, value) -> Optional[str]:
         """Render help/hint/label-like text for a Questionnaire item, or None if blank."""
@@ -1041,6 +1081,8 @@ class FHIRStrategy(BaseOutPutStrategy):
         if item is not None:
             if fhirpath_expr == 'false':
                 set_item_extension(item, build_hidden_extension())
+                # Never shown, so it can never be answered.
+                item.pop("required", None)
             elif fhirpath_expr != 'true':
                 set_item_extension(item, build_enable_when_expression(fhirpath_expr))
         return True
