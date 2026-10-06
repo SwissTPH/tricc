@@ -282,6 +282,16 @@ def test_segment_glob_union_and_shared(tmp_path):
     assert os.path.basename(shared_again[0]) == "shared.drawio"
 
 
+def test_segment_absolute_glob(tmp_path):
+    other = tmp_path / "elsewhere"
+    other.mkdir()
+    (other / "form.drawio").write_text("<mxfile/>", encoding="utf-8")
+    project = tmp_path / "project"
+    project.mkdir()
+    files = resolve_segment_globs(str(project), [str(other / "*")])
+    assert os.path.basename(files[0]) == "form.drawio"
+
+
 def test_segment_drive_url_mixed_with_local(tmp_path):
     (tmp_path / "common").mkdir()
     (tmp_path / "common" / "shared.drawio").write_text("<mxfile/>", encoding="utf-8")

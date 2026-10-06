@@ -138,7 +138,13 @@ class DrawioStrategy(BaseInputStrategy):
 
         # do the calculation, expression ...
 
-    def linking_nodes(self, node, page, pages, processed_nodes=OrderedSet(), path=[]):
+    def linking_nodes(self, node, page, pages, processed_nodes=None, path=None):
+        # New set per project. A mutable default survives the previous intervention,
+        # and nodes compare equal by draw.io id, so a later project skips shared pages.
+        if processed_nodes is None:
+            processed_nodes = OrderedSet()
+        if path is None:
+            path = []
         # get the edges that have that node as source
         node_edge = list(
             filter(
