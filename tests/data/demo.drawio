@@ -1,6 +1,6 @@
 <mxfile host="Electron" agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/29.0.3 Chrome/140.0.7339.249 Electron/38.7.0 Safari/537.36" pages="2">
   <diagram name="Page-1" id="aJ8MWjX5gSV-QbW_ORv6">
-    <mxGraphModel dx="1488" dy="922" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="850" math="0" shadow="0">
+    <mxGraphModel dx="1084" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="850" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -78,7 +78,7 @@
         <mxCell id="ohl9Rrx2-dCzlsjSCRpC-30" edge="1" parent="1" source="ohl9Rrx2-dCzlsjSCRpC-24" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="ohl9Rrx2-dCzlsjSCRpC-22">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <object label="&lt;font style=&quot;font-size: 12px&quot;&gt;We are happy for you&lt;/font&gt;" odk_type="note" name="demo.m.happy" id="ohl9Rrx2-dCzlsjSCRpC-24">
+        <object label="&lt;font style=&quot;font-size: 12px&quot;&gt;We are happy for you, because you selected ${demo.is_happy}&lt;/font&gt;" odk_type="note" name="demo.m.happy" id="ohl9Rrx2-dCzlsjSCRpC-24">
           <mxCell parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=left;fillColor=none;fontSize=12;strokeColor=default;" vertex="1">
             <mxGeometry height="37" width="145" x="420" y="70" as="geometry" />
           </mxCell>
