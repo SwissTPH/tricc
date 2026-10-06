@@ -237,9 +237,10 @@ context Patient
 
 // ── Condition helpers ─────────────────────────────────────────────────────────
 
-// Any-time "does this patient have an active Condition with this code". `~ "active"`
-// would need a declared code/codesystem, and the retrieve cannot take a String
-// argument as its code selector (fix/20260930-helper-cql-compile.md).
+// Any-time "does this patient have an active Condition with this code". Comparing
+// clinicalStatus by equivalence (`~`) against a Code would need a declared
+// code/codesystem, and the retrieve cannot take a String argument as its code
+// selector (fix/20260930-helper-cql-compile.md).
 define function HasCondition(code String):
   exists (
     [Condition] C

@@ -220,7 +220,7 @@ CASES = [
         op(TriccOperator.CONCATENATE, st("A"), ref("B")),
         "concat('A',${B})",
         "'A' + Helper.GetObservationValue('B')",
-        "'A' & %resource.repeat(item).where(linkId='B').answer.where($this.exists()).value",
+        "'A' & (%resource.repeat(item).where(linkId='B').answer.where($this.exists()).value).toString()",
     ),
     (
         "paren",
