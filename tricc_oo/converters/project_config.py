@@ -179,7 +179,10 @@ def resolve_segment_globs(
 
 
 def _resolve_local_segment_glob(project_root: str, pattern: str, exts: Tuple[str, ...]) -> List[str]:
-    full_pattern = os.path.join(project_root, *pattern.split("/"))
+    if os.path.isabs(pattern):
+        full_pattern = os.path.normpath(pattern)
+    else:
+        full_pattern = os.path.join(project_root, *pattern.split("/"))
     hits = glob.glob(full_pattern)
     if not hits and os.path.isfile(full_pattern):
         hits = [full_pattern]

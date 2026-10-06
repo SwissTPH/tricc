@@ -54,7 +54,6 @@ def _project_after_linking(name: str) -> TriccProject:
     temp.walkthrough_goto_node = DrawioStrategy.walkthrough_goto_node.__get__(
         temp, DrawioStrategy
     )
-    # Fresh set: linking_nodes uses a mutable default for processed_nodes
     temp.linking_nodes(parent.root, parent, project.pages, OrderedSet(), [])
     return project
 
