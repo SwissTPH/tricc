@@ -956,14 +956,15 @@ def shield_required(value):
     """
     if value is None or value == "":
         return None
+    # TriccReference subclasses TriccStatic. A name is not a 1/yes/true literal.
+    if isinstance(value, (TriccReference, TriccOperation)):
+        return _as_boolean_required(value)
     if isinstance(value, TriccStatic):
         cast = _required_token_bool(value.value)
         if cast is not None:
             return TriccStatic(cast)
         if isinstance(value.value, str):
             return shield_required(value.value)
-        return _as_boolean_required(value)
-    if isinstance(value, (TriccOperation, TriccReference)):
         return _as_boolean_required(value)
     cast = _required_token_bool(value)
     if cast is not None:
