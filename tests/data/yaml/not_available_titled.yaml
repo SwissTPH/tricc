@@ -1,0 +1,40 @@
+# Not-available with a question title and several reasons.
+# Stacked like select_one: header = title, options = reasons.
+
+id: not_available_titled
+title: Not available titled
+process: main
+
+nodes:
+  - id: start
+    type: start
+    label: "Start"
+
+  - id: weight
+    type: integer
+    name: weight
+    label: "Weight (kg)"
+
+  - id: weight_na
+    type: not_available
+    name: weight_na
+    label: "Weight estimation"
+    options:
+      - id: opt_unstable
+        name: "unstable"
+        label: "Not stable enough"
+      - id: opt_noscale
+        name: "noscale"
+        label: "Cannot be measured"
+
+  - id: end
+    type: end
+    label: "End"
+
+edges:
+  - source: start
+    target: weight
+  - source: weight
+    target: weight_na
+  - source: weight_na
+    target: end
