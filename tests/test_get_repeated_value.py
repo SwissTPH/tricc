@@ -96,8 +96,9 @@ class TestSlotArgument(unittest.TestCase):
         op = TriccOperation(TriccOperator.GET_REPEATED_VALUE, [TriccReference("w"), 4])
         self.assertEqual(get_repeat_index_arg(op), 4)
 
-    def test_missing_argument_defaults_to_slot_one(self):
-        self.assertEqual(get_repeat_index_arg(_repeated(TriccReference("w"))), 1)
+    def test_missing_argument_means_any_slot(self):
+        """Omitting the slot is latest-so-far, not a silent default to slot 1."""
+        self.assertIsNone(get_repeat_index_arg(_repeated(TriccReference("w"))))
 
     def test_non_literal_slot_leaves_reference_unscoped(self):
         """An expression as the slot must warn, not raise, and not scope the lookup."""
@@ -122,6 +123,19 @@ class TestParsing(unittest.TestCase):
         self.assertIsInstance(op.reference[0], TriccReference)
         self.assertIsInstance(op.reference[1], TriccStatic)
         self.assertEqual(get_repeat_index_arg(op), 2)
+
+    def test_single_quoted_code_becomes_reference(self):
+        """A CQL string literal must not stay a TriccStatic or resolution skips it."""
+        op = parse_expression("", "GetRepeatedValue('etat.r.006')")
+        self.assertIsInstance(op, TriccOperation)
+        self.assertEqual(op.operator, TriccOperator.GET_REPEATED_VALUE)
+        self.assertIsInstance(op.reference[0], TriccReference)
+        self.assertEqual(op.reference[0].value, "etat.r.006")
+
+    def test_omitted_slot_is_a_single_argument(self):
+        op = parse_expression("", 'GetRepeatedValue("weight")')
+        self.assertEqual(len(op.reference), 1)
+        self.assertIsInstance(op.reference[0], TriccReference)
 
 
 class TestSlotScopedResolution(unittest.TestCase):
@@ -222,6 +236,32 @@ class TestSlotScopedResolution(unittest.TestCase):
         modified = _resolve(calc.expression, calc, processed)
         self.assertEqual(modified.reference[0], local)
 
+    def test_omitted_slot_merges_all_slots_newest_first(self):
+        """Confirm-and-overwrite: no slot argument coalesces every processed capture."""
+        slot1 = TriccNodeInteger(
+            id="w1", name="weight", label="Weight r1", repeat=1, path_len=1, version=1
+        )
+        slot2 = TriccNodeInteger(
+            id="w2", name="weight", label="Weight r2", repeat=2, path_len=3, version=1
+        )
+        calc = TriccNodeCalculate(
+            id="c1",
+            name="weight_effective",
+            label="Effective weight",
+            expression=_repeated(TriccReference("weight")),
+            path_len=4,
+        )
+        activity, start = _activity_with_nodes(slot1, slot2, calc)
+        processed = OrderedSet()
+        for node in (start, slot1, slot2):
+            processed.add(node)
+
+        modified = _resolve(calc.expression, calc, processed)
+        operand = modified.reference[0]
+        self.assertEqual(operand.operator, TriccOperator.GET_INHERITED_VALUE)
+        self.assertEqual(operand.reference[0], slot2)
+        self.assertEqual(set(operand.reference), {slot1, slot2})
+
 
 class TestXlsFormRendering(unittest.TestCase):
     def setUp(self):
@@ -269,6 +309,69 @@ class TestXlsFormExportValidates(unittest.TestCase):
             self.assertNotIn("GetRepeatedValue", calculation)
             self.assertIn("${weight_Rr_2}", calculation)
             self.assertIn("${weight}", calculation)
+
+
+class TestOmittedSlotXlsForm(unittest.TestCase):
+    """Optional slot: latest capture this consultation (confirm-and-overwrite)."""
+
+    @staticmethod
+    def _find_node(project, name):
+        for page in project.pages.values():
+            for node in page.nodes.values():
+                if getattr(node, "name", None) == name:
+                    return node
+        raise AssertionError(f"node {name!r} not found")
+
+    def test_latest_fixture_resolves_to_the_earlier_capture(self):
+        project = load_yaml_project("tests/data/yaml/get_repeated_value_latest.yaml")
+        expression = self._find_node(project, "last_weight_value").expression
+        xpath = _render(project, expression)
+        self.assertEqual(expression.operator, TriccOperator.GET_REPEATED_VALUE)
+        self.assertIn("${weight}", xpath)
+        self.assertNotIn("'weight'", xpath)
+        self.assertNotEqual(xpath.strip(), "1")
+
+    def test_before_the_reask_only_sees_the_original(self):
+        project = load_yaml_project(
+            "tests/data/yaml/get_repeated_value_confirm_overwrite.yaml"
+        )
+        xpath = _render(project, self._find_node(project, "last_weight_value").expression)
+        self.assertIn("${weight}", xpath)
+        self.assertNotIn("${weight_Rr_2}", xpath)
+
+    def test_after_the_reask_prefers_the_correction(self):
+        project = load_yaml_project(
+            "tests/data/yaml/get_repeated_value_confirm_overwrite.yaml"
+        )
+        xpath = _render(project, self._find_node(project, "weight_effective").expression)
+        self.assertIn("${weight_Rr_2}", xpath)
+        self.assertRegex(xpath, r"\$\{weight_Rr_2\}.*\$\{weight\}")
+
+    def test_unresolved_reference_stops_the_build(self):
+        strategy = get_output_strategy("XLSFormCDSSStrategy")(
+            load_yaml_project(FIXTURE), "/tmp"
+        )
+        with self.assertRaises(SystemExit):
+            strategy.tricc_operation_get_repeated_value(
+                ["'weight'"], [TriccReference("weight")]
+            )
+
+    def test_empty_operands_stop_the_build(self):
+        strategy = get_output_strategy("XLSFormCDSSStrategy")(
+            load_yaml_project(FIXTURE), "/tmp"
+        )
+        with self.assertRaises(SystemExit):
+            strategy.tricc_operation_get_repeated_value([], [])
+
+    def test_leftover_reference_serializes_as_field(self):
+        """TriccReference subclasses TriccStatic; the reference branch must win."""
+        strategy = get_output_strategy("XLSFormCDSSStrategy")(
+            load_yaml_project(FIXTURE), "/tmp"
+        )
+        self.assertEqual(
+            strategy.get_tricc_operation_operand(TriccReference("weight")),
+            "${weight}",
+        )
 
 
 if __name__ == "__main__":

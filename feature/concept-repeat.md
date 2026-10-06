@@ -4,7 +4,7 @@
 |-------|-------|
 | **Status** | Implemented |
 | **Branch target** | `feature/repeat` (core); evolutions on `feature/adv_merge_calc` |
-| **Related** | `feature/advanced-merge-calc.md`, `feature/populate-context.md`, `feature/20260813-concepttype-structuremap.md` (Observation repeat-index on extract), `feature/20260821-get-repeated-value-operation.md` (`GetRepeatedValue` as an expression operation) |
+| **Related** | `feature/advanced-merge-calc.md`, `feature/populate-context.md`, `feature/20260813-concepttype-structuremap.md` (Observation repeat-index on extract), `feature/20260821-get-repeated-value-operation.md` (`GetRepeatedValue` as an expression operation), `feature/20260825-get-repeated-value-latest.md` (optional slot = latest this consultation) |
 | **Authoring surface** | draw.io attributes + YAML fixtures for tests |
 
 Valid status values: `Draft` → `Approved` → `Implemented` → `Superseded`.

@@ -74,6 +74,8 @@ This is the most important area for regression testing.
 | `_filter_inheritable_versions`     | `visitors/tricc.py`       | Drops `repeat=-1` from inheritance operands | `test_concept_repeat.py` |
 | `get_repeat` / `propagate_activity_repeat` | `models/base.py`, `xml_to_tricc.py` | Concept repeat slot resolution and activity propagation | `test_concept_repeat.py`, `concept_repeat_activity_inherit.yaml` |
 | `process_operation_reference` (`inherit_display_versions`) | `visitors/tricc.py` | Multi-version DisplayModel → `GET_INHERITED_VALUE` in value expressions only | `test_display_reference_inheritance.py` |
+| `get_repeat_index_arg` / `process_operation_reference` (`GET_REPEATED_VALUE`) | `visitors/tricc.py` | `GetRepeatedValue(code[, slot])` → slot-scoped or any-slot latest capture | `test_get_repeated_value.py`, `repeat_value_reference.yaml`, `get_repeated_value_*.yaml` |
+| `as_concept_reference` | `converters/cql_to_operation.py` | Normalizes a concept-code argument to `TriccReference` whatever the quoting | `test_get_repeated_value.py` |
 | `is_factor_edge_label` / `process_factor_edge` / `get_factor_terms` | `xml_to_tricc.py`, `visitors/tricc.py` | Rhombus/select factor edges → `TriccNodeFactor` | `test_rhombus_factor_edge.py` |
 | `get_last_version`                 | `visitors/tricc.py`       | Most recent prior version | Same as version_filter |
 | Display text injection             | `visitors/text_injection.py` | `${ref}` → CONCATENATE on DisplayModel fields | `test_text_injection.py`, `note_text_injection.yaml` |
@@ -134,6 +136,8 @@ These are usually exercised indirectly by the higher-level methods above.
 - `note_text_injection.yaml` — `${ref}` display text injection
 - `goto_snippet_injection.yaml` / `goto_snippet_double_inject.yaml` / `goto_instance_nested.yaml` — goto snippet vs nested instance
 - `populate_patient.yaml` / `populate_encounter.yaml` / `populate_history.yaml` — populate contexts
+- `repeat_value_reference.yaml` — `GetRepeatedValue(concept, slot)` delta across two slots
+- `get_repeated_value_latest.yaml` / `get_repeated_value_confirm_overwrite.yaml` / `get_repeated_value_slot.yaml` — omit-slot latest and confirm-and-overwrite
 
 **Gap**: We currently lack dedicated fixtures for:
 - Multi-process + diagnosis ordering
@@ -147,7 +151,7 @@ These are usually exercised indirectly by the higher-level methods above.
 - `tests/test_text_injection.py` — display `${ref}` parse / ODK serialize
 - `tests/test_goto_snippet.py` — goto `instance=-1` snippet injection
 - `tests/test_populate_context.py` — populate context behaviour
-- `tests/test_fhir_repeat.py` — FHIR repeat extensions and Helper CQL accessors
+- `tests/test_get_repeated_value.py` — `GetRepeatedValue` slot-scoped resolve, omit-slot latest, XLSForm export
 - `tests/test_rhombus_factor_edge.py` — Integer (+/-) factor labels on rhombus out-edges
 - `tests/test_stashed_loop_mermaid.py` — stashed-node loop diagnostics
 - `tests/test_strategies/test_opensrp_strategy.py` — OpenSRP / FHIR pipeline (FSH, PlanDefinition, smoke build)

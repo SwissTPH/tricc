@@ -1,0 +1,44 @@
+# GetRepeatedValue with the repeat slot omitted: read back the value already
+# collected for a concept earlier in the same consultation.
+
+id: get_repeated_value_latest
+title: GetRepeatedValue latest
+process: main
+
+nodes:
+  - id: start
+    type: start
+    label: "Start"
+    name: start_grv
+
+  - id: q_weight
+    type: decimal
+    name: weight
+    label: "Weight (kg)"
+    required: true
+
+  - id: calc_last_weight
+    type: calculate
+    name: last_weight_value
+    label: "Last collected weight"
+    calculate: "GetRepeatedValue('weight')"
+
+  - id: note_confirm
+    type: note
+    name: note_weight_confirm
+    label: "For this child the weight is ${last_weight_value}. Is this correct?"
+
+  - id: end
+    type: end
+    label: "End"
+    name: end_grv
+
+edges:
+  - source: start
+    target: q_weight
+  - source: q_weight
+    target: calc_last_weight
+  - source: calc_last_weight
+    target: note_confirm
+  - source: note_confirm
+    target: end

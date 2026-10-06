@@ -219,7 +219,8 @@ class DrawioStrategy(BaseInputStrategy):
                         if node is not None:
                             logger.warning(node.get_name())
                 if isinstance(node, TriccNodeSelectNotAvailable):
-                    set_prev_next_node(node.options[0], target_node)
+                    for opt in node.options.values():
+                        set_prev_next_node(opt, target_node)
                 else:
                     set_prev_next_node(node, target_node)
             else:

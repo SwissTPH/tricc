@@ -4,7 +4,7 @@
 |-------|-------|
 | **Status** | Implemented |
 | **Branch target** | `develop` |
-| **Related** | `feature/concept-repeat.md` (repeat slots), `feature/advanced-merge-calc.md` + `fix/20260820-opensrp-inherited-value.md` (multi-version merge), `feature/populate-context.md` + `fix/20260821-merge-input-into-populate.md` (populate contexts / CHT contact-summary channel — see §3.5) |
+| **Related** | `feature/concept-repeat.md` (repeat slots), `feature/20260825-get-repeated-value-latest.md` (optional slot = latest this consultation), `feature/advanced-merge-calc.md` + `fix/20260820-opensrp-inherited-value.md` (multi-version merge), `feature/populate-context.md` + `fix/20260821-merge-input-into-populate.md` (populate contexts / CHT contact-summary channel — see §3.5) |
 | **Authoring surface** | Calculate / relevance expressions in draw.io and YAML fixtures |
 
 Valid status values: `Draft` → `Approved` → `Implemented` → `Superseded`.
@@ -154,7 +154,7 @@ data from **outside** the form, which is exactly what populate nodes exist for.
 |-------|----------|
 | Slot argument must be a literal integer | An expression as the slot (`GetRepeatedValue("weight", n)`) is not supported — slot selection happens while the graph is built, before any answer exists |
 | Missing slot | Authoring error: unresolved reference, reported like any other unknown reference |
-| Omitted slot argument | Treated as slot `1`, with a warning |
+| Omitted slot argument | Latest capture so far, any slot — see `feature/20260825-get-repeated-value-latest.md` |
 | Slots captured outside this form | Not read by this feature. CHT and FHIR both *have* a channel for out-of-form data (contact summary / task inputs, and Helper CQL), but reaching it needs the generated-populate route in §3.5 / §14 — not part of this change |
 
 ---
@@ -237,7 +237,7 @@ GET_REPEATED_VALUE( <concept reference>, <slot literal> )
 | Input | Behaviour |
 |-------|-----------|
 | `TriccStatic(int)` / `TriccStatic("2")` / `int` / numeric `str` | used as the slot |
-| absent (single-argument call) | slot `1`, `logger.warning` |
+| absent (single-argument call) | `None` (any slot / latest) — see `feature/20260825-get-repeated-value-latest.md` |
 | non-numeric / an expression | `logger.warning`, slot ignored (`ref_repeat = None`) → behaves like a plain reference; do not crash |
 
 ### 7.2 Unresolvable slot
