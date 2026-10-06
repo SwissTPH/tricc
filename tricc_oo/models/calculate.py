@@ -21,6 +21,7 @@ class TriccNodeDisplayCalculateBase(TriccNodeCalculateBase):
     help: Optional[str] = None  # for diagnostic display
     trigger: Optional[Union[Expression, TriccOperation, TriccReference]] = None
     applicability: Optional[Union[Expression, TriccOperation, TriccReference]] = None
+    concept_type: Optional[str] = None
 
     # no need to copy save
     def to_fake(self):
