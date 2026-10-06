@@ -147,6 +147,8 @@ def _questionnaire_item_fsh(item: dict, path: str) -> list[str]:
         lines.append(f"* {item_path}.text = \"{item['text']}\"")
     if "required" in item:
         lines.append(f"* {item_path}.required = {str(item['required']).lower()}")
+    for ext in (item.get("_required") or {}).get("extension", []):
+        lines += _extension_fsh(ext, f"* {item_path}.required")
     if "repeats" in item:
         lines.append(f"* {item_path}.repeats = {str(item['repeats']).lower()}")
     if "readOnly" in item:

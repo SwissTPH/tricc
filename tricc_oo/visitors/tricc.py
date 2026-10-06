@@ -4391,6 +4391,7 @@ def generate_base(node, processed_nodes, **kwargs):
                 elif node.tricc_type in (
                     TriccNodeType.integer,
                     TriccNodeType.decimal,
+                    TriccNodeType.quantity,
                 ):
                     constraints = []
                     constraints_min = ""

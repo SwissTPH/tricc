@@ -23,7 +23,12 @@ from pydantic import BaseModel, Field, ValidationError
 
 from tricc_oo.strategies.input.base_input_strategy import BaseInputStrategy
 from tricc_oo.converters.utils import generate_id
-from tricc_oo.converters.xml_to_tricc import parse_expression, load_expressions, propagate_activity_repeat
+from tricc_oo.converters.xml_to_tricc import (
+    parse_expression,
+    load_expressions,
+    propagate_activity_repeat,
+    shield_required,
+)
 from tricc_oo.visitors.tricc import set_prev_next_node
 from tricc_oo.visitors.utils import PROCESSES
 from tricc_oo.strategies.registry import register_input_strategy
@@ -86,7 +91,8 @@ class YamlNode(BaseModel):
     name: Optional[str] = None
     label: Optional[str] = None
     process: Optional[str] = None
-    required: Optional[bool] = None
+    # bool / 1 / "yes" or a boolean expression string. Shielded before the node is built.
+    required: Optional[Union[bool, int, float, str]] = None
     relevance: Optional[str] = None
     calculate: Optional[str] = None          # for calculate nodes
     expression: Optional[str] = None         # for rhombus / some calculates
@@ -429,9 +435,8 @@ class YamlStrategy(BaseInputStrategy):
         for attr in allowed_attrs:
             val = getattr(ynode, attr, None)
             if val is not None:
-                # "required" in the domain model is an expression-like thing, not a bare bool
                 if attr == "required":
-                    data[attr] = "1" if val else "0"
+                    data[attr] = shield_required(val)
                 else:
                     data[attr] = val
 

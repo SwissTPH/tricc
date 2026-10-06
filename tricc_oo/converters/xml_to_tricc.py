@@ -898,6 +898,8 @@ def load_expressions(node):
         node.trigger = parse_expression("", node.trigger)
     if getattr(node, "default", None):
         node.default = parse_expression("", node.default)
+    if hasattr(node, "required") and getattr(node, "required", None) is not None:
+        node.required = shield_required(node.required)
     if getattr(node, "reference", None):
         if isinstance(node, TriccNodeRhombus):
             # Rhombus is not TriccNodeDisplayModel — no ${REF} injection; clean for CQL only
@@ -911,6 +913,69 @@ def load_expressions(node):
     # Display-model only: clean full string then extract ${REF} → CONCATENATE (input load only)
     if isinstance(node, TriccNodeDisplayModel):
         apply_display_text_injections(node, clean_fn=remove_html)
+
+
+_REQUIRED_TRUE_TOKENS = {"1", "true", "yes"}
+_REQUIRED_FALSE_TOKENS = {"0", "false", "no"}
+# Boolean predicates whose get_datatype() follows the operand instead of "boolean".
+_REQUIRED_BOOLEAN_OPERATORS = (TriccOperator.ISNULL, TriccOperator.ISNOTNULL)
+
+
+def _required_token_bool(value):
+    """Map the authored shortcuts ``1`` / ``yes`` / ``true`` (and the false pair) to a bool."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)) and value in (0, 1):
+        return bool(value)
+    if isinstance(value, str):
+        token = value.strip().lower()
+        if token in _REQUIRED_TRUE_TOKENS:
+            return True
+        if token in _REQUIRED_FALSE_TOKENS:
+            return False
+    return None
+
+
+def _as_boolean_required(value):
+    """Force an expression-valued ``required`` to a boolean operation."""
+    if isinstance(value, TriccReference):
+        return TriccOperation(TriccOperator.ISTRUE, [value])
+    if isinstance(value, TriccOperation):
+        if value.operator in _REQUIRED_BOOLEAN_OPERATORS or value.get_datatype() == "boolean":
+            return value
+        return TriccOperation(TriccOperator.ISTRUE, [value])
+    return value
+
+
+def shield_required(value):
+    """Normalise an authored ``required`` to ``TriccStatic(bool)`` or a boolean operation.
+
+    ``1`` / ``yes`` / ``true`` and ``0`` / ``no`` / ``false`` are cast before any
+    expression parse, so they stay literals and are not read as names. Anything
+    else is parsed and forced to a boolean type. ``None`` and ``""`` stay unset.
+    """
+    if value is None or value == "":
+        return None
+    if isinstance(value, TriccStatic):
+        cast = _required_token_bool(value.value)
+        if cast is not None:
+            return TriccStatic(cast)
+        if isinstance(value.value, str):
+            return shield_required(value.value)
+        return _as_boolean_required(value)
+    if isinstance(value, (TriccOperation, TriccReference)):
+        return _as_boolean_required(value)
+    cast = _required_token_bool(value)
+    if cast is not None:
+        return TriccStatic(cast)
+    if isinstance(value, str):
+        parsed = parse_expression("", value.strip())
+        # A failed parse returns the original string; do not parse it again.
+        if isinstance(parsed, str):
+            logger.warning("required expression could not be parsed: %s", value)
+            return parsed
+        return shield_required(parsed)
+    return value
 
 
 def parse_expression(label=None, expression=None):

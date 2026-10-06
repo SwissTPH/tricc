@@ -217,6 +217,18 @@ Relevance conditions from the TRICC graph are converted to **FHIRPath** using
 }
 ```
 
+### Required
+
+An input is required by default. At input load, `1` / `yes` / `true` and
+`0` / `no` / `false` become a boolean. Any other value is a boolean expression.
+
+A boolean is `Questionnaire.item.required`. An expression is the SDC
+`requiredExpression` slice: `cqf-expression` on the `required` primitive
+(`_required`), FHIRPath, not a second item extension. Display, group, hidden
+and trigger items do not carry it. A constant-false relevance still hides the
+item and leaves `required` in place. The data-capture renderer ignores
+`required` while `enableWhen` or `enableWhenExpression` is false.
+
 ### Option relevance (answerOptionsToggleExpression)
 
 A `relevance` on a **select option** (not the question) is emitted as SDC

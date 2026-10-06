@@ -80,6 +80,7 @@ media_nodes = [
     TriccNodeType.select_one,
     TriccNodeType.decimal,
     TriccNodeType.integer,
+    TriccNodeType.quantity,
     TriccNodeType.text,
 ]
 
