@@ -1,0 +1,32 @@
+# Legacy single-cell not_available: shape text is the one option, title is NO_LABEL.
+
+id: not_available_legacy
+title: Not available legacy
+process: main
+
+nodes:
+  - id: start
+    type: start
+    label: "Start"
+
+  - id: weight
+    type: integer
+    name: weight
+    label: "Weight (kg)"
+
+  - id: weight_na
+    type: not_available
+    name: weight_na
+    label: "Not stable enough, Weight cannot be measured"
+
+  - id: end
+    type: end
+    label: "End"
+
+edges:
+  - source: start
+    target: weight
+  - source: weight
+    target: weight_na
+  - source: weight_na
+    target: end
