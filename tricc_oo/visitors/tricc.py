@@ -14,6 +14,7 @@ from tricc_oo.models.base import (
     and_join, or_join, clean_or_list, nand_join, TriccEdge
 )
 from tricc_oo.models.ordered_set import OrderedSet
+from tricc_oo.visitors.loop_guard import LoopGuard, RecursionGuard, describe_node
 from tricc_oo.models.calculate import (
     TriccNodeDisplayBridge,
     TriccNodeBridge,
@@ -1944,7 +1945,11 @@ def stashed_node_func(node, callback, recursive=False, **kwargs):
     prev_stashed_nodes = stashed_nodes.copy()
     loop_count = 0
     len_prev_processed_nodes = 0
+    # check_stashed_loop only catches a *frozen* stash list; an oscillating one would
+    # spin forever, so cap the total number of iterations as well.
+    guard = LoopGuard(f"stashed_node_func({callback.__name__})")
     while len(stashed_nodes) > 0:
+        guard.tick(lambda: [f"  stashed: {describe_node(n)}" for n in stashed_nodes])
         loop_count = check_stashed_loop(
             stashed_nodes, prev_stashed_nodes, processed_nodes, len_prev_processed_nodes, loop_count
         )
@@ -3408,8 +3413,43 @@ def get_extended_next_nodes(node):
     return nodes
 
 
+# Expression generation recurses through prev nodes / calculation terms; a dependency
+# loop or a runaway re-expansion makes that recursion unbounded, which used to hang the
+# conversion instead of failing. The guard gives it a budget (see visitors/loop_guard.py).
+EXPRESSION_GUARD = RecursionGuard("get_node_expression")
+
+
 # calculate or retrieve a node expression
 def get_node_expression(in_node, processed_nodes, get_overall_exp=False, is_prev=False, negate=False, process=None):
+    """Build the expression of a node, under the expression recursion guard.
+
+    Args:
+        in_node: node whose expression is requested.
+        processed_nodes: nodes already processed by the current walkthrough.
+        get_overall_exp: build the activity-wide expression instead of the node one.
+        is_prev: the node is being evaluated as a predecessor of another node.
+        negate: return the negated expression.
+        process: current process name (mutable single-item list).
+
+    Returns:
+        The node ``TriccOperation`` / ``TriccStatic`` expression, or None.
+
+    Raises:
+        TriccLoopError: the recursion exceeded its depth / call budget, meaning the
+            graph has a dependency loop or an exploding expression tree.
+    """
+    with EXPRESSION_GUARD(in_node):
+        return _get_node_expression(
+            in_node,
+            processed_nodes,
+            get_overall_exp=get_overall_exp,
+            is_prev=is_prev,
+            negate=negate,
+            process=process,
+        )
+
+
+def _get_node_expression(in_node, processed_nodes, get_overall_exp=False, is_prev=False, negate=False, process=None):
     # in case of calculate we only use the select multiple if none is not selected
     expression = None
     negate_expression = None

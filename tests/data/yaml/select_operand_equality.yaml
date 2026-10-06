@@ -1,0 +1,67 @@
+# Equality against a select, authored in CQL: yes/no select (native boolean
+# item), plain select_one, and a select read back with GetRepeatedValue.
+# See fix/20260902-select-operand-coded-equality.md.
+
+id: select_operand_equality
+title: Select operand equality
+process: main
+
+nodes:
+  - id: start
+    type: start
+    label: Start
+    name: start_soe
+    form_id: select-operand
+
+  - id: q_yn
+    type: select_yesno
+    name: fup_yn
+    label: "Follow up needed?"
+
+  - id: q_sel
+    type: select_one
+    name: fup_type
+    label: "Follow up type"
+    options:
+      - id: opt_home
+        name: home_visit
+        label: Home visit
+      - id: opt_clinic
+        name: clinic_visit
+        label: Clinic visit
+
+  - id: q_on_yes
+    type: integer
+    name: days_to_visit
+    label: "Days until the visit"
+    relevance: '"fup_yn" = ''yes'''
+
+  - id: q_on_option
+    type: integer
+    name: km_to_home
+    label: "Distance to the home"
+    relevance: '"fup_type" = ''home_visit'''
+
+  - id: q_on_repeated
+    type: integer
+    name: visits_planned
+    label: "Visits planned"
+    relevance: "GetRepeatedValue('fup_type') = 'home_visit'"
+
+  - id: end
+    type: end
+    label: End
+
+edges:
+  - source: start
+    target: q_yn
+  - source: q_yn
+    target: q_sel
+  - source: q_sel
+    target: q_on_yes
+  - source: q_on_yes
+    target: q_on_option
+  - source: q_on_option
+    target: q_on_repeated
+  - source: q_on_repeated
+    target: end
