@@ -107,7 +107,8 @@ item with `flyover`. Hidden items emit neither. See
 Examples used across element families:
 
 - `name`, `label`, `list_name`
-- `required`, `constraint`, `constraint_message`
+- `required` — boolean (`1` / `yes` / `true`, or `0` / `no` / `false`) or a boolean expression
+- `constraint`, `constraint_message`
 - `relevance`, `priority`
 - `save`, `expression`, `trigger`
 - `reference`, `instance`, `process`, `form_id`

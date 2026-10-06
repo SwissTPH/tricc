@@ -29,6 +29,21 @@ ALLOWED_CONTEXTS = MASTER_CONTEXTS | {ENCOUNTER_CONTEXT, HISTORY_CONTEXT}
 # the task-injected ones; every other context is contact-summary backed.
 INPUTS_GROUP_CONTEXTS = frozenset({ENCOUNTER_CONTEXT})
 DEFAULT_HISTORY_PERIOD = "P1Y"
+# populate `data_type` → FHIR Questionnaire item type. Authors write the value shape
+# they expect back; the item type has to agree with it for SDC to seed `initial`.
+_POPULATE_DATA_TYPE_TO_FHIR_ITEM = {
+    "quantity": "quantity",
+    "decimal": "decimal",
+    "integer": "integer",
+    "boolean": "boolean",
+    "string": "string",
+    "text": "string",
+    "date": "date",
+    "datetime": "dateTime",
+    "code": "choice",
+    "coding": "choice",
+    "choice": "choice",
+}
 
 _ISO_DURATION_RE = re.compile(
     r"^P(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$",
@@ -154,6 +169,40 @@ def resolve_populate_reference(node: "TriccNodePopulate", qualified: bool = Fals
             f"'{code}', {_cql_string_literal(period)}, 1, {repeat_arg})"
         )
     return f"{prefix}GetPatientValue('{code}')"
+
+
+def populate_fhir_item_type(node) -> Optional[str]:
+    """FHIR Questionnaire item type for a populate node, or None to keep the default.
+
+    A populate node's item is seeded with an ``initial`` value produced by its CQL
+    accessor, and SDC requires that value's type to match the item type — a
+    ``Quantity`` cannot seed a ``string`` item. The author declares the shape with
+    ``data_type``; without it the generic hidden-``string`` default stands, which is
+    right for the boolean/coded cases that dominate.
+
+    Args:
+        node: A ``TriccNodePopulate``.
+
+    Returns:
+        FHIR item type string (e.g. ``"quantity"``), or None when unset/unknown.
+    """
+    declared = (getattr(node, "data_type", None) or "").strip().lower()
+    if not declared:
+        return None
+    item_type = _POPULATE_DATA_TYPE_TO_FHIR_ITEM.get(declared)
+    if item_type is None:
+        logger.warning(
+            f"Unknown populate data_type '{declared}' on {node.get_name()}; keeping default item type"
+        )
+    return item_type
+
+
+def populate_unit(node) -> Optional[str]:
+    """Unit of measure declared on a populate node (``quantity`` data_type only)."""
+    if populate_fhir_item_type(node) != "quantity":
+        return None
+    unit = getattr(node, "unit", None)
+    return str(unit).strip() or None if unit else None
 
 
 def populate_uses_inputs_group(node) -> bool:

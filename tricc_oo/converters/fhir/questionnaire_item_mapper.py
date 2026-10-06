@@ -35,6 +35,8 @@ FHIR_TYPE_QUANTITY = "quantity"
 # SDC extension URLs (openSRP profile)
 # ---------------------------------------------------------------------------
 SDC_EXT_ENABLE_WHEN_EXPR = "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-enableWhenExpression"
+# SDC requiredExpression slice: cqf-expression on the Questionnaire.item.required primitive.
+CQF_EXPRESSION_EXT = "http://hl7.org/fhir/StructureDefinition/cqf-expression"
 SDC_EXT_ANSWER_OPTIONS_TOGGLE = (
     "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-answerOptionsToggleExpression"
 )
@@ -49,6 +51,8 @@ SDC_EXT_ITEM_CONTROL = "http://hl7.org/fhir/StructureDefinition/questionnaire-it
 # QuestionnaireResponse and shown instead of the static ``item.text``.
 # Android FHIR Data Capture reads it from ``Questionnaire.item._text``.
 CQF_EXT_TEXT_EXPRESSION = "http://hl7.org/fhir/StructureDefinition/cqf-expression"
+SDC_EXT_UNIT = "http://hl7.org/fhir/StructureDefinition/questionnaire-unit"
+UCUM_SYSTEM = "http://unitsofmeasure.org"
 OPENSRP_EXT_POPULATE = "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-itemPopulationContext"
 
 # ---------------------------------------------------------------------------
@@ -321,6 +325,36 @@ def is_calculate_type(tricc_type: str) -> bool:
     return tricc_type in CALCULATE_NODE_TYPES
 
 
+def build_unit_extension(
+    unit: str,
+    system: Optional[str] = None,
+    code: Optional[str] = None,
+) -> dict:
+    """Build a ``questionnaire-unit`` extension for a ``quantity`` item.
+
+    SDC renderers use it both to label the input and to build the answer
+    ``Quantity`` (``value`` + ``unit``/``system``/``code``), which is what lets
+    the extraction StructureMap copy the unit onto ``Observation.valueQuantity``
+    instead of dropping it.
+
+    Args:
+        unit: Human-readable unit (e.g. ``C``, ``kg``).
+        system: Code system for the unit; defaults to UCUM.
+        code: Code within that system; defaults to ``unit``.
+
+    Returns:
+        FHIR extension dict.
+    """
+    return {
+        "url": SDC_EXT_UNIT,
+        "valueCoding": {
+            "system": system or UCUM_SYSTEM,
+            "code": code or unit,
+            "display": unit,
+        },
+    }
+
+
 def build_item_control_extension(control_code: str) -> dict:
     """Build a questionnaire-itemControl extension dict.
 
@@ -512,6 +546,32 @@ def build_item_answer_media_extension(binary_id: str, content_type: str) -> dict
     return {
         "url": SDC_EXT_ITEM_ANSWER_MEDIA,
         "valueAttachment": _image_attachment(binary_id, content_type),
+    }
+
+
+def build_required_expression(fhirpath_expr: str) -> dict:
+    """Build the SDC ``requiredExpression`` slice (``cqf-expression`` on ``required``).
+
+    The expression replaces the boolean. It must evaluate to a boolean. A renderer
+    ignores ``required`` while the item is disabled (``enableWhen`` /
+    ``enableWhenExpression`` is false); the Questionnaire keeps the expression.
+
+    Args:
+        fhirpath_expr: FHIRPath expression string.
+
+    Returns:
+        The primitive companion ``{"extension": [...]}`` stored as ``_required``.
+    """
+    return {
+        "extension": [
+            {
+                "url": CQF_EXPRESSION_EXT,
+                "valueExpression": {
+                    "language": "text/fhirpath",
+                    "expression": fhirpath_expr,
+                },
+            }
+        ]
     }
 
 

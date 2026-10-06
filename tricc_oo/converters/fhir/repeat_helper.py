@@ -99,35 +99,60 @@ def cql_helper_repeat_block(fhir_version: str = "4.0.1") -> str:
     encounter). ``GetHistoryObservation*``/``GetHistoryCondition*`` are the deliberate
     any-time/"outside the encounter" lookback, unscoped by ``encounterid``, used by the
     ``history`` populate context. See feature/20260812-intervention-order-and-dedup.md.
+
+    Everything here has to survive cql-to-elm translation; the constraints that shape
+    the emitted text are documented in fix/20260930-helper-cql-compile.md:
+
+    - Codes are matched against ``code.coding.code`` at runtime rather than with a
+      retrieve terminology clause. A retrieve code selector takes a string *literal*
+      and a declared ``codesystem``, so ``[Observation: Code code from …]`` cannot
+      take a ``String`` function argument — and concepts are exported under the
+      project's own CodeSystem, not SNOMED.
+    - A query source that is a function invocation must be parenthesized
+      (``(GetObservations(code)) O``).
+    - ``extension.value`` is a choice type: the repeat index needs
+      ``as FHIR.integer`` and then ``.value``, not ``as Integer``.
+    - ``sort by`` needs a comparable type, so choice elements are cast
+      (``sort by (effective as FHIR.dateTime)``); ascending + ``Last`` gives "latest".
+    - CQL has no ``skip``/``take`` query clauses — the history lookback uses the
+      ``Skip``/``First`` functions.
     """
     return f"""\
 // ── Repeat / current-encounter helpers ────────────────────────────────────────
 // Extension URL: {TRICC_OBSERVATION_REPEAT_EXT}
 
-define function GetObservations(code String):
-  if encounterid is null then {{}} as List<Observation>
-  else
-    [Observation: Code code from "http://snomed.info/sct"] O
-      where O.status in {{'final', 'amended', 'corrected'}}
-        and O.encounter.reference = 'Encounter/' + encounterid
+define function ObservationHasCode(O Observation, code String):
+  exists (O.code.coding C where C.code = code)
 
 define function ObservationRepeatIndex(O Observation):
   singleton from (
-    O.extension.where(url = '{TRICC_OBSERVATION_REPEAT_EXT}').value as Integer
+    O.extension E
+      where E.url = '{TRICC_OBSERVATION_REPEAT_EXT}'
+      return (E.value as FHIR.integer).value
   )
 
+define function GetObservations(code String):
+  if encounterid is null then {{}} as List<Observation>
+  else
+    [Observation] O
+      where O.status in {{'final', 'amended', 'corrected'}}
+        and ObservationHasCode(O, code)
+        and O.encounter.reference = 'Encounter/' + encounterid
+
 define function GetObservation(code String):
-  First(
-    GetObservations(code) O
+  Last(
+    (GetObservations(code)) O
       where ObservationRepeatIndex(O) is null or ObservationRepeatIndex(O) = 1
-      sort by effective desc
+      return O
+      sort by (effective as FHIR.dateTime)
   )
 
 define function GetRepeated(code String, repeatIndex Integer):
-  First(
-    GetObservations(code) O
+  Last(
+    (GetObservations(code)) O
       where ObservationRepeatIndex(O) = repeatIndex
-      sort by effective desc
+      return O
+      sort by (effective as FHIR.dateTime)
   )
 
 define function GetObservationValue(code String):
@@ -139,10 +164,20 @@ define function GetRepeatedValue(code String, repeatIndex Integer):
 define function GetNumberOfRepeat(code String):
   Count(
     distinct(
-      GetObservations(code) O
+      (GetObservations(code)) O
         return ObservationRepeatIndex(O)
     )
   )
+
+define function GetHistoryObservations(code String, repeatIndex Integer):
+  [Observation] O
+    where O.status in {{'final', 'amended', 'corrected'}}
+      and ObservationHasCode(O, code)
+      and (
+        repeatIndex is null
+        or ObservationRepeatIndex(O) = repeatIndex
+        or (repeatIndex = 1 and ObservationRepeatIndex(O) is null)
+      )
 
 define function GetHistoryObservation(
   code String,
@@ -151,18 +186,14 @@ define function GetHistoryObservation(
   repeatIndex Integer
 ):
   First(
-    (
-      [Observation: Code code from "http://snomed.info/sct"] O
-        where O.status in {{'final', 'amended', 'corrected'}}
-        and (
-          repeatIndex is null
-          or ObservationRepeatIndex(O) = repeatIndex
-          or (repeatIndex = 1 and ObservationRepeatIndex(O) is null)
-        )
-        sort by effective desc
-    ) O
-      skip reverseOrderPosition - 1
-      take 1
+    Skip(
+      (
+        (GetHistoryObservations(code, repeatIndex)) O
+          return O
+          sort by (effective as FHIR.dateTime) desc
+      ),
+      Coalesce(reverseOrderPosition, 1) - 1
+    )
   )
 
 define function GetHistoryObservationValue(
@@ -176,43 +207,59 @@ define function GetHistoryObservationValue(
 // ── Condition family (same current-encounter / history split; no repeat index —
 // Condition entries aren't repeated within one encounter the way vitals are) ──
 
+define function ConditionHasCode(C Condition, code String):
+  exists (C.code.coding CC where CC.code = code)
+
+define function ConditionVerificationCode(C Condition):
+  First(C.verificationStatus.coding CC return CC.code.value)
+
+define function ConditionClinicalCode(C Condition):
+  First(C.clinicalStatus.coding CC return CC.code.value)
+
 define function GetConditions(code String):
   if encounterid is null then {{}} as List<Condition>
   else
-    [Condition: Code code from "http://snomed.info/sct"] C
-      where C.encounter.reference = 'Encounter/' + encounterid
-
-define function ConditionVerificationCode(C Condition):
-  First(C.verificationStatus.coding.code)
+    [Condition] C
+      where ConditionHasCode(C, code)
+        and C.encounter.reference = 'Encounter/' + encounterid
 
 define function GetActiveConditions(code String):
-  GetConditions(code) C
+  (GetConditions(code)) C
     where ConditionVerificationCode(C) != 'refuted'
       and ConditionVerificationCode(C) != 'entered-in-error'
 
 define function GetCondition(code String):
-  First(GetActiveConditions(code) C sort by recordedDate desc)
+  Last(
+    (GetActiveConditions(code)) C
+      return C
+      sort by (recordedDate as FHIR.dateTime)
+  )
 
 define function GetConditionValue(code String):
-  exists(GetActiveConditions(code))
+  exists (GetActiveConditions(code))
 
 define function HasProvisionalCondition(code String):
-  exists(GetConditions(code) C where ConditionVerificationCode(C) = 'provisional')
+  exists ((GetConditions(code)) C where ConditionVerificationCode(C) = 'provisional')
 
 define function HasConfirmedCondition(code String):
-  exists(GetConditions(code) C where ConditionVerificationCode(C) = 'confirmed')
+  exists ((GetConditions(code)) C where ConditionVerificationCode(C) = 'confirmed')
 
 define function HasRefutedCondition(code String):
-  exists(GetConditions(code) C where ConditionVerificationCode(C) = 'refuted')
+  exists ((GetConditions(code)) C where ConditionVerificationCode(C) = 'refuted')
+
+define function GetHistoryConditions(code String):
+  [Condition] C
+    where ConditionHasCode(C, code)
+      and ConditionVerificationCode(C) != 'refuted'
+      and ConditionVerificationCode(C) != 'entered-in-error'
 
 define function GetHistoryCondition(code String):
-  First(
-    [Condition: Code code from "http://snomed.info/sct"] C
-      where First(C.verificationStatus.coding.code) != 'refuted'
-        and First(C.verificationStatus.coding.code) != 'entered-in-error'
-      sort by recordedDate desc
+  Last(
+    (GetHistoryConditions(code)) C
+      return C
+      sort by (recordedDate as FHIR.dateTime)
   )
 
 define function GetHistoryConditionValue(code String):
-  exists(GetHistoryCondition(code))
+  exists (GetHistoryConditions(code))
 """

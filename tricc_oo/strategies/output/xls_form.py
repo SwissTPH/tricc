@@ -748,14 +748,18 @@ class XLSFormStrategy(BaseOutPutStrategy):
     def get_tricc_operation_operand(self, r, coalesce_fallback="''"):
         # function transform an object to XLSFORM value
         # @param r reference to be translated
+        # TriccReference subclasses TriccStatic — check it first so field
+        # refs become ${name} and $this becomes '.' (not a quoted/static name).
         if isinstance(r, TriccOperation):
             return self.get_tricc_operation_expression(r)
         elif isinstance(r, TriccReference):
-            # Checked before TriccStatic: TriccReference subclasses it, so the generic
-            # static branch would otherwise swallow unresolved references and emit a
-            # bare token instead of ${field}.
+            if r.value == "$this":
+                return "."
+            name = get_export_name(r.value)
+            if name == ".":
+                return "."
             logger.warning(f"reference `{r.value}` still used in a calculate")
-            return f"${{{get_export_name(r.value)}}}"
+            return f"${{{name}}}"
         elif isinstance(r, (TriccStatic, str, int, float)):
             return get_export_name(r)
 

@@ -1,0 +1,90 @@
+# E2E fixture: encounter-scoped populate across two processes.
+#
+# Process `triage` captures a temperature; its extraction StructureMap writes an
+# Observation (code=fever, valueQuantity). Process `assess` runs later in the SAME
+# encounter and re-reads that Observation through a `populate` node with
+# context=encounter, which TRICC exports as a CQL `initialExpression`
+# (Helper.GetEncounterObservationValue) on the assess Questionnaire.
+#
+# Consumed by the openSRP android e2e test
+# quest/src/test/java/.../TriccEncounterPopulateE2ETest.kt
+
+id: fever_triage
+title: Fever triage
+process: triage
+
+nodes:
+  - id: t_start
+    type: start
+    label: Start triage
+    name: start_triage
+    form_id: fever-triage
+
+  - id: t_fever
+    type: quantity
+    name: fever
+    label: "Temperature"
+    required: true
+    concept_type: vital
+    unit: "C"
+    unit_code: "Cel"
+
+  - id: t_end
+    type: end
+    label: End triage
+    name: end_triage
+
+edges:
+  - source: t_start
+    target: t_fever
+  - source: t_fever
+    target: t_end
+
+---
+id: fever_assess
+title: Fever assessment
+process: history-and-physical
+
+nodes:
+  - id: a_start
+    type: start
+    label: Start assessment
+    name: start_assess
+    form_id: fever-assess
+
+  - id: a_pop_fever
+    type: populate
+    name: fever
+    label: "Temperature recorded at triage"
+    context: encounter
+    concept_type: vital
+    data_type: quantity
+    unit: "C"
+    unit_code: "Cel"
+
+  - id: a_high
+    type: calculate
+    name: fever_high
+    label: "Temperature at or above 37.5"
+    calculate: "fever >= 37.5"
+
+  - id: a_note
+    type: note
+    name: fever_note
+    label: "Fever confirmed from triage temperature."
+    relevance: "fever_high = true"
+
+  - id: a_end
+    type: end
+    label: End assessment
+    name: end_assess
+
+edges:
+  - source: a_start
+    target: a_pop_fever
+  - source: a_pop_fever
+    target: a_high
+  - source: a_high
+    target: a_note
+  - source: a_note
+    target: a_end
