@@ -120,6 +120,7 @@ execute()
   ├── process_calculate()  → generate_calculate(node)  adds CQL defines + calculatedExpression
   ├── process_export()     → generate_export(node)     builds StructureMap rules
   ├── _sanitize_questionnaires() / _prune_unused_hidden_calculates()
+  ├── _prune_empty_groups()  → drop `group` items left with no children
   └── export()
         ├── [FHIRStrategy] write questionnaire/, library/, structure-map/, ValueSet/, binary/
         └── [OpenSRPStrategy]
@@ -228,6 +229,18 @@ Relevance conditions from the TRICC graph are converted to **FHIRPath** using
 }
 ```
 
+### Required
+
+An input is required by default. At input load, `1` / `yes` / `true` and
+`0` / `no` / `false` become a boolean. Any other value is a boolean expression.
+
+A boolean is `Questionnaire.item.required`. An expression is the SDC
+`requiredExpression` slice: `cqf-expression` on the `required` primitive
+(`_required`), FHIRPath, not a second item extension. Display, group, hidden
+and trigger items do not carry it. A constant-false relevance still hides the
+item and leaves `required` in place. The data-capture renderer ignores
+`required` while `enableWhen` or `enableWhenExpression` is false.
+
 ### Option relevance (answerOptionsToggleExpression)
 
 A `relevance` on a **select option** (not the question) is emitted as SDC
@@ -274,6 +287,18 @@ Rules (still **one Questionnaire per CPG process** — registration is not split
 Visible questions, groups, displays, and calculates that a remaining expression in the
 same form reads are kept. Hidden populate / `load_*` items stay only when this process
 extracts them or something here reads them (`fix/20260824-prune-unused-initial-calculates.md`).
+
+**Empty groups are not exported** (`fix/20260828-empty-group-pruning.md`). A FHIR SDC
+`group` is a container: it has no `answer` and nothing of its own to render, so a
+childless one is a dangling section header. `_prune_empty_groups()` runs right after the
+unused-calculate prune (which is what empties groups in the first place) and before
+StructureMap / CQL assembly, so those see the final tree. The test is depth-first, so a
+group whose only content was itself empty groups goes too; `text`, `enableWhenExpression`
+and media extensions do not save a childless group. Extraction rules and CQL defines are
+resynced to the survivors through the same `_resync_segment_assets` helper the calculate
+prune uses. A Questionnaire left with `item: []` is then dropped by the existing
+`_prune_empty_questionnaires` pass — on `demo.drawio` that is what happens to `main`,
+whose only content was one empty group.
 
 **Updated 2026-08-23** (`fix/20260823-questionnaire-item-order.md`): items follow
 flowchart order (first outgoing edge first). The walk used to push `next_nodes`
@@ -355,6 +380,17 @@ In-form calculation (e.g. BMI from weight + height both answered in the same Que
   yes/no case is handled in CQL, where the answer is a `valueBoolean`.
 - Page / activity groups take `enableWhenExpression` from `activity.relevance`
   (XLSForm begin-group relevant), not only the start node's own `relevance`.
+- Branching on a **container** (an activity, a page/group, or a routing node that is
+  not exported as an answerable item) does **not** emit `…answer…` for it — a `group`
+  or `display` item has no `answer`, so the path would yield an empty collection and
+  the item would stay disabled for the life of the form. The operand is replaced by
+  that container's own relevance, inlined and parenthesised, so an item with
+  conditions of its own gets `own and (container relevance)` and an item whose only
+  condition is the container gets a verbatim copy of the container's
+  `enableWhenExpression`. A container with no relevance inlines to `true`, and a
+  relevance cycle fails open to `true` with a warning. `validate()` logs an error if
+  any exported expression still reads `.answer` of a `group` / `display` item. See
+  `fix/20260828-answer-reference-on-non-answerable-node.md`.
 - Boolean / numeric / string items still use `.answer.value`.
 - A calculate whose expression is boolean is emitted as Questionnaire `type: boolean`.
 - A calculate whose expression is numeric (`AGE_MONTH`, `PLUS`, `COUNT`, …) is

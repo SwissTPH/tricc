@@ -474,6 +474,22 @@ class TriccNodeInteger(TriccNodeNumber):
     tricc_type: TriccNodeType = TriccNodeType.integer
 
 
+class TriccNodeQuantity(TriccNodeNumber):
+    """A numeric answer that carries a unit of measure.
+
+    Exported as an SDC ``quantity`` Questionnaire item (with a
+    ``questionnaire-unit`` extension) so the answer is a full ``Quantity`` rather
+    than a bare decimal, and extracted to ``Observation.valueQuantity`` with the
+    unit preserved. ``unit`` is the human-readable code (e.g. ``C``, ``kg``);
+    ``unit_system`` / ``unit_code`` default to UCUM.
+    """
+
+    tricc_type: TriccNodeType = TriccNodeType.quantity
+    unit: Optional[str] = None
+    unit_system: Optional[str] = None
+    unit_code: Optional[str] = None
+
+
 class TriccNodeText(TriccNodeInputModel):
     tricc_type: TriccNodeType = TriccNodeType.text
     datatype: str = "string"
