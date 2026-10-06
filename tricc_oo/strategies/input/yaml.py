@@ -25,6 +25,7 @@ from tricc_oo.strategies.input.base_input_strategy import BaseInputStrategy
 from tricc_oo.converters.utils import generate_id
 from tricc_oo.converters.xml_to_tricc import parse_expression, load_expressions, propagate_activity_repeat
 from tricc_oo.visitors.tricc import set_prev_next_node
+from tricc_oo.visitors.utils import PROCESSES
 from tricc_oo.strategies.registry import register_input_strategy
 
 # Core models
@@ -43,6 +44,7 @@ from tricc_oo.models.tricc import (
     TriccNodeSelectOption,
     TriccNodeInteger,
     TriccNodeDecimal,
+    TriccNodeQuantity,
     TriccNodeText,
     TriccNodeGoTo,
 )
@@ -100,6 +102,13 @@ class YamlNode(BaseModel):
     repeat: Optional[int] = None
     context: Optional[str] = None
     period: Optional[str] = None
+    # quantity questions (and populate nodes reading one) carry a unit of measure
+    unit: Optional[str] = None
+    unit_system: Optional[str] = None
+    unit_code: Optional[str] = None
+    # populate: FHIR item type of the value being read back (e.g. "quantity")
+    data_type: Optional[str] = None
+    concept_type: Optional[str] = None
     form_id: Optional[str] = None            # start node only; required by XLSForm export
     hint: Optional[str] = None
     help: Optional[str] = None
@@ -163,6 +172,14 @@ NODE_TYPE_MAP: Dict[str, Dict[str, Any]] = {
         "attrs": ["label", "name", "required", "min", "max", "relevance", "save", "repeat", "hint", "help"],
         "tricc_type": TriccNodeType.decimal,
     },
+    "quantity": {
+        "model": TriccNodeQuantity,
+        "attrs": [
+            "label", "name", "required", "min", "max", "relevance", "save", "repeat",
+            "hint", "help", "unit", "unit_system", "unit_code", "concept_type",
+        ],
+        "tricc_type": TriccNodeType.quantity,
+    },
     "text": {
         "model": TriccNodeText,
         "attrs": ["label", "name", "required", "relevance", "save", "repeat", "hint", "help"],
@@ -205,7 +222,10 @@ NODE_TYPE_MAP: Dict[str, Dict[str, Any]] = {
     },
     "populate": {
         "model": TriccNodePopulate,
-        "attrs": ["label", "name", "context", "period", "repeat", "data_type", "concept_type"],
+        "attrs": [
+            "label", "name", "context", "period", "repeat", "data_type", "concept_type",
+            "unit", "unit_system", "unit_code",
+        ],
         "tricc_type": TriccNodeType.populate,
     },
     "goto": {
@@ -225,6 +245,7 @@ YAML_TYPE_TO_TRICC_TYPE = {
     "note": TriccNodeType.note,
     "integer": TriccNodeType.integer,
     "decimal": TriccNodeType.decimal,
+    "quantity": TriccNodeType.quantity,
     "text": TriccNodeType.text,
     "select_one": TriccNodeType.select_one,
     "select_multiple": TriccNodeType.select_multiple,
@@ -249,7 +270,11 @@ class YamlStrategy(BaseInputStrategy):
         python tests/build.py -i my_test.yaml -o out/ -I YamlStrategy -O ...
     """
 
-    processes = ["main"]
+    # Same cpg-common-process list DrawioStrategy uses, so a fixture can lay out a
+    # multi-process flow (one TriccSegment / Questionnaire per process) instead of
+    # only the single "main" process. Fixtures that declare `process: main` keep
+    # short-circuiting in execute_linked_process and are unaffected.
+    processes = PROCESSES
 
     def __init__(self, input_path: Union[str, List[str]]):
         super().__init__(input_path)

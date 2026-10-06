@@ -113,6 +113,27 @@ Examples used across element families:
 - `reference`, `instance`, `process`, `form_id`
 - `repeat` — concept capture slot (see [Concept repeat](#concept-repeat) below)
 
+## Instance vs repeat
+
+`instance` and `repeat` answer two different questions and are **not exclusive** — a
+node can carry both.
+
+| | `instance` | `repeat` |
+|---|---|---|
+| Question | *where* does this collection happen? | *how many times* is it collected? |
+| Intent | the **same** collection, which may land at different points of an intervention but must not happen twice | a deliberate **re-ask**, so the answer may differ |
+| Value inheritance | **yes** — once collected, later instances reuse the value | **no** — each repeat collects afresh |
+| Typical use | "get the fever measurement; depending on the complaint or sign it may happen sooner or later in the intervention" | "check whether the fever status is still the same as at the previous repeat" |
+
+A repeat deliberately does **not** test whether the previous repeat was actually
+shown, because there are paths where it does not apply.
+
+`repeat=-1` says only *"do not inherit the previous value"* — the slot number itself
+carries no meaning and is never referenced. `tricc_oo` keeps such captures independent
+through `_Vv_n` peer renumbering; `tricc_og` instead allocates repeat numbers from
+**100** upward, purely so an auto-allocated slot cannot collide with a hand-authored
+`repeat=1..n`.
+
 ## Concept repeat
 
 Authors can collect the **same concept more than once** in one encounter by setting an
@@ -121,7 +142,7 @@ integer `repeat` on a capture node or on `activity_start`.
 | Scope | Attribute | Effect |
 |-------|-----------|--------|
 | Capture node | `repeat=<n>` | Versioning and skip logic use `(name, repeat)` instead of `name` alone |
-| Activity start | `repeat=<n>` | Propagated to in-scope descendants (overrides node-level `repeat`; excludes `populate` nodes, including the `input` alias) |
+| Activity start | `repeat=<n>` | Propagated to in-scope descendants (overrides node-level `repeat`; excludes `populate` nodes, including the `input` alias, **and any descendant carrying an `instance`**) |
 
 **Defaults and rules:**
 
@@ -130,6 +151,9 @@ integer `repeat` on a capture node or on `activity_start`.
 - **No cross-repeat inheritance** — a value at `repeat=1` is not merged into logic at `repeat=2`.
 - Export suffix **`_Rr_<n>` only when `repeat > 1`** (alongside `_Vv_<n>` version and `_Ii_<n>` instance suffixes). Values `0` and `-1` do not get `_Rr_`.
 - `repeat=0` on `populate` / pre-filled nodes forces in-form collection even when pre-encounter data exists.
+- **A descendant carrying an `instance` is not repeated.** An instance is by definition a
+  collect-once value that later occurrences inherit (see [Instance vs repeat](#instance-vs-repeat)),
+  so a repeating activity must not re-ask it — the same reason `populate` nodes are exempt.
 - **`repeat=-1` (local-only):** node stays referenceable by name, but does **not** inherit prior values, does **not** feed other nodes’ multi-version coalesce, and is **not** skip-suppressed against other `repeat=-1` occurrences of the same concept (each capture is fully independent — e.g. two different callers each injecting the same snippet activity both get their own, unsuppressed capture). Shares the export base with default `repeat=1`; uniqueness uses `_Vv_n` peer renumbering.
 
 **Same-name value merge:** when several versions of a concept exist in one slot, calculates and expression refs may merge **all** prior versions (`GET_INHERITED_VALUE` → ODK `coalesce`). See `feature/advanced-merge-calc.md`.

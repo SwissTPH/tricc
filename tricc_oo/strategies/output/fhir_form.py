@@ -55,6 +55,9 @@ from tricc_oo.converters.fhir.repeat_helper import (
 from tricc_oo.converters.fhir.questionnaire_item_mapper import (
     CALCULATE_NODE_TYPES,
     CQF_EXT_TEXT_EXPRESSION,
+    FHIR_TYPE_DISPLAY,
+    FHIR_TYPE_GROUP,
+    NODE_TYPE_TO_FHIR,
     SDC_EXT_ANSWER_OPTIONS_TOGGLE,
     SDC_EXT_CALCULATED_EXPR,
     SDC_EXT_ENABLE_WHEN_EXPR,
@@ -86,6 +89,7 @@ from tricc_oo.converters.datadictionnary import lookup_codesystems_code
 from tricc_oo.models.base import (
     RETURNS_BOOLEAN,
     RETURNS_NUMBER,
+    TriccGroup,
     TriccNodeType,
     TriccOperation,
     TriccOperator,
@@ -131,6 +135,8 @@ _INTERNAL_ITEM_LABEL_PREFIXES = ("path:", "contains:", "save:")
 # Hidden items of these types are candidates for unused-calculate pruning.
 _PRUNE_CALC_ITEM_TYPES = frozenset({"boolean", "string", "integer", "decimal", "quantity"})
 _LINK_ID_IN_EXPRESSION = re.compile(r"""linkId\s*=\s*['"]([^'"]+)['"]""")
+# linkId whose `.answer` an expression reads: the last `where(linkId=…)` of the path.
+_ANSWER_LINK_ID_IN_EXPRESSION = re.compile(r"""linkId\s*=\s*['"]([^'"]+)['"]\s*\)\s*\.answer""")
 _NUMERIC_LITERAL = re.compile(r"^-?\d+(\.\d+)?$")
 # Choice EQUAL wraps as ``…answer.where($this.exists()).value.code = 'x'``.
 # HAPI does not resolve that chain; membership ``answer.where($this.value.code = 'x')`` does.
@@ -322,6 +328,10 @@ class FHIRStrategy(BaseOutPutStrategy):
         # True while serialising display text: choice references then render the
         # option label (.value.display) rather than the code.
         self._in_display_text: bool = False
+        # Cycle guard for relevance inlined in place of a non-answerable operand
+        # (fix/20260828-answer-reference-on-non-answerable-node.md).
+        self._inlining_relevance: set[int] = set()
+        self._reference_node_index_cache: Optional[Dict[str, object]] = None
 
     def get_tricc_operation_expression(self, operation):
         # For CQL
@@ -1020,6 +1030,138 @@ class FHIRStrategy(BaseOutPutStrategy):
         if self._is_effective_relevance(node_rel):
             return node_rel
         return None
+
+    # FHIR item types that carry no ``answer`` element, so a ``…answer…`` path
+    # against them can only ever yield an empty collection.
+    _NON_ANSWERABLE_FHIR_TYPES = frozenset({FHIR_TYPE_GROUP, FHIR_TYPE_DISPLAY})
+
+    def _is_answerable_item(self, node) -> bool:
+        """Return True if ``node`` is exported as an answerable Questionnaire item.
+
+        Only answerable items have ``QuestionnaireResponse.item.answer``. Activity /
+        segment / page containers and ``activity_start`` are ``group`` items, notes are
+        ``display``, and routing nodes (``end``, ``goto``, ``link_in``/``link_out``,
+        ``exclusive``) produce no item at all - emitting ``.answer`` for any of them gives
+        an empty collection, which makes the whole expression evaluate false forever
+        (``fix/20260828-answer-reference-on-non-answerable-node.md``).
+
+        ``NODE_TYPE_TO_FHIR`` / ``SKIP_NODE_TYPES`` are the authority here rather than the
+        class hierarchy, because they are the same tables ``generate_base`` emits items
+        from - so this predicate cannot drift from what is actually in the Questionnaire.
+        Hidden calculates (``bridge``, ``wait``, ``rhombus``, ``factor``, ``populate``)
+        *are* answerable despite being routing-ish nodes.
+
+        Args:
+            node: A TRICC node or ``TriccGroup`` used as an expression operand.
+
+        Returns:
+            True if a ``…answer…`` FHIRPath may be emitted for ``node``.
+        """
+        tricc_type = getattr(node, "tricc_type", None)
+        if tricc_type is None:
+            return True
+        if should_skip(tricc_type):
+            return False
+        mapping = NODE_TYPE_TO_FHIR.get(tricc_type)
+        if mapping is None:
+            # Unmapped type: keep the historical answer idiom rather than guessing.
+            return True
+        return bool(mapping[0]) and mapping[0] not in self._NON_ANSWERABLE_FHIR_TYPES
+
+    @staticmethod
+    def _operand_label(node) -> str:
+        """Best-effort human name for a node, for log messages only."""
+        return str(getattr(node, "export_name", None) or getattr(node, "name", None) or node.__class__.__name__)
+
+    def _fhirpath_inlined_relevance(self, node) -> str:
+        """FHIRPath for a non-answerable operand: that node's own relevance, inlined.
+
+        Branching on a container means "this container is relevant", so the operand is
+        replaced by the very expression the container's own ``enableWhenExpression``
+        carries - ``_effective_relevance`` + ``convert_expression_to_fhirpath`` are the
+        same primitives ``generate_relevance`` uses, so the two texts match. The operand
+        stays inside the referencing item's own relevance operation, so an item with
+        conditions of its own ends up with ``own and (container relevance)``, while an item
+        whose only condition is the container gets a verbatim copy.
+
+        Args:
+            node: The non-answerable node being referenced.
+
+        Returns:
+            Parenthesised FHIRPath, or ``'true'`` when the node is unconditionally
+            relevant / its relevance cannot be expressed in FHIRPath. Never an empty
+            ``.answer`` path.
+        """
+        relevance = self._effective_relevance(node)
+        if relevance is None:
+            return "true"
+
+        node_key = id(node)
+        if node_key in self._inlining_relevance:
+            logger.warning(
+                "FHIRStrategy: relevance cycle through '%s'; inlining 'true' instead of recursing",
+                self._operand_label(node),
+            )
+            return "true"
+
+        self._inlining_relevance.add(node_key)
+        try:
+            expression = self.convert_expression_to_fhirpath(relevance)
+        except NotImplementedError as exc:
+            # Same fail-open policy as generate_relevance: an inexpressible relevance
+            # must not disable the referencing item for the life of the form.
+            logger.warning(
+                "FHIRStrategy: cannot inline relevance of '%s' (%s); using 'true'",
+                self._operand_label(node),
+                exc,
+            )
+            return "true"
+        finally:
+            self._inlining_relevance.discard(node_key)
+
+        if not expression or expression == "true":
+            return "true"
+        return f"({expression})"
+
+    def _reference_node_index(self) -> Dict[str, object]:
+        """Lazy ``export_name`` -> node index over every activity, group and node.
+
+        Used only to decide answerability of a ``TriccReference`` (a bare name), so a
+        cached snapshot is enough: the graph no longer changes once ``process_base`` ran.
+        """
+        if self._reference_node_index_cache is not None:
+            return self._reference_node_index_cache
+
+        index: Dict[str, object] = {}
+
+        def register(candidate) -> None:
+            export_name = getattr(candidate, "export_name", None)
+            if export_name and export_name not in index:
+                index[export_name] = candidate
+
+        activities = list((getattr(self.project, "pages", None) or {}).values())
+        seen_activities = set()
+        while activities:
+            activity = activities.pop()
+            if activity is None or id(activity) in seen_activities:
+                continue
+            seen_activities.add(id(activity))
+            register(activity)
+            for node in (getattr(activity, "nodes", None) or {}).values():
+                register(node)
+            for group in (getattr(activity, "groups", None) or {}).values():
+                register(group)
+            activities.extend((getattr(activity, "instances", None) or {}).values())
+
+        self._reference_node_index_cache = index
+        return index
+
+    def _resolve_reference_node(self, ref):
+        """Node behind a ``TriccReference`` name, or None when it cannot be resolved."""
+        name = getattr(ref, "value", None)
+        if not isinstance(name, str) or not name:
+            return None
+        return self._reference_node_index().get(name)
 
     def _answer_option_coding(self, opt) -> dict:
         """Return the valueCoding dict used on both answerOption and toggle slices."""
@@ -1844,6 +1986,9 @@ class FHIRStrategy(BaseOutPutStrategy):
         if isinstance(r, TriccOperation):
             return self.get_tricc_operation_expression_fhirpath(r)
         elif isinstance(r, TriccReference):
+            node = self._resolve_reference_node(r)
+            if node is not None and not self._is_answerable_item(node):
+                return self._fhirpath_inlined_relevance(node)
             return self._fhirpath_answer(get_export_name(r.value))
         elif isinstance(r, TriccStatic):
             if isinstance(r.value, bool):
@@ -1865,9 +2010,12 @@ class FHIRStrategy(BaseOutPutStrategy):
                 if literal is not None:
                     return literal
             return f"'{r.name}'"
-        elif issubclass(r.__class__, TriccNodeInputModel):
-            return self._fhirpath_answer(get_export_name(r))
-        elif issubclass(r.__class__, TriccNodeBaseModel):
+        elif isinstance(r, (TriccNodeBaseModel, TriccGroup)):
+            # Containers and non-materialised routing nodes have no `answer`: branching on
+            # them means "this container is relevant", so inline their relevance instead
+            # (fix/20260828-answer-reference-on-non-answerable-node.md).
+            if not self._is_answerable_item(r):
+                return self._fhirpath_inlined_relevance(r)
             return self._fhirpath_answer(get_export_name(r))
         else:
             raise NotImplementedError(f"This type of node {r.__class__} is not supported within an operation")
@@ -1957,11 +2105,15 @@ class FHIRStrategy(BaseOutPutStrategy):
         # TriccReference subclasses TriccStatic, so it must be checked first —
         # otherwise it would be caught (and excluded) by the TriccStatic branch below.
         if isinstance(original_ref, TriccReference):
-            return True
+            node = self._resolve_reference_node(original_ref)
+            return node is None or self._is_answerable_item(node)
         if isinstance(original_ref, (TriccStatic, str, TriccOperation, TriccNodeSelectOption)):
             return False
-        if isinstance(original_ref, (TriccNodeInputModel, TriccNodeBaseModel)):
-            return True
+        if isinstance(original_ref, (TriccNodeInputModel, TriccNodeBaseModel, TriccGroup)):
+            # A non-answerable operand was emitted as an inlined relevance (a boolean
+            # expression), not an answer collection: appending
+            # `.where($this.exists()).value` to it would corrupt it.
+            return self._is_answerable_item(original_ref)
         return False
 
     def _item_path_index_fingerprint(self):
@@ -3291,5 +3443,60 @@ class FHIRStrategy(BaseOutPutStrategy):
                 leftover,
             )
 
+        self._validate_answer_references()
+
         # Future: add deeper checks (linkId uniqueness, expression syntax, etc.)
         logger.info("FHIRStrategy: basic validation complete")
+
+    @staticmethod
+    def _index_item_types(items, bucket: Dict[str, str]) -> None:
+        """Collect ``linkId`` -> FHIR item type for every item, nested ones included."""
+        for item in items or []:
+            link_id = item.get("linkId")
+            if link_id:
+                bucket[link_id] = item.get("type")
+            FHIRStrategy._index_item_types(item.get("item"), bucket)
+
+    @staticmethod
+    def _questionnaire_expressions(items, found=None) -> List[Tuple[str, str]]:
+        """Every ``(carrier linkId, expression)`` pair on a Questionnaire item tree."""
+        found = [] if found is None else found
+        for item in items or []:
+            link_id = item.get("linkId") or "?"
+            for extension in item.get("extension") or []:
+                expression = (extension.get("valueExpression") or {}).get("expression")
+                if isinstance(expression, str):
+                    found.append((link_id, expression))
+            FHIRStrategy._questionnaire_expressions(item.get("item"), found)
+        return found
+
+    def _validate_answer_references(self) -> int:
+        """Warn when an expression reads ``.answer`` of an item that has none.
+
+        Standing guard for ``fix/20260828-answer-reference-on-non-answerable-node.md``:
+        ``group`` and ``display`` items carry no ``answer``, so such a path yields an
+        empty collection and the expression evaluates false for the life of the form -
+        silently, since the FHIRPath itself stays valid. A linkId absent from this
+        Questionnaire is *not* flagged: ``%resource.repeat(item)`` paths deliberately
+        reach items that live elsewhere.
+
+        Returns:
+            Number of offending ``.answer`` references found.
+        """
+        offenders = 0
+        for segment, questionnaire in (self.questionnaires or {}).items():
+            item_types: Dict[str, str] = {}
+            self._index_item_types(questionnaire.get("item"), item_types)
+            for carrier, expression in self._questionnaire_expressions(questionnaire.get("item")):
+                for target in dict.fromkeys(_ANSWER_LINK_ID_IN_EXPRESSION.findall(expression)):
+                    if item_types.get(target) in self._NON_ANSWERABLE_FHIR_TYPES:
+                        offenders += 1
+                        logger.error(
+                            "FHIRStrategy: '%s' (%s) reads .answer of '%s', which is a %s item "
+                            "and has none - the expression can never be true",
+                            carrier,
+                            segment,
+                            target,
+                            item_types.get(target),
+                        )
+        return offenders
