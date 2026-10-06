@@ -343,6 +343,14 @@ In-form calculation (e.g. BMI from weight + height both answered in the same Que
 - `CASE` / `IFS` become nested FHIRPath `iif()` (same shape as XLSForm nested `if()`),
   so in-form calculates such as `age_in_months` get a live `calculatedExpression`.
   See `fix/20260824-fhirpath-case-iif.md`.
+- Single-value functions (`ROUND`, `ABS`, `LENGTH`) are emitted as
+  `X.select($this.round())`, never as a bare `X.round()`. HAPI's math functions
+  raise on an empty focus instead of returning empty, and openSRP evaluates every
+  `calculatedExpression` at render time while all answers are still empty — one
+  bare `.round()` makes the whole Questionnaire fail to render. `select()` skips an
+  empty collection and gives the body a single-item focus without duplicating the
+  (long) operand path. `ROUND` / `ABS` operands also take the numeric wrap above.
+  See `fix/20260831-fhirpath-empty-safe-math.md`.
 
 Out-of-form calculation (depends on data not captured in this Questionnaire, e.g. observation
 history from a prior process) still routes through CQL, but as a one-time `initialExpression`

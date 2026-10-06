@@ -196,8 +196,10 @@ class TestConvertExpressionToFhirpath(unittest.TestCase):
         op = TriccOperation(TriccOperator.LENGTH, [TriccReference("name")])
         expr = self.strategy.convert_expression_to_fhirpath(op)
         self.assertNotIn("Length(", expr)
-        self.assertIn(".length()", expr)
+        self.assertIn(".select($this.length())", expr)
         self.assertIn(".value", expr)
+        # A string operand must not be cast to decimal.
+        self.assertNotIn(".toDecimal()", expr)
 
     def test_round_abs_use_suffix_functions(self):
         round_expr = self.strategy.convert_expression_to_fhirpath(
@@ -210,6 +212,9 @@ class TestConvertExpressionToFhirpath(unittest.TestCase):
         self.assertIn(".round()", round_expr)
         self.assertNotIn("Abs(", abs_expr)
         self.assertIn(".abs()", abs_expr)
+        # Numeric operand: value scalar cast to decimal (fix/20260824-fhirpath-numeric-arithmetic).
+        self.assertIn(".value).toDecimal()", round_expr)
+        self.assertIn(".value).toDecimal()", abs_expr)
 
     def test_concatenate_uses_ampersand_not_plus(self):
         op = TriccOperation(TriccOperator.CONCATENATE, [TriccStatic("a"), TriccStatic("b")])

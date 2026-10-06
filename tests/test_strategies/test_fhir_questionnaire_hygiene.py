@@ -16,6 +16,7 @@ Run with:
     python -m pytest tests/test_strategies/test_fhir_questionnaire_hygiene.py -v
 """
 
+import re
 import unittest
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -522,6 +523,65 @@ class TestSingletonSdcExpressions(unittest.TestCase):
         strategy._sanitize_questionnaires()
         item = strategy.questionnaires["main"]["item"][0]
         self.assertEqual(len(_expression_urls(item, SDC_EXT_CALCULATED_EXPR)), 1)
+
+
+# `.round()` / `.abs()` outside a select($this. …) projection: HAPI raises on an
+# empty focus instead of returning empty, so such an expression kills the whole
+# Questionnaire at render time. See fix/20260831-fhirpath-empty-safe-math.md.
+_BARE_MATH = re.compile(r"(?<!\$this)\.(?:round|abs)\(\)")
+
+
+def _fhirpath_expressions(item):
+    for ext in item.get("extension", []):
+        value_expr = ext.get("valueExpression") or {}
+        if value_expr.get("language") == "text/fhirpath":
+            yield ext.get("url"), value_expr.get("expression", "")
+    for child in item.get("item", []):
+        yield from _fhirpath_expressions(child)
+
+
+class TestEmptySafeMathExpressions(unittest.TestCase):
+    """No live FHIRPath expression may call a HAPI math function on a bare focus."""
+
+    def test_round_in_calculate_and_relevance_is_projected(self):
+        strategy = _make_strategy()
+        activity = _registration_activity()
+        weight = TriccNodeInteger(id="w1", name="weight", label="Weight")
+        bmi = TriccNodeCalculate(id="bmi1", name="bmi", label="BMI")
+        bmi.expression_reference = TriccOperation(TriccOperator.ROUND, [weight])
+        obese = TriccNodeSelectYesNo(
+            id="q1",
+            name="confirm_obese",
+            label="Confirm?",
+            list_name="yes_no",
+            activity=activity,
+        )
+        obese.relevance = TriccOperation(
+            TriccOperator.MORE, [TriccOperation(TriccOperator.ROUND, [weight]), 25]
+        )
+        strategy.questionnaires["registration"] = {
+            "resourceType": "Questionnaire",
+            "item": [
+                {"linkId": "weight", "type": "integer"},
+                {"linkId": "bmi", "type": "decimal"},
+                {"linkId": get_export_name(obese), "type": "boolean"},
+            ],
+        }
+
+        strategy.generate_calculate(bmi)
+        strategy.generate_relevance(obese)
+
+        expressions = [
+            (url, expr)
+            for item in strategy.questionnaires["registration"]["item"]
+            for url, expr in _fhirpath_expressions(item)
+        ]
+        urls = {url for url, _ in expressions}
+        self.assertIn(SDC_EXT_CALCULATED_EXPR, urls)
+        self.assertIn(SDC_EXT_ENABLE_WHEN_EXPR, urls)
+        for url, expr in expressions:
+            self.assertIn(".select($this.round())", expr, url)
+            self.assertIsNone(_BARE_MATH.search(expr), f"{url}: {expr}")
 
 
 if __name__ == "__main__":

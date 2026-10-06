@@ -2751,17 +2751,36 @@ class FHIRStrategy(BaseOutPutStrategy):
     # (X.round(), X.length()) rather than CQL's prefix Round(X)/Length(X),
     # and lowercase no-arg today()/now() rather than CQL's Today()/Now().
     # ============================================================
+    @staticmethod
+    def _fhirpath_single_value_call(expr: str, call: str) -> str:
+        """Emit ``X.<call>`` empty-safely as ``X.select($this.<call>)``.
+
+        HAPI's math functions (round, abs, sqrt, power, …) open with a
+        ``focus.size() != 1`` guard and raise instead of returning empty as
+        FHIRPath requires, so a bare ``X.round()`` crashes
+        ``initializeCalculatedExpressions`` at render time — every answer is
+        still empty then, so the whole Questionnaire fails to render.
+        ``select()`` skips an empty collection and gives the body a single-item
+        focus, without duplicating ``X`` the way ``iif(X.exists(), X.round(), {})``
+        would (``X`` is a long nested-item path).
+        See fix/20260831-fhirpath-empty-safe-math.md.
+        """
+        return f"{expr}.select($this.{call})"
+
     def tricc_operation_fhirpath_round(self, ref_expressions, original_references=None):
-        r_expr = f"{ref_expressions[0]}.round()"
-        return self._wrap_operand_if_needed(r_expr, original_references)
+        refs = list(original_references or [])
+        operand = self._fhirpath_numeric_operand(ref_expressions[0], refs[0] if refs else None)
+        return self._fhirpath_single_value_call(operand, "round()")
 
     def tricc_operation_fhirpath_abs(self, ref_expressions, original_references=None):
-        r_expr = f"{ref_expressions[0]}.abs()"
-        return self._wrap_operand_if_needed(r_expr, original_references)
+        refs = list(original_references or [])
+        operand = self._fhirpath_numeric_operand(ref_expressions[0], refs[0] if refs else None)
+        return self._fhirpath_single_value_call(operand, "abs()")
 
     def tricc_operation_fhirpath_length(self, ref_expressions, original_references=None):
-        r_expr = f"{ref_expressions[0]}.length()"
-        return self._wrap_operand_if_needed(r_expr, original_references)
+        # String operand — no numeric cast, but the same empty-focus guard.
+        operand = self._wrap_operand_if_needed(ref_expressions[0], original_references)
+        return self._fhirpath_single_value_call(operand, "length()")
 
     def tricc_operation_fhirpath_concatenate(self, ref_expressions, original_references=None):
         # FHIRPath string concatenation uses "&" ("+" is arithmetic-only).
