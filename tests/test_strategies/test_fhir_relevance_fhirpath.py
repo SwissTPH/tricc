@@ -725,3 +725,449 @@ class TestOptionRelevanceToggleExpression(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestNonAnswerableOperandInlinesRelevance(unittest.TestCase):
+    """`.answer` may only be emitted for answerable items.
+
+    Branching on a container (activity / group / routing node) must inline that
+    container's own relevance instead of reading an `.answer` element the container
+    does not have — see fix/20260828-answer-reference-on-non-answerable-node.md.
+    """
+
+    def setUp(self):
+        self.strategy = _make_strategy()
+
+    # ---------------------------------------------------------------- helpers
+    @staticmethod
+    def _activity(name, relevance=None):
+        from tricc_oo.models.calculate import TriccNodeBridge
+        from tricc_oo.models.tricc import TriccNodeActivity
+
+        root = TriccNodeBridge(id=f"{name}_root", name=f"{name}_root")
+        activity = TriccNodeActivity(id=name, name=name, export_name=name, root=root)
+        activity.relevance = relevance
+        return activity
+
+    @staticmethod
+    def _select_one(name):
+        from tricc_oo.models.tricc import TriccNodeSelectOne
+
+        return TriccNodeSelectOne(id=name, name=name, export_name=name, label=name, list_name=name)
+
+    # ---------------------------------------------------------------- answerability
+    def test_containers_and_routing_nodes_are_not_answerable(self):
+        from tricc_oo.models.calculate import (
+            TriccNodeActivityEnd,
+            TriccNodeActivityStart,
+            TriccNodeExclusive,
+        )
+        from tricc_oo.models.tricc import TriccNodeNote
+
+        for node in (
+            self._activity("signs"),
+            TriccNodeActivityStart(id="a_start", name="a_start"),
+            TriccNodeActivityEnd(id="a_end", activity=self._activity("host")),
+            TriccNodeExclusive(id="excl", name="excl"),
+            TriccNodeNote(id="note", name="note", label="note"),
+        ):
+            with self.subTest(node=node.__class__.__name__):
+                self.assertFalse(self.strategy._is_answerable_item(node))
+
+    def test_questions_and_hidden_calculates_stay_answerable(self):
+        from tricc_oo.models.calculate import TriccNodeBridge, TriccNodeCalculate
+
+        for node in (
+            self._select_one("select_why"),
+            TriccNodeCalculate(id="calc", name="calc"),
+            TriccNodeBridge(id="bridge", name="bridge"),
+        ):
+            with self.subTest(node=node.__class__.__name__):
+                self.assertTrue(self.strategy._is_answerable_item(node))
+
+    # ---------------------------------------------------------------- inlining
+    def test_activity_operand_inlines_activity_relevance(self):
+        activity = self._activity(
+            "signs",
+            TriccOperation(
+                TriccOperator.SELECTED,
+                [TriccReference("select_why"), TriccStatic("demo.bad_p")],
+            ),
+        )
+        op = TriccOperation(TriccOperator.ISTRUE, [activity])
+        expr = self.strategy.convert_expression_to_fhirpath(op)
+
+        self.assertNotIn("linkId='signs'", expr)
+        self.assertNotIn(".answer.where($this.exists()).value", expr)
+        self.assertIn("linkId='select_why'", expr)
+        self.assertIn("demo.bad_p", expr)
+
+    def test_activity_relevance_is_anded_with_the_items_own_conditions(self):
+        activity = self._activity(
+            "signs",
+            TriccOperation(
+                TriccOperator.SELECTED,
+                [TriccReference("select_why"), TriccStatic("demo.bad_p")],
+            ),
+        )
+        own = TriccOperation(TriccOperator.ISTRUE, [TriccReference("consent")])
+        op = TriccOperation(
+            TriccOperator.AND,
+            [own, TriccOperation(TriccOperator.ISTRUE, [activity])],
+        )
+        expr = self.strategy.convert_expression_to_fhirpath(op)
+
+        self.assertIn(" and ", expr)
+        self.assertIn("linkId='consent'", expr)
+        self.assertIn("demo.bad_p", expr)
+        self.assertNotIn("linkId='signs'", expr)
+
+    def test_group_operand_inlines_group_relevance(self):
+        from tricc_oo.models.base import TriccGroup
+
+        activity = self._activity("signs")
+        group = TriccGroup(
+            id="grp",
+            name="grp",
+            export_name="grp",
+            activity=activity,
+            relevance=TriccOperation(TriccOperator.ISTRUE, [TriccReference("fever")]),
+        )
+        expr = self.strategy.convert_expression_to_fhirpath(
+            TriccOperation(TriccOperator.ISTRUE, [group])
+        )
+
+        self.assertNotIn("linkId='grp'", expr)
+        self.assertIn("linkId='fever'", expr)
+
+    def test_activity_start_operand_inlines_its_activity_relevance(self):
+        from tricc_oo.models.calculate import TriccNodeActivityStart
+
+        activity = self._activity(
+            "signs", TriccOperation(TriccOperator.ISTRUE, [TriccReference("fever")])
+        )
+        node = TriccNodeActivityStart(id="signs_start", name="signs_start", export_name="signs_start")
+        node.activity = activity
+        expr = self.strategy.convert_expression_to_fhirpath(
+            TriccOperation(TriccOperator.ISTRUE, [node])
+        )
+
+        self.assertNotIn("linkId='signs_start'", expr)
+        self.assertIn("linkId='fever'", expr)
+
+    def test_container_without_relevance_inlines_true(self):
+        activity = self._activity("signs")
+        expr = self.strategy.convert_expression_to_fhirpath(
+            TriccOperation(TriccOperator.ISTRUE, [activity])
+        )
+
+        self.assertNotIn(".answer", expr)
+        self.assertEqual(expr, "(true = true)")
+
+    def test_relevance_cycle_fails_open_to_true(self):
+        first = self._activity("first")
+        second = self._activity("second")
+        first.relevance = TriccOperation(TriccOperator.ISTRUE, [second])
+        second.relevance = TriccOperation(TriccOperator.ISTRUE, [first])
+
+        expr = self.strategy.convert_expression_to_fhirpath(
+            TriccOperation(TriccOperator.ISTRUE, [first])
+        )
+
+        self.assertNotIn(".answer", expr)
+        self.assertNotIn("linkId='first'", expr)
+        self.assertNotIn("linkId='second'", expr)
+        self.assertEqual(expr, "(((((true = true)) = true)) = true)")
+
+    # ---------------------------------------------------------------- regressions
+    def test_answerable_node_operand_is_unchanged(self):
+        from tricc_oo.models.calculate import TriccNodeCalculate
+
+        calc = TriccNodeCalculate(id="danger", name="danger", export_name="danger")
+        select = self._select_one("select_why")
+
+        calc_expr = self.strategy.convert_expression_to_fhirpath(
+            TriccOperation(TriccOperator.ISTRUE, [calc])
+        )
+        self.assertEqual(
+            calc_expr,
+            "(%resource.repeat(item).where(linkId='danger').answer.where($this.exists()).value = true)",
+        )
+
+        select_expr = self.strategy.convert_expression_to_fhirpath(
+            TriccOperation(TriccOperator.SELECTED, [select, TriccStatic("demo.bad_p")])
+        )
+        self.assertIn("linkId='select_why'", select_expr)
+        self.assertIn(".answer", select_expr)
+
+    def test_unresolvable_reference_keeps_the_answer_idiom(self):
+        expr = self.strategy.convert_expression_to_fhirpath(
+            TriccOperation(TriccOperator.ISTRUE, [TriccReference("unknown_name")])
+        )
+        self.assertIn("linkId='unknown_name'", expr)
+        self.assertIn(".answer", expr)
+
+    def test_reference_resolving_to_an_activity_inlines_relevance(self):
+        activity = self._activity(
+            "signs", TriccOperation(TriccOperator.ISTRUE, [TriccReference("fever")])
+        )
+        self.strategy.project.pages = {"signs": activity}
+        self.strategy._reference_node_index_cache = None
+
+        expr = self.strategy.convert_expression_to_fhirpath(
+            TriccOperation(TriccOperator.ISTRUE, [TriccReference("signs")])
+        )
+
+        self.assertNotIn("linkId='signs'", expr)
+        self.assertIn("linkId='fever'", expr)
+
+
+class TestGenerateRelevanceOnContainerOperand(unittest.TestCase):
+    """End-to-end mirror of the reported symptom: a group whose enableWhenExpression
+    branched on a sibling *activity* was permanently disabled because groups have no
+    `answer` (fix/20260828-answer-reference-on-non-answerable-node.md)."""
+
+    ENABLE_WHEN = "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-enableWhenExpression"
+
+    def test_group_relevance_reading_an_activity_inlines_that_activity_relevance(self):
+        from tricc_oo.models.calculate import TriccNodeBridge
+        from tricc_oo.models.tricc import TriccNodeActivity
+
+        strategy = _make_strategy()
+        strategy.questionnaires["main"] = {
+            "resourceType": "Questionnaire",
+            "item": [
+                {"linkId": "signs", "type": "group", "text": "Signs", "item": []},
+                {"linkId": "extra_questions", "type": "group", "text": "Additional", "item": []},
+            ],
+        }
+
+        signs = TriccNodeActivity(
+            id="signs",
+            name="signs",
+            export_name="signs",
+            root=TriccNodeBridge(id="signs_root", name="signs_root"),
+        )
+        signs.relevance = TriccOperation(
+            TriccOperator.SELECTED,
+            [TriccReference("select_why"), TriccStatic("demo.bad_p")],
+        )
+
+        # Real export_name (not a patched get_export_name) so the *inner* reference
+        # keeps its own linkId.
+        node = MagicMock()
+        node.segment = "main"
+        node.tricc_type = "activity_start"
+        node.export_name = "extra_questions"
+        node.options = None
+        node.activity = None
+        node.relevance = TriccOperation(TriccOperator.ISTRUE, [signs])
+
+        strategy.generate_relevance(node)
+
+        item = strategy.questionnaires["main"]["item"][1]
+        exprs = [
+            ext["valueExpression"]["expression"]
+            for ext in item.get("extension", [])
+            if ext.get("url") == self.ENABLE_WHEN
+        ]
+        self.assertEqual(len(exprs), 1)
+        # The symptom: `.answer` of the Signs *group*.
+        self.assertNotIn("linkId='signs'", exprs[0])
+        # The fix: Signs' own condition, inlined.
+        self.assertIn("linkId='select_why'", exprs[0])
+        self.assertIn("demo.bad_p", exprs[0])
+
+        self.assertEqual(strategy._validate_answer_references(), 0)
+
+    def test_validator_flags_an_answer_read_of_a_group_item(self):
+        strategy = _make_strategy()
+        strategy.questionnaires["main"] = {
+            "resourceType": "Questionnaire",
+            "item": [
+                {"linkId": "signs", "type": "group", "item": []},
+                {
+                    "linkId": "extra_questions",
+                    "type": "group",
+                    "extension": [
+                        {
+                            "url": self.ENABLE_WHEN,
+                            "valueExpression": {
+                                "language": "text/fhirpath",
+                                "expression": (
+                                    "%resource.item.where(linkId='signs')"
+                                    ".answer.where($this.exists()).value = true"
+                                ),
+                            },
+                        }
+                    ],
+                },
+            ],
+        }
+        self.assertEqual(strategy._validate_answer_references(), 1)
+
+    def test_validator_ignores_link_ids_absent_from_this_questionnaire(self):
+        strategy = _make_strategy()
+        strategy.questionnaires["main"] = {
+            "resourceType": "Questionnaire",
+            "item": [
+                {
+                    "linkId": "followup",
+                    "type": "boolean",
+                    "extension": [
+                        {
+                            "url": self.ENABLE_WHEN,
+                            "valueExpression": {
+                                "language": "text/fhirpath",
+                                "expression": (
+                                    "%resource.repeat(item).where(linkId='elsewhere').answer.exists()"
+                                ),
+                            },
+                        }
+                    ],
+                }
+            ],
+        }
+        self.assertEqual(strategy._validate_answer_references(), 0)
+
+
+class TestPruneEmptyGroups(unittest.TestCase):
+    """A FHIR SDC group is a container: childless, it renders as a dangling section
+    header, so it must not be exported (fix/20260828-empty-group-pruning.md)."""
+
+    ENABLE_WHEN = "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-enableWhenExpression"
+
+    @staticmethod
+    def _link_ids(items, out=None):
+        out = [] if out is None else out
+        for item in items or []:
+            out.append(item["linkId"])
+            TestPruneEmptyGroups._link_ids(item.get("item"), out)
+        return out
+
+    def test_empty_group_dropped_populated_group_kept(self):
+        strategy = _make_strategy()
+        strategy.questionnaires["main"] = {
+            "item": [
+                {"linkId": "empty", "type": "group", "text": "Signs", "item": []},
+                {
+                    "linkId": "populated",
+                    "type": "group",
+                    "item": [{"linkId": "q1", "type": "boolean"}],
+                },
+                {"linkId": "loose", "type": "string"},
+            ]
+        }
+        strategy._prune_empty_groups()
+        self.assertEqual(
+            self._link_ids(strategy.questionnaires["main"]["item"]),
+            ["populated", "q1", "loose"],
+        )
+
+    def test_nested_empty_groups_are_dropped_transitively(self):
+        strategy = _make_strategy()
+        strategy.questionnaires["main"] = {
+            "item": [
+                {
+                    "linkId": "outer",
+                    "type": "group",
+                    "item": [
+                        {
+                            "linkId": "middle",
+                            "type": "group",
+                            "item": [{"linkId": "inner", "type": "group", "item": []}],
+                        }
+                    ],
+                }
+            ]
+        }
+        strategy._prune_empty_groups()
+        self.assertEqual(strategy.questionnaires["main"]["item"], [])
+
+    def test_text_and_enable_when_do_not_save_a_childless_group(self):
+        strategy = _make_strategy()
+        strategy.questionnaires["main"] = {
+            "item": [
+                {
+                    "linkId": "gated_empty",
+                    "type": "group",
+                    "text": "Additional Clinical Questions",
+                    "extension": [
+                        {
+                            "url": self.ENABLE_WHEN,
+                            "valueExpression": {
+                                "language": "text/fhirpath",
+                                "expression": "%resource.repeat(item).where(linkId='x').answer.exists()",
+                            },
+                        }
+                    ],
+                }
+            ]
+        }
+        strategy._prune_empty_groups()
+        self.assertEqual(strategy.questionnaires["main"]["item"], [])
+
+    def test_display_and_non_group_items_are_never_pruned(self):
+        strategy = _make_strategy()
+        strategy.questionnaires["main"] = {
+            "item": [
+                {"linkId": "note", "type": "display", "text": "hello"},
+                {"linkId": "flag", "type": "boolean"},
+            ]
+        }
+        strategy._prune_empty_groups()
+        self.assertEqual(self._link_ids(strategy.questionnaires["main"]["item"]), ["note", "flag"])
+
+    def test_extraction_rules_are_resynced_to_survivors(self):
+        strategy = _make_strategy()
+        strategy.questionnaires["main"] = {
+            "item": [
+                {"linkId": "empty", "type": "group", "item": []},
+                {
+                    "linkId": "kept_group",
+                    "type": "group",
+                    "item": [{"linkId": "q1", "type": "boolean"}],
+                },
+            ]
+        }
+        gone = MagicMock()
+        gone.link_id = "empty"
+        gone.link_ids = ["empty"]
+        survivor = MagicMock()
+        survivor.link_id = "q1"
+        survivor.link_ids = ["q1", "empty"]
+        strategy.extraction_rules["main"] = [gone, survivor]
+
+        strategy._prune_empty_groups()
+
+        self.assertEqual(strategy.extraction_rules["main"], [survivor])
+        self.assertEqual(survivor.link_ids, ["q1"])
+
+    def test_group_emptied_by_the_calculate_prune_is_removed_too(self):
+        """Pipeline order: `_prune_unused_hidden_calculates` empties the group,
+        `_prune_empty_groups` then removes the container it left behind."""
+        strategy = _make_strategy()
+        strategy.questionnaires["main"] = {
+            "item": [
+                {
+                    "linkId": "calc_only_group",
+                    "type": "group",
+                    "item": [
+                        {
+                            "linkId": "unused_calc",
+                            "type": "boolean",
+                            "extension": [
+                                {
+                                    "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-hidden",
+                                    "valueBoolean": True,
+                                }
+                            ],
+                        }
+                    ],
+                },
+                {"linkId": "visible", "type": "boolean"},
+            ]
+        }
+        strategy._prune_unused_hidden_calculates()
+        strategy._prune_empty_groups()
+        self.assertEqual(self._link_ids(strategy.questionnaires["main"]["item"]), ["visible"])

@@ -120,6 +120,7 @@ execute()
   ├── process_calculate()  → generate_calculate(node)  adds CQL defines + calculatedExpression
   ├── process_export()     → generate_export(node)     builds StructureMap rules
   ├── _sanitize_questionnaires() / _prune_unused_hidden_calculates()
+  ├── _prune_empty_groups()  → drop `group` items left with no children
   └── export()
         ├── [FHIRStrategy] write questionnaire/, library/, structure-map/, ValueSet/, binary/
         └── [OpenSRPStrategy]
@@ -263,6 +264,18 @@ Visible questions, groups, displays, and calculates that a remaining expression 
 same form reads are kept. Hidden populate / `load_*` items stay only when this process
 extracts them or something here reads them (`fix/20260824-prune-unused-initial-calculates.md`).
 
+**Empty groups are not exported** (`fix/20260828-empty-group-pruning.md`). A FHIR SDC
+`group` is a container: it has no `answer` and nothing of its own to render, so a
+childless one is a dangling section header. `_prune_empty_groups()` runs right after the
+unused-calculate prune (which is what empties groups in the first place) and before
+StructureMap / CQL assembly, so those see the final tree. The test is depth-first, so a
+group whose only content was itself empty groups goes too; `text`, `enableWhenExpression`
+and media extensions do not save a childless group. Extraction rules and CQL defines are
+resynced to the survivors through the same `_resync_segment_assets` helper the calculate
+prune uses. A Questionnaire left with `item: []` is then dropped by the existing
+`_prune_empty_questionnaires` pass — on `demo.drawio` that is what happens to `main`,
+whose only content was one empty group.
+
 **Updated 2026-08-23** (`fix/20260823-questionnaire-item-order.md`): items follow
 flowchart order (first outgoing edge first). The walk used to push `next_nodes`
 onto a stack in authored order, which **reversed** siblings — the registration /
@@ -323,6 +336,17 @@ In-form calculation (e.g. BMI from weight + height both answered in the same Que
   `fix/20260824-fhirpath-select-multiple-membership.md`.
 - Page / activity groups take `enableWhenExpression` from `activity.relevance`
   (XLSForm begin-group relevant), not only the start node's own `relevance`.
+- Branching on a **container** (an activity, a page/group, or a routing node that is
+  not exported as an answerable item) does **not** emit `…answer…` for it — a `group`
+  or `display` item has no `answer`, so the path would yield an empty collection and
+  the item would stay disabled for the life of the form. The operand is replaced by
+  that container's own relevance, inlined and parenthesised, so an item with
+  conditions of its own gets `own and (container relevance)` and an item whose only
+  condition is the container gets a verbatim copy of the container's
+  `enableWhenExpression`. A container with no relevance inlines to `true`, and a
+  relevance cycle fails open to `true` with a warning. `validate()` logs an error if
+  any exported expression still reads `.answer` of a `group` / `display` item. See
+  `fix/20260828-answer-reference-on-non-answerable-node.md`.
 - Boolean / numeric / string items still use `.answer.value`.
 - A calculate whose expression is boolean is emitted as Questionnaire `type: boolean`.
 - A calculate whose expression is numeric (`AGE_MONTH`, `PLUS`, `COUNT`, …) is
