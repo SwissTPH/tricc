@@ -187,7 +187,7 @@ define function GetHistoryObservation(
           )
           sort by (effective as FHIR.dateTime).value desc
       ),
-      reverseOrderPosition - 1
+      Coalesce(reverseOrderPosition, 1) - 1
     )
   )
 
@@ -222,7 +222,7 @@ define function GetHistoryObservationSince(
           )
           sort by (effective as FHIR.dateTime).value desc
       ),
-      reverseOrderPosition - 1
+      Coalesce(reverseOrderPosition, 1) - 1
     )
   )
 

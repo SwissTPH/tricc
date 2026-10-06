@@ -75,10 +75,17 @@ class TriccNodePopulate(TriccNodeFakeCalculateBase):
     period: Optional[str] = None
     # Concept read instead of ``name`` (FHIR export; feature/20260929-cql-populate-wiring.md §5)
     source: Optional[str] = None
+    # FHIR item type of the value read back (e.g. "quantity", "integer"). The
+    # Questionnaire item must carry the same type as the value the CQL accessor
+    # returns, otherwise the client cannot seed it as an `initial` answer.
     data_type: Optional[str] = None
     concept_type: Optional[str] = None
     repeat: Optional[int] = None
     is_sequence_defined: bool = False
+    # Unit of measure, when data_type is "quantity".
+    unit: Optional[str] = None
+    unit_system: Optional[str] = None
+    unit_code: Optional[str] = None
 
 
 class TriccNodeDisplayBridge(TriccNodeDisplayCalculateBase):
@@ -257,11 +264,6 @@ def get_node_from_list(in_nodes, node_id):
     nodes = list(filter(lambda x: x.id == node_id, in_nodes))
     if len(nodes) > 0:
         return nodes[0]
-
-
-# qualculate that saves quantity, or we may merge integer/decimals
-class TriccNodeQuantity(TriccNodeDisplayCalculateBase):
-    tricc_type: TriccNodeType = TriccNodeType.quantity
 
 
 TriccNodeCalculate.update_forward_refs()

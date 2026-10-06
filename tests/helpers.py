@@ -29,7 +29,6 @@ from tricc_oo.strategies.input.yaml import YamlStrategy
 def load_yaml_project(
     yaml_path: Union[str, Path],
     media_path: Optional[str] = None,
-    run_full_pipeline: bool = True,
 ) -> TriccProject:
     """
     Load a YAML test fixture and (optionally) run the full transformation pipeline.
@@ -41,8 +40,6 @@ def load_yaml_project(
     Args:
         yaml_path: Path to a .yaml file (can contain multiple documents/activities)
         media_path: Optional directory for any media artifacts
-        run_full_pipeline: If True (default), calls execute_linked_process + process_pages
-                           so that inheritance, calculates, relevance etc. are fully resolved.
 
     Returns:
         A fully (or partially) processed TriccProject.
@@ -64,15 +61,6 @@ def load_yaml_project(
 
     if project is None:
         raise RuntimeError(f"Failed to load project from {yaml_path}")
-
-    if run_full_pipeline:
-        # Ensure the main linked process and full calculate loading runs
-        # (this is what normally happens in tests/build.py)
-        if "main" in project.start_pages:
-            app = project.start_pages["main"]
-            # Re-process to guarantee all visitors ran
-            strategy.process_pages(app, project)
-        # For projects without "main", the strategy already did its best
 
     return project
 

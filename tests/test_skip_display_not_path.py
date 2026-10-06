@@ -40,9 +40,15 @@ def _mentions(op, target):
     return False
 
 
+def _walked_pages(project):
+    # A page that was instantiated (goto instance) is only a template: the output walk
+    # reaches its instances, never the template itself.
+    return [page for page in project.pages.values() if not getattr(page, "instances", None)]
+
+
 def _all_named(project, name):
     found = []
-    for page in project.pages.values():
+    for page in _walked_pages(project):
         for node in page.nodes.values():
             if getattr(node, "name", None) == name:
                 found.append(node)
@@ -51,7 +57,7 @@ def _all_named(project, name):
 
 def _processed(project):
     nodes = OrderedSet()
-    for page in project.pages.values():
+    for page in _walked_pages(project):
         for node in page.nodes.values():
             nodes.add(node)
         for calc in getattr(page, "calculates", []) or []:
