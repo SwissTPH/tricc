@@ -39,6 +39,7 @@ from tricc_oo.models.tricc import (
     TriccNodeSelectOne,
     TriccNodeSelectMultiple,
     TriccNodeSelectYesNo,
+    TriccNodeSelectNotAvailable,
     TriccNodeSelectOption,
     TriccNodeInteger,
     TriccNodeDecimal,
@@ -185,6 +186,13 @@ NODE_TYPE_MAP: Dict[str, Dict[str, Any]] = {
         "has_options": True,
         "tricc_type": TriccNodeType.select_yesno,
     },
+    "not_available": {
+        "model": TriccNodeSelectNotAvailable,
+        "attrs": ["label", "name", "required", "relevance", "save", "repeat", "hint", "help"],
+        "has_options": True,
+        # Same as the draw.io model: SelectNotAvailable subclasses SelectOne.
+        "tricc_type": TriccNodeType.select_one,
+    },
     "calculate": {
         "model": TriccNodeCalculate,
         "attrs": ["label", "name", "calculate", "relevance", "save", "reference", "repeat"],
@@ -221,6 +229,7 @@ YAML_TYPE_TO_TRICC_TYPE = {
     "select_one": TriccNodeType.select_one,
     "select_multiple": TriccNodeType.select_multiple,
     "select_yesno": TriccNodeType.select_yesno,
+    "not_available": TriccNodeType.not_available,
     "calculate": TriccNodeType.calculate,
     "rhombus": TriccNodeType.rhombus,
     "populate": TriccNodeType.populate,
