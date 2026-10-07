@@ -3418,10 +3418,40 @@ def get_extended_next_nodes(node):
 # conversion instead of failing. The guard gives it a budget (see visitors/loop_guard.py).
 EXPRESSION_GUARD = RecursionGuard("get_node_expression")
 
+# Expressions already built during the current top-level get_node_expression call.
+# A predecessor shared by several paths (e.g. a navigation ladder where each rhombus is
+# reached both through its "Yes -> goto" branch and its "continue" branch) would
+# otherwise be re-expanded once per path, doubling the work at every step
+# (fix/20261006-expression-memoisation.md). None outside a top-level call: the graph and
+# processed_nodes change between calls, so results are never reused across them.
+_EXPRESSION_CACHE = None
+
+
+def _expression_cache_key(in_node, processed_nodes, get_overall_exp, is_prev, negate, process):
+    """Key of one get_node_expression request within a top-level call."""
+    return (
+        id(in_node),
+        id(processed_nodes),
+        bool(get_overall_exp),
+        bool(is_prev),
+        bool(negate),
+        process[0] if process else None,
+    )
+
+
+def _cached_expression_copy(expression):
+    """Copy a cached expression so callers never share (and mutate) one operation."""
+    if isinstance(expression, TriccOperation):
+        return expression.copy(keep_node=True)
+    return expression
+
 
 # calculate or retrieve a node expression
 def get_node_expression(in_node, processed_nodes, get_overall_exp=False, is_prev=False, negate=False, process=None):
     """Build the expression of a node, under the expression recursion guard.
+
+    Within one top-level call, each (node, flags) request is built once and served
+    from a cache afterwards; the cache is dropped when the top-level call returns.
 
     Args:
         in_node: node whose expression is requested.
@@ -3438,15 +3468,31 @@ def get_node_expression(in_node, processed_nodes, get_overall_exp=False, is_prev
         TriccLoopError: the recursion exceeded its depth / call budget, meaning the
             graph has a dependency loop or an exploding expression tree.
     """
-    with EXPRESSION_GUARD(in_node):
-        return _get_node_expression(
-            in_node,
-            processed_nodes,
-            get_overall_exp=get_overall_exp,
-            is_prev=is_prev,
-            negate=negate,
-            process=process,
-        )
+    global _EXPRESSION_CACHE
+    top_level = _EXPRESSION_CACHE is None
+    if top_level:
+        _EXPRESSION_CACHE = {}
+    try:
+        key = _expression_cache_key(in_node, processed_nodes, get_overall_exp, is_prev, negate, process)
+        if key in _EXPRESSION_CACHE:
+            return _cached_expression_copy(_EXPRESSION_CACHE[key][1])
+        # a node whose expression is still being built is not cached yet, so a real
+        # dependency loop keeps recursing and still trips the guard
+        with EXPRESSION_GUARD(in_node):
+            expression = _get_node_expression(
+                in_node,
+                processed_nodes,
+                get_overall_exp=get_overall_exp,
+                is_prev=is_prev,
+                negate=negate,
+                process=process,
+            )
+        # keep in_node alive with its result so its id() cannot be reused in this call
+        _EXPRESSION_CACHE[key] = (in_node, expression)
+        return _cached_expression_copy(expression)
+    finally:
+        if top_level:
+            _EXPRESSION_CACHE = None
 
 
 def _get_node_expression(in_node, processed_nodes, get_overall_exp=False, is_prev=False, negate=False, process=None):
