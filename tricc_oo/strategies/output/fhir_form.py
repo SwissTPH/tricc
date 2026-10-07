@@ -34,6 +34,7 @@ from tricc_oo.converters.fhir.structuremap import (
     extraction_rule_link_ids,
     extraction_rules_conflict,
     merge_extraction_rules,
+    target_structuremap_extension,
 )
 from tricc_oo.converters.fhir.ids import (
     fhir_resource_id,
@@ -43,6 +44,8 @@ from tricc_oo.converters.fhir.ids import (
 )
 from tricc_oo.converters.fhir.populate_helper import (
     cql_helper_populate_block,
+    populate_fhir_item_type,
+    populate_unit,
     resolve_populate_reference,
 )
 from tricc_oo.converters.fhir.repeat_helper import (
@@ -55,6 +58,9 @@ from tricc_oo.converters.fhir.repeat_helper import (
 from tricc_oo.converters.fhir.questionnaire_item_mapper import (
     CALCULATE_NODE_TYPES,
     CQF_EXT_TEXT_EXPRESSION,
+    FHIR_TYPE_DISPLAY,
+    FHIR_TYPE_GROUP,
+    NODE_TYPE_TO_FHIR,
     SDC_EXT_ANSWER_OPTIONS_TOGGLE,
     SDC_EXT_CALCULATED_EXPR,
     SDC_EXT_ENABLE_WHEN_EXPR,
@@ -62,6 +68,7 @@ from tricc_oo.converters.fhir.questionnaire_item_mapper import (
     SDC_EXT_INITIAL_EXPR,
     build_answer_options_toggle_expression,
     build_enable_when_expression,
+    build_required_expression,
     build_hidden_extension,
     build_initial_expression,
     build_initial_expression_cql,
@@ -69,6 +76,7 @@ from tricc_oo.converters.fhir.questionnaire_item_mapper import (
     build_item_answer_media_extension,
     build_item_control_display_item,
     build_item_media_extension,
+    build_unit_extension,
     get_display_type_extensions,
     get_fhir_item_type,
     image_content_type,
@@ -82,10 +90,12 @@ from tricc_oo.converters.fhir.questionnaire_item_mapper import (
     dedupe_singleton_item_extensions,
 )
 from tricc_oo.converters.tricc_to_xls_form import get_export_name
+from tricc_oo.converters.xml_to_tricc import shield_required
 from tricc_oo.converters.datadictionnary import lookup_codesystems_code
 from tricc_oo.models.base import (
     RETURNS_BOOLEAN,
     RETURNS_NUMBER,
+    TriccGroup,
     TriccNodeType,
     TriccOperation,
     TriccOperator,
@@ -103,6 +113,7 @@ from tricc_oo.models.tricc import (
     TriccNodeSelectOption,
     TriccNodeSelectYesNo,
     TriccNodeDisplayModel,
+    TriccNodeTrigger,
 )
 from tricc_oo.models.calculate import TriccNodeDisplayCalculateBase, TriccNodePopulate
 from tricc_oo.strategies.output.base_output_strategy import BaseOutPutStrategy
@@ -119,6 +130,8 @@ FHIR_VERSION = "4.0.1"
 QUESTIONNAIRE_PROFILE = "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire"
 LIBRARY_PROFILE = "http://hl7.org/fhir/StructureDefinition/Library"
 STRUCTUREMAP_PROFILE = "http://hl7.org/fhir/StructureDefinition/StructureMap"
+# Questionnaire → Library link read by FHIR-Core before evaluating CQL initialExpression.
+CQF_LIBRARY_EXT = "http://hl7.org/fhir/StructureDefinition/cqf-library"
 VALUESET_PROFILE = "http://hl7.org/fhir/StructureDefinition/ValueSet"
 CODESYSTEM_PROFILE = "http://hl7.org/fhir/StructureDefinition/CodeSystem"
 
@@ -131,6 +144,8 @@ _INTERNAL_ITEM_LABEL_PREFIXES = ("path:", "contains:", "save:")
 # Hidden items of these types are candidates for unused-calculate pruning.
 _PRUNE_CALC_ITEM_TYPES = frozenset({"boolean", "string", "integer", "decimal", "quantity"})
 _LINK_ID_IN_EXPRESSION = re.compile(r"""linkId\s*=\s*['"]([^'"]+)['"]""")
+# linkId whose `.answer` an expression reads: the last `where(linkId=…)` of the path.
+_ANSWER_LINK_ID_IN_EXPRESSION = re.compile(r"""linkId\s*=\s*['"]([^'"]+)['"]\s*\)\s*\.answer""")
 _NUMERIC_LITERAL = re.compile(r"^-?\d+(\.\d+)?$")
 # Choice EQUAL wraps as ``…answer.where($this.exists()).value.code = 'x'``.
 # HAPI does not resolve that chain; membership ``answer.where($this.value.code = 'x')`` does.
@@ -222,10 +237,15 @@ context Patient
 
 // ── Condition helpers ─────────────────────────────────────────────────────────
 
+// Any-time "does this patient have an active Condition with this code". Comparing
+// clinicalStatus by equivalence (`~`) against a Code would need a declared
+// code/codesystem, and the retrieve cannot take a String argument as its code
+// selector (fix/20260930-helper-cql-compile.md).
 define function HasCondition(code String):
-  exists(
-    [Condition: Code code from "http://snomed.info/sct"] C
-      where C.clinicalStatus ~ "active"
+  exists (
+    [Condition] C
+      where ConditionHasCode(C, code)
+        and ConditionClinicalCode(C) = 'active'
   )
 
 // ── Age helpers ───────────────────────────────────────────────────────────────
@@ -322,6 +342,10 @@ class FHIRStrategy(BaseOutPutStrategy):
         # True while serialising display text: choice references then render the
         # option label (.value.display) rather than the code.
         self._in_display_text: bool = False
+        # Cycle guard for relevance inlined in place of a non-answerable operand
+        # (fix/20260828-answer-reference-on-non-answerable-node.md).
+        self._inlining_relevance: set[int] = set()
+        self._reference_node_index_cache: Optional[Dict[str, object]] = None
 
     def get_tricc_operation_expression(self, operation):
         # For CQL
@@ -411,10 +435,15 @@ class FHIRStrategy(BaseOutPutStrategy):
         logger.info("FHIRStrategy: writing output files")
         self._sanitize_questionnaires()
         self._prune_unused_hidden_calculates()
+        # A group whose last hidden calculate just went is now a dangling section header
+        # (fix/20260828-empty-group-pruning.md).
+        self._prune_empty_groups()
         # StructureMaps and CQL libraries must see the pruned Questionnaire
         # (fix/20260824-prune-unused-initial-calculates.md).
         self._assemble_extraction_maps()
         self._assemble_cql_libraries()
+        self._attach_target_structuremap_extensions()
+        self._attach_cqf_library_extensions()
         self.export(self.project.start_pages, version=version)
         logger.info("FHIRStrategy: validating")
         self.validate()
@@ -618,7 +647,13 @@ class FHIRStrategy(BaseOutPutStrategy):
         if fhir_type == "choice" and self._is_yesno_boolean_select(node):
             fhir_type = "boolean"
 
-        if fhir_type == "string" and self._expression_returns_boolean(node):
+        if isinstance(node, TriccNodePopulate):
+            # The item is seeded with an `initial` built from this node's CQL
+            # accessor, so its type has to match the value that comes back.
+            declared_type = populate_fhir_item_type(node)
+            if declared_type:
+                fhir_type = declared_type
+        elif fhir_type == "string" and self._expression_returns_boolean(node):
             fhir_type = "boolean"
         elif fhir_type == "string":
             number_type = self._expression_fhir_number_type(node)
@@ -648,6 +683,7 @@ class FHIRStrategy(BaseOutPutStrategy):
             "text": label,
             "type": fhir_type,
         }
+        self._apply_item_required(item, node, hidden=hidden, fhir_type=fhir_type)
 
         if is_repeating(tricc_type):
             item["repeats"] = True
@@ -662,6 +698,21 @@ class FHIRStrategy(BaseOutPutStrategy):
         media_extension = self._build_item_media_extension(getattr(node, "image", None))
         if media_extension:
             extensions.append(media_extension)
+        if fhir_type == "quantity":
+            unit = populate_unit(node) if isinstance(node, TriccNodePopulate) else getattr(node, "unit", None)
+            if unit:
+                extensions.append(
+                    build_unit_extension(
+                        unit,
+                        getattr(node, "unit_system", None),
+                        getattr(node, "unit_code", None),
+                    )
+                )
+            else:
+                logger.warning(
+                    f"FHIRStrategy: quantity item '{link_id}' has no unit; "
+                    "the answer Quantity will carry a value with no unit of measure"
+                )
         if fhir_type == "boolean" and not hidden:
             orientation_ext = self._boolean_choice_orientation_extension()
             if orientation_ext:
@@ -719,6 +770,39 @@ class FHIRStrategy(BaseOutPutStrategy):
             self._attach_help_hint_items(item, node)
 
         return True
+
+    def _apply_item_required(self, item: dict, node, hidden: bool, fhir_type: str) -> None:
+        """Set ``item.required`` from a static bool, or ``_required`` from an operation.
+
+        A disabled item stays required in the Questionnaire. The SDC renderer ignores
+        ``required`` while ``enableWhen`` or ``enableWhenExpression`` is false, and
+        while the item is hidden. Display, group, hidden and trigger items are never
+        required.
+        """
+        if hidden or fhir_type in ("group", "display"):
+            return
+        if not isinstance(node, TriccNodeInputModel) or isinstance(node, TriccNodeTrigger):
+            return
+        required = shield_required(getattr(node, "required", None))
+        if isinstance(required, TriccStatic) and isinstance(required.value, bool):
+            if required.value:
+                item["required"] = True
+            return
+        if not isinstance(required, TriccOperation):
+            return
+        self._enter_serialisation_context(node)
+        try:
+            fhirpath_expr = self.convert_expression_to_fhirpath(required)
+        except NotImplementedError as exc:
+            logger.warning(
+                "FHIRStrategy: required expression on %s is not exported (%s)",
+                get_export_name(node),
+                exc,
+            )
+            return
+        finally:
+            self._leave_serialisation_context()
+        item["_required"] = build_required_expression(fhirpath_expr)
 
     def _questionnaire_item_text(self, value) -> Optional[str]:
         """Render help/hint/label-like text for a Questionnaire item, or None if blank."""
@@ -1020,6 +1104,138 @@ class FHIRStrategy(BaseOutPutStrategy):
         if self._is_effective_relevance(node_rel):
             return node_rel
         return None
+
+    # FHIR item types that carry no ``answer`` element, so a ``…answer…`` path
+    # against them can only ever yield an empty collection.
+    _NON_ANSWERABLE_FHIR_TYPES = frozenset({FHIR_TYPE_GROUP, FHIR_TYPE_DISPLAY})
+
+    def _is_answerable_item(self, node) -> bool:
+        """Return True if ``node`` is exported as an answerable Questionnaire item.
+
+        Only answerable items have ``QuestionnaireResponse.item.answer``. Activity /
+        segment / page containers and ``activity_start`` are ``group`` items, notes are
+        ``display``, and routing nodes (``end``, ``goto``, ``link_in``/``link_out``,
+        ``exclusive``) produce no item at all - emitting ``.answer`` for any of them gives
+        an empty collection, which makes the whole expression evaluate false forever
+        (``fix/20260828-answer-reference-on-non-answerable-node.md``).
+
+        ``NODE_TYPE_TO_FHIR`` / ``SKIP_NODE_TYPES`` are the authority here rather than the
+        class hierarchy, because they are the same tables ``generate_base`` emits items
+        from - so this predicate cannot drift from what is actually in the Questionnaire.
+        Hidden calculates (``bridge``, ``wait``, ``rhombus``, ``factor``, ``populate``)
+        *are* answerable despite being routing-ish nodes.
+
+        Args:
+            node: A TRICC node or ``TriccGroup`` used as an expression operand.
+
+        Returns:
+            True if a ``…answer…`` FHIRPath may be emitted for ``node``.
+        """
+        tricc_type = getattr(node, "tricc_type", None)
+        if tricc_type is None:
+            return True
+        if should_skip(tricc_type):
+            return False
+        mapping = NODE_TYPE_TO_FHIR.get(tricc_type)
+        if mapping is None:
+            # Unmapped type: keep the historical answer idiom rather than guessing.
+            return True
+        return bool(mapping[0]) and mapping[0] not in self._NON_ANSWERABLE_FHIR_TYPES
+
+    @staticmethod
+    def _operand_label(node) -> str:
+        """Best-effort human name for a node, for log messages only."""
+        return str(getattr(node, "export_name", None) or getattr(node, "name", None) or node.__class__.__name__)
+
+    def _fhirpath_inlined_relevance(self, node) -> str:
+        """FHIRPath for a non-answerable operand: that node's own relevance, inlined.
+
+        Branching on a container means "this container is relevant", so the operand is
+        replaced by the very expression the container's own ``enableWhenExpression``
+        carries - ``_effective_relevance`` + ``convert_expression_to_fhirpath`` are the
+        same primitives ``generate_relevance`` uses, so the two texts match. The operand
+        stays inside the referencing item's own relevance operation, so an item with
+        conditions of its own ends up with ``own and (container relevance)``, while an item
+        whose only condition is the container gets a verbatim copy.
+
+        Args:
+            node: The non-answerable node being referenced.
+
+        Returns:
+            Parenthesised FHIRPath, or ``'true'`` when the node is unconditionally
+            relevant / its relevance cannot be expressed in FHIRPath. Never an empty
+            ``.answer`` path.
+        """
+        relevance = self._effective_relevance(node)
+        if relevance is None:
+            return "true"
+
+        node_key = id(node)
+        if node_key in self._inlining_relevance:
+            logger.warning(
+                "FHIRStrategy: relevance cycle through '%s'; inlining 'true' instead of recursing",
+                self._operand_label(node),
+            )
+            return "true"
+
+        self._inlining_relevance.add(node_key)
+        try:
+            expression = self.convert_expression_to_fhirpath(relevance)
+        except NotImplementedError as exc:
+            # Same fail-open policy as generate_relevance: an inexpressible relevance
+            # must not disable the referencing item for the life of the form.
+            logger.warning(
+                "FHIRStrategy: cannot inline relevance of '%s' (%s); using 'true'",
+                self._operand_label(node),
+                exc,
+            )
+            return "true"
+        finally:
+            self._inlining_relevance.discard(node_key)
+
+        if not expression or expression == "true":
+            return "true"
+        return f"({expression})"
+
+    def _reference_node_index(self) -> Dict[str, object]:
+        """Lazy ``export_name`` -> node index over every activity, group and node.
+
+        Used only to decide answerability of a ``TriccReference`` (a bare name), so a
+        cached snapshot is enough: the graph no longer changes once ``process_base`` ran.
+        """
+        if self._reference_node_index_cache is not None:
+            return self._reference_node_index_cache
+
+        index: Dict[str, object] = {}
+
+        def register(candidate) -> None:
+            export_name = getattr(candidate, "export_name", None)
+            if export_name and export_name not in index:
+                index[export_name] = candidate
+
+        activities = list((getattr(self.project, "pages", None) or {}).values())
+        seen_activities = set()
+        while activities:
+            activity = activities.pop()
+            if activity is None or id(activity) in seen_activities:
+                continue
+            seen_activities.add(id(activity))
+            register(activity)
+            for node in (getattr(activity, "nodes", None) or {}).values():
+                register(node)
+            for group in (getattr(activity, "groups", None) or {}).values():
+                register(group)
+            activities.extend((getattr(activity, "instances", None) or {}).values())
+
+        self._reference_node_index_cache = index
+        return index
+
+    def _resolve_reference_node(self, ref):
+        """Node behind a ``TriccReference`` name, or None when it cannot be resolved."""
+        name = getattr(ref, "value", None)
+        if not isinstance(name, str) or not name:
+            return None
+        return self._reference_node_index().get(name)
 
     def _answer_option_coding(self, opt) -> dict:
         """Return the valueCoding dict used on both answerOption and toggle slices."""
@@ -1444,19 +1660,7 @@ class FHIRStrategy(BaseOutPutStrategy):
                 total += removed
                 if removed == 0:
                     break
-            surviving = self._collect_all_link_ids(q.get("item"))
-            if segment in (self.extraction_rules or {}):
-                kept = []
-                for rule in self.extraction_rules[segment]:
-                    ids = [lid for lid in extraction_rule_link_ids(rule) if lid in surviving]
-                    if not ids:
-                        continue
-                    if hasattr(rule, "link_ids"):
-                        rule.link_ids = ids
-                    rule.link_id = ids[0]
-                    kept.append(rule)
-                self.extraction_rules[segment] = kept
-            self._drop_orphan_cql_defines(segment, q.get("item"))
+            self._resync_segment_assets(segment, q)
             if total:
                 logger.info(
                     "FHIRStrategy: pruned %s unused hidden calculate item(s) from Questionnaire '%s'",
@@ -1571,6 +1775,87 @@ class FHIRStrategy(BaseOutPutStrategy):
         if link_id in keep_ids:
             return False
         return True
+
+    def _resync_segment_assets(self, segment: str, questionnaire: dict) -> None:
+        """Re-point one segment's extraction rules / CQL defines at surviving items.
+
+        Shared by every pass that removes items from a Questionnaire, so pruning
+        passes cannot drift apart. A rule that names no surviving ``linkId`` is
+        dropped; one that names some keeps only those.
+
+        Args:
+            segment: Process / Questionnaire key.
+            questionnaire: The Questionnaire resource dict, already filtered.
+        """
+        surviving = self._collect_all_link_ids(questionnaire.get("item"))
+        if segment in (self.extraction_rules or {}):
+            kept = []
+            for rule in self.extraction_rules[segment]:
+                ids = [lid for lid in extraction_rule_link_ids(rule) if lid in surviving]
+                if not ids:
+                    continue
+                if hasattr(rule, "link_ids"):
+                    rule.link_ids = ids
+                rule.link_id = ids[0]
+                kept.append(rule)
+            self.extraction_rules[segment] = kept
+        self._drop_orphan_cql_defines(segment, questionnaire.get("item"))
+
+    @staticmethod
+    def _filter_empty_groups(items) -> Tuple[list, int]:
+        """Drop ``group`` items left with no children, depth-first.
+
+        Children are resolved before the parent is judged, so a group whose only
+        content was itself empty groups goes too, transitively.
+
+        Args:
+            items: Questionnaire.item list (may be None).
+
+        Returns:
+            (kept items, number of groups removed at this level and below)
+        """
+        kept = []
+        removed = 0
+        for item in items or []:
+            children = item.get("item")
+            if children:
+                new_children, child_removed = FHIRStrategy._filter_empty_groups(children)
+                removed += child_removed
+                if new_children:
+                    item["item"] = new_children
+                else:
+                    item.pop("item", None)
+            if item.get("type") == FHIR_TYPE_GROUP and not item.get("item"):
+                removed += 1
+                continue
+            kept.append(item)
+        return kept, removed
+
+    def _prune_empty_groups(self) -> None:
+        """Remove ``group`` items with no children from every Questionnaire.
+
+        A FHIR SDC group is a container: it has no ``answer`` and nothing of its own to
+        render, so a childless one is a dangling section header. Runs after
+        ``_prune_unused_hidden_calculates`` (which is what empties groups) and before the
+        StructureMap / CQL assembly, so those see the final tree. See
+        ``fix/20260828-empty-group-pruning.md``.
+        """
+        for segment, q in (self.questionnaires or {}).items():
+            new_items, removed = self._filter_empty_groups(q.get("item"))
+            if not removed:
+                continue
+            q["item"] = new_items
+            self._resync_segment_assets(segment, q)
+            logger.info(
+                "FHIRStrategy: pruned %s empty group item(s) from Questionnaire '%s'",
+                removed,
+                segment,
+            )
+            if not new_items:
+                logger.warning(
+                    "FHIRStrategy: Questionnaire '%s' has no items left after pruning empty groups",
+                    segment,
+                )
 
     def export(self, start_pages, version):
         form_id = self.resolve_form_id(start_pages)
@@ -1722,6 +2007,60 @@ class FHIRStrategy(BaseOutPutStrategy):
                 lib_id, child_cql, form_id, name=cql_name
             )
 
+    def _set_questionnaire_extension(self, q: dict, extension: dict) -> None:
+        """Set one Questionnaire-level extension, replacing any entry with the same URL."""
+        existing = q.setdefault("extension", [])
+        for ext in existing:
+            if (ext or {}).get("url") == extension["url"]:
+                ext.clear()
+                ext.update(extension)
+                return
+        existing.append(extension)
+
+    def _attach_target_structuremap_extensions(self) -> None:
+        """Link each Questionnaire to the StructureMap that extracts its answers.
+
+        ``ResourceMapper.extract`` resolves the map from this extension; a
+        Questionnaire without it cannot be StructureMap-extracted at all, however
+        complete the emitted ``.map`` is. Counterpart of
+        ``_attach_cqf_library_extensions`` — the Questionnaire is the only place a
+        client looks for either link.
+        """
+        for segment, q in (self.questionnaires or {}).items():
+            sm = (self.extraction_maps or {}).get(segment)
+            if not isinstance(sm, dict):
+                continue
+            url = sm.get("url")
+            if not url:
+                continue
+            self._set_questionnaire_extension(q, target_structuremap_extension(url))
+            logger.debug(f"FHIRStrategy: linked Questionnaire '{segment}' to StructureMap {url}")
+
+    def _attach_cqf_library_extensions(self) -> None:
+        """Link each Questionnaire to the Library holding its CQL ``define``s.
+
+        Questionnaire expressions reference bare define names
+        (``Calc_load_fever``), so a client has no way to find the Library they
+        live in unless the Questionnaire says so. FHIR-Core reads exactly this
+        extension before evaluating any CQL ``initialExpression``
+        (``Questionnaire.cqfLibraryUrls()``); without it the expressions are
+        silently ignored and the item opens blank.
+
+        The per-segment (child) Library is the target, not the Helper — the child
+        ``include``s the Helper, and only the child declares the defines.
+        """
+        for segment, q in (self.questionnaires or {}).items():
+            library = (self.libraries or {}).get(segment)
+            if not isinstance(library, dict):
+                continue
+            url = library.get("url")
+            if not url:
+                continue
+            self._set_questionnaire_extension(
+                q, {"url": CQF_LIBRARY_EXT, "valueCanonical": url}
+            )
+            logger.debug(f"FHIRStrategy: linked Questionnaire '{segment}' to Library {url}")
+
     def _make_library_resource(
         self, lib_id: str, cql_text: str, form_id: str, name: Optional[str] = None
     ) -> dict:
@@ -1740,10 +2079,17 @@ class FHIRStrategy(BaseOutPutStrategy):
         lib_name = name or to_fhir_id(lib_id)
         encoded = base64.b64encode(cql_text.encode("utf-8")).decode("ascii")
 
+        # A Library canonical must end in the CQL library *name*, not the UUID id: the
+        # CQL engine turns the url into a VersionedIdentifier and resolves the library
+        # source by its id part, so a UUID canonical fails with "Could not load source
+        # for library <uuid>" even though the resource itself was found. The REST `id`
+        # stays a UUID for idempotent PUT (fix/20260930-helper-cql-compile.md).
+        canonical_url = f"{self.base_url}/Library/{lib_name}"
+
         return {
             "resourceType": "Library",
             "id": resource_id,
-            "url": f"{self.base_url}/Library/{resource_id}",
+            "url": canonical_url,
             "version": "1.0.0",
             "name": lib_name,
             "title": f"{form_id} - {lib_name} CQL Library",
@@ -1844,6 +2190,9 @@ class FHIRStrategy(BaseOutPutStrategy):
         if isinstance(r, TriccOperation):
             return self.get_tricc_operation_expression_fhirpath(r)
         elif isinstance(r, TriccReference):
+            node = self._resolve_reference_node(r)
+            if node is not None and not self._is_answerable_item(node):
+                return self._fhirpath_inlined_relevance(node)
             return self._fhirpath_answer(get_export_name(r.value))
         elif isinstance(r, TriccStatic):
             if isinstance(r.value, bool):
@@ -1865,9 +2214,12 @@ class FHIRStrategy(BaseOutPutStrategy):
                 if literal is not None:
                     return literal
             return f"'{r.name}'"
-        elif issubclass(r.__class__, TriccNodeInputModel):
-            return self._fhirpath_answer(get_export_name(r))
-        elif issubclass(r.__class__, TriccNodeBaseModel):
+        elif isinstance(r, (TriccNodeBaseModel, TriccGroup)):
+            # Containers and non-materialised routing nodes have no `answer`: branching on
+            # them means "this container is relevant", so inline their relevance instead
+            # (fix/20260828-answer-reference-on-non-answerable-node.md).
+            if not self._is_answerable_item(r):
+                return self._fhirpath_inlined_relevance(r)
             return self._fhirpath_answer(get_export_name(r))
         else:
             raise NotImplementedError(f"This type of node {r.__class__} is not supported within an operation")
@@ -1957,11 +2309,15 @@ class FHIRStrategy(BaseOutPutStrategy):
         # TriccReference subclasses TriccStatic, so it must be checked first —
         # otherwise it would be caught (and excluded) by the TriccStatic branch below.
         if isinstance(original_ref, TriccReference):
-            return True
+            node = self._resolve_reference_node(original_ref)
+            return node is None or self._is_answerable_item(node)
         if isinstance(original_ref, (TriccStatic, str, TriccOperation, TriccNodeSelectOption)):
             return False
-        if isinstance(original_ref, (TriccNodeInputModel, TriccNodeBaseModel)):
-            return True
+        if isinstance(original_ref, (TriccNodeInputModel, TriccNodeBaseModel, TriccGroup)):
+            # A non-answerable operand was emitted as an inlined relevance (a boolean
+            # expression), not an answer collection: appending
+            # `.where($this.exists()).value` to it would corrupt it.
+            return self._is_answerable_item(original_ref)
         return False
 
     def _item_path_index_fingerprint(self):
@@ -3291,5 +3647,60 @@ class FHIRStrategy(BaseOutPutStrategy):
                 leftover,
             )
 
+        self._validate_answer_references()
+
         # Future: add deeper checks (linkId uniqueness, expression syntax, etc.)
         logger.info("FHIRStrategy: basic validation complete")
+
+    @staticmethod
+    def _index_item_types(items, bucket: Dict[str, str]) -> None:
+        """Collect ``linkId`` -> FHIR item type for every item, nested ones included."""
+        for item in items or []:
+            link_id = item.get("linkId")
+            if link_id:
+                bucket[link_id] = item.get("type")
+            FHIRStrategy._index_item_types(item.get("item"), bucket)
+
+    @staticmethod
+    def _questionnaire_expressions(items, found=None) -> List[Tuple[str, str]]:
+        """Every ``(carrier linkId, expression)`` pair on a Questionnaire item tree."""
+        found = [] if found is None else found
+        for item in items or []:
+            link_id = item.get("linkId") or "?"
+            for extension in item.get("extension") or []:
+                expression = (extension.get("valueExpression") or {}).get("expression")
+                if isinstance(expression, str):
+                    found.append((link_id, expression))
+            FHIRStrategy._questionnaire_expressions(item.get("item"), found)
+        return found
+
+    def _validate_answer_references(self) -> int:
+        """Warn when an expression reads ``.answer`` of an item that has none.
+
+        Standing guard for ``fix/20260828-answer-reference-on-non-answerable-node.md``:
+        ``group`` and ``display`` items carry no ``answer``, so such a path yields an
+        empty collection and the expression evaluates false for the life of the form -
+        silently, since the FHIRPath itself stays valid. A linkId absent from this
+        Questionnaire is *not* flagged: ``%resource.repeat(item)`` paths deliberately
+        reach items that live elsewhere.
+
+        Returns:
+            Number of offending ``.answer`` references found.
+        """
+        offenders = 0
+        for segment, questionnaire in (self.questionnaires or {}).items():
+            item_types: Dict[str, str] = {}
+            self._index_item_types(questionnaire.get("item"), item_types)
+            for carrier, expression in self._questionnaire_expressions(questionnaire.get("item")):
+                for target in dict.fromkeys(_ANSWER_LINK_ID_IN_EXPRESSION.findall(expression)):
+                    if item_types.get(target) in self._NON_ANSWERABLE_FHIR_TYPES:
+                        offenders += 1
+                        logger.error(
+                            "FHIRStrategy: '%s' (%s) reads .answer of '%s', which is a %s item "
+                            "and has none - the expression can never be true",
+                            carrier,
+                            segment,
+                            target,
+                            item_types.get(target),
+                        )
+        return offenders
