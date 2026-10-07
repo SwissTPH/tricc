@@ -71,6 +71,20 @@ interventions:
   needs `common/labs/*`). An `activity` line may also be a Google Drive file or
   folder URL (mixed with local globs). Downloads go under `{ -o }/.tricc-drive-cache`.
   Restricted Drive needs `TRICC_GOOGLE_AUTH` or `auth/google.json`.
+- **Mixing draw.io and YAML in one intervention:** `activity` may be a mapping from
+  input strategy to globs instead of a list. The list form keeps using
+  `input_strategy` (or `-I`).
+
+  ```yaml
+  activity:
+    DrawioStrategy: [common/*]
+    YamlStrategy: [child/*]
+  ```
+
+  Each group's globs only match that strategy's extensions (`.drawio`, or `.yaml` /
+  `.yml`). All groups load into one project and are linked once, so a goto in a YAML
+  activity can target a draw.io page id and the other way round. Activity / page ids
+  must be unique across both formats.
 - **Output path is still `-o`**, not a YAML key. With interventions:
 
   `{ -o }/{strategy}/{intervention_id}/`

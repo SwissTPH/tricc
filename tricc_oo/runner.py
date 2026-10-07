@@ -39,6 +39,9 @@ logger = logging.getLogger("default")
 
 LOCAL_EXTS = (".drawio", ".yaml", ".yml")
 Job = Tuple[Optional[TriccInterventionConfig], List[str]]
+# One input strategy and the files it reads.
+InputGroup = Tuple[str, List[str]]
+GroupedJob = Tuple[Optional[TriccInterventionConfig], List[InputGroup]]
 
 
 def list_local_folder_files(folder_path: str, valid_exts: Sequence[str] = (".drawio",)) -> List[str]:
@@ -97,6 +100,47 @@ def read_input_file_contents(files: Sequence[str]) -> List[str]:
     return file_content
 
 
+def build_grouped_jobs(
+    in_filepath: str,
+    project_config: TriccProjectConfig,
+    input_strategy: str,
+    precollected_files: Optional[List[str]] = None,
+    dest_dir: Optional[str] = None,
+) -> List[GroupedJob]:
+    """One job per intervention, its files grouped by input strategy.
+
+    A list-form ``activity`` (and a project without interventions) gives a single group
+    read with ``input_strategy``; a mapping gives one group per strategy, each glob
+    filtered by that strategy's file extensions.
+    """
+    if project_config.interventions:
+        project_root = find_project_root(in_filepath)
+        if not project_root:
+            raise ValueError(
+                "tricc.yaml interventions require a local -i directory (or file) as the project root"
+            )
+        jobs: List[GroupedJob] = []
+        for intervention in project_config.interventions:
+            groups: List[InputGroup] = []
+            for strategy_name, globs in intervention.activity_groups(input_strategy):
+                files = resolve_segment_globs(
+                    project_root,
+                    globs,
+                    valid_exts_for_strategy(strategy_name),
+                    dest_dir=dest_dir,
+                )
+                groups.append((strategy_name, files))
+            logger.info(
+                "Intervention %s: %s",
+                intervention.id,
+                ", ".join(f"{len(files)} {name} file(s)" for name, files in groups),
+            )
+            jobs.append((intervention, groups))
+        return jobs
+    files = precollected_files if precollected_files is not None else collect_local_files(in_filepath)
+    return [(None, [(input_strategy, files)])]
+
+
 def build_jobs(
     in_filepath: str,
     project_config: TriccProjectConfig,
@@ -104,26 +148,50 @@ def build_jobs(
     precollected_files: Optional[List[str]] = None,
     dest_dir: Optional[str] = None,
 ) -> List[Job]:
-    """One job per intervention (globbed files), or a single job of collected files."""
-    if project_config.interventions:
-        project_root = find_project_root(in_filepath)
-        if not project_root:
-            raise ValueError(
-                "tricc.yaml interventions require a local -i directory (or file) as the project root"
-            )
-        jobs: List[Job] = []
-        for intervention in project_config.interventions:
-            job_files = resolve_segment_globs(
-                project_root,
-                intervention.activity,
-                valid_exts_for_strategy(input_strategy),
-                dest_dir=dest_dir,
-            )
-            logger.info("Intervention %s: %s file(s)", intervention.id, len(job_files))
-            jobs.append((intervention, job_files))
-        return jobs
-    files = precollected_files if precollected_files is not None else collect_local_files(in_filepath)
-    return [(None, files)]
+    """One job per intervention (globbed files), or a single job of collected files.
+
+    Flat view of ``build_grouped_jobs`` (all groups' files, in order).
+    """
+    return [
+        (intervention, [f for _, files in groups for f in files])
+        for intervention, groups in build_grouped_jobs(
+            in_filepath, project_config, input_strategy, precollected_files, dest_dir
+        )
+    ]
+
+
+def load_input_project(
+    groups: Sequence[Tuple[str, Sequence[str], Sequence[str]]],
+    media_path: str,
+    project_config: TriccProjectConfig,
+    intervention: Optional[TriccInterventionConfig],
+):
+    """Build the TriccProject from ``(strategy name, files, contents)`` groups.
+
+    A single group goes through that strategy's own ``execute`` (unchanged behaviour).
+    Several groups are loaded into one project, then linked once, so a goto in one
+    format can target an activity defined in the other.
+    """
+    if len(groups) == 1:
+        name, files, contents = groups[0]
+        InputStrategyCls = get_input_strategy(name)
+        logger.info("build the graph from strategy %s", InputStrategyCls.__name__)
+        return InputStrategyCls(list(files)).execute(
+            list(contents),
+            media_path,
+            project_config=project_config,
+            intervention=intervention,
+        )
+    from tricc_oo.strategies.input.drawio import DrawioStrategy
+
+    strategies = [(get_input_strategy(name)(list(files)), contents) for name, files, contents in groups]
+    project = strategies[0][0].new_project(project_config, intervention)
+    for strategy, contents in strategies:
+        logger.info("load activities with strategy %s", type(strategy).__name__)
+        strategy.load(list(contents), media_path, project)
+    linker = DrawioStrategy([f for _, files, _ in groups for f in files])
+    linker.write_terminology(project, media_path)
+    return linker.link_project(project)
 
 
 def run_one_export(
@@ -136,17 +204,27 @@ def run_one_export(
     intervention: Optional[TriccInterventionConfig],
     test_strategy_name: Optional[str] = None,
 ) -> None:
+    return run_grouped_export(
+        [(input_strategy_name, files, file_content)],
+        out_dir,
+        output_strategy_name,
+        project_config,
+        intervention,
+        test_strategy_name=test_strategy_name,
+    )
+
+
+def run_grouped_export(
+    groups: Sequence[Tuple[str, Sequence[str], Sequence[str]]],
+    out_dir: str,
+    output_strategy_name: str,
+    project_config: TriccProjectConfig,
+    intervention: Optional[TriccInterventionConfig],
+    test_strategy_name: Optional[str] = None,
+):
     os.makedirs(out_dir, exist_ok=True)
     media_path = os.path.join(out_dir, "media-tmp")
-    InputStrategyCls = get_input_strategy(input_strategy_name)
-    input_strategy = InputStrategyCls(list(files))
-    logger.info("build the graph from strategy %s", InputStrategyCls.__name__)
-    project = input_strategy.execute(
-        list(file_content),
-        media_path,
-        project_config=project_config,
-        intervention=intervention,
-    )
+    project = load_input_project(groups, media_path, project_config, intervention)
     OutputStrategyCls = get_output_strategy(output_strategy_name)
     output_strategy = OutputStrategyCls(project, out_dir)
     logger.info("Using strategy %s", OutputStrategyCls.__name__)
@@ -180,7 +258,7 @@ def run_project_build(
     input_strategy = resolve_input_strategy(cli_input_strategy, project_config)
     output_strategies = resolve_output_strategies(cli_output_strategy, project_config)
     try:
-        jobs = build_jobs(
+        jobs = build_grouped_jobs(
             in_filepath,
             project_config,
             input_strategy,
@@ -196,9 +274,9 @@ def run_project_build(
     any_loaded = False
     for strategy_name in output_strategies:
         built = {}
-        for intervention, job_files in jobs:
-            contents = read_input_file_contents(job_files)
-            if not contents:
+        for intervention, job_groups in jobs:
+            groups = [(name, files, read_input_file_contents(files)) for name, files in job_groups]
+            if not any(contents for _, _, contents in groups):
                 logger.critical("No valid input files found or loaded")
                 return 1
             any_loaded = True
@@ -210,11 +288,9 @@ def run_project_build(
                 has_interventions=has_interventions,
                 n_strategies=n_strategies,
             )
-            output_strategy = run_one_export(
-                job_files,
-                contents,
+            output_strategy = run_grouped_export(
+                groups,
                 out_dir,
-                input_strategy,
                 strategy_name,
                 project_config,
                 intervention,

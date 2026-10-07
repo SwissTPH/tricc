@@ -70,26 +70,15 @@ class DrawioStrategy(BaseInputStrategy):
         # refresh the edges (were remove by previous code)
 
     def execute(self, file_content, media_path, project_config=None, intervention=None):
-        project = TriccProject()
-        if project_config is not None:
-            project.title = project_config.title
-            project.image_max_width = project_config.image_max_width()
-            project.image_max_height = project_config.image_max_height()
-        project.intervention = intervention
-        diagrams = []
+        project = self.new_project(project_config, intervention)
+        self.load(file_content, media_path, project)
+        return self.finalize(project, media_path)
+
+    def load(self, file_content, media_path, project):
         # read all project.pages
         logger.info("# Create the activities from diagram project.pages")
-        # if os.path.isdir(in_filepath):
-        #     files = [f for f in os.listdir(in_filepath) if f.endswith('.drawio')]
-        # elif os.path.isfile(in_filepath):
-        #     files = [in_filepath]
-        # else:
-        #     logger.critical(f"no input file found at {in_filepath}")
-        #     exit(1)
-        # for file in files:
         for f in file_content:
             file_diagrams = read_drawio(f)
-            diagrams += file_diagrams
             for diagram in file_diagrams:
                 old_page_len = len(project.pages)
                 id_tab = diagram.attrib.get("id")
@@ -102,18 +91,10 @@ class DrawioStrategy(BaseInputStrategy):
                 create_activity(diagram, media_path, project)
                 if len(project.pages) == old_page_len:
                     logger.error(f"diagram {id_tab}::{name_tab} was not loaded properly")
-        logger.info("# Create the graph from the start node")
-        for k, v in project.code_systems.items():
-            with open(
-                os.path.join(os.path.dirname(media_path), f"{k}_codesystem.json"),
-                "w",
-                encoding="utf-8",
-            ) as file:
-                file.write(v.json(indent=4))
 
-        for k, v in project.value_sets.items():
-            with open(os.path.join(os.path.dirname(media_path), f"{k}_valueset.json"), "w") as file:
-                file.write(v.json(indent=4))
+    def finalize(self, project, media_path):
+        logger.info("# Create the graph from the start node")
+        self.write_terminology(project, media_path)
         app = self.execute_linked_process(project)
         if app:
             project.start_pages["main"] = app
@@ -130,13 +111,6 @@ class DrawioStrategy(BaseInputStrategy):
                     self.process_pages(project.start_pages[process], project.pages)
             return project
         return None
-        # Q. how to handle graph output
-        # hardlink with out edge: create a fake node
-        # or should we always create that fake node
-        # *** or should we enfore "next activity node" ****
-        #
-
-        # do the calculation, expression ...
 
     def linking_nodes(self, node, page, pages, processed_nodes=None, path=None):
         # New set per project. A mutable default survives the previous intervention,

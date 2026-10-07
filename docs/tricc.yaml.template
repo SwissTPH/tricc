@@ -12,6 +12,8 @@
 title: My project
 
 # How drawings are read. Default: DrawioStrategy. CLI -I overrides this.
+# Used for every intervention whose `activity` is a plain list; an `activity`
+# mapping names the strategy per group instead (see young_infants below).
 input_strategy: DrawioStrategy
 
 # One or more exporters, run in this order. CLI -O replaces this list.
@@ -77,9 +79,15 @@ interventions:
   - id: young_infants
     title: Young infants
     description: IMCI for young infants under 2 months
+    # activity may also be a mapping {InputStrategy: [globs]}: one intervention
+    # then mixes draw.io pages and YAML activities. Each glob only picks the files
+    # of its strategy (.drawio / .yaml, .yml); a goto may target an activity id
+    # from either format, and ids must be unique across both.
     activity:
-      - common/*
-      - young_infant/*
+      DrawioStrategy:
+        - common/*
+      YamlStrategy:
+        - young_infant/*
     start:
       on: demand
       condition: "AgeInMonths() < 2"

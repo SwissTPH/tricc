@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -108,7 +108,10 @@ class TriccInterventionConfig(BaseModel):
     id: str
     title: str
     description: Optional[str] = None
-    activity: List[str] = Field(min_length=1)
+    # Either a list of globs, read with the project's ``input_strategy``, or a mapping
+    # ``{InputStrategyName: [globs]}`` so one intervention can mix drawio and yaml
+    # activities. See ``activity_groups``.
+    activity: Union[List[str], Dict[str, List[str]]] = Field(min_length=1)
     start: List[TriccInterventionStart] = Field(
         default_factory=lambda: [TriccInterventionStart(on="demand")]
     )
@@ -137,12 +140,27 @@ class TriccInterventionConfig(BaseModel):
 
     @field_validator("activity")
     @classmethod
-    def _non_empty_globs(cls, value: List[str]) -> List[str]:
-        cleaned = [(g or "").strip() for g in value]
-        cleaned = [g for g in cleaned if g]
-        if not cleaned:
-            raise ValueError("activity must list at least one path glob")
-        return cleaned
+    def _non_empty_globs(
+        cls, value: Union[List[str], Dict[str, List[str]]]
+    ) -> Union[List[str], Dict[str, List[str]]]:
+        def clean(globs: List[str], where: str) -> List[str]:
+            cleaned = [(g or "").strip() for g in globs or []]
+            cleaned = [g for g in cleaned if g]
+            if not cleaned:
+                raise ValueError(f"{where} must list at least one path glob")
+            return cleaned
+
+        if isinstance(value, dict):
+            groups: Dict[str, List[str]] = {}
+            for strategy, globs in value.items():
+                name = (strategy or "").strip()
+                if not name:
+                    raise ValueError("activity strategy names must be non-empty")
+                if name in groups:
+                    raise ValueError(f"activity lists strategy {name!r} twice")
+                groups[name] = clean(globs, f"activity.{name}")
+            return groups
+        return clean(value, "activity")
 
     @field_validator("description")
     @classmethod
@@ -151,6 +169,16 @@ class TriccInterventionConfig(BaseModel):
             return None
         stripped = value.strip()
         return stripped or None
+
+    def activity_groups(self, default_strategy: str) -> List[Tuple[str, List[str]]]:
+        """``[(input strategy name, globs)]``, in authoring order.
+
+        The list form is a single group read with ``default_strategy`` (the project's
+        ``input_strategy`` or the ``-I`` override), exactly as before.
+        """
+        if isinstance(self.activity, dict):
+            return [(name, list(globs)) for name, globs in self.activity.items()]
+        return [(default_strategy, list(self.activity))]
 
     def demand_starts(self) -> List[TriccInterventionStart]:
         return [item for item in self.start if item.on == "demand"]

@@ -1,6 +1,8 @@
 import abc
+import os
 
 from tricc_oo.models.tricc import (
+    TriccProject,
     TriccNodeMainStart,
     TriccSegment,
     node_container_for_root,
@@ -121,3 +123,50 @@ class BaseInputStrategy:
     @abc.abstractmethod
     def execute(in_filepath, media_path):
         pass
+
+    # ------------------------------------------------------------------
+    # Building blocks, so several input strategies can feed one project
+    # (tricc.yaml ``activity: {DrawioStrategy: [...], YamlStrategy: [...]}``).
+    # ``execute`` == new_project + load + finalize for every strategy.
+    # ------------------------------------------------------------------
+    @staticmethod
+    def new_project(project_config=None, intervention=None) -> TriccProject:
+        project = TriccProject()
+        if project_config is not None:
+            project.title = project_config.title
+            project.image_max_width = project_config.image_max_width()
+            project.image_max_height = project_config.image_max_height()
+        project.intervention = intervention
+        return project
+
+    def load(self, file_content, media_path, project) -> None:
+        """Read this strategy's files into ``project.pages``; no linking."""
+        raise NotImplementedError
+
+    @staticmethod
+    def write_terminology(project, media_path) -> None:
+        """Write the project CodeSystems / ValueSets next to the media folder."""
+        out_dir = os.path.dirname(media_path)
+        for k, v in project.code_systems.items():
+            with open(os.path.join(out_dir, f"{k}_codesystem.json"), "w", encoding="utf-8") as file:
+                file.write(v.json(indent=4))
+        for k, v in project.value_sets.items():
+            with open(os.path.join(out_dir, f"{k}_valueset.json"), "w") as file:
+                file.write(v.json(indent=4))
+
+    def link_project(self, project):
+        """Build the main flow from the loaded pages, then link and process them."""
+        app = self.execute_linked_process(project)
+        if app:
+            project.start_pages["main"] = app
+            project.pages[app.id] = app
+            self.process_pages(app, project)
+            return project
+        # Projects that only have non-main processes
+        if project.start_pages:
+            for process, pages in project.start_pages.items():
+                targets = pages if isinstance(pages, list) else [pages]
+                for page in targets:
+                    self.process_pages(page, project)
+            return project
+        return project if project.pages else None

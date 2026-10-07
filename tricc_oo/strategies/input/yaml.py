@@ -296,13 +296,11 @@ class YamlStrategy(BaseInputStrategy):
         project_config=None,
         intervention=None,
     ) -> Optional[TriccProject]:
-        project = TriccProject()
-        if project_config is not None:
-            project.title = project_config.title
-            project.image_max_width = project_config.image_max_width()
-            project.image_max_height = project_config.image_max_height()
-        project.intervention = intervention
+        project = self.new_project(project_config, intervention)
+        self.load(file_content, media_path, project)
+        return self.finalize(project, media_path)
 
+    def load(self, file_content: List[str], media_path: str, project: TriccProject) -> None:
         for raw_content in file_content:
             if not raw_content or not raw_content.strip():
                 continue
@@ -329,30 +327,22 @@ class YamlStrategy(BaseInputStrategy):
                     except ValidationError as exc:
                         logger.error(f"Invalid YAML activity definition: {exc}")
                         continue
+                    if yaml_activity.id in project.pages:
+                        # Same rule as DrawioStrategy; matters when a project mixes
+                        # drawio pages and yaml activities sharing one id space.
+                        raise ValueError(
+                            f"activity id {yaml_activity.id!r} is already loaded (duplicate activity / diagram id)"
+                        )
 
                     activity = self._build_activity(yaml_activity, project)
                     if activity is not None:
                         project.pages[activity.id] = activity
                         self._assign_start_page(activity, project)
 
+    def finalize(self, project: TriccProject, media_path: str) -> Optional[TriccProject]:
         # Re-use the sophisticated linking / inheritance / calculate logic
         # already present in the base class and DrawioStrategy.
-        app = self.execute_linked_process(project)
-        if app:
-            project.start_pages["main"] = app
-            project.pages[app.id] = app
-            self.process_pages(app, project)
-            return project
-
-        # Fallback for projects that only have non-main processes
-        if project.start_pages:
-            for process, pages in project.start_pages.items():
-                targets = pages if isinstance(pages, list) else [pages]
-                for page in targets:
-                    self.process_pages(page, project)
-            return project
-
-        return project if project.pages else None
+        return self.link_project(project)
 
     # ------------------------------------------------------------------
     # Activity construction
