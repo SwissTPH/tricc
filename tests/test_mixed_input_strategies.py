@@ -177,3 +177,19 @@ def test_single_group_reads_like_before(tmp_path):
         None,
     )
     assert DEMO_SUB_PAGE_ID in project.pages
+
+
+def test_library_calculate_appears_once_in_a_mixed_build(tmp_path):
+    _mixed_project(tmp_path)
+    (tmp_path / "cql").mkdir()
+    (tmp_path / "cql" / "common.cql").write_text("define shared_flag: 1 = 1\n", encoding="utf-8")
+    config = (tmp_path / "tricc.yaml").read_text(encoding="utf-8")
+    (tmp_path / "tricc.yaml").write_text(config.replace("interventions:", "libraries: [cql/*]\ninterventions:"), encoding="utf-8")
+    logging.disable(logging.WARNING)
+    try:
+        assert run_project_build(str(tmp_path), str(tmp_path / "out")) == 0
+    finally:
+        logging.disable(logging.NOTSET)
+    forms = [os.path.join(d, f) for d, _, fs in os.walk(tmp_path / "out") for f in fs if f.endswith(".xlsx")]
+    survey = pd.read_excel(forms[0], sheet_name="survey", dtype=str).fillna("")
+    assert list(survey["name"]).count("shared_flag") == 1

@@ -524,6 +524,9 @@ class TriccProject(BaseModel):
     image_max_height: Optional[int] = None
     # Current intervention when building from tricc.yaml (see project_config).
     intervention: Optional[Any] = None
+    # Calculates from the tricc.yaml ``libraries`` (CQL defines); attached to the main
+    # start page as dangling calculates, i.e. stashed next to the root.
+    library_calculates: List[Any] = []
 
     def register_segment(self, segment: TriccSegment) -> None:
         root = getattr(segment, "root", None)

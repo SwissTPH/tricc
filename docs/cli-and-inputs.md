@@ -63,6 +63,17 @@ interventions:
 - **CLI `-I` / `-O` win** when passed; `-O` replaces the YAML list (does not append).
 - **`parameters.tricc_version`** must equal the installed `tricc-oo` version, or the
   build fails. Omit the key to skip the check.
+- **`terminology`** lists project CodeSystem files (FHIR JSON, globs relative to
+  `tricc.yaml`). They are loaded before any activity into the project's CodeSystems
+  (keyed by CodeSystem `name`, e.g. `demo` for `demo.fever` codes, `tricc` for
+  unprefixed ones) and exported next to the forms; concepts found in activities are
+  merged into them.
+- **`libraries`** lists CQL files. Each `define name: <expression>` becomes a
+  calculate that any activity can reference by name, processed like a free-floating
+  calculate on the main page (computed once its references are available). Only
+  expression defines are supported: declarations (`library`, `using`, `include`,
+  `context`, …) are ignored, functions are rejected, names must be plain identifiers,
+  and a name may be defined once across all libraries.
 - **Image caps** apply when extracting pictures from draw.io (`0` / omitted = no cap).
   A single image object may set `max_width` / `max_height` (Edit Data) to override
   one side; `0` means unlimited for that side.

@@ -31,6 +31,20 @@ parameters:
   image_max_width: 0
   image_max_height: 0
 
+# Project CodeSystems (FHIR JSON): the central definition of concepts, loaded before
+# any activity and exported with the forms. Concepts an activity adds are merged in.
+# Keyed by the CodeSystem `name` (the code prefix, e.g. `demo` for `demo.fever`;
+# `tricc` for unprefixed codes). Globs relative to this file, like `activity`.
+# terminology:
+#   - terminology/*.json
+
+# CQL libraries: every `define name: <expression>` becomes a calculate that any
+# activity (draw.io or YAML) can reference by name, as if it were drawn free-floating
+# on the main page. library / using / include / context lines are ignored; functions
+# are not supported; names must be plain identifiers.
+# libraries:
+#   - cql/*.cql
+
 # Each entry is one algorithm. Omit this list to keep today's behaviour
 # (every top-level drawing in -i is one implicit on-demand intervention).
 #

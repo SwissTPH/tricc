@@ -29,6 +29,7 @@ from tricc_oo.converters.project_config import (
     valid_exts_for_strategy,
 )
 from tricc_oo.models.project_config import TriccInterventionConfig, TriccProjectConfig
+from tricc_oo.strategies.input.base_input_strategy import BaseInputStrategy
 from tricc_oo.strategies.registry import (
     get_input_strategy,
     get_output_strategy,
@@ -160,35 +161,54 @@ def build_jobs(
     ]
 
 
+Sources = Sequence[Tuple[str, str]]  # (path, text)
+
+
+def resolve_project_sources(
+    in_filepath: str, project_config: TriccProjectConfig
+) -> Tuple[List[Tuple[str, str]], List[Tuple[str, str]]]:
+    """Read the tricc.yaml ``terminology`` (.json) and ``libraries`` (.cql) files."""
+    if not project_config.terminology and not project_config.libraries:
+        return [], []
+    project_root = find_project_root(in_filepath)
+    if not project_root:
+        raise ValueError("tricc.yaml terminology / libraries require a local -i directory as the project root")
+
+    def read(globs, exts):
+        if not globs:
+            return []
+        files = resolve_segment_globs(project_root, globs, exts)
+        return list(zip(files, read_input_file_contents(files)))
+
+    return read(project_config.terminology, (".json",)), read(project_config.libraries, (".cql",))
+
+
 def load_input_project(
     groups: Sequence[Tuple[str, Sequence[str], Sequence[str]]],
     media_path: str,
     project_config: TriccProjectConfig,
     intervention: Optional[TriccInterventionConfig],
+    terminology: Sources = (),
+    libraries: Sources = (),
 ):
     """Build the TriccProject from ``(strategy name, files, contents)`` groups.
 
-    A single group goes through that strategy's own ``execute`` (unchanged behaviour).
-    Several groups are loaded into one project, then linked once, so a goto in one
-    format can target an activity defined in the other.
+    Terminology and libraries are loaded first, so every activity sees the project
+    CodeSystems and library calculates. A single group is finalised by its own strategy
+    (same as its ``execute``); several groups are loaded into one project, then linked
+    once, so a goto in one format can target an activity defined in the other.
     """
-    if len(groups) == 1:
-        name, files, contents = groups[0]
-        InputStrategyCls = get_input_strategy(name)
-        logger.info("build the graph from strategy %s", InputStrategyCls.__name__)
-        return InputStrategyCls(list(files)).execute(
-            list(contents),
-            media_path,
-            project_config=project_config,
-            intervention=intervention,
-        )
-    from tricc_oo.strategies.input.drawio import DrawioStrategy
-
     strategies = [(get_input_strategy(name)(list(files)), contents) for name, files, contents in groups]
     project = strategies[0][0].new_project(project_config, intervention)
+    BaseInputStrategy.load_terminology(project, terminology)
+    BaseInputStrategy.load_libraries(project, libraries)
     for strategy, contents in strategies:
-        logger.info("load activities with strategy %s", type(strategy).__name__)
+        logger.info("build the graph from strategy %s", type(strategy).__name__)
         strategy.load(list(contents), media_path, project)
+    if len(strategies) == 1:
+        return strategies[0][0].finalize(project, media_path)
+    from tricc_oo.strategies.input.drawio import DrawioStrategy
+
     linker = DrawioStrategy([f for _, files, _ in groups for f in files])
     linker.write_terminology(project, media_path)
     return linker.link_project(project)
@@ -203,6 +223,8 @@ def run_one_export(
     project_config: TriccProjectConfig,
     intervention: Optional[TriccInterventionConfig],
     test_strategy_name: Optional[str] = None,
+    terminology: Sources = (),
+    libraries: Sources = (),
 ) -> None:
     return run_grouped_export(
         [(input_strategy_name, files, file_content)],
@@ -211,6 +233,8 @@ def run_one_export(
         project_config,
         intervention,
         test_strategy_name=test_strategy_name,
+        terminology=terminology,
+        libraries=libraries,
     )
 
 
@@ -221,10 +245,14 @@ def run_grouped_export(
     project_config: TriccProjectConfig,
     intervention: Optional[TriccInterventionConfig],
     test_strategy_name: Optional[str] = None,
+    terminology: Sources = (),
+    libraries: Sources = (),
 ):
     os.makedirs(out_dir, exist_ok=True)
     media_path = os.path.join(out_dir, "media-tmp")
-    project = load_input_project(groups, media_path, project_config, intervention)
+    project = load_input_project(
+        groups, media_path, project_config, intervention, terminology=terminology, libraries=libraries
+    )
     OutputStrategyCls = get_output_strategy(output_strategy_name)
     output_strategy = OutputStrategyCls(project, out_dir)
     logger.info("Using strategy %s", OutputStrategyCls.__name__)
@@ -265,6 +293,7 @@ def run_project_build(
             precollected_files=precollected_files,
             dest_dir=os.path.join(out_path, ".tricc-drive-cache"),
         )
+        terminology, libraries = resolve_project_sources(in_filepath, project_config)
     except ValueError as exc:
         logger.critical("%s", exc)
         return 1
@@ -295,6 +324,8 @@ def run_project_build(
                 project_config,
                 intervention,
                 test_strategy_name=test_strategy_name,
+                terminology=terminology,
+                libraries=libraries,
             )
             if intervention is not None:
                 built[intervention.id] = output_strategy

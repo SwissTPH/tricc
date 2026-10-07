@@ -99,10 +99,13 @@ class DrawioStrategy(BaseInputStrategy):
         if app:
             project.start_pages["main"] = app
             project.pages[app.id] = app
+            self.attach_library_calculates(project, app)
             self.process_pages(app, project)
 
             return project
         elif project.start_pages:
+            first = next(iter(project.start_pages.values()))
+            self.attach_library_calculates(project, first[0] if isinstance(first, list) and first else first)
             for process in project.start_pages:
                 if isinstance(project.start_pages[process], list):
                     for page_to_process in project.start_pages[process]:

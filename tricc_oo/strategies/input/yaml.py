@@ -340,6 +340,9 @@ class YamlStrategy(BaseInputStrategy):
                         self._assign_start_page(activity, project)
 
     def finalize(self, project: TriccProject, media_path: str) -> Optional[TriccProject]:
+        # Project CodeSystems (tricc.yaml ``terminology``) are exported like drawio's;
+        # without terminology the yaml input builds none, so nothing is written.
+        self.write_terminology(project, media_path)
         # Re-use the sophisticated linking / inheritance / calculate logic
         # already present in the base class and DrawioStrategy.
         return self.link_project(project)

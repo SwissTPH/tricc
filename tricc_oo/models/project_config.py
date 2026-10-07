@@ -202,7 +202,17 @@ class TriccProjectConfig(BaseModel):
     input_strategy: str = "DrawioStrategy"
     output_strategies: List[str] = Field(default_factory=list)
     parameters: Dict[str, Any] = Field(default_factory=dict)
+    # Project CodeSystems (FHIR JSON): the central concept definitions, loaded into
+    # TriccProject.code_systems before any activity. Globs relative to tricc.yaml.
+    terminology: List[str] = Field(default_factory=list)
+    # CQL libraries; every ``define`` becomes a calculate available to all activities.
+    libraries: List[str] = Field(default_factory=list)
     interventions: List[TriccInterventionConfig] = Field(default_factory=list)
+
+    @field_validator("terminology", "libraries")
+    @classmethod
+    def _clean_globs(cls, value: List[str]) -> List[str]:
+        return [(g or "").strip() for g in value if (g or "").strip()]
 
     @field_validator("title", "input_strategy")
     @classmethod
