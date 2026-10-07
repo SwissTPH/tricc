@@ -67,7 +67,19 @@ interventions:
   `tricc.yaml`). They are loaded before any activity into the project's CodeSystems
   (keyed by CodeSystem `name`, e.g. `demo` for `demo.fever` codes, `tricc` for
   unprefixed ones) and exported next to the forms; concepts found in activities are
-  merged into them.
+  merged into them. A terminology concept keeps its own display: an activity label
+  that differs is only logged at debug level (two draw.io labels that differ for the
+  same code still warn).
+- **Concept texts:** a CodeSystem concept carries its label in `display` and its
+  translations / hint / help in `designation[]` (`{language, use, value}`). `use` is
+  `{system: http://terminology.hl7.org/CodeSystem/designation-usage, code: display}`
+  for labels and `{system: https://tricc.org/CodeSystem/designation-use, code: hint}`
+  (or `code: help`) for hint / help. When a draw.io node has hint / help shapes, they
+  are written as designations of its concept in the default language, unless the
+  concept already has one for that language.
+- **`parameters.languages`**: `{default: en, available: [en, fr]}` (a list or a single
+  code also work; the first entry is then the default). Without it the default
+  language is `en`.
 - **`libraries`** lists CQL files. Each `define name: <expression>` becomes a
   calculate that any activity can reference by name, processed like a free-floating
   calculate on the main page (computed once its references are available). Only

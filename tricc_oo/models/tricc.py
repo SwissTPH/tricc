@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Union, Set
+from typing import Any, Dict, List, Optional, Union, Set, Tuple
 from fhir.resources.codesystem import CodeSystem
 from fhir.resources.valueset import ValueSet
 from pydantic import BaseModel
@@ -503,7 +503,9 @@ class TriccNodeMoreInfo(TriccNodeInputModel, TriccParentMixIn):
 class TriccProject(BaseModel):
     title: str = "My project"
     description: str = ""
+    # default language (tricc.yaml parameters.languages.default) and every configured one
     lang_code: str = "en"
+    languages: List[str] = []
     # abstract graph / Scheduling
     # abs_graph: MultiDiGraph = MultiDiGraph()
     # abs_graph_process_start: Dict = {}
@@ -551,6 +553,9 @@ class TriccProject(BaseModel):
 
     # dict of code_system_id: codesystem
     code_systems: Dict[str, CodeSystem] = {}
+    # (code_systems key, code) of the concepts loaded from the tricc.yaml terminology;
+    # their text wins over the one authored in activities
+    terminology_concepts: Set[Tuple[str, str]] = set()
     # dict of valueset_id: valueset
     value_sets: Dict[str, ValueSet] = {}
 

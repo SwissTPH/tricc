@@ -67,7 +67,7 @@ from tricc_oo.visitors.tricc import (
     set_prev_next_node,  inject_node_before,
     merge_node, remove_prev_next, get_activity_wait, get_count_terms_details,
 )
-from tricc_oo.converters.datadictionnary import add_concept
+from tricc_oo.converters.datadictionnary import add_concept, add_concept_texts
 
 TRICC_YES_LABEL = ["yes", "oui"]
 TRICC_NO_LABEL = ["no", "non"]
@@ -196,6 +196,9 @@ def apply_goto_repeat_to_activity(goto, activity):
 
 def get_activity_details(diagram, activity, project, media_path):
     nodes = get_nodes(diagram, activity)
+    terminology = project.terminology_concepts
+    # hint / help shapes are attached by process_edges, so their designations come after
+    authored_concepts = []
     for n in nodes.values():
         if (
             issubclass(n.__class__, (TriccNodeDisplayModel, TriccNodeDisplayCalculateBase, TriccNodePopulate))
@@ -210,9 +213,10 @@ def get_activity_details(diagram, activity, project, media_path):
                     n.select.name,
                     n.label,
                     {"dataType": "Boolean", "conceptType": get_concept_type(n)},
+                    terminology,
                 )
             elif not isinstance(n, TriccNodeSelectNotAvailable):
-                add_concept(
+                concept = add_concept(
                     project.code_systems,
                     system,
                     n.name,
@@ -221,7 +225,9 @@ def get_activity_details(diagram, activity, project, media_path):
                         "dataType": get_data_type(n.tricc_type),
                         "conceptType": get_concept_type(n),
                     },
+                    terminology,
                 )
+                authored_concepts.append((concept, n))
             elif not issubclass(n.__class__, TriccNodeCalculate):
                 system = n.name.split(".")[0] if "." in n.name else "calculate"
                 add_concept(
@@ -233,6 +239,7 @@ def get_activity_details(diagram, activity, project, media_path):
                         "dataType": get_data_type(n.tricc_type),
                         "conceptType": get_concept_type(n),
                     },
+                    terminology,
                 )
             if getattr(n, "save", None):
                 system = n.save.split(".")[0] if "." in n.save else "tricc"
@@ -245,6 +252,7 @@ def get_activity_details(diagram, activity, project, media_path):
                         "dataType": get_data_type(n.tricc_type),
                         "conceptType": get_concept_type(n),
                     },
+                    terminology,
                 )
     groups = get_groups(diagram, nodes, activity)
     if groups and len(groups) > 0:
@@ -254,6 +262,8 @@ def get_activity_details(diagram, activity, project, media_path):
     images = process_edges(diagram, media_path, activity, nodes, project)
     if images:
         project.images += images
+    for concept, n in authored_concepts:
+        add_concept_texts(concept, project.lang_code, getattr(n, "hint", None), getattr(n, "help", None))
     # link back the activity
     
     manage_dangling_calculate(activity)

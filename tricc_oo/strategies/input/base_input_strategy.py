@@ -136,6 +136,10 @@ class BaseInputStrategy:
             project.title = project_config.title
             project.image_max_width = project_config.image_max_width()
             project.image_max_height = project_config.image_max_height()
+            default_lang, languages = project_config.languages()
+            if default_lang:
+                project.lang_code = default_lang
+                project.languages = languages
         project.intervention = intervention
         return project
 
@@ -169,6 +173,7 @@ class BaseInputStrategy:
             if code_system.concept is None:
                 code_system.concept = []
             project.code_systems[key] = code_system
+            project.terminology_concepts.update((key, c.code) for c in code_system.concept)
 
     @staticmethod
     def load_libraries(project, sources) -> None:

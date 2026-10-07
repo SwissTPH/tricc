@@ -30,9 +30,17 @@ parameters:
   # A single image shape may set max_width / max_height (Edit Data) to override one side.
   image_max_width: 0
   image_max_height: 0
+  # Languages of the CodeSystem designations (translations, hint, help).
+  # Omit to keep the single default language `en`.
+  # languages:
+  #   default: en
+  #   available: [en, fr]
 
 # Project CodeSystems (FHIR JSON): the central definition of concepts, loaded before
-# any activity and exported with the forms. Concepts an activity adds are merged in.
+# any activity and exported with the forms. Concepts an activity adds are merged in;
+# a concept defined here keeps its own display. Hint / help (and translations) are
+# concept designations: use {system: https://tricc.org/CodeSystem/designation-use,
+# code: hint | help}, or the HL7 designation-usage `display` code for labels.
 # Keyed by the CodeSystem `name` (the code prefix, e.g. `demo` for `demo.fever`;
 # `tricc` for unprefixed codes). Globs relative to this file, like `activity`.
 # terminology:

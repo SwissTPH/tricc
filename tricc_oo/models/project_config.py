@@ -251,6 +251,29 @@ class TriccProjectConfig(BaseModel):
     def image_max_height(self) -> Optional[int]:
         return coerce_max_dimension(self.parameters.get("image_max_height"), "image_max_height")
 
+    def languages(self) -> Tuple[Optional[str], List[str]]:
+        """``(default, available)`` from ``parameters.languages``.
+
+        Accepts ``{default: en, available: [en, fr]}``, a list (the first entry is the
+        default) or a single code. ``(None, [])`` when not configured.
+        """
+        raw = self.parameters.get("languages")
+        if raw is None or raw == "":
+            return None, []
+        if isinstance(raw, str):
+            raw = [raw]
+        if isinstance(raw, dict):
+            available = [str(c).strip() for c in raw.get("available") or [] if str(c).strip()]
+            default = str(raw.get("default") or "").strip() or (available[0] if available else None)
+        elif isinstance(raw, list):
+            available = [str(c).strip() for c in raw if str(c).strip()]
+            default = available[0] if available else None
+        else:
+            raise ValueError("parameters.languages must be a code, a list or {default, available}")
+        if default and default not in available:
+            available.insert(0, default)
+        return default, available
+
     def tricc_version(self) -> Optional[str]:
         raw = self.parameters.get("tricc_version")
         if raw is None:
