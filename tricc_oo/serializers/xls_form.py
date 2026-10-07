@@ -7,6 +7,7 @@ from tricc_oo.converters.tricc_to_xls_form import (
 )
 from tricc_oo.visitors.text_injection import serialize_injection_for_js_text
 from tricc_oo.models.lang import SingletonLangClass
+from tricc_oo.serializers.xls_form_translations import MORE_INFO_TEXT_USES, remember_row
 from tricc_oo.converters.utils import clean_name, remove_html, remove_html_full, generate_id
 from tricc_oo.models.base import (
     TriccOperator,
@@ -607,8 +608,10 @@ def get_more_info_choice(strategy, counter,title=None):
     return values
 
 
-def inject_more_info(strategy, base_name, relevance, message, df_survey, df_choice):
+def inject_more_info(strategy, base_name, relevance, message, df_survey, df_choice, node=None):
     title, stripped_message = extract_help_title(message)
+    if node is not None:
+        remember_row(strategy, ("survey", base_name), node, MORE_INFO_TEXT_USES)
     counter = len(df_choice[(df_choice["list_name"].str.startswith("more_info"))])
     df_survey.loc[len(df_survey)] = get_more_info_select(strategy, base_name, relevance, counter)
     df_survey.loc[len(df_survey)] = get_more_info_message(strategy, base_name, stripped_message)
@@ -647,7 +650,8 @@ def generate_xls_form_export(
                     _printed_relevance_string(strategy, node, processed_nodes, **kwargs),
                     node.help,
                     df_survey,
-                    df_choice)
+                    df_choice,
+                    node=node)
             add_calculate(calculates, node)
             if node.group != cur_group and not isinstance(node, TriccNodeSelectOption):
                 return False
@@ -674,6 +678,11 @@ def generate_xls_form_export(
                         == 0
                     ):
                         df_choice.loc[len(df_choice)] = values
+                        remember_row(
+                            strategy,
+                            ("choices", node.list_name, BOOLEAN_MAP.get(str(node.name), node.name)),
+                            node,
+                        )
                 elif isinstance(node, TriccNodeMoreInfo):
                     inject_more_info(
                         strategy,
@@ -716,6 +725,7 @@ def generate_xls_form_export(
                             else:
                                 values.append(get_xfrom_trad(strategy, node, column, SURVEY_MAP))
                         df_survey.loc[len(df_survey)] = values
+                        remember_row(strategy, ("survey", get_export_name(node)), node)
                     else:
                         logger.warning("node {} have an unmapped type {}".format(node.get_name(), node.tricc_type))
                     
@@ -729,7 +739,8 @@ def generate_xls_form_export(
                     _printed_relevance_string(strategy, node, processed_nodes, **kwargs),
                 node.help,
                     df_survey,
-                    df_choice
+                    df_choice,
+                    node=node,
                 )
             # continue walk °
             return True

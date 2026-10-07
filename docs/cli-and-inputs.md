@@ -79,7 +79,18 @@ interventions:
   concept already has one for that language.
 - **`parameters.languages`**: `{default: en, available: [en, fr]}` (a list or a single
   code also work; the first entry is then the default). Without it the default
-  language is `en`.
+  language is `en` and outputs are single-language, as before. With it:
+  - XLSForm (and the CHT / CDSS variants) write every text column once per language
+    (`label::en`, `label::fr`, `hint::fr`, `help::fr`, `constraint_message::fr`, …) and
+    set `settings.default_language` to the default code. The default-language column
+    holds the built text; the others come from the row's concept designations
+    (`display` / `hint` / `help`), else the gettext catalogue, else the default text.
+  - FHIR Questionnaires add the standard `translation` extension on `item._text`
+    (label, and the help / flyover child items) and on `answerOption.valueCoding._display`
+    for every non-default language that has a designation.
+  - A row's concept is its node's explicit YAML `concept`, else the concept whose code
+    is the node name. Designation text is used as is (`${name}` tokens are not remapped
+    to export names).
 - **`libraries`** lists CQL files. Each `define name: <expression>` becomes a
   calculate that any activity can reference by name, processed like a free-floating
   calculate on the main page (computed once its references are available). Only

@@ -94,13 +94,15 @@ from tricc_oo.converters.fhir.questionnaire_item_mapper import (
     item_allows_initial,
     set_item_extension,
     set_item_text_expression,
+    add_translations,
     should_skip,
     strip_illegal_initials,
     dedupe_singleton_item_extensions,
 )
 from tricc_oo.converters.tricc_to_xls_form import get_export_name
 from tricc_oo.converters.xml_to_tricc import shield_required
-from tricc_oo.converters.datadictionnary import lookup_codesystems_code
+from tricc_oo.converters.datadictionnary import concept_text, lookup_codesystems_code
+from tricc_oo.serializers.xls_form_translations import node_concept, translations_active
 from tricc_oo.models.base import (
     RETURNS_BOOLEAN,
     RETURNS_NUMBER,
@@ -719,6 +721,9 @@ class FHIRStrategy(BaseOutPutStrategy):
         }
         self._apply_item_required(item, node, hidden=hidden, fhir_type=fhir_type)
 
+        if not hidden:
+            add_translations(item, "text", self._concept_translations(node, "display"))
+
         if is_repeating(tricc_type):
             item["repeats"] = True
 
@@ -767,6 +772,9 @@ class FHIRStrategy(BaseOutPutStrategy):
             item["answerOption"] = []
             for opt in node.options.values():
                 option_entry = {"valueCoding": self._answer_option_coding(opt)}
+                add_translations(
+                    option_entry["valueCoding"], "display", self._concept_translations(opt, "display")
+                )
                 answer_media_extension = self._build_item_answer_media_extension(
                     getattr(opt, "image", None)
                 )
@@ -887,6 +895,23 @@ class FHIRStrategy(BaseOutPutStrategy):
         text = str(value).strip()
         return (text or None), None
 
+    def _concept_translations(self, node, use) -> List[Tuple[str, str]]:
+        """``(language, text)`` from the node concept's ``use`` designations for every
+        tricc.yaml language but the default one (whose text is ``item.text``)."""
+        project = self.project
+        if not translations_active(project):
+            return []
+        concept = node_concept(project, node)
+        if concept is None:
+            return []
+        translations = []
+        for language in project.languages:
+            if language != project.lang_code:
+                text = concept_text(concept, use, language, project.lang_code)
+                if text:
+                    translations.append((language, text))
+        return translations
+
     @staticmethod
     def _injection_export_name(value) -> str:
         """Export name used for a ``${...}`` token in the static fallback text."""
@@ -906,12 +931,14 @@ class FHIRStrategy(BaseOutPutStrategy):
         help_text, help_operation = self._display_text_and_operation(getattr(node, "help", None))
         if help_text:
             child = build_item_control_display_item(f"{parent_id}-help", help_text, "help")
+            add_translations(child, "text", self._concept_translations(node, "help"))
             children.append(child)
             if help_operation is not None:
                 self._pending_text_expressions.append((node, child, help_operation))
         hint_text, hint_operation = self._display_text_and_operation(getattr(node, "hint", None))
         if hint_text:
             child = build_item_control_display_item(f"{parent_id}-hint", hint_text, "flyover")
+            add_translations(child, "text", self._concept_translations(node, "hint"))
             children.append(child)
             if hint_operation is not None:
                 self._pending_text_expressions.append((node, child, hint_operation))

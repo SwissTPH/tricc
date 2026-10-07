@@ -503,6 +503,9 @@ class YamlStrategy(BaseInputStrategy):
             # We will attach options after the parent node is created
             data["options"] = {}
 
+        if ynode.concept is not None and "concept_code" in model_cls.model_fields:
+            data["concept_code"], data["concept_system"] = self._concept_ref(ynode.concept)
+
         try:
             node = model_cls(**data)
         except Exception as exc:
@@ -514,7 +517,7 @@ class YamlStrategy(BaseInputStrategy):
             node.options = {}
             # Integer keys (0, 1, …) match draw.io and Dict[int, TriccNodeSelectOption].
             for i, opt in enumerate(ynode.options):
-                opt_code = opt.concept if isinstance(opt.concept, str) else getattr(opt.concept, "code", None)
+                opt_code, opt_system = self._concept_ref(opt.concept)
                 opt_name = opt.name or opt_code or opt.id
                 opt_label = opt.label
                 if opt_label is None:
@@ -527,6 +530,8 @@ class YamlStrategy(BaseInputStrategy):
                     list_name=list_name or (ynode.name or f"list_{ynode.id}"),
                     select=node,
                     relevance=parse_expression("", opt.relevance) if opt.relevance else None,
+                    concept_code=opt_code,
+                    concept_system=opt_system,
                 )
                 node.options[i] = opt_node
                 # Also set activity/group if they exist on the parent
@@ -545,16 +550,22 @@ class YamlStrategy(BaseInputStrategy):
         return node
 
     @staticmethod
+    def _concept_ref(concept: Optional[ConceptRef]):
+        """``(code, system)`` of a YAML concept link (``(None, None)`` when absent)."""
+        if concept is None:
+            return None, None
+        if isinstance(concept, str):
+            return concept, None
+        return concept.code, concept.system
+
+    @staticmethod
     def _resolve_concept(concept: Optional[ConceptRef], name: Optional[str], project: TriccProject, where: str):
         """The CodeSystem concept of a node / option: explicit ``concept``, else ``name``."""
         if not project.code_systems:
             return None
-        if concept is None:
-            code, system = name, None
-        elif isinstance(concept, str):
-            code, system = concept, None
-        else:
-            code, system = concept.code, concept.system
+        code, system = YamlStrategy._concept_ref(concept)
+        if code is None:
+            code = name
         if not code:
             return None
         found = find_concept(project.code_systems, code, system)

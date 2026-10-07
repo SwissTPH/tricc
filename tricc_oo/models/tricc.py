@@ -303,6 +303,10 @@ class TriccNodeDisplayModel(TriccNodeBaseModel):
     priority: Union[float, int, None] = None
     concept_type: str = None
     datatype: str = None
+    # explicit CodeSystem concept (YAML `concept`) when it is not the node name;
+    # concept_system is a code_systems key, CodeSystem url, id or name
+    concept_code: Optional[str] = None
+    concept_system: Optional[str] = None
     # to use the enum value of the TriccNodeType
 
 

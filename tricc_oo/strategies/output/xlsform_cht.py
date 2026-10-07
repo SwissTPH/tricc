@@ -688,6 +688,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
         return latest
 
     def export(self, start_pages, version, **kwargs):
+        self.apply_translations()
         form_id = None
         if start_pages[self.processes[0]].root.form_id is not None:
             form_id = str(start_pages[self.processes[0]].root.form_id)
@@ -721,7 +722,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             "form_title": title,
             "form_id": form_id,
             "version": version,
-            "default_language": "English (en)",
+            "default_language": self.default_language_setting(),
             "style": "pages",
         }
         df_settings = pd.DataFrame(settings, index=indx)
@@ -768,7 +769,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
                     "form_title": title,
                     "form_id": f"{new_form_id}",
                     "version": version,
-                    "default_language": "English (en)",
+                    "default_language": self.default_language_setting(),
                     "style": "pages",
                 }
                 df_settings = pd.DataFrame(settings, index=indx)
@@ -872,7 +873,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             "form_title": title,
             "form_id": form_id,
             "version": version,
-            "default_language": "English (en)",
+            "default_language": self.default_language_setting(),
             "style": "pages",
         }
         df_settings = pd.DataFrame(settings, index=[[1]])
