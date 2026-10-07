@@ -8,6 +8,7 @@ process: main
 nodes:
   - id: start
     type: start
+    form_id: not_available_titled
     label: "Start"
 
   - id: weight

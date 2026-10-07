@@ -7,6 +7,7 @@ process: main
 nodes:
   - id: start
     type: start
+    form_id: not_available_legacy
     label: "Start"
 
   - id: weight

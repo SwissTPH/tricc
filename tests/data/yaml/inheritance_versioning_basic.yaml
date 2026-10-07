@@ -13,6 +13,7 @@ process: main
 nodes:
   - id: start_base
     type: start
+    form_id: inheritance_base
     label: "Start Base"
 
   - id: calc_eligible_v1
@@ -44,6 +45,7 @@ process: main
 nodes:
   - id: start_override
     type: start
+    form_id: inheritance_override
     label: "Start Override"
 
   - id: q_extra_check

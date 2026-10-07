@@ -5,6 +5,7 @@ process: main
 nodes:
   - id: start
     type: start
+    form_id: populate_history
     label: Start
     name: start_hist
 

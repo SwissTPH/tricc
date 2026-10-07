@@ -8,6 +8,7 @@ process: main
 nodes:
   - id: start
     type: start
+    form_id: basic_flow
     label: "Start"
     name: start_basic
 

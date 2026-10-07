@@ -7,6 +7,7 @@ process: main
 nodes:
   - id: start
     type: start
+    form_id: parent_main
     label: "Start"
     name: start_parent
 
