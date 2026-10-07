@@ -1,5 +1,6 @@
 import re
 import logging
+import zlib
 import requests
 import base64
 from collections import defaultdict
@@ -3153,7 +3154,9 @@ def clone_activity_for_snippet(goto, target_activity):
     _snippet_inject_seq += 1
     caller_inst = getattr(getattr(goto, "activity", None), "instance", 0) or 0
     # High band + caller instance + goto id entropy + monotonic seq → unique node ids
-    goto_key = abs(hash(str(getattr(goto, "id", "")) + str(getattr(goto, "name", "")))) % 10000
+    # crc32, not hash(): str hashes are salted per process, which gave the clones
+    # different ids (and _Vv_ version numbers) on every run.
+    goto_key = zlib.crc32((str(getattr(goto, "id", "")) + str(getattr(goto, "name", ""))).encode("utf-8")) % 10000
     snippet_nb = 900000 + (int(caller_inst) * 100000) + (goto_key * 10) + (_snippet_inject_seq % 10)
     # Ensure not colliding with any live or previously used instance slot
     used = set(getattr(template, "instances", {}) or {})

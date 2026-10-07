@@ -32,6 +32,18 @@ def get_tricc_type(diagram, node_type, tricc_type):
     return diagram.find(f'.//{node_type}[@{type_name}="{str(tricc_type)}"]')
 
 
+def _unique_in_document_order(diagram, elements):
+    """Drop duplicates and return the elements in document order.
+
+    lxml elements hash by identity, so ``list(set(elements))`` comes out in memory-address
+    order: a different node / edge order on every run, which changes how pages are linked
+    and walked and makes the exports non-deterministic.
+    """
+    position = {el: i for i, el in enumerate(diagram.iter())}
+    unique = dict.fromkeys(elements)
+    return sorted(unique, key=lambda el: position.get(el, len(position)))
+
+
 def get_tricc_type_list(diagram, node_type, tricc_type=None, parent_id=None):
     if tricc_type:
         tricc_type = str(tricc_type)
@@ -41,12 +53,12 @@ def get_tricc_type_list(diagram, node_type, tricc_type=None, parent_id=None):
         result = []
         for type_ in tricc_type:
             result += get_tricc_type_list(diagram, node_type, type_, parent_id)
-        return list(set(result))
+        return _unique_in_document_order(diagram, result)
     if isinstance(node_type, list):
         result = []
         for type_ in node_type:
             result += get_tricc_type_list(diagram, type_, tricc_type, parent_id)
-        return list(set(result))
+        return _unique_in_document_order(diagram, result)
     elif tricc_type is None:
         child = list(diagram.findall(f".//{node_type}[@{type_name}]{parent_suffix}"))
         if child:
@@ -112,7 +124,10 @@ def get_edges_list(diagram):
     # return list(diagram.findall('.//mxCell[@edge][@source][@target]'))
     # to ensure source and target one can use this xpath above
     # but better trigger a pydantic error if source/target are missing
-    return list(set(diagram.findall(".//mxCell[@edge][@source]") + diagram.findall(".//mxCell[@edge][@target]")))
+    return _unique_in_document_order(
+        diagram,
+        diagram.findall(".//mxCell[@edge][@source]") + diagram.findall(".//mxCell[@edge][@target]"),
+    )
 
 
 def get_select_option_image(diagram, select_option_id):

@@ -1673,7 +1673,9 @@ class FHIRStrategy(BaseOutPutStrategy):
     def _assemble_extraction_maps(self, version: str = "1.0.0") -> None:
         """Build one QuestionnaireResponse → Bundle StructureMap per process."""
         form_key = self.resolve_form_id()
-        processes = set(self.questionnaires or {}) | set(self.extraction_rules or {})
+        # Ordered union (graph discovery order): a set of strings follows the per-run
+        # hash seed, which reordered the StructureMaps in the Composition between runs.
+        processes = list(dict.fromkeys([*(self.questionnaires or {}), *(self.extraction_rules or {})]))
         for process in processes:
             rules = merge_extraction_rules(self.extraction_rules.get(process) or [])
             self.extraction_rules[process] = rules
