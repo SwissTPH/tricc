@@ -71,6 +71,27 @@ def lookup_codesystems_code(codesystems, ref):
                 return concept
 
 
+def find_concept(codesystems, code, system=None):
+    """Concept ``code``; ``system`` (CodeSystem key, url, id or name) narrows the search."""
+    if not system:
+        return lookup_codesystems_code(codesystems, code)
+    for key, code_system in codesystems.items():
+        if system in (key, code_system.url, code_system.id, code_system.name):
+            return next((c for c in code_system.concept or [] if c.code == code), None)
+    return None
+
+
+def concept_text(concept, use, language, default_language=None):
+    """``use`` text of ``concept`` in ``language``.
+
+    ``concept.display`` holds the default-language label, so it answers ``display``
+    for ``default_language`` (or any language when that is None) before designations.
+    """
+    if use == "display" and concept.display and default_language in (None, language):
+        return concept.display
+    return get_designation(concept, use, language)
+
+
 def add_concept(codesystems, system, code, display, attributes, terminology=None):
     """Add (or merge into) ``system|code``.
 

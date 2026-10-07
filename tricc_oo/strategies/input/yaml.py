@@ -23,6 +23,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 from tricc_oo.strategies.input.base_input_strategy import BaseInputStrategy
 from tricc_oo.converters.utils import generate_id
+from tricc_oo.converters.datadictionnary import concept_text, find_concept
 from tricc_oo.converters.xml_to_tricc import (
     parse_expression,
     load_expressions,
@@ -72,11 +73,26 @@ logger = logging.getLogger("default")
 # YAML Test Format Schema (Pydantic)
 # ---------------------------------------------------------------------------
 
+class YamlConceptRef(BaseModel):
+    """Link to a project CodeSystem concept; ``system`` is a CodeSystem name, id or url."""
+    code: str
+    system: Optional[str] = None
+
+
+# A plain string is a concept code in any project CodeSystem.
+ConceptRef = Union[str, YamlConceptRef]
+
+
 class YamlOption(BaseModel):
-    """Option for select_one / select_multiple / select_yesno."""
+    """Option for select_one / select_multiple / select_yesno.
+
+    Without ``label`` the text comes from the option's concept (``concept``, else
+    ``name``) in the project terminology. ``name`` defaults to the concept code.
+    """
     id: str
-    name: str
-    label: str
+    name: Optional[str] = None
+    label: Optional[str] = None
+    concept: Optional[ConceptRef] = None
     relevance: Optional[str] = None
 
 
@@ -86,6 +102,11 @@ class YamlNode(BaseModel):
 
     Only a subset of fields is supported in the initial implementation.
     Add fields here as needed for more advanced test scenarios.
+
+    ``label`` / ``hint`` / ``help`` left out are read from the node's concept
+    (``concept``, else ``name``) in the project terminology (tricc.yaml
+    ``terminology``): ``display`` and the ``hint`` / ``help`` designations in the
+    default language. Inline text wins.
     """
     id: str
     type: str  # e.g. "integer", "select_one", "calculate", "rhombus", ...
@@ -118,6 +139,12 @@ class YamlNode(BaseModel):
     form_id: Optional[str] = None            # start node only; required by XLSForm export
     hint: Optional[str] = None
     help: Optional[str] = None
+    concept: Optional[ConceptRef] = None
+
+
+# Nodes whose label is not display text (it is the parse context of their expression).
+NO_CONCEPT_TEXT_TYPES = {"calculate", "rhombus"}
+TEXT_FIELD_USES = {"label": "display", "hint": "hint", "help": "help"}
 
 
 class YamlEdge(BaseModel):
@@ -453,6 +480,14 @@ class YamlStrategy(BaseInputStrategy):
                 else:
                     data[attr] = val
 
+        if ynode.type not in NO_CONCEPT_TEXT_TYPES and any(
+            f in allowed_attrs and f not in data for f in TEXT_FIELD_USES
+        ):
+            concept = self._resolve_concept(ynode.concept, ynode.name, project, f"node {ynode.id}")
+            for field, text in self._concept_texts(concept, project).items():
+                if field in allowed_attrs and field not in data:
+                    data[field] = text
+
         # Ensure we have at least a label or name for nodes that require it
         if "label" not in data and ynode.label:
             data["label"] = ynode.label
@@ -479,10 +514,16 @@ class YamlStrategy(BaseInputStrategy):
             node.options = {}
             # Integer keys (0, 1, …) match draw.io and Dict[int, TriccNodeSelectOption].
             for i, opt in enumerate(ynode.options):
+                opt_code = opt.concept if isinstance(opt.concept, str) else getattr(opt.concept, "code", None)
+                opt_name = opt.name or opt_code or opt.id
+                opt_label = opt.label
+                if opt_label is None:
+                    concept = self._resolve_concept(opt.concept, opt_name, project, f"option {opt.id}")
+                    opt_label = self._concept_texts(concept, project).get("label", opt_name)
                 opt_node = TriccNodeSelectOption(
                     id=opt.id,
-                    name=opt.name,
-                    label=opt.label,
+                    name=opt_name,
+                    label=opt_label,
                     list_name=list_name or (ynode.name or f"list_{ynode.id}"),
                     select=node,
                     relevance=parse_expression("", opt.relevance) if opt.relevance else None,
@@ -502,6 +543,38 @@ class YamlStrategy(BaseInputStrategy):
             normalize_populate_node(node)
 
         return node
+
+    @staticmethod
+    def _resolve_concept(concept: Optional[ConceptRef], name: Optional[str], project: TriccProject, where: str):
+        """The CodeSystem concept of a node / option: explicit ``concept``, else ``name``."""
+        if not project.code_systems:
+            return None
+        if concept is None:
+            code, system = name, None
+        elif isinstance(concept, str):
+            code, system = concept, None
+        else:
+            code, system = concept.code, concept.system
+        if not code:
+            return None
+        found = find_concept(project.code_systems, code, system)
+        if found is None:
+            # A missing explicit link is worth noticing; a name without concept is common.
+            (logger.info if concept is not None else logger.debug)(
+                f"{where}: concept {code!r} not found in the project terminology"
+            )
+        return found
+
+    @staticmethod
+    def _concept_texts(concept, project: TriccProject) -> Dict[str, str]:
+        if concept is None:
+            return {}
+        texts = {}
+        for field, use in TEXT_FIELD_USES.items():
+            text = concept_text(concept, use, project.lang_code, project.lang_code)
+            if text:
+                texts[field] = text
+        return texts
 
     def _apply_expressions(self, node: Any) -> None:
         """Run the project's expression loader on the newly created node."""

@@ -161,6 +161,25 @@ YAML files are plain text, git-friendly, and much easier to review than draw.io
 files when the goal is to exercise the internal transformation engine rather than
 clinical authoring.
 
+**Texts from the CodeSystem.** With a tricc.yaml `terminology`, a node (or select
+option) may leave out `label` / `hint` / `help`: they are read from its concept, i.e.
+`concept` (`{code, system?}` or a plain code; `system` is a CodeSystem name, id or url)
+or else the node `name`. `label` is the concept `display`, `hint` / `help` its
+designations of that use in the default language. Inline text wins. An option's
+`name` defaults to its concept code. A concept that cannot be found leaves the text
+empty (an option falls back to its name).
+
+```yaml
+nodes:
+  - {id: age, type: integer, name: age}                  # concept "age"
+  - id: fev
+    type: select_one
+    name: has_fever
+    concept: {code: fever, system: demo}
+    options:
+      - {id: o1, concept: fever_yes}                      # name fever_yes
+```
+
 See `tricc_oo/strategies/input/yaml.py` for the supported format and current
 limitations. The YAML strategy is intentionally a *supplement* to draw.io, not
 a replacement.
