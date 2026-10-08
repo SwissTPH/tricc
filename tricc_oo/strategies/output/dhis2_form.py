@@ -45,7 +45,7 @@ class DHIS2Strategy(BaseOutPutStrategy):
 
     def __init__(self, project, output_path):
         super().__init__(project, output_path)
-        form_id = getattr(self.project.start_pages["main"], 'form_id', 'dhis2_program')
+        form_id = self.project.intervention_name() or "dhis2_program"
         self.program_metadata = {
             "id": self.generate_id(form_id),
             "name": form_id,
@@ -579,7 +579,7 @@ class DHIS2Strategy(BaseOutPutStrategy):
             ]
 
     def export(self, start_pages, version):
-        form_id = start_pages["main"].root.form_id or "dhis2_program"
+        form_id = self.project.intervention_name() or "dhis2_program"
         base_path = os.path.join(self.output_path, form_id)
         if not os.path.exists(base_path):
             os.makedirs(base_path)

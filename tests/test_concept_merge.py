@@ -60,7 +60,7 @@ id: texts_main
 title: Texts main
 process: main
 nodes:
-  - {{id: start, type: start, label: Texts, name: start_texts, form_id: texts}}
+  - {{id: start, type: start, label: Texts, name: start_texts}}
   - {{id: to_drawio, type: goto, name: to_drawio, label: Sub, link: {SUB_PAGE_ID}}}
   - {{id: end, type: end, name: end_texts, label: End}}
 edges:
@@ -94,6 +94,7 @@ def _project(tmp_path, terminology=False, languages=None):
     lines += [
         "interventions:",
         "  - id: texts",
+        "    name: texts",
         "    title: Texts",
         "    activity:",
         "      YamlStrategy: [yaml/*]",
@@ -147,9 +148,9 @@ def test_conflicting_authored_displays_still_warn(caplog):
 
 
 def test_terminology_marks_its_concepts():
-    from tricc_oo.models.tricc import TriccProject
+    from tricc_oo.models.tricc import TriccIntervention
 
-    project = TriccProject()
+    project = TriccIntervention()
     BaseInputStrategy.load_terminology(project, [("cs.json", json.dumps(TERMINOLOGY))])
     assert ("tricc", "age") in project.terminology_concepts
     concept = add_concept(project.code_systems, "tricc", "age", "Age", {}, project.terminology_concepts)

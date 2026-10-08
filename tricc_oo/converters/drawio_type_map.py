@@ -38,7 +38,7 @@ from tricc_oo.models.tricc import (
 TYPE_MAP = {
     TriccNodeType.start: {
         "objects": ["UserObject", "object"],
-        "attributes": ["process", "parent", "form_id", "relevance", "priority"],
+        "attributes": ["process", "parent", "relevance", "priority"],
         "mandatory_attributes": ["label"],
         "model": TriccNodeMainStart,
     },

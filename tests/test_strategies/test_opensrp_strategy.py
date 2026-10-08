@@ -392,13 +392,13 @@ class TestOpenSRPStrategyInit(unittest.TestCase):
     """Smoke tests for OpenSRPStrategy instantiation."""
 
     def _make_mock_project(self):
-        """Build a minimal mock TriccProject."""
+        """Build a minimal mock TriccIntervention."""
         project = MagicMock()
         project.nodes = {}
         project.edges = {}
         project.form_id = "demo"
         project.version = "1.0.0"
-        project.intervention = None
+        project.config = None
         return project
 
     def test_instantiation(self):
@@ -464,7 +464,7 @@ class TestOpenSRPStrategyInit(unittest.TestCase):
         from tricc_oo.models.project_config import TriccInterventionConfig
 
         project = self._make_mock_project()
-        project.intervention = TriccInterventionConfig(
+        project.config = TriccInterventionConfig(
             id="pediatrics",
             title="Pediatrics",
             activity=["child/*"],
@@ -496,7 +496,7 @@ class TestOpenSRPStrategyInit(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             parent_project = self._make_mock_project()
-            parent_project.intervention = TriccInterventionConfig(
+            parent_project.config = TriccInterventionConfig(
                 id="pediatrics", title="Pediatrics", activity=["a/*"]
             )
             parent = OpenSRPStrategy(parent_project, tmp)
@@ -525,7 +525,7 @@ class TestOpenSRPStrategyInit(unittest.TestCase):
                 ],
             )
             child_project = self._make_mock_project()
-            child_project.intervention = child_cfg
+            child_project.config = child_cfg
             child = OpenSRPStrategy(child_project, tmp)
             child._form_id = "fup"
             child.questionnaires = {

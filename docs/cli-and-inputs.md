@@ -13,7 +13,8 @@ launch.json debug matrix).
   Default without a project file: `XLSFormCHTStrategy` (`tests/build.py`).
 - `-T`: test strategy class (optional). Runs after the output strategy and adds test
   material without changing the deployable artifact. See [Test strategies](#test-strategies--t).
-- `-d`: form id.
+- `-d`: form id. Deprecated and unused; the form is named by `interventions[].name`
+  (or, without interventions, by the main start's legacy `form_id`).
 - `-l`: log level shortcut (`d`, `i`, `w`).
 - `-D`: download directory.
 
@@ -50,6 +51,7 @@ parameters:
   image_max_height: 1200
 interventions:
   - id: pediatrics
+    name: pediatrics          # form name in every output; optional, defaults to id
     title: Pediatrics
     start:
       on: demand
@@ -100,6 +102,13 @@ interventions:
 - **Image caps** apply when extracting pictures from draw.io (`0` / omitted = no cap).
   A single image object may set `max_width` / `max_height` (Edit Data) to override
   one side; `0` means unlimited for that side.
+- **The intervention `name` names the form** in every output: XLSForm file and
+  `form_id` setting, CHT form, DHIS2 program, OpenMRS form, FHIR / OpenSRP folder and
+  resource ids. It defaults to the intervention `id`. A `form_id` on a drawing's main
+  start (or a YAML activity / start node) is **deprecated**: with `interventions` it is
+  ignored and logged once per value (`form_id is ignored when interventions are
+  declared; set interventions[].name`). Only a project without `interventions` still
+  reads it; when it is missing there, the project `title` slug is used.
 - **Each intervention is a separate conversion** of its globs. `common/*` listed on
   two interventions is read twice. `*` is one folder level (`common/labs/x.drawio`
   needs `common/labs/*`). An `activity` line may also be a Google Drive file or
@@ -258,7 +267,7 @@ python tests/build.py -i flow.drawio -o out/ -O XLSFormCHTStrategy -T TestSpecSt
 
 | Name | Emits |
 |---|---|
-| `TestSpecStrategy` | `<form_id>.form-model.json` — export names, types, options, relevance/constraint/calculation references, edges, end and diagnosis nodes |
+| `TestSpecStrategy` | `<intervention name>.form-model.json` — export names, types, options, relevance/constraint/calculation references, edges, end and diagnosis nodes |
 
 The output of `-O XLSFormCHTStrategy -T TestSpecStrategy` is identical to `-O
 XLSFormCHTStrategy` plus one JSON file. If a test strategy raises, the error is logged and the

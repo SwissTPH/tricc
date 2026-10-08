@@ -15,7 +15,7 @@ def test_cht_demand_properties_json(tmp_path):
     out = tmp_path / "out"
     out.mkdir()
     project = MagicMock()
-    project.intervention = TriccInterventionConfig(
+    project.config = TriccInterventionConfig(
         id="pediatrics",
         title="Pediatrics",
         activity=["a/*"],
@@ -36,7 +36,7 @@ def test_cht_follow_up_js_and_parent_calculate(tmp_path):
     parent_out.mkdir()
     child_out.mkdir()
     parent_project = MagicMock()
-    parent_project.intervention = TriccInterventionConfig(
+    parent_project.config = TriccInterventionConfig(
         id="pediatrics", title="Pediatrics", activity=["a/*"]
     )
     child_cfg = TriccInterventionConfig(
@@ -54,7 +54,7 @@ def test_cht_follow_up_js_and_parent_calculate(tmp_path):
         ],
     )
     child_project = MagicMock()
-    child_project.intervention = child_cfg
+    child_project.config = child_cfg
     parent = XLSFormCHTStrategy.__new__(XLSFormCHTStrategy)
     parent.project = parent_project
     parent.output_path = str(parent_out)
@@ -96,7 +96,7 @@ def _cht_parent_child(tmp_path, start, parent_names=("classification",)):
     parent_out.mkdir()
     child_out.mkdir()
     parent_project = MagicMock()
-    parent_project.intervention = TriccInterventionConfig(
+    parent_project.config = TriccInterventionConfig(
         id="pediatrics", title="Pediatrics", activity=["a/*"]
     )
     child_cfg = TriccInterventionConfig(
@@ -106,7 +106,7 @@ def _cht_parent_child(tmp_path, start, parent_names=("classification",)):
         start=[start],
     )
     child_project = MagicMock()
-    child_project.intervention = child_cfg
+    child_project.config = child_cfg
     parent = XLSFormCHTStrategy.__new__(XLSFormCHTStrategy)
     parent.project = parent_project
     parent.output_path = str(parent_out)

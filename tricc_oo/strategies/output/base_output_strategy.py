@@ -243,7 +243,7 @@ class BaseOutPutStrategy(abc.ABC):
 
     def link_follow_up(self, child_strategy, start) -> None:
         """Wire a follow-up intervention onto this (parent) export. Default: ignore."""
-        child_id = getattr(getattr(child_strategy, "project", None), "intervention", None)
+        child_id = getattr(getattr(child_strategy, "project", None), "config", None)
         child_id = getattr(child_id, "id", None) or "?"
         logger.info(
             "%s ignores start.on=follow_up for intervention %s",

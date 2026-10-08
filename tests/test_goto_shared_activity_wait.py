@@ -35,7 +35,7 @@ from pathlib import Path
 import yaml as pyyaml
 
 from tricc_oo.models.ordered_set import OrderedSet
-from tricc_oo.models.tricc import TriccProject, TriccNodeGoTo
+from tricc_oo.models.tricc import TriccIntervention, TriccNodeGoTo
 from tricc_oo.strategies.input.drawio import DrawioStrategy
 from tricc_oo.strategies.input.yaml import YamlActivity, YamlStrategy
 from tricc_oo.visitors.tricc import (
@@ -89,7 +89,7 @@ def _build_and_process(name: str):
     path = DATA / name
     content = path.read_text(encoding="utf-8")
     strategy = YamlStrategy(str(path))
-    project = TriccProject()
+    project = TriccIntervention()
     for loaded in pyyaml.safe_load_all(content):
         if not loaded:
             continue

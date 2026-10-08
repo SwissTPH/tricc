@@ -19,7 +19,7 @@ import logging
 from typing import Any, Dict, List, Optional, Type, Union
 
 import yaml
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from tricc_oo.strategies.input.base_input_strategy import BaseInputStrategy
 from tricc_oo.converters.utils import generate_id
@@ -36,7 +36,7 @@ from tricc_oo.strategies.registry import register_input_strategy
 
 # Core models
 from tricc_oo.models.tricc import (
-    TriccProject,
+    TriccIntervention,
     TriccNodeActivity,
     TriccSegment,
     TriccEdge,
@@ -64,6 +64,8 @@ from tricc_oo.models.calculate import (
     TriccNodeActivityEnd,
     TriccNodeEnd,
     TriccNodePopulate,
+    TriccNodeProposedDiagnosis,
+    TriccNodeDiagnosis,
 )
 
 logger = logging.getLogger("default")
@@ -73,7 +75,13 @@ logger = logging.getLogger("default")
 # YAML Test Format Schema (Pydantic)
 # ---------------------------------------------------------------------------
 
-class YamlConceptRef(BaseModel):
+class YamlModel(BaseModel):
+    """Unknown keys are ignored, e.g. the frontend's presentation-only ``ui`` blocks
+    (geometry, viewport, waypoints), edge ``id`` or ``formatVersion``."""
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+
+class YamlConceptRef(YamlModel):
     """Link to a project CodeSystem concept; ``system`` is a CodeSystem name, id or url."""
     code: str
     system: Optional[str] = None
@@ -83,7 +91,7 @@ class YamlConceptRef(BaseModel):
 ConceptRef = Union[str, YamlConceptRef]
 
 
-class YamlOption(BaseModel):
+class YamlOption(YamlModel):
     """Option for select_one / select_multiple / select_yesno.
 
     Without ``label`` the text comes from the option's concept (``concept``, else
@@ -96,7 +104,7 @@ class YamlOption(BaseModel):
     relevance: Optional[str] = None
 
 
-class YamlNode(BaseModel):
+class YamlNode(YamlModel):
     """
     Declarative representation of a TRICC node in YAML.
 
@@ -136,10 +144,19 @@ class YamlNode(BaseModel):
     # populate: FHIR item type of the value being read back (e.g. "quantity")
     data_type: Optional[str] = None
     concept_type: Optional[str] = None
-    form_id: Optional[str] = None            # start node only; required by XLSForm export
+    # start node only. Legacy: names the form only without tricc.yaml interventions
+    # (use interventions[].name). ``formId`` accepted too.
+    form_id: Optional[str] = Field(default=None, validation_alias=AliasChoices("form_id", "formId"))
     hint: Optional[str] = None
     help: Optional[str] = None
     concept: Optional[ConceptRef] = None
+    # Select concept code. Conversion exports this instead of a placeholder name.
+    filter: Optional[str] = None
+    # proposed_diagnosis / diagnosis. Copied only when the node type's attr list names them.
+    severity: Optional[str] = None
+    remote_reference: Optional[str] = None
+    trigger: Optional[str] = None
+    priority: Optional[int] = None
 
 
 # Nodes whose label is not display text (it is the parse context of their expression).
@@ -147,23 +164,39 @@ NO_CONCEPT_TEXT_TYPES = {"calculate", "rhombus"}
 TEXT_FIELD_USES = {"label": "display", "hint": "hint", "help": "help"}
 
 
-class YamlEdge(BaseModel):
+class YamlEdge(YamlModel):
     """Edge between two nodes. 'value' is used for conditional (rhombus) edges."""
     source: str
     target: str
     value: Optional[str] = None
 
 
-class YamlActivity(BaseModel):
+class YamlActivity(YamlModel):
     """
     One activity (equivalent to one draw.io page/tab).
     """
     id: str
-    title: str
+    # defaults to the id
+    title: Optional[str] = None
     process: str = "main"
     nodes: List[YamlNode]
     edges: List[YamlEdge] = Field(default_factory=list)
     applicability: Optional[str] = None
+    # names the activity in outputs (else the title slug)
+    name: Optional[str] = None
+    # plain-language twin of ``applicability``, a string or {lang: text}; informational
+    intent: Optional[Union[str, Dict[str, str]]] = None
+    # Legacy: names the form only without tricc.yaml interventions (use
+    # interventions[].name). Read for a start node that has none. ``formId`` accepted too.
+    form_id: Optional[str] = Field(default=None, validation_alias=AliasChoices("form_id", "formId"))
+
+    @model_validator(mode="after")
+    def _defaults(self) -> "YamlActivity":
+        if not self.title:
+            self.title = self.id
+        if self.name is not None:
+            self.name = self.name.strip() or None
+        return self
 
 
 # Mapping from YAML "type" string to (model class, extra attributes to copy)
@@ -171,7 +204,7 @@ class YamlActivity(BaseModel):
 NODE_TYPE_MAP: Dict[str, Dict[str, Any]] = {
     "start": {
         "model": TriccNodeMainStart,
-        # form_id is required by the XLSForm export, so fixtures can drive a full export
+        # form_id: legacy form name, read only without tricc.yaml interventions
         "attrs": ["process", "label", "relevance", "form_id"],
         "tricc_type": TriccNodeType.start,
     },
@@ -220,19 +253,19 @@ NODE_TYPE_MAP: Dict[str, Dict[str, Any]] = {
     },
     "select_one": {
         "model": TriccNodeSelectOne,
-        "attrs": ["label", "name", "required", "relevance", "save", "repeat", "hint", "help"],
+        "attrs": ["label", "name", "required", "relevance", "save", "repeat", "hint", "help", "filter"],
         "has_options": True,
         "tricc_type": TriccNodeType.select_one,
     },
     "select_multiple": {
         "model": TriccNodeSelectMultiple,
-        "attrs": ["label", "name", "required", "relevance", "save", "repeat", "hint", "help"],
+        "attrs": ["label", "name", "required", "relevance", "save", "repeat", "hint", "help", "filter"],
         "has_options": True,
         "tricc_type": TriccNodeType.select_multiple,
     },
     "select_yesno": {
         "model": TriccNodeSelectYesNo,
-        "attrs": ["label", "name", "required", "relevance", "save", "repeat", "hint", "help"],
+        "attrs": ["label", "name", "required", "relevance", "save", "repeat", "hint", "help", "filter"],
         "has_options": True,
         "tricc_type": TriccNodeType.select_yesno,
     },
@@ -266,6 +299,18 @@ NODE_TYPE_MAP: Dict[str, Dict[str, Any]] = {
         "attrs": ["label", "name", "link", "instance", "repeat"],
         "tricc_type": TriccNodeType.goto,
     },
+    # Same attributes the model and the draw.io map actually carry. A missing entry
+    # makes _create_node return None, so the node is dropped on YAML load.
+    "proposed_diagnosis": {
+        "model": TriccNodeProposedDiagnosis,
+        "attrs": ["label", "name", "severity", "reference", "remote_reference", "trigger", "repeat", "save"],
+        "tricc_type": TriccNodeType.proposed_diagnosis,
+    },
+    "diagnosis": {
+        "model": TriccNodeDiagnosis,
+        "attrs": ["label", "name", "severity", "reference", "save", "repeat", "priority"],
+        "tricc_type": TriccNodeType.diagnosis,
+    },
 }
 
 # Map YAML type strings to TriccNodeType (for nodes where the map above does not list it)
@@ -287,6 +332,8 @@ YAML_TYPE_TO_TRICC_TYPE = {
     "calculate": TriccNodeType.calculate,
     "rhombus": TriccNodeType.rhombus,
     "populate": TriccNodeType.populate,
+    "proposed_diagnosis": TriccNodeType.proposed_diagnosis,
+    "diagnosis": TriccNodeType.diagnosis,
 }
 
 
@@ -322,12 +369,12 @@ class YamlStrategy(BaseInputStrategy):
         media_path: str,
         project_config=None,
         intervention=None,
-    ) -> Optional[TriccProject]:
+    ) -> Optional[TriccIntervention]:
         project = self.new_project(project_config, intervention)
         self.load(file_content, media_path, project)
         return self.finalize(project, media_path)
 
-    def load(self, file_content: List[str], media_path: str, project: TriccProject) -> None:
+    def load(self, file_content: List[str], media_path: str, project: TriccIntervention) -> None:
         for raw_content in file_content:
             if not raw_content or not raw_content.strip():
                 continue
@@ -366,7 +413,7 @@ class YamlStrategy(BaseInputStrategy):
                         project.pages[activity.id] = activity
                         self._assign_start_page(activity, project)
 
-    def finalize(self, project: TriccProject, media_path: str) -> Optional[TriccProject]:
+    def finalize(self, project: TriccIntervention, media_path: str) -> Optional[TriccIntervention]:
         # Project CodeSystems (tricc.yaml ``terminology``) are exported like drawio's;
         # without terminology the yaml input builds none, so nothing is written.
         self.write_terminology(project, media_path)
@@ -378,14 +425,19 @@ class YamlStrategy(BaseInputStrategy):
     # Activity construction
     # ------------------------------------------------------------------
     def _build_activity(
-        self, yaml_act: YamlActivity, project: TriccProject
+        self, yaml_act: YamlActivity, project: TriccIntervention
     ) -> Optional[TriccNodeActivity]:
         root_node = None
         nodes: Dict[str, Any] = {}
         edges: List[TriccEdge] = []
+        pending_ends: List[YamlNode] = []
 
-        # 1. Create all nodes
+        # 1. Create every node except activity_end. That model names itself from
+        # activity.id, so it is created once the container exists.
         for ynode in yaml_act.nodes:
+            if ynode.type == "activity_end":
+                pending_ends.append(ynode)
+                continue
             node = self._create_node(ynode, yaml_act, project)
             if node is None:
                 logger.warning(f"Skipping unknown or unsupported node type: {ynode.type}")
@@ -397,8 +449,31 @@ class YamlStrategy(BaseInputStrategy):
         if root_node is None:
             logger.error(f"Activity '{yaml_act.id}' has no start/activity_start node")
             return None
+        if yaml_act.form_id and isinstance(root_node, TriccNodeMainStart) and not root_node.form_id:
+            root_node.form_id = yaml_act.form_id
+        activity_name = yaml_act.name or yaml_act.title.lower().replace(" ", "_")
 
-        # 2. Create edges
+        # 3. Assemble the activity (segment when root is a main start) before ends,
+        # so activity_end.__init__ can read activity.id.
+        activity = node_container_for_root(
+            root_node,
+            id=yaml_act.id,
+            label=yaml_act.title,
+            name=activity_name,
+            nodes=nodes,
+            edges=edges,
+            process=yaml_act.process,
+        )
+        for ynode in pending_ends:
+            node = self._create_node(ynode, yaml_act, project, activity=activity)
+            if node is None:
+                logger.warning(f"Skipping unknown or unsupported node type: {ynode.type}")
+                continue
+            nodes[ynode.id] = node
+            if getattr(activity, "nodes", None) is not None:
+                activity.nodes[ynode.id] = node
+
+        # 2. Create edges, now that ends exist.
         for yedge in yaml_act.edges:
             if yedge.source not in nodes or yedge.target not in nodes:
                 logger.warning(
@@ -418,7 +493,7 @@ class YamlStrategy(BaseInputStrategy):
             root_node,
             id=yaml_act.id,
             label=yaml_act.title,
-            name=yaml_act.title.lower().replace(" ", "_"),
+            name=activity_name,
             nodes=nodes,
             edges=edges,
             process=yaml_act.process,
@@ -447,12 +522,13 @@ class YamlStrategy(BaseInputStrategy):
 
         if yaml_act.applicability:
             activity.applicability = parse_expression("", yaml_act.applicability)
+        activity.intent = yaml_act.intent
 
         logger.info(f"Loaded YAML activity: {yaml_act.id} ({yaml_act.title})")
         return activity
 
     def _create_node(
-        self, ynode: YamlNode, yaml_act: YamlActivity, project: TriccProject
+        self, ynode: YamlNode, yaml_act: YamlActivity, project: TriccIntervention, activity=None
     ) -> Optional[Any]:
         """Create a concrete Tricc* node instance from a YamlNode definition."""
         type_info = NODE_TYPE_MAP.get(ynode.type)
@@ -470,6 +546,11 @@ class YamlStrategy(BaseInputStrategy):
             "id": ynode.id,
             "tricc_type": tricc_type,
         }
+        # activity_end names itself from activity.id inside __init__. The container
+        # is built first and passed in; creating the end before that drops the node.
+        if activity is not None:
+            data["activity"] = activity
+            data["group"] = activity
 
         # Copy supported attributes from YAML (with some normalization)
         for attr in allowed_attrs:
@@ -480,10 +561,15 @@ class YamlStrategy(BaseInputStrategy):
                 else:
                     data[attr] = val
 
+        # A select filter is the concept code. Look that up before the local name,
+        # which may be a placeholder such as ``select_``.
+        concept_name = ynode.name
+        if type_info.get("has_options") and isinstance(ynode.filter, str) and ynode.filter.strip() and not ynode.concept:
+            concept_name = ynode.filter.strip()
         if ynode.type not in NO_CONCEPT_TEXT_TYPES and any(
             f in allowed_attrs and f not in data for f in TEXT_FIELD_USES
         ):
-            concept = self._resolve_concept(ynode.concept, ynode.name, project, f"node {ynode.id}")
+            concept = self._resolve_concept(ynode.concept, concept_name, project, f"node {ynode.id}")
             for field, text in self._concept_texts(concept, project).items():
                 if field in allowed_attrs and field not in data:
                     data[field] = text
@@ -505,6 +591,14 @@ class YamlStrategy(BaseInputStrategy):
 
         if ynode.concept is not None and "concept_code" in model_cls.model_fields:
             data["concept_code"], data["concept_system"] = self._concept_ref(ynode.concept)
+        elif (
+            type_info.get("has_options")
+            and isinstance(ynode.filter, str)
+            and ynode.filter.strip()
+            and "concept_code" in model_cls.model_fields
+        ):
+            data["filter"] = ynode.filter.strip()
+            data["concept_code"] = data["filter"]
 
         try:
             node = model_cls(**data)
@@ -559,7 +653,7 @@ class YamlStrategy(BaseInputStrategy):
         return concept.code, concept.system
 
     @staticmethod
-    def _resolve_concept(concept: Optional[ConceptRef], name: Optional[str], project: TriccProject, where: str):
+    def _resolve_concept(concept: Optional[ConceptRef], name: Optional[str], project: TriccIntervention, where: str):
         """The CodeSystem concept of a node / option: explicit ``concept``, else ``name``."""
         if not project.code_systems:
             return None
@@ -577,7 +671,7 @@ class YamlStrategy(BaseInputStrategy):
         return found
 
     @staticmethod
-    def _concept_texts(concept, project: TriccProject) -> Dict[str, str]:
+    def _concept_texts(concept, project: TriccIntervention) -> Dict[str, str]:
         if concept is None:
             return {}
         texts = {}
@@ -636,7 +730,7 @@ class YamlStrategy(BaseInputStrategy):
         if dangling:
             activity.calculates.extend(dangling)
 
-    def _assign_start_page(self, activity: TriccNodeActivity, project: TriccProject) -> None:
+    def _assign_start_page(self, activity: TriccNodeActivity, project: TriccIntervention) -> None:
         """Replicate the start page assignment logic from xml_to_tricc."""
         root = activity.root
         if root is None:

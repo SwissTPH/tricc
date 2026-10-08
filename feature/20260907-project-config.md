@@ -3,6 +3,7 @@
 | Field | Value |
 |-------|-------|
 | **Status** | Implemented |
+| **Note** | Superseded in part: the intervention `name` names the form; `form_id` is legacy-only. See `feature/20261008-intervention-name-replaces-form-id.md`. |
 | **Related** | `docs/cli-and-inputs.md`, `docs/tricc-elements.md` (image enrichment), `feature/tricc-segment.md`, `feature/20260915-intervention-start.md` (replaces `kind` / `applicability`), `feature/careplan.md` (Superseded), `feature/opensrp-register.md` |
 | **Strategy** | Project load + all output strategies |
 | **Approval** | Approved 2026-09-07 |

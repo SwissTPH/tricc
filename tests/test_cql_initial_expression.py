@@ -36,7 +36,7 @@ def _make_strategy(cls_name: str = "OpenSRPStrategy"):
     project.edges = {}
     project.form_id = "demo"
     project.version = "1.0.0"
-    project.intervention = None
+    project.config = None
     strategy = cls(project, tempfile.mkdtemp())
     strategy._form_id = "demo"
     return strategy

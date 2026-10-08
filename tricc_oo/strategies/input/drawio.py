@@ -13,7 +13,7 @@ from tricc_oo.visitors.tricc import (
 from tricc_oo.visitors.utils import PROCESSES
 
 from tricc_oo.models import (
-    TriccProject,
+    TriccIntervention,
     OrderedSet,
     TriccNodeActivity,
     TriccNodeGoTo,
@@ -206,7 +206,7 @@ class DrawioStrategy(BaseInputStrategy):
                         node = get_node_from_list(processed_nodes, node_id)
                         if node is not None:
                             logger.warning(node.get_name())
-                if isinstance(node, TriccNodeSelectNotAvailable):
+                if isinstance(node, TriccNodeSelectNotAvailable) and node.options:
                     for opt in node.options.values():
                         set_prev_next_node(opt, target_node)
                 else:

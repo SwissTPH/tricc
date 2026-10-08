@@ -411,23 +411,18 @@ class FHIRStrategy(BaseOutPutStrategy):
             )
 
     def resolve_form_id(self, start_pages=None) -> str:
-        """Resolve and cache the project form id (folder name; may contain ``_``).
+        """Resolve and cache the form id (folder name; may contain ``_``): the intervention name.
 
         Args:
-            start_pages: Optional start_pages dict; defaults to ``project.start_pages``.
+            start_pages: Unused; kept for callers. See ``TriccIntervention.intervention_name``.
 
         Returns:
             Raw form id string used for output paths.
         """
         if getattr(self, "_form_id", None):
             return self._form_id
-        pages = start_pages if start_pages is not None else getattr(self.project, "start_pages", None)
-        form_id = "fhir-form"
-        if pages and "main" in pages:
-            root = getattr(pages["main"], "root", None)
-            form_id = (getattr(root, "form_id", None) if root else None) or form_id
-        elif getattr(self.project, "form_id", None):
-            form_id = self.project.form_id
+        resolve = getattr(self.project, "intervention_name", None)
+        form_id = (resolve() if callable(resolve) else None) or "fhir-form"
         self._form_id = form_id
         return form_id
 

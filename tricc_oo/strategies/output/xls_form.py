@@ -214,10 +214,9 @@ class XLSFormStrategy(BaseOutPutStrategy):
         ]
 
     def export(self, start_pages, version):
-        if start_pages["main"].root.form_id is not None:
-            form_id = str(start_pages["main"].root.form_id)
-        else:
-            logger.critical("form id required in the first start node")
+        form_id = self.project.intervention_name()
+        if not form_id:
+            logger.critical("form id required: set interventions[].name (or a project title)")
             exit(1)
         title = start_pages["main"].root.label
         if self.project is not None:
@@ -929,8 +928,8 @@ class XLSFormStrategy(BaseOutPutStrategy):
         """Validate the generated XLS form using pyxform."""
         try:
             # Determine the XLS file path
-            if self.project.start_pages["main"].root.form_id is not None:
-                form_id = str(self.project.start_pages["main"].root.form_id)
+            form_id = self.project.intervention_name()
+            if form_id:
                 xls_path = os.path.join(self.output_path, form_id + ".xlsx")
 
                 if not os.path.exists(xls_path):

@@ -240,7 +240,7 @@ class SpiceStrategy(BaseOutPutStrategy):
 
     def export(self, start_pages, version):
         # Save the JSON output to a file
-        file_name = f"{start_pages['main'].root.form_id}.json"
+        file_name = f"{self.project.intervention_name() or 'spice_form'}.json"
         output_path = os.path.join(self.output_path, file_name)
 
         with open(output_path, "w") as json_file:

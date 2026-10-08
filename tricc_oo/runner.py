@@ -191,7 +191,7 @@ def load_input_project(
     terminology: Sources = (),
     libraries: Sources = (),
 ):
-    """Build the TriccProject from ``(strategy name, files, contents)`` groups.
+    """Build the TriccIntervention from ``(strategy name, files, contents)`` groups.
 
     Terminology and libraries are loaded first, so every activity sees the project
     CodeSystems and library calculates. A single group is finalised by its own strategy

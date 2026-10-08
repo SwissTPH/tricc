@@ -12,6 +12,7 @@ from tricc_oo.models.base import (
 )
 
 import logging
+import re
 
 
 logger = logging.getLogger(__name__)
@@ -102,6 +103,8 @@ class TriccNodeActivity(TriccNodeBaseModel):
     # - case definition
     calculates: List[TriccNodeCalculateBase] = []
     applicability: Optional[Union[Expression, TriccOperation]] = None
+    # plain-language twin of ``applicability`` (text or {lang: text}); informational
+    intent: Optional[Union[str, Dict[str, str]]] = None
     is_sequence_defined: bool = False
 
     # redefine
@@ -504,7 +507,14 @@ class TriccNodeMoreInfo(TriccNodeInputModel, TriccParentMixIn):
     datatype: str = "n/a"
 
 
-class TriccProject(BaseModel):
+class TriccIntervention(BaseModel):
+    """One intervention being converted: its loaded activities, terminology and outputs.
+
+    A tricc.yaml project with several ``interventions`` builds one TriccIntervention per
+    entry (``config`` holds that entry); without ``interventions`` the whole
+    input is a single implicit intervention. Formerly ``TriccProject``.
+    """
+
     title: str = "My project"
     description: str = ""
     # default language (tricc.yaml parameters.languages.default) and every configured one
@@ -528,8 +538,10 @@ class TriccProject(BaseModel):
     contexts: Set[triccName] = set()
     image_max_width: Optional[int] = None
     image_max_height: Optional[int] = None
-    # Current intervention when building from tricc.yaml (see project_config).
-    intervention: Optional[Any] = None
+    # tricc.yaml entry of this intervention (TriccInterventionConfig); None when implicit
+    config: Optional[Any] = None
+    # legacy form_id values already reported by intervention_name()
+    ignored_form_ids: Set[str] = set()
     # Calculates from the tricc.yaml ``libraries`` (CQL defines); attached to the main
     # start page as dangling calculates, i.e. stashed next to the root.
     library_calculates: List[Any] = []
@@ -545,9 +557,48 @@ class TriccProject(BaseModel):
     def get_keyword_trad(keyword):
         return keyword
 
+    def _legacy_form_ids(self) -> List[str]:
+        """Distinct ``form_id`` of the loaded roots, main start first."""
+        activities = []
+        for process in ["main", *[p for p in self.start_pages if p != "main"]]:
+            page = self.start_pages.get(process)
+            activities.extend(page if isinstance(page, (list, tuple)) else [page])
+        activities.extend(self.pages.values())
+        found = []
+        for activity in activities:
+            form_id = getattr(getattr(activity, "root", None), "form_id", None)
+            form_id = str(form_id).strip() if form_id is not None else ""
+            if form_id and form_id not in found:
+                found.append(form_id)
+        return found
+
+    def intervention_name(self) -> str:
+        """Name of the form in every output (see feature/20261008-intervention-name-replaces-form-id.md).
+
+        With a tricc.yaml intervention: its ``name``, else its ``id``; a drawing ``form_id`` is
+        ignored and reported once per distinct value. Without one (implicit single
+        intervention): the main start's legacy ``form_id``, else the project title slug.
+        Empty only for an empty title; callers keep their own default for that case.
+        """
+        intervention = getattr(self, "config", None)
+        if intervention is not None:
+            name = getattr(intervention, "name", None) or getattr(intervention, "id", None) or ""
+            for form_id in self._legacy_form_ids():
+                if form_id not in self.ignored_form_ids:
+                    self.ignored_form_ids.add(form_id)
+                    logger.warning(
+                        f"form_id {form_id!r} is ignored when interventions are declared; "
+                        f"set interventions[].name (intervention {intervention.id!r} uses {name!r})"
+                    )
+            return name
+        legacy = self._legacy_form_ids()
+        if legacy:
+            return legacy[0]
+        return re.sub(r"[^a-z0-9]+", "_", (self.title or "").lower()).strip("_")
+
     def export_form_title(self, fallback_label: Optional[str] = None) -> str:
         """Intervention title from tricc.yaml, else the start-node label, else project title."""
-        intervention = getattr(self, "intervention", None)
+        intervention = getattr(self, "config", None)
         titled = getattr(intervention, "title", None) if intervention is not None else None
         if titled:
             return titled
@@ -566,3 +617,7 @@ class TriccProject(BaseModel):
     # class Config:
     # Allow arbitrary types for validation
     #    arbitrary_types_allowed = True
+
+
+# Deprecated name, kept for code outside this repository.
+TriccProject = TriccIntervention

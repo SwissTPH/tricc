@@ -139,7 +139,9 @@ Examples used across element families:
 - `constraint`, `constraint_message`
 - `relevance`, `priority`
 - `save`, `expression`, `trigger`
-- `reference`, `instance`, `process`, `form_id`
+- `reference`, `instance`, `process`
+- `form_id` — deprecated: names the form only for a project without `tricc.yaml`
+  `interventions` (otherwise ignored with a warning; use `interventions[].name`)
 - `repeat` — concept capture slot (see [Concept repeat](#concept-repeat) below)
 
 ## Instance vs repeat

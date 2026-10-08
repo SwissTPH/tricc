@@ -2,7 +2,7 @@ import abc
 import os
 
 from tricc_oo.models.tricc import (
-    TriccProject,
+    TriccIntervention,
     TriccNodeMainStart,
     TriccSegment,
     node_container_for_root,
@@ -130,8 +130,8 @@ class BaseInputStrategy:
     # ``execute`` == new_project + load + finalize for every strategy.
     # ------------------------------------------------------------------
     @staticmethod
-    def new_project(project_config=None, intervention=None) -> TriccProject:
-        project = TriccProject()
+    def new_project(project_config=None, intervention=None) -> TriccIntervention:
+        project = TriccIntervention()
         if project_config is not None:
             project.title = project_config.title
             project.image_max_width = project_config.image_max_width()
@@ -140,7 +140,7 @@ class BaseInputStrategy:
             if default_lang:
                 project.lang_code = default_lang
                 project.languages = languages
-        project.intervention = intervention
+        project.config = intervention
         return project
 
     def load(self, file_content, media_path, project) -> None:

@@ -17,7 +17,7 @@ from tricc_oo.models.tricc import (
     TriccNodeActivity,
     TriccNodeMainStart,
     TriccNodeNote,
-    TriccProject,
+    TriccIntervention,
 )
 from tricc_oo.strategies.output.base_output_strategy import BaseOutPutStrategy
 from tricc_oo.strategies.output.html_form import HTMLStrategy
@@ -180,7 +180,7 @@ class TestBaseExecuteRunsRelevancePass(unittest.TestCase):
         start.group = activity
         activity.activity = activity
         activity.group = activity
-        project = TriccProject(pages={"main": activity}, start_pages={"main": activity})
+        project = TriccIntervention(pages={"main": activity}, start_pages={"main": activity})
         strategy = _CountingStrategy(project, "/tmp/walk_context_execute")
         strategy.execute()
         self.assertGreater(strategy.relevance_calls, 0)

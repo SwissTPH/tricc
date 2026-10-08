@@ -47,7 +47,7 @@ id: concept_main
 title: Concept main
 process: main
 nodes:
-  - {id: start, type: start, label: Concept demo, name: start_concept, form_id: concept_demo}
+  - {id: start, type: start, label: Concept demo, name: start_concept}
   - {id: intro, type: note, name: intro, label: Inline intro}
   - {id: age, type: integer, name: age, required: true}
   - id: fev
@@ -83,6 +83,7 @@ def _build(tmp_path):
                 "terminology: [terminology/*]",
                 "interventions:",
                 "  - id: concept",
+                "    name: concept_demo",
                 "    title: Concept",
                 "    activity: [yaml/*]",
             ]
@@ -167,6 +168,7 @@ def _build_translated(tmp_path, output="XLSFormStrategy", languages="{default: e
                 "terminology: [terminology/*]",
                 "interventions:",
                 "  - id: concept",
+                "    name: concept_demo",
                 "    title: Concept",
                 "    activity: [yaml/*]",
             ]
@@ -246,6 +248,7 @@ def test_fhir_questionnaire_carries_translation_extensions(tmp_path):
                 "terminology: [terminology/*]",
                 "interventions:",
                 "  - id: concept",
+                "    name: concept_demo",
                 "    title: Concept",
                 "    activity: [yaml/*]",
             ]

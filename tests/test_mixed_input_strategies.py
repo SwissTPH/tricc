@@ -55,7 +55,7 @@ id: mixed_main
 title: Mixed main
 process: main
 nodes:
-  - {{id: start, type: start, label: Mixed demo, name: start_mixed, form_id: mixed_demo}}
+  - {{id: start, type: start, label: Mixed demo, name: start_mixed}}
   - {{id: intro, type: note, name: intro_note, label: Intro from yaml}}
   - {{id: to_drawio, type: goto, name: to_drawio, label: Drawio sub-activity, link: {SUB_PAGE_ID}}}
   - {{id: end, type: end, name: end_mixed, label: End}}
@@ -78,6 +78,7 @@ def _mixed_project(tmp_path):
                 "output_strategies: [XLSFormStrategy]",
                 "interventions:",
                 "  - id: mixed",
+                "    name: mixed_demo",
                 "    title: Mixed",
                 "    activity:",
                 "      YamlStrategy: [yaml/*]",

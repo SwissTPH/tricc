@@ -121,7 +121,7 @@ and `input/base_input_strategy.py` define the contracts new strategies must impl
 - `tricc_oo/models/base.py` — `TriccNodeBaseModel` and the `TriccNodeType` enum (all node kinds:
   flow anchors, questions, inputs, calculate/logic, navigation, diagnosis).
 - `tricc_oo/models/calculate.py` / `models/tricc.py` — `TriccOperation` + `TriccOperator` (the
-  expression system) and `TriccProject`/activity/page containers.
+  expression system) and `TriccIntervention` (one per intervention build; formerly `TriccProject`)/activity/page containers.
 - Pydantic models throughout; graph nodes are connected via edges with optional labels, processed in
   topological order where possible.
 

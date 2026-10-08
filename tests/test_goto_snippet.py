@@ -17,7 +17,7 @@ from tricc_oo.models.tricc import (
     TriccNodeGoTo,
     TriccNodeInteger,
     TriccNodeNote,
-    TriccProject,
+    TriccIntervention,
 )
 from tricc_oo.strategies.input.drawio import DrawioStrategy
 from tricc_oo.strategies.input.yaml import YamlStrategy, YamlActivity
@@ -32,12 +32,12 @@ def _load_yaml(name: str):
     return strategy.execute([content], media_path=str(DATA / "media-tmp"))
 
 
-def _project_after_linking(name: str) -> TriccProject:
+def _project_after_linking(name: str) -> TriccIntervention:
     """Build activities from YAML and run linking_nodes only (no load_calculate)."""
     path = DATA / name
     content = path.read_text(encoding="utf-8")
     strategy = YamlStrategy(str(path))
-    project = TriccProject()
+    project = TriccIntervention()
     for loaded in yaml.safe_load_all(content):
         if not loaded:
             continue

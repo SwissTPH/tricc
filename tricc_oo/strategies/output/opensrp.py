@@ -578,7 +578,7 @@ class OpenSRPStrategy(FHIRStrategy):
             ],
             "action": child_actions,
         }
-        intervention = getattr(self.project, "intervention", None)
+        intervention = getattr(self.project, "config", None)
         demand_cql = None
         if intervention is not None:
             demand_cql = intervention.demand_condition()
@@ -621,7 +621,7 @@ class OpenSRPStrategy(FHIRStrategy):
 
     def link_follow_up(self, child_strategy, start) -> None:
         """Attach a follow-up action + ActivityDefinition to this parent PlanDefinition."""
-        child_intervention = getattr(getattr(child_strategy, "project", None), "intervention", None)
+        child_intervention = getattr(getattr(child_strategy, "project", None), "config", None)
         child_id = getattr(child_intervention, "id", None)
         if not child_id:
             raise ValueError("follow-up intervention is missing an id")

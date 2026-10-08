@@ -689,11 +689,9 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
 
     def export(self, start_pages, version, **kwargs):
         self.apply_translations()
-        form_id = None
-        if start_pages[self.processes[0]].root.form_id is not None:
-            form_id = str(start_pages[self.processes[0]].root.form_id)
-        else:
-            logger.critical("form id required in the first start node")
+        form_id = self.project.intervention_name()
+        if not form_id:
+            logger.critical("form id required: set interventions[].name (or a project title)")
             exit(1)
         root_label = start_pages[self.processes[0]].root.label
         if isinstance(root_label, str):
@@ -844,7 +842,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             exit(1)
 
     def _write_demand_properties(self, form_id, title):
-        intervention = getattr(self.project, "intervention", None)
+        intervention = getattr(self.project, "config", None)
         condition = intervention.demand_condition() if intervention is not None else None
         if not condition:
             return
@@ -913,14 +911,14 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
         return hidden
 
     def link_follow_up(self, child_strategy, start) -> None:
-        child_intervention = getattr(getattr(child_strategy, "project", None), "intervention", None)
+        child_intervention = getattr(getattr(child_strategy, "project", None), "config", None)
         child_id = getattr(child_intervention, "id", None)
         if not child_id:
             raise ValueError("follow-up intervention is missing an id")
         parent_form_id = getattr(self, "_form_id", None)
         child_form_id = getattr(child_strategy, "_form_id", None)
         if not parent_form_id or not child_form_id:
-            raise ValueError("CHT follow-up requires form_id on parent and child start nodes")
+            raise ValueError("CHT follow-up requires an intervention name on parent and child")
         applies_field = None
         if start.condition:
             parsed = transform_cql_to_operation(
@@ -971,8 +969,8 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
         """Validate the generated XLS form(s) using pyxform conversion and ODK Validate JAR."""
         if generated_files is None:
             # Fallback for single file validation
-            if self.project.start_pages["main"].root.form_id is not None:
-                form_id = str(self.project.start_pages["main"].root.form_id)
+            form_id = self.project.intervention_name()
+            if form_id:
                 generated_files = [os.path.join(self.output_path, form_id + ".xlsx")]
             else:
                 logger.error("Form ID not found for validation")

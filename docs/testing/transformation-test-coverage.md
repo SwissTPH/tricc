@@ -6,7 +6,7 @@ This document maps the key methods/functions involved in the transformation pipe
 
 **Important principles**:
 - One good YAML fixture (or small set of fixtures) can cover **tens of methods** at once.
-- The primary vehicle for these tests is the **YAML input strategy** (`YamlStrategy`) + direct inspection of the resulting `TriccProject` / activities after `process_pages` / `execute_linked_process`.
+- The primary vehicle for these tests is the **YAML input strategy** (`YamlStrategy`) + direct inspection of the resulting `TriccIntervention` / activities after `process_pages` / `execute_linked_process`.
 - Existing draw.io-based integration tests and output strategy tests provide secondary coverage.
 
 ---

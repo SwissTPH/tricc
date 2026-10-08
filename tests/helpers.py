@@ -22,14 +22,14 @@ import os
 from pathlib import Path
 from typing import Optional, Union
 
-from tricc_oo.models.tricc import TriccProject, TriccNodeBaseModel
+from tricc_oo.models.tricc import TriccIntervention, TriccNodeBaseModel
 from tricc_oo.strategies.input.yaml import YamlStrategy
 
 
 def load_yaml_project(
     yaml_path: Union[str, Path],
     media_path: Optional[str] = None,
-) -> TriccProject:
+) -> TriccIntervention:
     """
     Load a YAML test fixture and (optionally) run the full transformation pipeline.
 
@@ -42,7 +42,7 @@ def load_yaml_project(
         media_path: Optional directory for any media artifacts
 
     Returns:
-        A fully (or partially) processed TriccProject.
+        A fully (or partially) processed TriccIntervention.
     """
     yaml_path = Path(yaml_path)
     if not yaml_path.exists():

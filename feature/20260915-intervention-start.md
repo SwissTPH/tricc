@@ -3,6 +3,7 @@
 | Field | Value |
 |-------|-------|
 | **Status** | Implemented |
+| **Note** | Superseded in part: the intervention `name` names the form; `form_id` is legacy-only. See `feature/20261008-intervention-name-replaces-form-id.md`. |
 | **Related** | `feature/20260907-project-config.md` (Implemented — adds `interventions`; this spec replaces its `kind` / `applicability` keys), `feature/careplan.md` (Superseded), `feature/careplan-intervention-plandefinition.md`, `feature/opensrp-register.md`, `feature/populate-context.md`, `docs/open-srp-export.md`, `docs/cli-and-inputs.md` |
 | **Strategy** | `XLSFormCHTStrategy` (+ `XLSFormCHTHFStrategy`), `OpenSRPStrategy`. Other strategies build the forms and ignore `start`. |
 | **Approval** | Approved 2026-09-15 |

@@ -73,8 +73,14 @@ parameters:
 # due / window use UCUM time units only: s, min, h, d, wk, mo (mo = 30 d).
 # start may be a list if one intervention is both on demand and a follow-up.
 # kind and applicability are gone; use start instead.
+#
+# name names the form in every output (XLSForm file and form_id setting, CHT form,
+# DHIS2 program, FHIR / OpenSRP resource ids). It defaults to id. The drawings'
+# form_id is deprecated: with interventions it is ignored (with a warning); copy
+# its value into name to keep the old form name.
 interventions:
   - id: pediatrics                    # machine name; used in output folders
+    name: pediatrics                  # form name; optional, defaults to id
     title: Pediatrics                 # form title
     description: IMCI for children from 2 months to 5 years
     activity:

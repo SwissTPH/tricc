@@ -12,7 +12,7 @@ import pytest
 
 from tricc_oo.converters.cql_library import build_library_calculates, parse_cql_library
 from tricc_oo.models.project_config import TriccProjectConfig
-from tricc_oo.models.tricc import TriccProject
+from tricc_oo.models.tricc import TriccIntervention
 from tricc_oo.runner import run_project_build
 from tricc_oo.strategies.input.base_input_strategy import BaseInputStrategy
 
@@ -21,7 +21,7 @@ id: lib_main
 title: Library main
 process: main
 nodes:
-  - {id: start, type: start, label: Lib demo, name: start_lib, form_id: lib_demo}
+  - {id: start, type: start, label: Lib demo, name: start_lib}
   - {id: age, type: integer, name: age, label: Age in years, required: true}
   - {id: old_note, type: note, name: old_note, label: Older child, relevance: is_older}
   - {id: end, type: end, name: end_lib, label: End}
@@ -81,6 +81,7 @@ def _project(tmp_path, output="XLSFormStrategy", libraries="[cql/*]", terminolog
                 f"libraries: {libraries}",
                 "interventions:",
                 "  - id: lib",
+                "    name: lib_demo",
                 "    title: Lib",
                 "    activity: [yaml/*]",
             ]
@@ -132,7 +133,7 @@ def test_library_defines_become_calculates():
 
 
 def test_same_define_in_two_libraries_is_rejected():
-    project = TriccProject()
+    project = TriccIntervention()
     with pytest.raises(ValueError, match="already defined"):
         BaseInputStrategy.load_libraries(project, [("a.cql", "define x: 1"), ("b.cql", "define x: 2")])
 
@@ -141,7 +142,7 @@ def test_same_define_in_two_libraries_is_rejected():
 
 
 def test_terminology_is_keyed_by_codesystem_name():
-    project = TriccProject()
+    project = TriccIntervention()
     BaseInputStrategy.load_terminology(project, [("cs.json", json.dumps(CODESYSTEM))])
     assert list(project.code_systems) == ["tricc"]
     assert project.code_systems["tricc"].concept[0].code == "age"
@@ -156,7 +157,7 @@ def test_terminology_is_keyed_by_codesystem_name():
 )
 def test_terminology_rejects_bad_files(sources, message):
     with pytest.raises(ValueError, match=message):
-        BaseInputStrategy.load_terminology(TriccProject(), sources)
+        BaseInputStrategy.load_terminology(TriccIntervention(), sources)
 
 
 def test_config_cleans_terminology_and_library_globs():

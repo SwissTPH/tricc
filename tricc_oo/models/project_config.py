@@ -107,6 +107,9 @@ class TriccInterventionConfig(BaseModel):
 
     id: str
     title: str
+    # Names the form in every output (XLSForm form_id, CHT form, FHIR ids, ...).
+    # Defaults to ``id``; replaces the drawings' ``form_id``.
+    name: Optional[str] = None
     description: Optional[str] = None
     # Either a list of globs, read with the project's ``input_strategy``, or a mapping
     # ``{InputStrategyName: [globs]}`` so one intervention can mix drawio and yaml
@@ -162,9 +165,9 @@ class TriccInterventionConfig(BaseModel):
             return groups
         return clean(value, "activity")
 
-    @field_validator("description")
+    @field_validator("name", "description")
     @classmethod
-    def _empty_description(cls, value: Optional[str]) -> Optional[str]:
+    def _empty_to_none(cls, value: Optional[str]) -> Optional[str]:
         if value is None:
             return None
         stripped = value.strip()
@@ -203,7 +206,7 @@ class TriccProjectConfig(BaseModel):
     output_strategies: List[str] = Field(default_factory=list)
     parameters: Dict[str, Any] = Field(default_factory=dict)
     # Project CodeSystems (FHIR JSON): the central concept definitions, loaded into
-    # TriccProject.code_systems before any activity. Globs relative to tricc.yaml.
+    # TriccIntervention.code_systems before any activity. Globs relative to tricc.yaml.
     terminology: List[str] = Field(default_factory=list)
     # CQL libraries; every ``define`` becomes a calculate available to all activities.
     libraries: List[str] = Field(default_factory=list)
