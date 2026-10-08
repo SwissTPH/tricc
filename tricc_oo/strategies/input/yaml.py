@@ -150,8 +150,6 @@ class YamlNode(YamlModel):
     hint: Optional[str] = None
     help: Optional[str] = None
     concept: Optional[ConceptRef] = None
-    # Select concept code. Conversion exports this instead of a placeholder name.
-    filter: Optional[str] = None
     # proposed_diagnosis / diagnosis. Copied only when the node type's attr list names them.
     severity: Optional[str] = None
     remote_reference: Optional[str] = None
@@ -253,19 +251,19 @@ NODE_TYPE_MAP: Dict[str, Dict[str, Any]] = {
     },
     "select_one": {
         "model": TriccNodeSelectOne,
-        "attrs": ["label", "name", "required", "relevance", "save", "repeat", "hint", "help", "filter"],
+        "attrs": ["label", "name", "required", "relevance", "save", "repeat", "hint", "help"],
         "has_options": True,
         "tricc_type": TriccNodeType.select_one,
     },
     "select_multiple": {
         "model": TriccNodeSelectMultiple,
-        "attrs": ["label", "name", "required", "relevance", "save", "repeat", "hint", "help", "filter"],
+        "attrs": ["label", "name", "required", "relevance", "save", "repeat", "hint", "help"],
         "has_options": True,
         "tricc_type": TriccNodeType.select_multiple,
     },
     "select_yesno": {
         "model": TriccNodeSelectYesNo,
-        "attrs": ["label", "name", "required", "relevance", "save", "repeat", "hint", "help", "filter"],
+        "attrs": ["label", "name", "required", "relevance", "save", "repeat", "hint", "help"],
         "has_options": True,
         "tricc_type": TriccNodeType.select_yesno,
     },
@@ -551,15 +549,10 @@ class YamlStrategy(BaseInputStrategy):
                 else:
                     data[attr] = val
 
-        # A select filter is the concept code. Look that up before the local name,
-        # which may be a placeholder such as ``select_``.
-        concept_name = ynode.name
-        if type_info.get("has_options") and isinstance(ynode.filter, str) and ynode.filter.strip() and not ynode.concept:
-            concept_name = ynode.filter.strip()
         if ynode.type not in NO_CONCEPT_TEXT_TYPES and any(
             f in allowed_attrs and f not in data for f in TEXT_FIELD_USES
         ):
-            concept = self._resolve_concept(ynode.concept, concept_name, project, f"node {ynode.id}")
+            concept = self._resolve_concept(ynode.concept, ynode.name, project, f"node {ynode.id}")
             for field, text in self._concept_texts(concept, project).items():
                 if field in allowed_attrs and field not in data:
                     data[field] = text
@@ -581,14 +574,6 @@ class YamlStrategy(BaseInputStrategy):
 
         if ynode.concept is not None and "concept_code" in model_cls.model_fields:
             data["concept_code"], data["concept_system"] = self._concept_ref(ynode.concept)
-        elif (
-            type_info.get("has_options")
-            and isinstance(ynode.filter, str)
-            and ynode.filter.strip()
-            and "concept_code" in model_cls.model_fields
-        ):
-            data["filter"] = ynode.filter.strip()
-            data["concept_code"] = data["filter"]
 
         try:
             node = model_cls(**data)
