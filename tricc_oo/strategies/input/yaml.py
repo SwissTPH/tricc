@@ -453,7 +453,7 @@ class YamlStrategy(BaseInputStrategy):
             root_node.form_id = yaml_act.form_id
         activity_name = yaml_act.name or yaml_act.title.lower().replace(" ", "_")
 
-        # 3. Assemble the activity (segment when root is a main start) before ends,
+        # 2. Assemble the activity (segment when root is a main start) before ends,
         # so activity_end.__init__ can read activity.id.
         activity = node_container_for_root(
             root_node,
@@ -470,10 +470,8 @@ class YamlStrategy(BaseInputStrategy):
                 logger.warning(f"Skipping unknown or unsupported node type: {ynode.type}")
                 continue
             nodes[ynode.id] = node
-            if getattr(activity, "nodes", None) is not None:
-                activity.nodes[ynode.id] = node
 
-        # 2. Create edges, now that ends exist.
+        # 3. Create edges, now that ends exist.
         for yedge in yaml_act.edges:
             if yedge.source not in nodes or yedge.target not in nodes:
                 logger.warning(
@@ -487,17 +485,9 @@ class YamlStrategy(BaseInputStrategy):
                 value=yedge.value,
             )
             edges.append(edge)
-
-        # 3. Assemble the activity (segment when root is a main start)
-        activity = node_container_for_root(
-            root_node,
-            id=yaml_act.id,
-            label=yaml_act.title,
-            name=activity_name,
-            nodes=nodes,
-            edges=edges,
-            process=yaml_act.process,
-        )
+        # The model copied both collections on construction; hand it the complete ones.
+        activity.nodes = nodes
+        activity.edges = edges
 
         # Wire root to activity
         root_node.activity = activity
