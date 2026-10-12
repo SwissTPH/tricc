@@ -512,6 +512,9 @@ def _get_name(name, id, act_id):
 def get_nodes(diagram, activity):
     nodes = {activity.root.id: activity.root}
     get_all_nodes(diagram, activity, nodes)
+    # get_all_nodes reloads the root shape; that copy shares the activity name too
+    if isinstance(activity.root, TriccNodeActivityStart) and activity.root.id in nodes:
+        nodes[activity.root.id].name = activity.name
     new_nodes = {}
     node_to_remove = []
     activity_end_node = None
@@ -598,7 +601,8 @@ def create_root_node(diagram):
         if elm is not None:
             external_id = elm.attrib.get("id")
             id = get_id(external_id, diagram.attrib.get("id"))
-            name = generate_id("start"+external_id)
+            # the start node is the activity: it shares the activity name (else act_<id>)
+            name = _get_name(elm.attrib.get("name", "act_"), external_id, diagram.attrib.get("id"))
             node = TriccNodeActivityStart(
                 id=id,
                 external_id=external_id,

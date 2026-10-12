@@ -45,7 +45,8 @@ TYPE_MAP = {
     TriccNodeType.activity_start: {
         "objects": ["UserObject", "object"],
         "attributes": ["parent", "parent", "instance", "repeat", "relevance", "priority"],
-        "mandatory_attributes": ["label", "name"],
+        # a sequence node: no business name; it shares the activity's (see create_root_node)
+        "mandatory_attributes": ["label"],
         "model": TriccNodeActivityStart,
     },
     TriccNodeType.note: {

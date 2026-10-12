@@ -19,7 +19,7 @@ import logging
 from typing import Any, Dict, List, Optional, Type, Union
 
 import yaml
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, PrivateAttr, ValidationError, model_validator
 
 from tricc_oo.strategies.input.base_input_strategy import BaseInputStrategy
 from tricc_oo.converters.utils import generate_id
@@ -188,8 +188,12 @@ class YamlActivity(YamlModel):
     # interventions[].name). Read for a start node that has none. ``formId`` accepted too.
     form_id: Optional[str] = Field(default=None, validation_alias=AliasChoices("form_id", "formId"))
 
+    # whether ``title`` was written (it defaults to the id)
+    _title_given: bool = PrivateAttr(default=False)
+
     @model_validator(mode="after")
     def _defaults(self) -> "YamlActivity":
+        self._title_given = bool(self.title)
         if not self.title:
             self.title = self.id
         if self.name is not None:
@@ -450,13 +454,20 @@ class YamlStrategy(BaseInputStrategy):
         if yaml_act.form_id and isinstance(root_node, TriccNodeMainStart) and not root_node.form_id:
             root_node.form_id = yaml_act.form_id
         activity_name = yaml_act.name or yaml_act.title.lower().replace(" ", "_")
+        # The start node is the activity: activity-level keys are the single copy, and a
+        # value still written on the root (older files) is the fallback / keeps the root's.
+        activity_label = yaml_act.title
+        if not yaml_act._title_given and getattr(root_node, "label", None):
+            activity_label = root_node.label
+        if not getattr(root_node, "label", None):
+            root_node.label = yaml_act.title
 
         # 2. Assemble the activity (segment when root is a main start) before ends,
         # so activity_end.__init__ can read activity.id.
         activity = node_container_for_root(
             root_node,
             id=yaml_act.id,
-            label=yaml_act.title,
+            label=activity_label,
             name=activity_name,
             nodes=nodes,
             edges=edges,
@@ -510,6 +521,8 @@ class YamlStrategy(BaseInputStrategy):
 
         if yaml_act.applicability:
             activity.applicability = parse_expression("", yaml_act.applicability)
+        elif getattr(root_node, "relevance", None) is not None:
+            activity.applicability = root_node.relevance
         activity.intent = yaml_act.intent
 
         logger.info(f"Loaded YAML activity: {yaml_act.id} ({yaml_act.title})")
