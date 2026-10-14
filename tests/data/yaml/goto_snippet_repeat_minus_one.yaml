@@ -81,14 +81,17 @@ edges:
     target: trigger_b
   - source: trigger_b
     target: trigger_c
+    value: follow
   - source: trigger_c
     target: node_gate_b
+    value: follow
   - source: node_gate_b
     target: goto_a1
   - source: goto_a1
     target: end
   - source: trigger_c
     target: node_gate_c
+    value: follow
   - source: node_gate_c
     target: goto_a2
   - source: goto_a2

@@ -523,14 +523,24 @@ class TestSpecStrategy(BaseTestStrategy):
 
     @staticmethod
     def edges(observed: Dict[str, Any]) -> List[dict]:
-        """Derive edges between exported nodes from ``next_nodes``."""
+        """Derive edges between exported nodes from ``next_nodes``.
+
+        A node the model does not hold (path bridge, exclusive, …) is walked through
+        to the next exported nodes, so every edge ends on a known node.
+        """
         result: List[dict] = []
         seen = set()
         by_id = {id(node): name for name, node in observed.items()}
         for source_name, node in observed.items():
-            for target in getattr(node, "next_nodes", None) or []:
-                target_name = by_id.get(id(target)) or safe_export_name(target)
+            queue = list(getattr(node, "next_nodes", None) or [])
+            walked = set()
+            while queue:
+                target = queue.pop(0)
+                target_name = by_id.get(id(target))
                 if not target_name:
+                    if id(target) not in walked:
+                        walked.add(id(target))
+                        queue.extend(getattr(target, "next_nodes", None) or [])
                     continue
                 key = (source_name, target_name)
                 if key in seen:

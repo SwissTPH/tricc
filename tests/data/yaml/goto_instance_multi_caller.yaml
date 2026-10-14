@@ -62,6 +62,7 @@ edges:
     target: choice
   - source: choice
     target: rhombus_choice
+    value: follow
   - source: rhombus_choice
     target: goto_b1
     value: "yes"

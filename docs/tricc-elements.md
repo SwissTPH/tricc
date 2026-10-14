@@ -256,8 +256,9 @@ Full concept-repeat specification: `feature/concept-repeat.md` (status: Implemen
 
 ## Edge labels (conditional flow)
 
-During draw.io conversion (`process_edges` in `xml_to_tricc.py`), arrow labels are
-interpreted as branch semantics. Labels are case-insensitive unless noted.
+Arrow labels (draw.io) and edge `value`s (YAML) are interpreted as branch semantics by
+the same routine (`process_edge_label` in `xml_to_tricc.py`). Labels are case-insensitive
+unless noted.
 
 | Label pattern | Meaning | Typical source node |
 |---------------|---------|---------------------|
@@ -267,6 +268,14 @@ interpreted as branch semantics. Labels are case-insensitive unless noted.
 | *(empty)* | Treated as **yes** on `rhombus` out-edges | `rhombus` |
 | Integer factor (`-1`, `+2`, `3`, …) | **Yes** branch with optional score factor | `rhombus`, selects, calculates |
 | Reserved expression tokens | Condition edge → may insert a nested `rhombus` | Any calculate-capable node |
+| `Answer("<code>")` | Condition on the answer, as CQL; `<code>` is the answer concept (option concept code or name): `"<option name>" in $this` (select_one / select_multiple), `$this is true` / `$this is false` for `Answer("yes")` / `Answer("no")` (select_yesno); inserts a rhombus like any condition edge. `Answer('<code>')` is still read | `select_one`, `select_multiple`, `select_yesno` |
+
+In a CQL condition, the answer side of `in` / `contains` is a code: `"rash" in $this` and
+`'rash' in $this` both mean `selected(${q}, 'rash')`. The identifier is never read as a node.
+
+Every out-edge of a `select_yesno` needs `yes`, `no` or `follow`: an unlabelled one stops
+the conversion. In YAML, a `select_yesno` without `options` gets the built-in yes / no
+options (list `yes_no`), as in draw.io.
 
 **Integer factors on rhombus:** a numeric out-edge label (for example `-1` on a
 condition gate feeding a `count` node) is treated as an affirmative (**yes**) path.

@@ -4,7 +4,13 @@ import base64
 import os
 import re
 from tricc_oo.converters.cql_to_operation import transform_cql_to_operation
-from tricc_oo.converters.utils import clean_str, generate_id, remove_html, remove_html_full
+from tricc_oo.converters.utils import (
+    clean_str,
+    generate_id,
+    remove_html,
+    remove_html_full,
+    unquote_literal,
+)
 from tricc_oo.models.base import (
     TriccOperator, TriccOperation,
     TriccStatic, TriccReference, TriccNodeType, TriccEdge, OPERATION_LIST
@@ -49,6 +55,8 @@ from tricc_oo.models.tricc import (
     TriccNodeNote,
     TriccNodeLinkOut,
     TriccNodeDisplayModel,
+    TRICC_TRUE_VALUE,
+    TRICC_FALSE_VALUE,
 )
 from tricc_oo.visitors.text_injection import apply_display_text_injections
 
@@ -393,74 +401,7 @@ def process_edges(diagram, media_path, activity, nodes, project=None):
             isinstance(nodes[edge.target], (TriccNodeEnd)) and isinstance(activity.root, TriccNodeMainStart)
         ):
             end_found = True
-        if (
-            edge.target in nodes
-            and issubclass(nodes[edge.target].__class__, TriccRhombusMixIn)
-            and edge.source != nodes[edge.target].path.id
-        ):
-            edge.target = nodes[edge.target].path.id
-        # modify edge for selectyesNo
-        if edge.source in nodes and isinstance(nodes[edge.source], TriccNodeSelectYesNo):
-            process_yesno_edge(edge, nodes)
-
-        # create calculate based on edges label
-        elif edge.value is not None:
-            label = edge.value.strip()
-            label_html_free = html2text.html2text(label)
-            processed = False
-            calc = None
-            if isinstance(nodes[edge.source], TriccNodeRhombus):
-                if label.lower() in TRICC_FOLLOW_LABEL:
-                    processed = True
-                    edge.source = nodes[edge.source].path.id
-                    edge.source_external_id = None
-                elif label.lower() in TRICC_NO_LABEL:
-                    calc = process_exclusive_edge(edge, nodes)
-                elif label.lower() in TRICC_YES_LABEL or label == "":
-                    pass
-                elif is_factor_edge_label(label):
-                    # Integer (+/-) factor on a rhombus out-edge implies "yes"
-                    calc = process_factor_edge(edge, nodes)
-                else:
-                    logger.critical(f"missing label on edge in {diagram.attrib.get('name', diagram.attrib['id'])} from rhombus {edge.source} ")
-                    exit(1)
-                processed = True
-            elif label.lower() in TRICC_FOLLOW_LABEL:
-                logger.warning(f"continue label on edge in {diagram.attrib.get('name', diagram.attrib['id'])} from rhombus {edge.source} ")
-                processed = True
-            elif label.lower() in (TRICC_YES_LABEL) or label == "":
-                # do nothinbg for yes
-                processed = True
-            elif is_factor_edge_label(label):
-                calc = process_factor_edge(edge, nodes)
-            elif label.lower() in TRICC_NO_LABEL:
-                calc = process_exclusive_edge(edge, nodes)
-            elif any(
-                reserved in label_html_free
-                for reserved in ([str(o) for o in list(TriccOperator)] + list(OPERATION_LIST.keys()) + ["$this"])
-            ):
-                # manage comment
-                calc = process_condition_edge(edge, label_html_free, nodes)
-            else:
-                logger.warning(f"unsupported edge label {label} in {diagram.attrib.get('name', diagram.attrib['id'])}")
-                processed = True
-            if calc is not None:
-                processed = True
-                nodes[calc.id] = calc
-                # add edge between calc and
-                set_prev_next_node(calc, nodes[edge.target], edge_only=True)
-                edge.target = calc.id
-            if not processed:
-                logger.warning(
-                    "Edge between {0} and {1} with label '{2}' could not be interpreted: {3}".format(
-                        nodes[edge.source].get_name(),
-                        nodes[edge.target].get_name(),
-                        edge.value.strip(),
-                        "not management found",
-                    )
-                )
-        elif edge.source in nodes and isinstance(nodes[edge.source], TriccNodeRhombus):
-            logger.critical("rhombus {} node with labelless edges".format(nodes[edge.source].get_name()))
+        process_edge_label(edge, nodes, diagram.attrib.get("name", diagram.attrib["id"]))
     if not end_found:
         fake_end = TriccNodeActivityEnd(id=generate_id(f"e{activity.name}"), activity=activity, group=activity)
         last_nodes = [
@@ -499,6 +440,139 @@ def process_edges(diagram, media_path, activity, nodes, project=None):
     return images
 
 
+# Answer("<code>"): the answer concept as a CQL identifier. Answer('<code>') (a string,
+# '' escaping a quote) is still read, for files written before the identifier form.
+ANSWER_EDGE_LABEL = re.compile(
+    r"""^\s*Answer\(\s*(?:"((?:[^"\\]|\\.)*)"|'((?:[^']|'')*)')\s*\)\s*$"""
+)
+
+
+def _answer_option(select, code):
+    """The option of ``select`` answering ``code``: by concept code, else by name."""
+    options = list(select.options.values())
+    for option in options:
+        if getattr(option, "concept_code", None) == code:
+            return option
+    for option in options:
+        if str(option.name) == code:
+            return option
+    return None
+
+
+def answer_edge_condition(edge, nodes):
+    """Rewrite an ``Answer("<code>")`` edge of a select into its CQL condition.
+
+    ``<code>`` is the answer concept (an option's concept code or name).
+    select_one / select_multiple: ``"<option name>" in $this``; select_yesno:
+    ``$this is true`` for the yes answer, ``$this is false`` for the no answer. The
+    condition edge then inserts a rhombus between the select and the target
+    (``process_condition_edge``). Returns True when the edge was rewritten.
+    """
+    source = nodes.get(edge.source)
+    if edge.value is None or not isinstance(source, TriccNodeSelect):
+        return False
+    match = ANSWER_EDGE_LABEL.match(edge.value)
+    if not match:
+        return False
+    if match.group(1) is not None:
+        code = unquote_literal(f'"{match.group(1)}"')
+    else:
+        code = match.group(2).replace("''", "'")
+    option = _answer_option(source, code)
+    if isinstance(source, TriccNodeSelectYesNo):
+        yes_option, no_option = get_yes_no_options(source)
+        if option is None and code.lower() in [TRICC_TRUE_VALUE] + TRICC_YES_LABEL:
+            option = yes_option
+        elif option is None and code.lower() in [TRICC_FALSE_VALUE] + TRICC_NO_LABEL:
+            option = no_option
+        if option is None or option not in (yes_option, no_option):
+            logger.warning(f"edge {edge.id}: yesNo {source.get_name()} has no answer {code!r}")
+            return False
+        edge.value = "$this is true" if option is yes_option else "$this is false"
+        return True
+    if option is None:
+        logger.warning(f"edge {edge.id}: select {source.get_name()} has no option {code!r}")
+    edge.value = f'"{option.name if option is not None else code}" in $this'
+    return True
+
+
+def process_edge_label(edge, nodes, where):
+    """Interpret the label of one edge: rhombus path retarget, yes/no, ``Answer("…")``
+    (as a condition), no (exclusive), factor, condition and follow. Injected calculates go into ``nodes``.
+
+    Shared by the draw.io and YAML inputs; ``where`` names the page in the logs.
+    """
+    if (
+        edge.target in nodes
+        and issubclass(nodes[edge.target].__class__, TriccRhombusMixIn)
+        and edge.source != nodes[edge.target].path.id
+    ):
+        edge.target = nodes[edge.target].path.id
+    answered = answer_edge_condition(edge, nodes)
+    # modify edge for selectyesNo (an Answer('…') condition is a condition edge instead)
+    if not answered and edge.source in nodes and isinstance(nodes[edge.source], TriccNodeSelectYesNo):
+        process_yesno_edge(edge, nodes)
+
+    # create calculate based on edges label
+    elif edge.value is not None:
+        label = edge.value.strip()
+        label_html_free = html2text.html2text(label)
+        processed = False
+        calc = None
+        if isinstance(nodes[edge.source], TriccNodeRhombus):
+            if label.lower() in TRICC_FOLLOW_LABEL:
+                processed = True
+                edge.source = nodes[edge.source].path.id
+                edge.source_external_id = None
+            elif label.lower() in TRICC_NO_LABEL:
+                calc = process_exclusive_edge(edge, nodes)
+            elif label.lower() in TRICC_YES_LABEL or label == "":
+                pass
+            elif is_factor_edge_label(label):
+                # Integer (+/-) factor on a rhombus out-edge implies "yes"
+                calc = process_factor_edge(edge, nodes)
+            else:
+                logger.critical(f"missing label on edge in {where} from rhombus {edge.source} ")
+                exit(1)
+            processed = True
+        elif label.lower() in TRICC_FOLLOW_LABEL:
+            logger.warning(f"continue label on edge in {where} from rhombus {edge.source} ")
+            processed = True
+        elif label.lower() in (TRICC_YES_LABEL) or label == "":
+            # do nothinbg for yes
+            processed = True
+        elif is_factor_edge_label(label):
+            calc = process_factor_edge(edge, nodes)
+        elif label.lower() in TRICC_NO_LABEL:
+            calc = process_exclusive_edge(edge, nodes)
+        elif any(
+            reserved in label_html_free
+            for reserved in ([str(o) for o in list(TriccOperator)] + list(OPERATION_LIST.keys()) + ["$this"])
+        ):
+            # manage comment
+            calc = process_condition_edge(edge, label_html_free, nodes)
+        else:
+            logger.warning(f"unsupported edge label {label} in {where}")
+            processed = True
+        if calc is not None:
+            processed = True
+            nodes[calc.id] = calc
+            # add edge between calc and
+            set_prev_next_node(calc, nodes[edge.target], edge_only=True)
+            edge.target = calc.id
+        if not processed:
+            logger.warning(
+                "Edge between {0} and {1} with label '{2}' could not be interpreted: {3}".format(
+                    nodes[edge.source].get_name(),
+                    nodes[edge.target].get_name(),
+                    edge.value.strip(),
+                    "not management found",
+                )
+            )
+    elif edge.source in nodes and isinstance(nodes[edge.source], TriccNodeRhombus):
+        logger.critical("rhombus {} node with labelless edges".format(nodes[edge.source].get_name()))
+
+
 def get_id(elm_id, activity_id):
     return str(elm_id) if len(elm_id) > 8 else str(activity_id) + str(elm_id)
 
@@ -507,6 +581,19 @@ def _get_name(name, id, act_id):
     if name is not None and (name.endswith(("_", "."))):
         return name + get_id(id, act_id)
     return name
+
+
+def assign_rhombus_path(node, nodes, activity):
+    """Give a rhombus its path: a bridge over its in-edges, else the activity root.
+
+    Returns the injected bridge, for the caller to add to its nodes, or None.
+    """
+    calc = inject_bridge_path(node, nodes)
+    if calc:
+        node.path = calc
+        return calc
+    node.path = activity.root
+    return None
 
 
 def get_nodes(diagram, activity):
@@ -523,14 +610,9 @@ def get_nodes(diagram, activity):
         if hasattr(node, "name"):
             node.name = _get_name(node.name, node.id, activity.id)
         if issubclass(node.__class__, TriccRhombusMixIn) and node.path is None:
-            # generate rhombuse path
-            calc = inject_bridge_path(node, {**nodes, **new_nodes})
+            calc = assign_rhombus_path(node, {**nodes, **new_nodes}, activity)
             if calc:
-                node.path = calc
                 new_nodes[calc.id] = calc
-            else:
-                node.path = activity.root
-            # add the edge between trhombus and its path
         elif isinstance(node, TriccNodeGoTo):
             # instance == -1: snippet inject at link time — keep prev→goto→next edges as-is
             if getattr(node, "instance", 1) == -1:
@@ -1321,25 +1403,42 @@ def process_exclusive_edge(edge, nodes):
     return None
 
 
+def get_yes_no_options(select):
+    """``(yes, no)`` options of a yes/no select, by name (``true`` / ``yes``), else by label.
+
+    The label can be a translation ("Oui"); draw.io options are named true / false.
+    """
+    yes_option = no_option = None
+    for option in select.options.values():
+        name = str(option.name).lower()
+        if name in [TRICC_TRUE_VALUE] + TRICC_YES_LABEL:
+            yes_option = option
+        elif name in [TRICC_FALSE_VALUE] + TRICC_NO_LABEL:
+            no_option = option
+    for option in select.options.values():
+        if option in (yes_option, no_option):
+            continue
+        if (option.label or "").lower() == "yes":
+            yes_option = yes_option or option
+        else:
+            no_option = no_option or option
+    return yes_option, no_option
+
+
 def process_yesno_edge(edge, nodes):
     if not edge.value:
         logger.critical("yesNo {} node with labelless edges".format(nodes[edge.source].get_name()))
         exit(1)
     label = edge.value.strip().lower()
-    yes_option = None
-    no_option = None
-    for option in nodes[edge.source].options.values():
-        if option.label.lower() == "yes":
-            yes_option = option
-        else:
-            no_option = option
+    yes_option, no_option = get_yes_no_options(nodes[edge.source])
     if label.lower() in TRICC_FOLLOW_LABEL:
         pass
-    elif label.lower() in TRICC_YES_LABEL:
-        edge.source = yes_option.id
-        edge.source_external_id = None
-    elif label.lower() in TRICC_NO_LABEL:
-        edge.source = no_option.id
-        edge.source_external_id = None
+    elif label.lower() in TRICC_YES_LABEL + TRICC_NO_LABEL:
+        option = yes_option if label.lower() in TRICC_YES_LABEL else no_option
+        if option is None:
+            logger.warning(f"yesNo {nodes[edge.source].get_name()} has no {label} option for edge {edge.id}")
+        else:
+            edge.source = option.id
+            edge.source_external_id = None
     else:
         logger.warning("edge {0} is coming from select {1}".format(edge.id, nodes[edge.source].get_name()))

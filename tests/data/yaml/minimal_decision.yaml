@@ -48,6 +48,7 @@ edges:
     target: q_has_symptom
   - source: q_has_symptom
     target: rhombus_symptom
+    value: follow
   - source: rhombus_symptom
     target: note_positive
     value: "yes"

@@ -92,8 +92,10 @@ edges:
     target: trigger_a
   - source: trigger_a
     target: trigger_d
+    value: follow
   - source: trigger_d
     target: node_b
+    value: follow
   - source: node_b
     target: goto_c1
   - source: goto_c1
@@ -102,6 +104,7 @@ edges:
     target: end
   - source: trigger_d
     target: node_e
+    value: follow
   - source: node_e
     target: goto_c2
   - source: goto_c2

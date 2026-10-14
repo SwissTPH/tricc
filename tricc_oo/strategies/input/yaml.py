@@ -25,12 +25,15 @@ from tricc_oo.strategies.input.base_input_strategy import BaseInputStrategy
 from tricc_oo.converters.utils import generate_id
 from tricc_oo.converters.datadictionnary import concept_text, find_concept
 from tricc_oo.converters.xml_to_tricc import (
+    _get_name,
+    assign_rhombus_path,
     parse_expression,
     load_expressions,
+    process_edge_label,
     propagate_activity_repeat,
     shield_required,
 )
-from tricc_oo.visitors.tricc import set_prev_next_node
+from tricc_oo.visitors.tricc import get_select_yes_no_options, set_prev_next_node
 from tricc_oo.visitors.utils import PROCESSES
 from tricc_oo.strategies.registry import register_input_strategy
 
@@ -66,6 +69,7 @@ from tricc_oo.models.calculate import (
     TriccNodePopulate,
     TriccNodeProposedDiagnosis,
     TriccNodeDiagnosis,
+    TriccRhombusMixIn,
 )
 
 logger = logging.getLogger("default")
@@ -102,6 +106,8 @@ class YamlOption(YamlModel):
     label: Optional[str] = None
     concept: Optional[ConceptRef] = None
     relevance: Optional[str] = None
+    # the "none of these" answer, as the draw.io ``is_none`` attribute
+    is_none: bool = False
 
 
 class YamlNode(YamlModel):
@@ -269,7 +275,8 @@ NODE_TYPE_MAP: Dict[str, Dict[str, Any]] = {
         "model": TriccNodeSelectYesNo,
         "attrs": ["label", "name", "required", "relevance", "save", "repeat", "hint", "help"],
         "has_options": True,
-        "tricc_type": TriccNodeType.select_yesno,
+        # Same as the draw.io model: the node keeps select_one (exported as select_one yes_no).
+        "tricc_type": TriccNodeType.select_one,
     },
     "not_available": {
         "model": TriccNodeSelectNotAvailable,
@@ -445,6 +452,9 @@ class YamlStrategy(BaseInputStrategy):
                 logger.warning(f"Skipping unknown or unsupported node type: {ynode.type}")
                 continue
             nodes[ynode.id] = node
+            # options are edge sources too (yes / no, Answer('…')), as in draw.io
+            for option in (getattr(node, "options", None) or {}).values():
+                nodes[option.id] = option
             if ynode.type in ("start", "activity_start"):
                 root_node = node
 
@@ -497,6 +507,7 @@ class YamlStrategy(BaseInputStrategy):
         # The model copied both collections on construction; hand it the complete ones.
         activity.nodes = nodes
         activity.edges = edges
+        nodes = activity.nodes
 
         # Wire root to activity
         root_node.activity = activity
@@ -506,6 +517,17 @@ class YamlStrategy(BaseInputStrategy):
         for node in nodes.values():
             node.activity = activity
             node.group = activity
+
+        # 3b. Edge labels, as for draw.io: rhombus paths, then yes / no / factor /
+        # condition / follow / Answer('…'). Injected nodes and edges land in the activity.
+        for node in list(nodes.values()):
+            if isinstance(node, TriccRhombusMixIn) and node.path is None:
+                calc = assign_rhombus_path(node, nodes, activity)
+                if calc:
+                    nodes[calc.id] = calc
+        for edge in list(activity.edges):
+            process_edge_label(edge, nodes, yaml_act.id)
+        edges = activity.edges
 
         # 4. Post-process expressions (relevance, calculate, etc.)
         for node in nodes.values():
@@ -575,12 +597,17 @@ class YamlStrategy(BaseInputStrategy):
             data["label"] = ynode.label
         if "name" not in data and ynode.name:
             data["name"] = ynode.name
+        if ynode.type == "end" and "name" not in data:
+            # a sequence node: name it from its id, as the activity start
+            data["name"] = _get_name("end_", ynode.id, yaml_act.id)
 
         # Special handling for select nodes: create parent first (no options yet),
         # then create options with a reference back to the parent select.
         list_name = None
         if type_info.get("has_options"):
             list_name = ynode.name or f"list_{ynode.id}"
+            if ynode.type == "select_yesno" and not ynode.options:
+                list_name = "yes_no"
             data["list_name"] = list_name
             # We will attach options after the parent node is created
             data["options"] = {}
@@ -595,7 +622,10 @@ class YamlStrategy(BaseInputStrategy):
             return None
 
         # Post-creation wiring for select options (now that the parent exists)
-        if type_info.get("has_options"):
+        if ynode.type == "select_yesno" and not ynode.options:
+            # as draw.io: the built-in yes / no options
+            node.options = get_select_yes_no_options(node, None)
+        elif type_info.get("has_options"):
             node.options = {}
             # Integer keys (0, 1, …) match draw.io and Dict[int, TriccNodeSelectOption].
             for i, opt in enumerate(ynode.options):
@@ -614,6 +644,7 @@ class YamlStrategy(BaseInputStrategy):
                     relevance=parse_expression("", opt.relevance) if opt.relevance else None,
                     concept_code=opt_code,
                     concept_system=opt_system,
+                    is_none=opt.is_none,
                 )
                 node.options[i] = opt_node
                 # Also set activity/group if they exist on the parent

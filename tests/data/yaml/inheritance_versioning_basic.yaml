@@ -70,5 +70,6 @@ edges:
     target: q_extra_check
   - source: q_extra_check
     target: calc_eligible_v2
+    value: follow
   - source: calc_eligible_v2
     target: end_override
