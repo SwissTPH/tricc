@@ -913,7 +913,8 @@ def generate_calculates(node, calculates, used_calculates, processed_nodes, proc
         for option in node.options.values():
             if not option.name.startswith("opt_") and node.name != 'manual.diag':
                 calc_id = generate_id(f"contains_{node.id}_{option.name}")
-                expression = TriccOperation(TriccOperator.CONTAINS, [node, option.name])
+                # option membership, the code as a literal (a bare str would print unquoted)
+                expression = TriccOperation(TriccOperator.SELECTED, [node, TriccStatic(option.name)])
                 calc_node = TriccNodeCalculate(
                     name=option.name,
                     id=calc_id,

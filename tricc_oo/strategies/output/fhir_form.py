@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from tricc_oo.converters.fhir.concept_mapper import get_fhir_resource
+from tricc_oo.converters.utils import quoted_literal
 from tricc_oo.converters.fhir.structuremap import (
     apply_questionnaire_item_to_rule,
     build_extraction_rule,
@@ -2147,7 +2148,7 @@ class FHIRStrategy(BaseOutPutStrategy):
             return get_export_name(r.value)
         elif isinstance(r, TriccStatic):
             if isinstance(r.value, str):
-                value = f"'{r.value}'"
+                value = quoted_literal(r.value)
             else:
                 value = str(r.value)
             if value == "True":
@@ -2159,11 +2160,11 @@ class FHIRStrategy(BaseOutPutStrategy):
         elif isinstance(r, bool):
             return 'true' if r else 'false'
         elif isinstance(r, str):
-            return f"'{r}'"
+            return quoted_literal(r)
         elif isinstance(r, (int, float)):
             return str(r)
         elif isinstance(r, TriccNodeSelectOption):
-            return f"'{r.name}'"
+            return quoted_literal(r.name)
         elif isinstance(r, TriccNodePopulate):
             return self._populate_reference(r)
         elif issubclass(r.__class__, TriccNodeBaseModel):
@@ -2491,12 +2492,12 @@ class FHIRStrategy(BaseOutPutStrategy):
             if isinstance(r.value, (int, float, Decimal)):
                 return format_fhirpath_decimal(r.value)
             if isinstance(r.value, str):
-                return f"'{r.value}'"
+                return quoted_literal(r.value)
             return str(r.value)
         elif isinstance(r, bool):
             return "true" if r else "false"
         elif isinstance(r, str):
-            return f"'{r}'"
+            return quoted_literal(r)
         elif isinstance(r, (int, float, Decimal)):
             return format_fhirpath_decimal(r)
         elif isinstance(r, TriccNodeSelectOption):
@@ -2504,7 +2505,7 @@ class FHIRStrategy(BaseOutPutStrategy):
                 literal = self._yesno_option_boolean_literal(r)
                 if literal is not None:
                     return literal
-            return f"'{r.name}'"
+            return quoted_literal(r.name)
         elif isinstance(r, (TriccNodeBaseModel, TriccGroup)):
             # Containers and non-materialised routing nodes have no `answer`: branching on
             # them means "this container is relevant", so inline their relevance instead
