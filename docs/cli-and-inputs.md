@@ -1,18 +1,142 @@
 # CLI and Inputs
 
-TRICC is commonly executed through `tests/build.py`.
+Local clinical projects should use the **`tricc` command** after installing
+`tricc-oo`. `python tests/build.py` is the development harness (Google Drive,
+launch.json debug matrix).
 
 ## Main flags
 
 - `-i`, `--input`: required input (file, directory, or supported URL).
 - `-o`: output directory.
 - `-I`: input strategy class (default `DrawioStrategy`).
-- `-O`: output strategy class (default `XLSFormCDSSStrategy`).
+- `-O`: output strategy class. Overrides `tricc.yaml` `output_strategies` when passed.
+  Default without a project file: `XLSFormCHTStrategy` (`tests/build.py`).
 - `-T`: test strategy class (optional). Runs after the output strategy and adds test
   material without changing the deployable artifact. See [Test strategies](#test-strategies--t).
-- `-d`: form id.
+- `-d`: form id. Deprecated and unused; the form is named by `interventions[].name`
+  (or, without interventions, by the main start's legacy `form_id`).
 - `-l`: log level shortcut (`d`, `i`, `w`).
 - `-D`: download directory.
+
+## Project file (`tricc.yaml`)
+
+If `-i` is a directory (or a file), TRICC looks for `tricc.yaml` / `tricc.yml` in that
+folder. The file is optional. When present it names the project, pins the converter
+version, lists output strategies, optional image pixel caps, and **interventions**
+(each a glob of drawings). See `feature/20260907-project-config.md`.
+
+Copy [docs/tricc.yaml.template](./tricc.yaml.template) **into the clinical project
+folder** (Almanach, etc.) as `tricc.yaml`. That project is not part of this repo.
+
+With `tricc-oo` installed, run from that folder (no `tests/build.py`):
+
+```bash
+tricc -o ./build
+```
+
+`-i` defaults to the current directory. `python tests/build.py` remains the
+Google Drive / debug harness.
+
+Example:
+
+```yaml
+title: Almanach Global
+input_strategy: DrawioStrategy
+output_strategies:
+  - XLSFormStrategy
+  - XLSFormCHTStrategy
+parameters:
+  tricc_version: "1.7.3"
+  image_max_width: 1200
+  image_max_height: 1200
+interventions:
+  - id: pediatrics
+    name: pediatrics          # form name in every output; optional, defaults to id
+    title: Pediatrics
+    start:
+      on: demand
+      condition: "AgeInMonths() >= 2"
+    description: IMCI for children from 2 months to 5 years
+    activity:
+      - common/*
+      - child/*
+```
+
+- **CLI `-I` / `-O` win** when passed; `-O` replaces the YAML list (does not append).
+- **`parameters.tricc_version`** must equal the installed `tricc-oo` version, or the
+  build fails. Omit the key to skip the check.
+- **`terminology`** lists project CodeSystem files (FHIR JSON, globs relative to
+  `tricc.yaml`). They are loaded before any activity into the project's CodeSystems
+  (keyed by CodeSystem `name`, e.g. `demo` for `demo.fever` codes, `tricc` for
+  unprefixed ones) and exported next to the forms; concepts found in activities are
+  merged into them. A terminology concept keeps its own display: an activity label
+  that differs is only logged at debug level (two draw.io labels that differ for the
+  same code still warn).
+- **Concept texts:** a CodeSystem concept carries its label in `display` and its
+  translations / hint / help in `designation[]` (`{language, use, value}`). `use` is
+  `{system: http://terminology.hl7.org/CodeSystem/designation-usage, code: display}`
+  for labels and `{system: https://tricc.org/CodeSystem/designation-use, code: hint}`
+  (or `code: help`) for hint / help. When a draw.io node has hint / help shapes, they
+  are written as designations of its concept in the default language, unless the
+  concept already has one for that language.
+- **`parameters.languages`**: `{default: en, available: [en, fr]}` (a list or a single
+  code also work; the first entry is then the default). Without it the default
+  language is `en` and outputs are single-language, as before. With it:
+  - XLSForm (and the CHT / CDSS variants) write every text column once per language
+    (`label::en`, `label::fr`, `hint::fr`, `help::fr`, `constraint_message::fr`, …) and
+    set `settings.default_language` to the default code. The default-language column
+    holds the built text; the others come from the row's concept designations
+    (`display` / `hint` / `help`), else the gettext catalogue, else the default text.
+  - FHIR Questionnaires add the standard `translation` extension on `item._text`
+    (label, and the help / flyover child items) and on `answerOption.valueCoding._display`
+    for every non-default language that has a designation.
+  - A row's concept is its node's explicit YAML `concept`, else the concept whose code
+    is the node name. Designation text is used as is (`${name}` tokens are not remapped
+    to export names).
+- **`libraries`** lists CQL files. Each `define name: <expression>` becomes a
+  calculate that any activity can reference by name, processed like a free-floating
+  calculate on the main page (computed once its references are available). Only
+  expression defines are supported: declarations (`library`, `using`, `include`,
+  `context`, …) are ignored, functions are rejected, names must be plain identifiers,
+  and a name may be defined once across all libraries.
+- **Image caps** apply when extracting pictures from draw.io (`0` / omitted = no cap).
+  A single image object may set `max_width` / `max_height` (Edit Data) to override
+  one side; `0` means unlimited for that side.
+- **The intervention `name` names the form** in every output: XLSForm file and
+  `form_id` setting, CHT form, DHIS2 program, OpenMRS form, FHIR / OpenSRP folder and
+  resource ids. It defaults to the intervention `id`. A `form_id` on a drawing's main
+  start (or a YAML activity / start node) is **deprecated**: with `interventions` it is
+  ignored and logged once per value (`form_id is ignored when interventions are
+  declared; set interventions[].name`). Only a project without `interventions` still
+  reads it; when it is missing there, the project `title` slug is used.
+- **Each intervention is a separate conversion** of its globs. `common/*` listed on
+  two interventions is read twice. `*` is one folder level (`common/labs/x.drawio`
+  needs `common/labs/*`). An `activity` line may also be a Google Drive file or
+  folder URL (mixed with local globs). Downloads go under `{ -o }/.tricc-drive-cache`.
+  Restricted Drive needs `TRICC_GOOGLE_AUTH` or `auth/google.json`.
+- **Mixing draw.io and YAML in one intervention:** `activity` may be a mapping from
+  input strategy to globs instead of a list. The list form keeps using
+  `input_strategy` (or `-I`).
+
+  ```yaml
+  activity:
+    DrawioStrategy: [common/*]
+    YamlStrategy: [child/*]
+  ```
+
+  Each group's globs only match that strategy's extensions (`.drawio`, or `.yaml` /
+  `.yml`). All groups load into one project and are linked once, so a goto in a YAML
+  activity can target a draw.io page id and the other way round. Activity / page ids
+  must be unique across both formats.
+- **Output path is still `-o`**, not a YAML key. With interventions:
+
+  `{ -o }/{strategy}/{intervention_id}/`
+
+  Without interventions, a single strategy still writes directly into `-o` (same as
+  today). Several strategies without interventions write `{ -o }/{strategy}/`.
+- **`start`** says when the intervention can be opened (`on: demand` or
+  `on: follow_up`). `condition` is CQL. See `feature/20260915-intervention-start.md`.
+  `kind` and `applicability` are no longer valid keys.
 
 ## Input behavior
 
@@ -20,11 +144,14 @@ TRICC is commonly executed through `tests/build.py`.
 
 - Local directory: all `.drawio` files inside are added.
 - Local file: accepted only if path exists and ends with `.drawio`.
-- Google Drive URL: file id is extracted and downloaded to temp first.
+- Google Drive file or folder URL: downloaded first (see below). With
+  `interventions` in `tricc.yaml`, put Drive URLs in `activity:` instead of `-i`.
 
 ## Google Drive download flow
 
-1. Try authenticated download via `auth/google.json` and Drive API scope `drive.readonly`.
+1. Try authenticated download via `TRICC_GOOGLE_AUTH`, `{project}/auth/google.json`,
+   `{cwd}/auth/google.json`, or the TRICC checkout `auth/google.json`, using Drive
+   API scope `drive.readonly`.
 2. If auth is unavailable or fails, fallback to direct download.
 
 Important:
@@ -53,6 +180,25 @@ python tests/build.py -i tests/data/yaml/my_test_case.yaml -o out/ -I YamlStrate
 YAML files are plain text, git-friendly, and much easier to review than draw.io
 files when the goal is to exercise the internal transformation engine rather than
 clinical authoring.
+
+**Texts from the CodeSystem.** With a tricc.yaml `terminology`, a node (or select
+option) may leave out `label` / `hint` / `help`: they are read from its concept, i.e.
+`concept` (`{code, system?}` or a plain code; `system` is a CodeSystem name, id or url)
+or else the node `name`. `label` is the concept `display`, `hint` / `help` its
+designations of that use in the default language. Inline text wins. An option's
+`name` defaults to its concept code. A concept that cannot be found leaves the text
+empty (an option falls back to its name).
+
+```yaml
+nodes:
+  - {id: age, type: integer, name: age}                  # concept "age"
+  - id: fev
+    type: select_one
+    name: has_fever
+    concept: {code: fever, system: demo}
+    options:
+      - {id: o1, concept: fever_yes}                      # name fever_yes
+```
 
 See `tricc_oo/strategies/input/yaml.py` for the supported format and current
 limitations. The YAML strategy is intentionally a *supplement* to draw.io, not
@@ -121,7 +267,7 @@ python tests/build.py -i flow.drawio -o out/ -O XLSFormCHTStrategy -T TestSpecSt
 
 | Name | Emits |
 |---|---|
-| `TestSpecStrategy` | `<form_id>.form-model.json` — export names, types, options, relevance/constraint/calculation references, edges, end and diagnosis nodes |
+| `TestSpecStrategy` | `<intervention name>.form-model.json` — export names, types, options, relevance/constraint/calculation references, edges, end and diagnosis nodes |
 
 The output of `-O XLSFormCHTStrategy -T TestSpecStrategy` is identical to `-O
 XLSFormCHTStrategy` plus one JSON file. If a test strategy raises, the error is logged and the

@@ -100,59 +100,58 @@ def cql_helper_repeat_block(fhir_version: str = "4.0.1") -> str:
     any-time/"outside the encounter" lookback, unscoped by ``encounterid``, used by the
     ``history`` populate context. See feature/20260812-intervention-order-and-dedup.md.
 
-    Everything here has to survive cql-to-elm translation; the constraints that shape
-    the emitted text are documented in fix/20260930-helper-cql-compile.md:
+    Concepts are matched by **code alone, across any system**: the write side resolves a
+    concept's system per concept (``structuremap._concept_system_url``), so one project
+    spreads codes over several CodeSystems and a single declared code system on the read
+    side matches nothing. See fix/20260914-cql-retrieve-codesystem.md.
 
-    - Codes are matched against ``code.coding.code`` at runtime rather than with a
-      retrieve terminology clause. A retrieve code selector takes a string *literal*
-      and a declared ``codesystem``, so ``[Observation: Code code from …]`` cannot
-      take a ``String`` function argument — and concepts are exported under the
-      project's own CodeSystem, not SNOMED.
-    - A query source that is a function invocation must be parenthesized
-      (``(GetObservations(code)) O``).
-    - ``extension.value`` is a choice type: the repeat index needs
-      ``as FHIR.integer`` and then ``.value``, not ``as Integer``.
-    - ``sort by`` needs a comparable type, so choice elements are cast
-      (``sort by (effective as FHIR.dateTime)``); ascending + ``Last`` gives "latest".
-    - CQL has no ``skip``/``take`` query clauses — the history lookback uses the
-      ``Skip``/``First`` functions.
+    Every construct must be accepted by cql-to-elm 3.12.0 (the translator fhircore ships):
+    function-call query sources are parenthesised, sorts use comparable system values,
+    and "Nth most recent" is ``First(Skip(...))``. See
+    fix/20260929-cql-initial-expression-on-device.md.
     """
     return f"""\
 // ── Repeat / current-encounter helpers ────────────────────────────────────────
 // Extension URL: {TRICC_OBSERVATION_REPEAT_EXT}
 
-define function ObservationHasCode(O Observation, code String):
-  exists (O.code.coding C where C.code = code)
+// Concept codes are matched across any code system: a project's concepts are spread
+// over several CodeSystems (tricc, sym, calculate, …) and extraction stamps whichever
+// one owns the concept, so filtering the retrieve on one declared system matches
+// nothing. See fix/20260914-cql-retrieve-codesystem.md.
 
-define function ObservationRepeatIndex(O Observation):
-  singleton from (
-    O.extension E
-      where E.url = '{TRICC_OBSERVATION_REPEAT_EXT}'
-      return (E.value as FHIR.integer).value
-  )
+define function ObservationHasCode(O Observation, conceptCode String):
+  exists(O.code.coding C where C.code = conceptCode)
+
+define function ConditionHasCode(C Condition, conceptCode String):
+  exists(C.code.coding CC where CC.code = conceptCode)
 
 define function GetObservations(code String):
   if encounterid is null then {{}} as List<Observation>
   else
     [Observation] O
-      where O.status in {{'final', 'amended', 'corrected'}}
-        and ObservationHasCode(O, code)
+      where ObservationHasCode(O, code)
+        and O.status in {{'final', 'amended', 'corrected'}}
         and O.encounter.reference = 'Encounter/' + encounterid
 
+define function ObservationRepeatIndex(O Observation):
+  singleton from (
+    O.extension E
+      where E.url = '{TRICC_OBSERVATION_REPEAT_EXT}'
+      return FHIRHelpers.ToInteger(E.value as FHIR.integer)
+  )
+
 define function GetObservation(code String):
-  Last(
+  First(
     (GetObservations(code)) O
       where ObservationRepeatIndex(O) is null or ObservationRepeatIndex(O) = 1
-      return O
-      sort by (effective as FHIR.dateTime)
+      sort by (effective as FHIR.dateTime).value desc
   )
 
 define function GetRepeated(code String, repeatIndex Integer):
-  Last(
+  First(
     (GetObservations(code)) O
       where ObservationRepeatIndex(O) = repeatIndex
-      return O
-      sort by (effective as FHIR.dateTime)
+      sort by (effective as FHIR.dateTime).value desc
   )
 
 define function GetObservationValue(code String):
@@ -169,16 +168,6 @@ define function GetNumberOfRepeat(code String):
     )
   )
 
-define function GetHistoryObservations(code String, repeatIndex Integer):
-  [Observation] O
-    where O.status in {{'final', 'amended', 'corrected'}}
-      and ObservationHasCode(O, code)
-      and (
-        repeatIndex is null
-        or ObservationRepeatIndex(O) = repeatIndex
-        or (repeatIndex = 1 and ObservationRepeatIndex(O) is null)
-      )
-
 define function GetHistoryObservation(
   code String,
   period String,
@@ -188,9 +177,15 @@ define function GetHistoryObservation(
   First(
     Skip(
       (
-        (GetHistoryObservations(code, repeatIndex)) O
-          return O
-          sort by (effective as FHIR.dateTime) desc
+        [Observation] O
+          where ObservationHasCode(O, code)
+          and O.status in {{'final', 'amended', 'corrected'}}
+          and (
+            repeatIndex is null
+            or ObservationRepeatIndex(O) = repeatIndex
+            or (repeatIndex = 1 and ObservationRepeatIndex(O) is null)
+          )
+          sort by (effective as FHIR.dateTime).value desc
       ),
       Coalesce(reverseOrderPosition, 1) - 1
     )
@@ -204,17 +199,64 @@ define function GetHistoryObservationValue(
 ):
   GetHistoryObservation(code, period, reverseOrderPosition, repeatIndex).value
 
+// Same lookback, restricted to Observations effective on or after `since` (null: no
+// window). `period` above is kept for previously generated libraries and is ignored.
+// See feature/20260929-cql-populate-wiring.md §4.
+define function GetHistoryObservationSince(
+  code String,
+  since DateTime,
+  reverseOrderPosition Integer,
+  repeatIndex Integer
+):
+  First(
+    Skip(
+      (
+        [Observation] O
+          where ObservationHasCode(O, code)
+          and O.status in {{'final', 'amended', 'corrected'}}
+          and (since is null or (O.effective as FHIR.dateTime).value >= since)
+          and (
+            repeatIndex is null
+            or ObservationRepeatIndex(O) = repeatIndex
+            or (repeatIndex = 1 and ObservationRepeatIndex(O) is null)
+          )
+          sort by (effective as FHIR.dateTime).value desc
+      ),
+      Coalesce(reverseOrderPosition, 1) - 1
+    )
+  )
+
+define function GetHistoryObservationValueSince(
+  code String,
+  since DateTime,
+  reverseOrderPosition Integer,
+  repeatIndex Integer
+):
+  GetHistoryObservationSince(code, since, reverseOrderPosition, repeatIndex).value
+
+// Multi-select carry: a select_multiple answer is extracted as one Observation per ticked
+// option (same code, same effective time). Returns all option codes of the most recent
+// answer within the window, space-separated like an XLSForm select_multiple; null if none.
+// See feature/20260929-cql-populate-wiring.md §10.
+define function LatestObservationTime(code String, since DateTime):
+  (GetHistoryObservationSince(code, since, 1, null).effective as FHIR.dateTime).value
+
+define function GetHistoryObservationCodesSince(code String, since DateTime):
+  Combine(
+    distinct(
+      (
+        [Observation] O
+          where ObservationHasCode(O, code)
+            and O.status in {{'final', 'amended', 'corrected'}}
+            and (O.effective as FHIR.dateTime).value = LatestObservationTime(code, since)
+          return First((O.value as FHIR.CodeableConcept).coding.code).value
+      )
+    ),
+    ' '
+  )
+
 // ── Condition family (same current-encounter / history split; no repeat index —
 // Condition entries aren't repeated within one encounter the way vitals are) ──
-
-define function ConditionHasCode(C Condition, code String):
-  exists (C.code.coding CC where CC.code = code)
-
-define function ConditionVerificationCode(C Condition):
-  First(C.verificationStatus.coding CC return CC.code.value)
-
-define function ConditionClinicalCode(C Condition):
-  First(C.clinicalStatus.coding CC return CC.code.value)
 
 define function GetConditions(code String):
   if encounterid is null then {{}} as List<Condition>
@@ -223,43 +265,38 @@ define function GetConditions(code String):
       where ConditionHasCode(C, code)
         and C.encounter.reference = 'Encounter/' + encounterid
 
+define function ConditionVerificationCode(C Condition):
+  First(C.verificationStatus.coding.code)
+
 define function GetActiveConditions(code String):
   (GetConditions(code)) C
     where ConditionVerificationCode(C) != 'refuted'
       and ConditionVerificationCode(C) != 'entered-in-error'
 
 define function GetCondition(code String):
-  Last(
-    (GetActiveConditions(code)) C
-      return C
-      sort by (recordedDate as FHIR.dateTime)
-  )
+  First((GetActiveConditions(code)) C sort by recordedDate.value desc)
 
 define function GetConditionValue(code String):
-  exists (GetActiveConditions(code))
+  exists(GetActiveConditions(code))
 
 define function HasProvisionalCondition(code String):
-  exists ((GetConditions(code)) C where ConditionVerificationCode(C) = 'provisional')
+  exists((GetConditions(code)) C where ConditionVerificationCode(C) = 'provisional')
 
 define function HasConfirmedCondition(code String):
-  exists ((GetConditions(code)) C where ConditionVerificationCode(C) = 'confirmed')
+  exists((GetConditions(code)) C where ConditionVerificationCode(C) = 'confirmed')
 
 define function HasRefutedCondition(code String):
-  exists ((GetConditions(code)) C where ConditionVerificationCode(C) = 'refuted')
-
-define function GetHistoryConditions(code String):
-  [Condition] C
-    where ConditionHasCode(C, code)
-      and ConditionVerificationCode(C) != 'refuted'
-      and ConditionVerificationCode(C) != 'entered-in-error'
+  exists((GetConditions(code)) C where ConditionVerificationCode(C) = 'refuted')
 
 define function GetHistoryCondition(code String):
-  Last(
-    (GetHistoryConditions(code)) C
-      return C
-      sort by (recordedDate as FHIR.dateTime)
+  First(
+    [Condition] C
+      where ConditionHasCode(C, code)
+        and First(C.verificationStatus.coding.code) != 'refuted'
+        and First(C.verificationStatus.coding.code) != 'entered-in-error'
+      sort by recordedDate.value desc
   )
 
 define function GetHistoryConditionValue(code String):
-  exists (GetHistoryConditions(code))
+  GetHistoryCondition(code) is not null
 """

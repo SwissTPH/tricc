@@ -9,6 +9,7 @@ process: main
 nodes:
   - id: start
     type: start
+    form_id: get_repeated_value_confirm
     label: "Start"
     name: start_grv_confirm
 

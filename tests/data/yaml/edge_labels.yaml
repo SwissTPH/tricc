@@ -1,0 +1,54 @@
+# Edge labels in a YAML activity, as the authoring app writes them
+# (fix/20261012-yaml-edge-labels.md): select_yesno without options and
+# Answer("yes") / Answer("no") edges, Answer("<code>") on select_one and
+# select_multiple edges, rhombus yes / no.
+# Expected: temperature when fever = yes, age when fever = no, weight only when
+# cough = no, height when weight > 10, muac when not (weight > 10), rash_size
+# when signs includes rash.
+
+id: triage
+name: triage
+title: Triage
+process: main
+
+nodes:
+  - {id: s, type: start}
+  - {id: yn, type: select_yesno, name: fever, label: "Fever?"}
+  - {id: a, type: integer, name: temperature, label: "Temperature"}
+  - {id: b, type: integer, name: age, label: "Age"}
+  - id: q
+    type: select_one
+    name: cough
+    label: "Cough?"
+    options:
+      - {id: o1, name: "yes", label: "Yes"}
+      - {id: o2, name: "no", label: "No"}
+  - {id: c, type: integer, name: weight, label: "Weight"}
+  - {id: r, type: rhombus, label: "Weight above 10", reference: "\"weight\" > 10"}
+  - {id: d, type: integer, name: height, label: "Height"}
+  - {id: f, type: integer, name: muac, label: "MUAC"}
+  - id: m
+    type: select_multiple
+    name: signs
+    label: "Signs"
+    options:
+      - {id: m1, name: rash, label: "Rash"}
+      - {id: m2, name: pain, label: "Pain"}
+  - {id: g, type: integer, name: rash_size, label: "Rash size"}
+  - {id: e, type: end}
+
+edges:
+  - {source: s, target: yn}
+  - {source: yn, target: a, value: "Answer(\"yes\")"}
+  - {source: yn, target: b, value: "Answer(\"no\")"}
+  - {source: b, target: q}
+  - {source: a, target: q}
+  - {source: q, target: c, value: "Answer(\"no\")"}
+  - {source: c, target: r}
+  - {source: r, target: d, value: "yes"}
+  - {source: r, target: f, value: "no"}
+  - {source: d, target: m}
+  - {source: f, target: m}
+  - {source: m, target: g, value: "Answer(\"rash\")"}
+  - {source: m, target: e}
+  - {source: g, target: e}

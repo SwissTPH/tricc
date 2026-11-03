@@ -47,6 +47,7 @@ from tricc_oo.visitors.tricc import (
     generate_calculate,
     generate_base,
 )
+from tricc_oo.serializers.xls_form_translations import default_language_setting, translate_frames
 from tricc_oo.serializers.xls_form import (
     CHOICE_MAP,
     SURVEY_MAP,
@@ -146,7 +147,21 @@ class XLSFormStrategy(BaseOutPutStrategy):
 
     def __init__(self, project, output_path):
         super().__init__(project, output_path)
+        # per instance: the class-level frames are mutated in place and would carry
+        # rows (e.g. choices) from one build into the next in the same process
+        self.df_survey = pd.DataFrame(columns=SURVEY_MAP.keys())
+        self.df_calculate = pd.DataFrame(columns=SURVEY_MAP.keys())
+        self.df_choice = pd.DataFrame(columns=CHOICE_MAP.keys())
+        # (sheet, key) -> (node, column uses), to translate rows at export
+        self.translation_rows = {}
         self.do_clean()
+
+    def apply_translations(self):
+        """One text column per tricc.yaml language (no-op without parameters.languages)."""
+        self.df_survey, self.df_choice = translate_frames(self, self.project, self.df_survey, self.df_choice)
+
+    def default_language_setting(self):
+        return default_language_setting(self.project)
 
     def do_clean(self, **kwargs):
         self.calculates = {}
@@ -199,12 +214,13 @@ class XLSFormStrategy(BaseOutPutStrategy):
         ]
 
     def export(self, start_pages, version):
-        if start_pages["main"].root.form_id is not None:
-            form_id = str(start_pages["main"].root.form_id)
-        else:
-            logger.critical("form id required in the first start node")
+        form_id = self.project.intervention_name()
+        if not form_id:
+            logger.critical("form id required: set interventions[].name (or a project title)")
             exit(1)
         title = start_pages["main"].root.label
+        if self.project is not None:
+            title = self.project.export_form_title(title)
         file_name = form_id + ".xlsx"
         # make a 'settings' tab
         datetime.datetime.now()
@@ -214,7 +230,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
             "form_title": title,
             "form_id": form_id,
             "version": version,
-            "default_language": "English (en)",
+            "default_language": self.default_language_setting(),
             "style": "pages",
         }
         df_settings = pd.DataFrame(settings, index=indx)
@@ -226,6 +242,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
             os.makedirs(self.output_path)
 
         self.inject_version()
+        self.apply_translations()
 
         # create a Pandas Excel writer using XlsxWriter as the engine
         writer = pd.ExcelWriter(newpath, engine="xlsxwriter")
@@ -911,8 +928,8 @@ class XLSFormStrategy(BaseOutPutStrategy):
         """Validate the generated XLS form using pyxform."""
         try:
             # Determine the XLS file path
-            if self.project.start_pages["main"].root.form_id is not None:
-                form_id = str(self.project.start_pages["main"].root.form_id)
+            form_id = self.project.intervention_name()
+            if form_id:
                 xls_path = os.path.join(self.output_path, form_id + ".xlsx")
 
                 if not os.path.exists(xls_path):

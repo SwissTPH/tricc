@@ -1,5 +1,5 @@
 import logging
-from tricc_oo.converters.utils import clean_name
+from tricc_oo.converters.utils import clean_name, xpath_literal
 from tricc_oo.models.tricc import TriccNodeSelectOption, TRICC_TRUE_VALUE, TRICC_FALSE_VALUE, TriccNodeActivity
 from tricc_oo.converters.fhir.populate_helper import populate_uses_inputs_group
 from tricc_oo.models.calculate import TriccNodePopulate
@@ -71,7 +71,7 @@ def get_export_name(node, replace_dots=True):
         elif value == '$this':
             export_name = '.'
         elif isinstance(value, str) and not isinstance(node, str):
-            export_name = f"'{value}'"
+            export_name = xpath_literal(value)
         else:
             export_name = value
         if hasattr(node, 'export_name'):

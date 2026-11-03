@@ -3,9 +3,13 @@
 from tricc_oo.converters.utils import remove_html
 from tricc_oo.models.base import (
     TriccOperation,
-    TriccOperator,
     TriccReference,
-    TriccStatic,
+)
+from tricc_oo.models.message import (
+    TriccMessage,
+    TriccMessageMark,
+    TriccMessageMarkKind,
+    TriccMessageText,
 )
 from tricc_oo.models.tricc import TriccNodeNote, TriccNodeInteger
 from tricc_oo.visitors.text_injection import (
@@ -20,74 +24,128 @@ from tricc_oo.converters.tricc_to_xls_form import get_export_name
 from tricc_oo.models.calculate import TriccNodeRhombus, TriccNodeCalculate
 
 
+def _text_and_refs(message):
+    texts = []
+    refs = []
+    for part in getattr(message, "children", []) or []:
+        if isinstance(part, TriccMessageText):
+            texts.append(part.value)
+        elif isinstance(part, TriccReference):
+            refs.append(part.value)
+        elif isinstance(part, TriccMessageMark):
+            t, r = _text_and_refs(TriccMessage(children=part.children))
+            texts.extend(t)
+            refs.extend(r)
+        elif not isinstance(part, TriccMessageText):
+            refs.append(getattr(part, "name", part))
+    return texts, refs
+
+
 class TestParseInjectionText:
     def test_no_tokens_unchanged(self):
         assert parse_injection_text("plain label") == "plain label"
 
     def test_single_ref(self):
         result = parse_injection_text("${age}")
-        assert isinstance(result, TriccReference)
-        assert result.value == "age"
+        assert isinstance(result, TriccMessage)
+        assert isinstance(result.children[0], TriccReference)
+        assert result.children[0].value == "age"
 
     def test_concat_parts(self):
         result = parse_injection_text("Age is ${age} years")
-        assert isinstance(result, TriccOperation)
-        assert result.operator == TriccOperator.CONCATENATE
-        assert len(result.reference) == 3
-        assert isinstance(result.reference[0], TriccStatic)
-        assert result.reference[0].value == "Age is "
-        assert isinstance(result.reference[1], TriccReference)
-        assert result.reference[1].value == "age"
-        assert isinstance(result.reference[2], TriccStatic)
-        assert result.reference[2].value == " years"
+        assert isinstance(result, TriccMessage)
+        assert not isinstance(result, TriccOperation)
+        texts, refs = _text_and_refs(result)
+        assert texts == ["Age is ", " years"]
+        assert refs == ["age"]
 
     def test_two_refs(self):
         result = parse_injection_text("${a} and ${b}")
-        assert isinstance(result, TriccOperation)
-        assert result.operator == TriccOperator.CONCATENATE
-        refs = [p for p in result.reference if isinstance(p, TriccReference)]
-        assert [r.value for r in refs] == ["a", "b"]
+        assert isinstance(result, TriccMessage)
+        _, refs = _text_and_refs(result)
+        assert refs == ["a", "b"]
 
 
 class TestLoadDisplayText:
     def test_clean_then_parse(self):
         raw = "Age is <b>${age}</b> years"
-        result = load_display_text(raw, clean_fn=remove_html)
-        assert isinstance(result, TriccOperation)
-        assert result.operator == TriccOperator.CONCATENATE
-        refs = [p for p in result.reference if isinstance(p, TriccReference)]
-        assert len(refs) == 1 and refs[0].value == "age"
-        # Statics should not retain raw HTML tags
-        for p in result.reference:
-            if isinstance(p, TriccStatic):
-                assert "<b>" not in str(p.value)
-                assert "</b>" not in str(p.value)
+        result = load_display_text(raw)
+        assert isinstance(result, TriccMessage)
+        assert not isinstance(result, TriccOperation)
+        _, refs = _text_and_refs(result)
+        assert refs == ["age"]
+        md = serialize_injection_for_js_text(result)
+        assert "<b>" not in md
+        assert "</b>" not in md
+        assert "**${age}**" in md
 
     def test_dict_locales(self):
         raw = {"en": "Hi ${name}", "fr": "Bonjour ${name}"}
-        result = load_display_text(raw, clean_fn=remove_html)
-        assert isinstance(result["en"], TriccOperation)
-        assert isinstance(result["fr"], TriccOperation)
+        result = load_display_text(raw)
+        assert isinstance(result["en"], TriccMessage)
+        assert isinstance(result["fr"], TriccMessage)
 
     def test_no_tokens_still_cleaned(self):
-        # remove_html only strips markup when the string contains spaces
-        result = load_display_text("<b>Hello world</b>", clean_fn=remove_html)
-        assert isinstance(result, str)
-        assert "<b>" not in result
-        assert "Hello" in result
+        result = load_display_text("<b>Hello world</b>")
+        assert isinstance(result, TriccMessage)
+        assert serialize_injection_for_js_text(result) == "**Hello world**"
+
+    def test_plain_string_unchanged(self):
+        assert load_display_text("plain label") == "plain label"
+
+    def test_strong_wraps_ref(self):
+        result = load_display_text("<b>Give ${dose} mg</b>")
+        assert isinstance(result, TriccMessage)
+        assert len(result.children) == 1
+        mark = result.children[0]
+        assert isinstance(mark, TriccMessageMark)
+        assert mark.kind == TriccMessageMarkKind.STRONG
+        texts, refs = _text_and_refs(TriccMessage(children=mark.children))
+        assert refs == ["dose"]
+        assert texts == ["Give ", " mg"]
+        assert serialize_injection_for_js_text(result) == "**Give ${dose} mg**"
+
+    def test_html_not_markdownified_before_split(self):
+        result = load_display_text("<b>${age}</b>")
+        assert isinstance(result, TriccMessage)
+        mark = result.children[0]
+        assert isinstance(mark, TriccMessageMark)
+        assert isinstance(mark.children[0], TriccReference)
+        assert mark.children[0].value == "age"
+
+    def test_no_space_short_label(self):
+        result = load_display_text("<b>Yes</b>")
+        assert serialize_injection_for_js_text(result) == "**Yes**"
+        assert "<b>" not in serialize_injection_for_js_text(result)
+
+    def test_get_references_walks_marks(self):
+        result = load_display_text("<b>Give ${dose} mg</b> of ${drug}")
+        refs = [r.value for r in result.get_references() if isinstance(r, TriccReference)]
+        assert refs == ["dose", "drug"]
+
+    def test_replace_node_updates_interp(self):
+        result = load_display_text("Age is ${age}")
+        age = TriccNodeInteger(id="age1", name="age", label="Age", activity=None, group=None)
+        result.replace_node(TriccReference("age"), age)
+        assert age in list(result.children)
+
+    def test_markdown_no_trailing_newline(self):
+        result = load_display_text("<b>Hello world</b>")
+        actual = serialize_injection_for_js_text(result)
+        assert actual == "**Hello world**"
+        assert actual == actual.rstrip("\n")
 
 
 class TestSerializeOdk:
     def test_concat_to_injection_string(self):
-        op = TriccOperation(
-            TriccOperator.CONCATENATE,
-            [
-                TriccStatic("Age is "),
+        msg = TriccMessage(
+            children=[
+                TriccMessageText(value="Age is "),
                 TriccReference("age"),
-                TriccStatic(" years"),
-            ],
+                TriccMessageText(value=" years"),
+            ]
         )
-        assert serialize_injection_for_js_text(op, get_export_name) == "Age is ${age} years"
+        assert serialize_injection_for_js_text(msg, get_export_name) == "Age is ${age} years"
 
     def test_resolved_node_uses_export_name(self):
         age = TriccNodeInteger(
@@ -98,11 +156,14 @@ class TestSerializeOdk:
             group=None,
         )
         age.last = True
-        op = TriccOperation(
-            TriccOperator.CONCATENATE,
-            [TriccStatic("Age is "), age, TriccStatic(" years")],
+        msg = TriccMessage(
+            children=[
+                TriccMessageText(value="Age is "),
+                age,
+                TriccMessageText(value=" years"),
+            ]
         )
-        out = serialize_injection_for_js_text(op)
+        out = serialize_injection_for_js_text(msg)
         assert out.startswith("Age is ${")
         assert out.endswith("} years")
         assert "concat(" not in out
@@ -112,19 +173,18 @@ class TestGetNameLabel:
     def test_concat_uses_first_static_segment(self):
         from tricc_oo.models.base import label_text_for_name
 
-        op = TriccOperation(
-            TriccOperator.CONCATENATE,
-            [
-                TriccStatic("Patient is "),
+        msg = TriccMessage(
+            children=[
+                TriccMessageText(value="Patient is "),
                 TriccReference("age"),
-                TriccStatic(" years"),
-            ],
+                TriccMessageText(value=" years"),
+            ]
         )
-        assert label_text_for_name(op) == "Patient is "
+        assert label_text_for_name(msg) == "Patient is "
         note = TriccNodeNote(
             id="n1",
             name="note_age",
-            label=op,
+            label=msg,
             activity=None,
             group=None,
         )
@@ -134,19 +194,17 @@ class TestGetNameLabel:
     def test_concat_without_static_skips_label(self):
         from tricc_oo.models.base import label_text_for_name
 
-        op = TriccOperation(
-            TriccOperator.CONCATENATE,
-            [TriccReference("age"), TriccReference("weight")],
+        msg = TriccMessage(
+            children=[TriccReference("age"), TriccReference("weight")]
         )
-        assert label_text_for_name(op) is None
+        assert label_text_for_name(msg) is None
         note = TriccNodeNote(
             id="n2",
             name="note_only_refs",
-            label=op,
+            label=msg,
             activity=None,
             group=None,
         )
-        # name present; label portion skipped (no op dump in id)
         assert "note_only_refs" in note.get_name()
         assert "concatenate" not in note.get_name().lower()
 
@@ -161,11 +219,10 @@ class TestDisplayModelOnly:
             group=None,
         )
         load_expressions(note)
-        assert isinstance(note.label, TriccOperation)
-        assert note.label.operator == TriccOperator.CONCATENATE
+        assert isinstance(note.label, TriccMessage)
+        assert not isinstance(note.label, TriccOperation)
 
     def test_rhombus_label_not_converted_to_concatenate_injection(self):
-        # Rhombus is calculate-side, not TriccNodeDisplayModel
         rh = TriccNodeRhombus(
             id="r1",
             name="rh1",
@@ -174,14 +231,14 @@ class TestDisplayModelOnly:
             activity=None,
             group=None,
         )
-        # Simulate clean label without full expression parse of reference
         rh.label = "check ${age}"
         apply_display_text_injections(rh, clean_fn=remove_html)
-        # apply_display_text_injections does not check type — caller must;
-        # load_expressions must not call it for rhombus
         from tricc_oo.models.tricc import TriccNodeDisplayModel
 
         assert not isinstance(rh, TriccNodeDisplayModel)
+        load_expressions(rh)
+        assert isinstance(rh.label, str)
+        assert "${age}" in rh.label
 
     def test_calculate_not_display_model(self):
         calc = TriccNodeCalculate(
@@ -197,10 +254,24 @@ class TestDisplayModelOnly:
 
 
 class TestProcessReferenceResolve:
+    def test_iter_node_dependencies_includes_label_refs(self):
+        from tricc_oo.visitors.tricc import iter_node_dependencies
+
+        note = TriccNodeNote(
+            id="n1",
+            name="note_age",
+            label="Patient is ${age}",
+            activity=None,
+            group=None,
+        )
+        load_expressions(note)
+        names = []
+        for dep, etype in iter_node_dependencies(note):
+            if etype == "ref":
+                names.append(getattr(dep, "value", None) or getattr(dep, "name", None))
+        assert "age" in names
     def test_resolve_note_label_ref(self):
         from tricc_oo.models.tricc import TriccNodeActivity, TriccNodeMainStart
-        from tricc_oo.models.calculate import TriccNodeActivityStart
-        from tricc_oo.converters.utils import generate_id
 
         start = TriccNodeMainStart(id="start", name="start", label="Start")
         activity = TriccNodeActivity(
@@ -229,7 +300,7 @@ class TestProcessReferenceResolve:
         activity.nodes = {age.id: age, note.id: note, start.id: start}
 
         load_expressions(note)
-        assert isinstance(note.label, TriccOperation)
+        assert isinstance(note.label, TriccMessage)
 
         processed = {age, start}
         ok = process_reference(
@@ -241,10 +312,9 @@ class TestProcessReferenceResolve:
             warn=False,
         )
         assert ok is True
-        assert isinstance(note.label, TriccOperation)
-        # Reference should be replaced by the age node
+        assert isinstance(note.label, TriccMessage)
         node_parts = [
-            p for p in note.label.reference if not isinstance(p, TriccStatic)
+            p for p in note.label.children if not isinstance(p, TriccMessageText)
         ]
         assert age in node_parts or any(
             getattr(p, "name", None) == "age" for p in node_parts

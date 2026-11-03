@@ -81,3 +81,43 @@ def remove_html_full(string):
     )
     text = BeautifulSoup(text, "html.parser").get_text()
     return text.strip()
+
+
+def quoted_literal(value: str) -> str:
+    """A CQL / FHIRPath string literal: single quotes, with ``\\`` and ``'`` escaped."""
+    return "'" + str(value).replace("\\", "\\\\").replace("'", "\\'") + "'"
+
+
+def xpath_literal(value: str) -> str:
+    """An XPath 1.0 string literal (no escapes: pick the quote the value lacks, else concat)."""
+    value = str(value)
+    if "'" not in value:
+        return f"'{value}'"
+    if '"' not in value:
+        return f'"{value}"'
+    parts = value.split("'")
+    return "concat(" + ", \"'\", ".join(f"'{p}'" for p in parts) + ")"
+
+
+_CQL_ESCAPES = {"'": "'", '"': '"', "`": "`", "\\": "\\", "/": "/", "f": "\f", "n": "\n", "r": "\r", "t": "\t"}
+
+
+def unquote_literal(text: str) -> str:
+    """The value of a CQL / FHIRPath string literal (``'it\\'s'`` -> ``it's``)."""
+    if len(text) >= 2 and text[0] == text[-1] and text[0] in "'\"`":
+        text = text[1:-1]
+    out, i = [], 0
+    while i < len(text):
+        ch = text[i]
+        if ch == "\\" and i + 1 < len(text):
+            nxt = text[i + 1]
+            if nxt == "u" and i + 5 < len(text):
+                out.append(chr(int(text[i + 2:i + 6], 16)))
+                i += 6
+                continue
+            out.append(_CQL_ESCAPES.get(nxt, nxt))
+            i += 2
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)

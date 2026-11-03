@@ -72,10 +72,13 @@ TRICC implements this through start/process orchestration, activity diagrams, an
 - **Same-name merge:** when a concept is captured in several activities at the same
   repeat slot, later calculations coalesce **all** prior versions so optional
   intermediate activities can be skipped safely (`feature/advanced-merge-calc.md`).
+  Re-asking is suppressed **on the later widget only** (print-time `relevant`); the
+  flowchart path after that widget still runs (`fix/20260914-skip-display-not-path.md`).
 - **Goto snippet:** `goto` with `instance=-1` injects another activity’s content
   inline into the caller (no nested wait). Default/positive `instance` remains a
   nested activity run (`feature/goto-snippet-injection.md`).
 - **Display text injection:** notes and question labels may embed `${field_name}`
-  so runtime forms show live values (`feature/display-text-injection.md`).
+  so runtime forms show live values (`feature/display-text-injection.md`,
+  `feature/20260909-display-message-ast.md`).
 - **Populate:** non-display nodes preload patient / facility / encounter / history
   data via `context` (+ optional `period`) — `feature/populate-context.md`.

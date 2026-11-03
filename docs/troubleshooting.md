@@ -87,13 +87,25 @@ Symptoms:
 
 Checks:
 
-- **Same `name` + same `repeat` (default `1`)** — second capture is normally skipped / inherits (encounter-wide).
-- **Different `repeat` values** (e.g. `1` then `2`) — both can show; no cross-slot merge.
+- **Same `name` + same `repeat` (omitted `repeat` = `1`)** — later widget is hidden if the
+  earlier slot already has a value **and** that activity was entered. The rest of the flow
+  still runs (path/bridge is arrival **or** already captured). Do not expect graph
+  `node.relevance` to contain the skip; it is print-time `relevant` / `enableWhen` only.
+- **Different `repeat` values** (e.g. `1` then `2`) — both can show; no cross-slot skip and
+  no cross-slot value merge. Typical: re-enter age after rejecting an estimated weight.
+- **`instance` vs `repeat`** — a second **page** copy uses `instance` (e.g. `instance=2`).
+  That does **not** create a new concept slot. Putting `repeat=2` on the same question as
+  well makes it a second capture (it will be asked again). To hide IV/IO on convulsion after
+  coma, omit `repeat` on both copies; keep `instance=2` if you need a second activity instance.
 - **`repeat=-1`** — local-only: asked without inheriting prior values; does not feed global
   coalesce; **and is never skip-suppressed against another `repeat=-1` occurrence of the same
   concept** — two different callers each capturing the same `repeat=-1` node (e.g. via two
   separate `instance=-1` snippet injects of the same module) both get their own, independent
   capture. Only same `repeat` value **≥ 0** dedupes encounter-wide.
+- Later questions stay hidden after a skipped widget, but glucose / treatments after it also
+  stay hidden: skip was folded into graph relevance (fixed in
+  `fix/20260914-skip-display-not-path.md`). Confirm you are on an export that prints skip
+  only on the widget and ORs it on path/bridges.
 - See [Concept repeat](./tricc-elements.md#concept-repeat) and `feature/advanced-merge-calc.md`.
 
 ## Node after a repeated activity call never appears
@@ -150,8 +162,9 @@ Checks:
 - Injection applies only to **display** fields (`label`, `hint`, `help`, messages) on
   display models — not to calculate/rhombus labels.
 - Token must be a bare field name (`${age}`), not an expression (`${age + 1}`).
-- ODK/CHT rewrites to `${export_name}` after processing; FHIR uses concatenate expressions.
-- See `feature/display-text-injection.md`.
+- ODK/CHT rewrites to Markdown with `${export_name}` after processing; FHIR keeps that
+  Markdown in `item.text` and attaches a concatenate FHIRPath at serialize time.
+- See `feature/display-text-injection.md` and `feature/20260909-display-message-ast.md`.
 - For scoring flows (rhombus → `count`), use a signed integer on the true branch
   instead of leaving the edge unlabeled with a non-standard text label.
 

@@ -1,5 +1,6 @@
 # flake8: noqa
 from .base import *
+from .message import *
 from .calculate import *
 from .tricc import *
 from .ordered_set import *

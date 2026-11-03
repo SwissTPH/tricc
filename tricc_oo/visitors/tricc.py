@@ -1,17 +1,19 @@
 import re
 import logging
+import zlib
 import requests
 import base64
 from collections import defaultdict
 from typing import Optional
 from tricc_oo.visitors.text_injection import TEXT_INJECTION_FIELDS
+from tricc_oo.models.message import TriccMessage
 
-from tricc_oo.models.base import get_repeat
 from tricc_oo.converters.utils import generate_id
 from tricc_oo.models.base import (
-    TriccBaseModel, TriccNodeType, TriccGroup,
+    TriccBaseModel, TriccNodeType, TriccGroup, get_repeat, get_repeat_authored,
     TriccOperator, TriccOperation, TriccStatic, TriccReference, not_clean,
-    and_join, or_join, clean_or_list, nand_join, TriccEdge
+    and_join, or_join, clean_or_list, nand_join, TriccEdge,
+    expression_structural_key, clear_operation_join_cache,
 )
 from tricc_oo.models.ordered_set import OrderedSet
 from tricc_oo.visitors.loop_guard import LoopGuard, RecursionGuard, describe_node
@@ -139,9 +141,19 @@ def _get_defining_expression_op(expr):
     return current
 
 
+def _expression_origin_signature(expr, fallback):
+    """Name-only structural hash for inheritance grouping."""
+    if expr is None:
+        return hash(fallback)
+    sig = getattr(expr, "origin_signature", None)
+    if sig is not None and not callable(sig):
+        return sig
+    return hash(expression_structural_key(expr, name_only=True))
+
+
 def group_prev_versions_by_origin_signature(name, expression, prev_versions):
     """Group previous versions (same name + repeat) by the origin signature
-    (cleaned reference-only repr) of their *defining* expression.
+    (name-only structural hash) of their *defining* expression.
 
     Elements in each list bucket will later contribute via
     TriccOperation(GET_INHERITED_VALUE, bucket_list).
@@ -150,16 +162,12 @@ def group_prev_versions_by_origin_signature(name, expression, prev_versions):
     datatype-aware merge_expressions so that "values of the dict" still
     follow the old boolean/number/etc merge rules.
     """
-    expression_sig = hash(repr(expression.origin if expression.origin else name))
+    expression_sig = _expression_origin_signature(expression, name)
     sibling = []
     groups = defaultdict(list)
     for pv in (prev_versions or []):
         expr = getattr(pv, "expression", None) or getattr(pv, "expression_reference", None)
-        if expr:
-            
-            sig = hash(repr(getattr(expr, "origin", expr)))
-        else:
-            sig = hash(repr(expr.origin) if expr.origin else name)
+        sig = _expression_origin_signature(expr, name)
         if sig == expression_sig:
             sibling.append(pv)
         else:
@@ -206,10 +214,15 @@ def get_node_expressions(node, processed_nodes, process=None):
         (TriccNodeDisplayCalculateBase, TriccNodeProposedDiagnosis, TriccNodeDiagnosis, TriccNodeActivity)
     ) and not isinstance(node, (TriccNodeDisplayBridge))
     expression = None
+    pass_skipped = isinstance(node, (TriccNodeDisplayBridge, TriccNodeBridge))
     # in case of recursive call processed_nodes will be None
     if processed_nodes is None or is_ready_to_process(node, processed_nodes=processed_nodes):
         expression = get_node_expression(
-            node, processed_nodes=processed_nodes, get_overall_exp=get_overall_exp, process=process
+            node,
+            processed_nodes=processed_nodes,
+            get_overall_exp=get_overall_exp,
+            process=process,
+            pass_skipped=pass_skipped,
         )
     if (
         issubclass(node.__class__, TriccNodeCalculateBase)
@@ -514,44 +527,9 @@ def load_calculate(
                     for r in relevance_reference:
                         if issubclass(r.__class__, (TriccNodeDisplayCalculateBase)):
                             add_used_calculate(node, r, calculates, used_calculates, processed_nodes)
-            # add skip logic for display node ()
-            # repeat=-1 is "local-only": each occurrence stands on its own and must not
-            # be skip-suppressed because another repeat=-1 occurrence of the same
-            # concept was already captured elsewhere (see docs/tricc-elements.md,
-            # "Concept repeat").
-            if all_prev_versions and hasattr(node, "relevance") and get_repeat(node) != -1:
-                # search for same node in completly differnt activity
-                from tricc_oo.converters.fhir.populate_helper import populate_participates_in_skip
-
-                skip_prev_versions = [l for l in all_prev_versions if populate_participates_in_skip(l)]
-                last_expressions_other_activity = [
-                    (and_join([has_node_data_operation(l),TriccOperation(TriccOperator.ISTRUE,[l.activity.root])])) for l in skip_prev_versions if (
-                        node.is_sequence_defined and
-                        node.activity.base_instance != l.activity.base_instance
-                    )
-                ]
-                # search for same some in the same activity (might require a warning)
-                last_expression_same_activity = [
-                    has_node_data_operation(l) for l in skip_prev_versions if (
-                        node.is_sequence_defined and
-                        node.activity == l.activity
-                    )
-                ]
-
-                # we don't care about the same some in other activity isntance because this is managed on activity level
-                last_version_relevance = [*last_expressions_other_activity, *last_expression_same_activity]
-                if last_version_relevance:
-                    version_relevance = or_join(last_version_relevance)
-                else:
-                    version_relevance = None
-
-                if version_relevance:
-                    if getattr(node, "relevance", None):
-                        node.relevance = and_join([not_clean(version_relevance), node.relevance])
-
-                    elif hasattr(node, "relevance"):
-                        node.relevance = version_relevance
-            
+            # Skip-if-already-captured is print-time (display widgets) and
+            # path-time (bridges only). Do not NAND it into graph relevance
+            # (fix/20260914-skip-display-not-path.md).
 
             if (
                 not node.is_sequence_defined
@@ -591,7 +569,111 @@ def load_calculate(
 
 
 def has_node_data_operation(node):
-    return TriccOperation(TriccOperator.ISTRUE if node.get_datatype() == 'boolean' else TriccOperator.ISNOTNULL, [node])
+    datatype = None
+    getter = getattr(node, "get_datatype", None)
+    if callable(getter):
+        try:
+            datatype = getter()
+        except Exception:
+            datatype = getattr(node, "datatype", None)
+    else:
+        datatype = getattr(node, "datatype", None)
+    return TriccOperation(TriccOperator.ISTRUE if datatype == 'boolean' else TriccOperator.ISNOTNULL, [node])
+
+
+def _activity_skip_identity(activity):
+    """Stable identity for skip: templates are themselves (None != None is a trap)."""
+    if activity is None:
+        return None
+    return getattr(activity, "base_instance", None) or activity
+
+
+def _iter_already_captured_sources(node, processed_nodes):
+    """Earlier same-name captures that may hide *node* (print) or pass its path."""
+    from tricc_oo.converters.fhir.populate_helper import populate_participates_in_skip
+
+    if node is None or get_repeat(node) == -1:
+        return
+    if not getattr(node, "is_sequence_defined", False):
+        return
+    name = getattr(node, "name", None)
+    if not name:
+        return
+    node_activity = _activity_skip_identity(getattr(node, "activity", None))
+    authored = get_repeat_authored(node)
+    for other in processed_nodes or []:
+        if other is node or other is None:
+            continue
+        if isinstance(other, TriccNodeSelectOption):
+            continue
+        if getattr(other, "name", None) != name:
+            continue
+        if get_repeat(other) == -1:
+            continue
+        if not populate_participates_in_skip(other):
+            continue
+        if get_repeat_authored(other) != authored:
+            # repeat=2 is an independent capture (age/weight amend after
+            # "does this estimate make sense? No"). Skip is same slot only —
+            # including across activities (fix/20260914-skip-display-not-path.md).
+            continue
+        other_activity = _activity_skip_identity(getattr(other, "activity", None))
+        if other_activity != node_activity:
+            yield other, True
+        else:
+            yield other, False
+
+
+def get_already_captured_expression(node, processed_nodes):
+    """True when an earlier same-name capture already has a value (skip source)."""
+    terms = []
+    for other, cross_activity in _iter_already_captured_sources(node, processed_nodes):
+        has_data = has_node_data_operation(other)
+        if cross_activity:
+            root = getattr(getattr(other, "activity", None), "root", None)
+            if root is not None:
+                terms.append(and_join([has_data, TriccOperation(TriccOperator.ISTRUE, [root])]))
+            else:
+                terms.append(has_data)
+        else:
+            terms.append(has_data)
+    if not terms:
+        return None
+    return or_join(terms) if len(terms) > 1 else terms[0]
+
+
+def nand_already_captured_expression(node, processed_nodes, expression):
+    """Print-time display relevance: arrival AND NOT already captured."""
+    already = get_already_captured_expression(node, processed_nodes)
+    if already is None:
+        return expression
+    if expression is None or expression is True or expression == TriccStatic(True):
+        return not_clean(already)
+    return and_join([not_clean(already), expression])
+
+
+def or_already_captured_expression(node, processed_nodes, expression):
+    """Path/bridge: arrival OR already captured."""
+    already = get_already_captured_expression(node, processed_nodes)
+    if already is None:
+        return expression
+    if expression is None or expression is False or expression == TriccStatic(False):
+        return already
+    return or_join([expression, already])
+
+
+def serialize_display_relevance(node, processed_nodes, expression=None):
+    """NAND skip onto a question/note widget; does not mutate graph relevance."""
+    if expression is None:
+        expression = getattr(node, "relevance", None)
+    return nand_already_captured_expression(node, processed_nodes, expression)
+
+
+def is_display_skip_widget(node):
+    """Capture/note widgets that print skip; not calculate or bridge rows."""
+    return isinstance(node, TriccNodeDisplayModel) and not issubclass(
+        node.__class__, TriccNodeCalculateBase
+    )
 
 def get_max_named_version(calculates, name):
     max = 0
@@ -831,7 +913,8 @@ def generate_calculates(node, calculates, used_calculates, processed_nodes, proc
         for option in node.options.values():
             if not option.name.startswith("opt_") and node.name != 'manual.diag':
                 calc_id = generate_id(f"contains_{node.id}_{option.name}")
-                expression = TriccOperation(TriccOperator.CONTAINS, [node, option.name])
+                # option membership, the code as a literal (a bare str would print unquoted)
+                expression = TriccOperation(TriccOperator.SELECTED, [node, TriccStatic(option.name)])
                 calc_node = TriccNodeCalculate(
                     name=option.name,
                     id=calc_id,
@@ -862,9 +945,16 @@ def add_calculate(calculates, calc_node):
 
 
 def get_option_code_from_label(node, option_label):
+    from tricc_oo.visitors.text_injection import serialize_injection_for_js_text
+
+    want = option_label if isinstance(option_label, str) else serialize_injection_for_js_text(option_label)
+    want = want.strip()
     if hasattr(node, "options"):
         for i in node.options:
-            if node.options[i].label.strip() == option_label.strip():
+            got = node.options[i].label
+            if not isinstance(got, str):
+                got = serialize_injection_for_js_text(got)
+            if got.strip() == want:
                 return node.options[i].name
         logger.critical(f"option with label {option_label} not found in {node.get_name()}")
     else:
@@ -1101,7 +1191,7 @@ def process_reference(
                 new_dict = {}
                 changed = False
                 for locale, entry in value.items():
-                    if isinstance(entry, (TriccOperation)):
+                    if isinstance(entry, (TriccOperation, TriccMessage)):
                         modified = process_operation_reference(
                             entry,
                             node,
@@ -1123,7 +1213,7 @@ def process_reference(
                         new_dict[locale] = entry
                 if changed and replace_reference:
                     setattr(node, field, new_dict)
-            elif isinstance(value, (TriccOperation)):
+            elif isinstance(value, (TriccOperation, TriccMessage)):
                 modified_expression = process_operation_reference(
                     value,
                     node,
@@ -1321,9 +1411,10 @@ def process_operation_reference(
 
     # Repeat slot the whole operation is scoped to, when the operator selects one.
     # GET_HISTORY_VALUE reads outside the encounter slots; GET_REPEATED_VALUE names a slot.
-    if source_op.operator == TriccOperator.GET_HISTORY_VALUE:
+    operator = getattr(source_op, "operator", None)
+    if operator == TriccOperator.GET_HISTORY_VALUE:
         op_repeat = 0
-    elif source_op.operator == TriccOperator.GET_REPEATED_VALUE:
+    elif operator == TriccOperator.GET_REPEATED_VALUE:
         op_repeat = get_repeat_index_arg(source_op)
     else:
         op_repeat = None
@@ -1454,7 +1545,7 @@ def process_operation_reference(
             if modified_op is None:
                 modified_op = operation.copy(keep_node=True)
 
-            if isinstance(operation, TriccOperation):
+            if isinstance(operation, (TriccOperation, TriccMessage)):
                 modified_op.replace_node(TriccReference(clean_ref), replacement)
             elif operation == TriccReference(clean_ref):
                 modified_op = replacement
@@ -1626,7 +1717,11 @@ def stash_next_nodes(stashed_nodes, next_nodes):
     """
     if not next_nodes:
         return
-    for nn in reversed(list(next_nodes)):
+    if isinstance(next_nodes, (OrderedSet, list, tuple)):
+        siblings = reversed(next_nodes)
+    else:
+        siblings = reversed(list(next_nodes))
+    for nn in siblings:
         if nn not in stashed_nodes:
             stashed_nodes.insert_at_top(nn)
 
@@ -1932,6 +2027,7 @@ def get_data_for_log(node):
 
 
 def stashed_node_func(node, callback, recursive=False, **kwargs):
+    clear_expression_walk_caches()
     processed_nodes = kwargs.pop("processed_nodes", OrderedSet())
     stashed_nodes = kwargs.pop("stashed_nodes", OrderedSet())
     process = kwargs.pop("process", ["main"])
@@ -2211,6 +2307,23 @@ def iter_node_dependencies(node):
         elif isinstance(val, TriccReference):
             ref_sources.append([val])
 
+    if isinstance(node, TriccNodeDisplayModel):
+        for attr in TEXT_INJECTION_FIELDS:
+            val = getattr(node, attr, None)
+            if val is None:
+                continue
+            entries = val.values() if isinstance(val, dict) else [val]
+            for entry in entries:
+                if entry is None:
+                    continue
+                if hasattr(entry, "get_references"):
+                    try:
+                        ref_sources.append(entry.get_references())
+                    except Exception:
+                        pass
+                elif isinstance(entry, TriccReference):
+                    ref_sources.append([entry])
+
     for source in ref_sources:
         if not source:
             continue
@@ -2437,7 +2550,7 @@ def check_stashed_loop(stashed_nodes, prev_stashed_nodes, processed_nodes, len_p
 
     if (
         len(stashed_nodes) == len(prev_stashed_nodes)
-        and set(stashed_nodes) == set(prev_stashed_nodes)
+        and stashed_nodes == prev_stashed_nodes
         and len(processed_nodes) == len_prev_processed_nodes
     ):
         loop_count += 1
@@ -3042,7 +3155,9 @@ def clone_activity_for_snippet(goto, target_activity):
     _snippet_inject_seq += 1
     caller_inst = getattr(getattr(goto, "activity", None), "instance", 0) or 0
     # High band + caller instance + goto id entropy + monotonic seq → unique node ids
-    goto_key = abs(hash(str(getattr(goto, "id", "")) + str(getattr(goto, "name", "")))) % 10000
+    # crc32, not hash(): str hashes are salted per process, which gave the clones
+    # different ids (and _Vv_ version numbers) on every run.
+    goto_key = zlib.crc32((str(getattr(goto, "id", "")) + str(getattr(goto, "name", ""))).encode("utf-8")) % 10000
     snippet_nb = 900000 + (int(caller_inst) * 100000) + (goto_key * 10) + (_snippet_inject_seq % 10)
     # Ensure not colliding with any live or previously used instance slot
     used = set(getattr(template, "instances", {}) or {})
@@ -3404,12 +3519,13 @@ def has_loop(
 
 def get_extended_next_nodes(node):
 
-    nodes = node.next_nodes if hasattr(node, "next_nodes") else set()
+    nodes = OrderedSet(getattr(node, "next_nodes", ()))
     if issubclass(node.__class__, TriccNodeSelect):
         for o in node.options.values():
-            nodes = nodes | o.next_nodes
+            if o.next_nodes:
+                nodes |= o.next_nodes
     if isinstance(node, (TriccNodeActivity)):
-        nodes = nodes | node.root.next_nodes
+        nodes |= node.root.next_nodes
     return nodes
 
 
@@ -3420,7 +3536,24 @@ EXPRESSION_GUARD = RecursionGuard("get_node_expression")
 
 
 # calculate or retrieve a node expression
-def get_node_expression(in_node, processed_nodes, get_overall_exp=False, is_prev=False, negate=False, process=None):
+_GNE_CACHE = {}
+_GNE_MISS = object()
+
+
+def clear_expression_walk_caches():
+    """Drop memoized get_node_expression / join results for a new conversion walk."""
+    _GNE_CACHE.clear()
+    clear_operation_join_cache()
+
+
+def _gne_cache_key(in_node, get_overall_exp, is_prev, negate, process, pass_skipped):
+    proc = None
+    if process:
+        proc = process[0] if isinstance(process, (list, tuple)) else id(process)
+    return (id(in_node), getattr(in_node, "id", None), get_overall_exp, is_prev, negate, proc, bool(pass_skipped))
+
+
+def get_node_expression(in_node, processed_nodes, get_overall_exp=False, is_prev=False, negate=False, process=None, pass_skipped=False):
     """Build the expression of a node, under the expression recursion guard.
 
     Args:
@@ -3446,10 +3579,33 @@ def get_node_expression(in_node, processed_nodes, get_overall_exp=False, is_prev
             is_prev=is_prev,
             negate=negate,
             process=process,
+            pass_skipped=False
         )
 
 
-def _get_node_expression(in_node, processed_nodes, get_overall_exp=False, is_prev=False, negate=False, process=None):
+def _get_node_expression(
+    in_node, processed_nodes, get_overall_exp=False, is_prev=False, negate=False, process=None, pass_skipped=False
+):
+    cache_key = _gne_cache_key(in_node, get_overall_exp, is_prev, negate, process, pass_skipped)
+    cached = _GNE_CACHE.get(cache_key, _GNE_MISS)
+    if cached is not _GNE_MISS:
+        return cached
+    expression = _get_node_expression_uncached(
+        in_node,
+        processed_nodes,
+        get_overall_exp=get_overall_exp,
+        is_prev=is_prev,
+        negate=negate,
+        process=process,
+        pass_skipped=pass_skipped,
+    )
+    _GNE_CACHE[cache_key] = expression
+    return expression
+
+
+def _get_node_expression_uncached(
+    in_node, processed_nodes, get_overall_exp=False, is_prev=False, negate=False, process=None, pass_skipped=False
+):
     # in case of calculate we only use the select multiple if none is not selected
     expression = None
     negate_expression = None
@@ -3478,6 +3634,7 @@ def _get_node_expression(in_node, processed_nodes, get_overall_exp=False, is_pre
                 get_overall_exp=get_overall_exp,
                 is_prev=True,
                 process=process,
+                pass_skipped=pass_skipped,
             )
         else:
             # it is a empty calculate
@@ -3492,7 +3649,12 @@ def _get_node_expression(in_node, processed_nodes, get_overall_exp=False, is_pre
                 logger.critical(f"missing path for Rhombus {node.get_name()}")
                 exit(1)
         prev_exp = get_node_expression(
-            node.path, processed_nodes=processed_nodes, get_overall_exp=get_overall_exp, is_prev=True, process=process
+            node.path,
+            processed_nodes=processed_nodes,
+            get_overall_exp=get_overall_exp,
+            is_prev=True,
+            process=process,
+            pass_skipped=pass_skipped,
         )
         if prev_exp:
             prev_exp = prev_exp.copy(keep_node=True)
@@ -3536,11 +3698,20 @@ def _get_node_expression(in_node, processed_nodes, get_overall_exp=False, is_pre
     elif issubclass(node.__class__, TriccNodeCalculateBase):
         if negate:
             negate_expression = get_calculation_terms(
-                node, processed_nodes=processed_nodes, get_overall_exp=get_overall_exp, negate=True, process=process
+                node,
+                processed_nodes=processed_nodes,
+                get_overall_exp=get_overall_exp,
+                negate=True,
+                process=process,
+                pass_skipped=pass_skipped,
             )
         else:
             expression = get_calculation_terms(
-                node, processed_nodes=processed_nodes, get_overall_exp=get_overall_exp, process=process
+                node,
+                processed_nodes=processed_nodes,
+                get_overall_exp=get_overall_exp,
+                process=process,
+                pass_skipped=pass_skipped,
             )
 
     elif (
@@ -3565,7 +3736,8 @@ def _get_node_expression(in_node, processed_nodes, get_overall_exp=False, is_pre
             activity=node.activity,
             processed_nodes=processed_nodes,
             get_overall_exp=get_overall_exp,
-            process=process
+            process=process,
+            pass_skipped=pass_skipped,
         )
         # in_node not in processed_nodes is need for calculates that can but run after the end of the activity
     # if isinstance(node, TriccNodeActivitiy) and not prev:
@@ -3581,6 +3753,8 @@ def _get_node_expression(in_node, processed_nodes, get_overall_exp=False, is_pre
             logger.critical("exclusive can not negate None from {}".format(node.get_name()))
             # exit(1)
     else:
+        if pass_skipped and is_prev and is_display_skip_widget(node):
+            expression = or_already_captured_expression(node, processed_nodes, expression)
         return expression
 
 
@@ -3806,7 +3980,9 @@ def create_determine_diagnosis_activity(diags):
     return activity
 
 
-def get_prev_node_expression(node, activity, processed_nodes, get_overall_exp=False, excluded_name=None, process=None):
+def get_prev_node_expression(
+    node, activity, processed_nodes, get_overall_exp=False, excluded_name=None, process=None, pass_skipped=False
+):
     expression = None
     sub = None
     if node is None:
@@ -3853,6 +4029,7 @@ def get_prev_node_expression(node, activity, processed_nodes, get_overall_exp=Fa
                     get_overall_exp=get_overall_exp,
                     is_prev=True,
                     process=process,
+                    pass_skipped=pass_skipped,
                 ) or TriccStatic(True)
                 # if it is an activity or overall then we add the sub to act expression 
                 # else we update directly the node releavance subs
@@ -4197,7 +4374,7 @@ def get_factor_terms(node, processed_nodes, get_overall_exp=False, negate=False,
 # @param negate use to retriece the negation of a calculation
 
 
-def get_calculation_terms(node, processed_nodes, get_overall_exp=False, negate=False, process=None):
+def get_calculation_terms(node, processed_nodes, get_overall_exp=False, negate=False, process=None, pass_skipped=False):
     # returns something directly only if the negate is managed
     expression = None
     if isinstance(node, TriccNodeAdd):
@@ -4270,7 +4447,12 @@ def get_calculation_terms(node, processed_nodes, get_overall_exp=False, negate=F
         expression = node.expression
     elif expression is None:
         expression = get_prev_node_expression(
-            node, node.activity, processed_nodes=processed_nodes, get_overall_exp=get_overall_exp, process=process
+            node,
+            node.activity,
+            processed_nodes=processed_nodes,
+            get_overall_exp=get_overall_exp,
+            process=process,
+            pass_skipped=pass_skipped,
         )
 
     # manage the generic negation

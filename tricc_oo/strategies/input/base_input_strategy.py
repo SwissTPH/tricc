@@ -1,6 +1,9 @@
 import abc
+import os
+from typing import Tuple
 
 from tricc_oo.models.tricc import (
+    TriccIntervention,
     TriccNodeMainStart,
     TriccSegment,
     node_container_for_root,
@@ -22,6 +25,8 @@ class BaseInputStrategy:
     input_path = None
     project = None
     processes = ["main"]
+    #: file extensions this strategy reads (lower case, with the dot)
+    file_extensions: Tuple[str, ...] = ()
 
     def execute_linked_process(self, project):
         # create an overall activity only if not specified
@@ -121,3 +126,120 @@ class BaseInputStrategy:
     @abc.abstractmethod
     def execute(in_filepath, media_path):
         pass
+
+    # ------------------------------------------------------------------
+    # Building blocks, so several input strategies can feed one project
+    # (tricc.yaml ``activity: {DrawioStrategy: [...], YamlStrategy: [...]}``).
+    # ``execute`` == new_project + load + finalize for every strategy.
+    # ------------------------------------------------------------------
+    @staticmethod
+    def new_project(project_config=None, intervention=None) -> TriccIntervention:
+        project = TriccIntervention()
+        if project_config is not None:
+            project.title = project_config.title
+            project.image_max_width = project_config.image_max_width()
+            project.image_max_height = project_config.image_max_height()
+            project.calculate_code_system = project_config.calculate_code_system
+            default_lang, languages = project_config.languages()
+            if default_lang:
+                project.lang_code = default_lang
+                project.languages = languages
+        project.config = intervention
+        return project
+
+    def load(self, file_content, media_path, project) -> None:
+        """Read this strategy's files into ``project.pages``; no linking."""
+        raise NotImplementedError
+
+    @staticmethod
+    def load_terminology(project, sources) -> None:
+        """Load tricc.yaml ``terminology`` CodeSystems into ``project.code_systems``.
+
+        ``sources`` is ``[(path, json text)]``. Keys follow the drawio import: the
+        CodeSystem ``name`` (the concept-code prefix, e.g. ``demo`` for ``demo.fever``),
+        falling back to its ``id``, so concepts added later by an input strategy land in
+        the same CodeSystem.
+        """
+        import json
+
+        from fhir.resources.codesystem import CodeSystem
+
+        for path, text in sources:
+            data = json.loads(text)
+            if data.get("resourceType") != "CodeSystem":
+                raise ValueError(f"{path}: terminology files must be FHIR CodeSystem resources")
+            code_system = CodeSystem.model_validate(data)
+            key = code_system.name or code_system.id
+            if not key:
+                raise ValueError(f"{path}: CodeSystem needs a name or id")
+            if key in project.code_systems:
+                raise ValueError(f"{path}: CodeSystem {key!r} is defined twice in terminology")
+            if code_system.concept is None:
+                code_system.concept = []
+            project.code_systems[key] = code_system
+            project.terminology_concepts.update((key, c.code) for c in code_system.concept)
+
+    @staticmethod
+    def load_libraries(project, sources) -> None:
+        """Parse tricc.yaml ``libraries`` (``[(path, cql text)]``) into calculates."""
+        from tricc_oo.converters.cql_library import build_library_calculates
+
+        seen = {}
+        for path, text in sources:
+            for calc in build_library_calculates(text, path):
+                if calc.name in seen:
+                    raise ValueError(f"{path}: define {calc.name!r} is already defined in {seen[calc.name]}")
+                seen[calc.name] = path
+                project.library_calculates.append(calc)
+
+    @staticmethod
+    def write_terminology(project, media_path) -> None:
+        """Write the project CodeSystems / ValueSets next to the media folder."""
+        out_dir = os.path.dirname(media_path)
+        for k, v in project.code_systems.items():
+            with open(os.path.join(out_dir, f"{k}_codesystem.json"), "w", encoding="utf-8") as file:
+                file.write(v.json(indent=4))
+        for k, v in project.value_sets.items():
+            with open(os.path.join(out_dir, f"{k}_valueset.json"), "w") as file:
+                file.write(v.json(indent=4))
+
+    @staticmethod
+    def attach_library_calculates(project, page) -> None:
+        """Hang the tricc.yaml library calculates on ``page`` as dangling calculates.
+
+        The walkers schedule a page's prev-less calculates when they reach its root, so
+        library defines join the stash next to the root and are processed once their
+        references are ready -- exactly like a free-floating calculate drawn on the page.
+        """
+        calculates = getattr(project, "library_calculates", None) or []
+        if page is None or not calculates:
+            return
+        for calc in calculates:
+            if calc.id in page.nodes:
+                continue
+            calc.activity = page
+            calc.group = page
+            page.nodes[calc.id] = calc
+            page.calculates.append(calc)
+
+    def link_project(self, project):
+        """Build the main flow from the loaded pages, then link and process them."""
+        app = self.execute_linked_process(project)
+        if app:
+            project.start_pages["main"] = app
+            project.pages[app.id] = app
+            self.attach_library_calculates(project, app)
+            self.process_pages(app, project)
+            return project
+        # Projects that only have non-main processes
+        if project.start_pages:
+            first = True
+            for process, pages in project.start_pages.items():
+                targets = pages if isinstance(pages, list) else [pages]
+                for page in targets:
+                    if first:
+                        self.attach_library_calculates(project, page)
+                        first = False
+                    self.process_pages(page, project)
+            return project
+        return project if project.pages else None

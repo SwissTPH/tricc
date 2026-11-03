@@ -415,6 +415,26 @@ def build_text_expression_extension(fhirpath: str) -> dict:
     }
 
 
+TRANSLATION_EXT = "http://hl7.org/fhir/StructureDefinition/translation"
+
+
+def add_translations(element: dict, field: str, translations) -> None:
+    """Add a ``translation`` extension per ``(language, text)`` on ``element._<field>``."""
+    if not translations:
+        return
+    extensions = element.setdefault(f"_{field}", {}).setdefault("extension", [])
+    for language, text in translations:
+        extensions.append(
+            {
+                "url": TRANSLATION_EXT,
+                "extension": [
+                    {"url": "lang", "valueCode": language},
+                    {"url": "content", "valueString": text},
+                ],
+            }
+        )
+
+
 def set_item_text_expression(item: dict, fhirpath: str) -> None:
     """Attach (or replace) the dynamic-text expression on ``item._text``.
 

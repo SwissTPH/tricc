@@ -124,7 +124,7 @@ execute()
   └── export()
         ├── [FHIRStrategy] write questionnaire/, library/, structure-map/, ValueSet/, binary/
         └── [OpenSRPStrategy]
-              ├── _prune_empty_questionnaires()     → drop item: []
+              ├── _prune_empty_questionnaires()     → drop Q with no answerable item
               ├── generate_intervention_plandefinition() → single PD, 1 action/process
               ├── generate_task_structuremap()      → Task map + next Task on done
               ├── _wire_questionnaire_extensions()  → cqlInputResources + planDefinitions on Q
@@ -133,6 +133,18 @@ execute()
 ```
 
 See `feature/20260824-output-walk-context.md`.
+
+### Empty questionnaires are never emitted
+
+A Questionnaire is **empty** when it holds no answerable item *at any depth*: `group` and
+`display` items are structural, so a tree built only from them renders nothing. A page that
+is just a start node produces exactly that shape — a single childless `group` — which also
+violates FHIR invariant `que-1` ("Group items must have nested items").
+
+`_prune_empty_questionnaires()` drops such a process before PlanDefinition, StructureMap and
+Composition generation, together with its per-process CQL defines, Library, extraction map
+and StructureMaps, and logs a warning naming the process. Nothing downstream can then
+reference it. See `fix/20260909-opensrp-empty-main-questionnaire-dangling-library.md`.
 
 ---
 
@@ -418,9 +430,10 @@ In-form calculation (e.g. BMI from weight + height both answered in the same Que
 ### Dynamic display text (`${REF}` injection)
 
 Text authored with `${field}` tokens — note labels, question labels, `hint` and `help`
-(`feature/display-text-injection.md`) — is exported as a **`cqf-expression` on the item's `text`
-element**, which openSRP FHIR Data Capture evaluates against the in-progress QuestionnaireResponse
-and shows instead of the static text:
+(`feature/display-text-injection.md`, `feature/20260909-display-message-ast.md`) — is stored as a
+message tree, exported as Markdown in `item.text`, and as a **`cqf-expression` on the item's
+`text` element**, which openSRP FHIR Data Capture evaluates against the in-progress
+QuestionnaireResponse and shows instead of the static text:
 
 ```json
 {
@@ -475,6 +488,23 @@ Capture throws at `$populate` if they appear) with no author-authored
 populate/calculate expression, so a later process in the same visit doesn't re-ask a question an
 earlier one already captured. For an any-time/cross-encounter lookback, use
 `GetHistoryObservationValue`/`GetHistoryConditionValue` instead (see "Concept repeat" below).
+
+**Updated 2026-09-14** (`fix/20260914-cql-retrieve-codesystem.md`): the Helper retrieves match a
+concept **by code, across any code system** — `[Observation] O where ObservationHasCode(O, code)`,
+not `[Observation: Code code from "…"]`. The write side resolves a concept's system per concept
+(whichever project CodeSystem holds it, else `{base_url}/CodeSystem/tricc`), so one form's
+extraction map stamps several systems and a single declared code system on the read side matched
+nothing — while `"http://snomed.info/sct"` and `~ "active"` were quoted CQL identifiers that no
+declaration in the library resolved, so the Helper did not even translate. Consequences:
+
+- the only quoted identifier in a generated `*-Helper.cql` is now the library's own name — no
+  `codesystem` / `code` / `valueset` declaration is emitted, and none is needed;
+- concept codes are assumed unique project-wide, which is what `lookup_codesystems_code` (the
+  read path everywhere else in TRICC) already assumes;
+- `HasCondition` tests clinical status as
+  `exists(C.clinicalStatus.coding CS where CS.code = 'active')`;
+- no public Helper function name or signature changed, so previously generated segment libraries
+  keep resolving.
 
 ```json
 {
@@ -568,16 +598,23 @@ CQL references to repeated concepts use `Helper.GetRepeatedValue("code", n)` whe
 default slot (`repeat=1`) uses `Helper.GetObservationValue("code")`.
 
 Authoring surface: `repeat` on capture nodes or `activity_start` in draw.io / YAML.
-See [TRICC Elements — Concept repeat](./tricc-elements.md#concept-repeat).
+Same-slot skip-if-already-asked is applied on display **enableWhen** (not on calculate items);
+path/bridge expressions OR “already captured” so later items still enable. See
+[TRICC Elements — Concept repeat](./tricc-elements.md#concept-repeat) and
+`fix/20260914-skip-display-not-path.md`.
 
 ---
 
 ## PlanDefinition
 
-**One** `PlanDefinition` resource is exported per project — see
-`feature/careplan-intervention-plandefinition.md` for the full rationale and scope. Today
-**one project = one Intervention**; multi-Intervention / multi-CarePlan orchestration and
-applicability/eligibility gating are future work (`feature/careplan-claude.md`).
+**One** `PlanDefinition` resource is exported per intervention — see
+`feature/careplan-intervention-plandefinition.md` for the nesting rationale. With
+`tricc.yaml` `interventions`, each intervention is its own package. On-demand
+eligibility (`start.condition`, `on: demand`) is a CQL applicability `condition` on
+the wrapper action. Follow-up (`on: follow_up`) adds a nested action with
+`relatedAction` + an ActivityDefinition (`kind: Task`). See
+`feature/20260915-intervention-start.md`. Drawing-level CarePlan orchestration in
+`feature/careplan.md` is superseded.
 
 An earlier revision also exported a second, wrapping `{form_id}-available-care-catalog`
 PlanDefinition (top action triggered by `available-care`, single child action linking down to
@@ -608,17 +645,23 @@ once, nested with **one child `action` per non-empty process**
     PlanDefinitions, so a client juggling several selected Interventions can pick "whichever
     unlocked action has the lowest order."
   - **definitionCanonical**: **Questionnaire** absolute URL (launch form **now**)
-- **No** contained Task ActivityDefinition / **no** `transform`, and no applicability
-  `condition` yet (every action is unconditionally listed)
+- **condition** on the wrapper: CQL from `start.condition` when `on: demand` (omitted = always)
+- **No** contained Task ActivityDefinition / **no** `transform` on the Start-care path
+
+Follow-up interventions (`start.on: follow_up`) append a nested action with
+`relatedAction` (`after-end` + `offsetDuration` = `due`), optional CQL `condition`,
+timing bounds from `window`, and `definitionCanonical` → `ActivityDefinition/{…}`
+written under `activity-definition/`. Start-care actions still must point at a
+Questionnaire; only follow-up actions may point at an ActivityDefinition.
 
 Empty questionnaires (`"item": []`) are **removed** from the package (no action, no library
 entry for that process).
 
 ### Task-wrapped Questionnaire (planning — not due now)
 
-**Upcoming planning feature only.** When a form is scheduled but **not due now**, export may
-use ActivityDefinition (`kind: Task`) + StructureMap so the client holds a Task
-(`reasonReference` → Questionnaire) until due. That path is **not** used for Start care.
+**Follow-up tasks** use ActivityDefinition (`kind: Task`) as above. A separate
+**planning** path (form not due now, StructureMap → Task) remains available for
+experiments; it is **not** used for Start care.
 
 Optional Task StructureMaps may still be written under `structure-map/` for multi-process
 experiments; they are **not** wired as the Intervention PD's `definitionCanonical` for
@@ -666,8 +709,47 @@ See **`feature/opensrp-register.md`** §2.1 and **`feature/opensrp-export-hygien
 
 ## Questionnaire Extensions (openSRP wiring)
 
-The `_wire_questionnaire_extensions()` method adds two openSRP-specific
+The `_wire_questionnaire_extensions()` method adds these openSRP-specific
 extensions to each Questionnaire:
+
+### `cqf-library`
+
+**Updated 2026-09-29** (`feature/20260929-cql-populate-wiring.md`,
+`fix/20260929-cql-initial-expression-on-device.md`). The only extension fhircore reads to
+evaluate the Questionnaire's `text/cql-identifier` `initialExpression`s — nothing reads
+`cqlInputResources`. Emitted when the process has a generated Library **and** at least one
+item carries a CQL expression:
+
+```json
+{
+  "url": "http://hl7.org/fhir/StructureDefinition/cqf-library",
+  "valueCanonical": "https://fhir.tricc.io/Library/<project>-<process>"
+}
+```
+
+Library canonicals end in the **CQL library name**, not the UUID `id`: the CQL engine
+(cqf-fhir-cr, on HAPI and on device) derives the library identifier from the last URL
+segment. `id` stays the UUID used for REST addressing. Segment Libraries declare
+`relatedArtifact: depends-on` the Helper, and every Library declares the `encounterid`
+input parameter, which fhircore fills from the Encounter in the launch context.
+
+Every define an item's `initialExpression` names returns **that item's type** — fhircore
+copies the result into `item.initial` unchanged and the SDK refuses a mismatch ("Unable to
+load form"). Helper accessors return `Observation.value[x]`, so they are wrapped in
+`Helper.ValueAsString / ValueAsDecimal / ValueAsInteger / ValueAsBoolean / ValueAsDate /
+ValueAsCoding` (null when the stored value cannot be that type). Items with `answerOption`
+get no CQL `initialExpression` (`initial` next to `answerOption` breaks que-11), and an
+`initialExpression` naming no define is removed at export — one unknown name fails every
+prefill of the form.
+
+**Deployment, not export** — for fhircore to evaluate a Library:
+
+- it must be listed in the **app manifest** (`Composition?identifier=<app id>`, e.g. a
+  "Libraries" section with `focus: Library/<id>`); a Library downloaded by the data sync
+  alone is not loaded into the CQL engine. The package `Composition.json` TRICC writes is not
+  that manifest;
+- after a Library changes on the server, run **Settings → Sync configuration** on the device:
+  re-login does not refresh it when the data sync already stored the new version.
 
 ### `cqlInputResources`
 
@@ -675,13 +757,18 @@ Points to the CQL Library for this process:
 
 ```json
 {
-  "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-launchContext",
-  "extension": [
-    { "url": "name", "valueId": "<form_id>-<process>" },
-    { "url": "type", "valueCode": "Library" }
-  ]
+  "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-cqlInputResources",
+  "valueReference": { "reference": "https://fhir.tricc.io/Library/<process-library-id>" }
 }
 ```
+
+**Emitted only when that Library exists.** The per-process Library is generated only when
+the process has calculates, so the reference is resolved from the assembled libraries — it
+is never computed from the process name as a fallback. A process with no CQL simply gets no
+`cqlInputResources`; pointing at a never-generated Library would leave fhircore with a
+reference that is absent from disk, from `Composition`, and from anything `push-to-fhir.sh`
+uploads. `PlanDefinition.library` is filtered the same way. See
+`fix/20260909-opensrp-empty-main-questionnaire-dangling-library.md`.
 
 ### `planDefinitions`
 

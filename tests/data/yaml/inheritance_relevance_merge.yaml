@@ -8,6 +8,7 @@ process: registration
 nodes:
   - id: s1
     type: start
+    form_id: relevance_base
     label: Start
 
   - id: calc_risk
@@ -35,6 +36,7 @@ process: registration
 nodes:
   - id: s2
     type: start
+    form_id: relevance_extension
     label: Start
 
   - id: calc_risk_v2

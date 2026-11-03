@@ -13,7 +13,7 @@ from tricc_oo.visitors.tricc import (
 from tricc_oo.visitors.utils import PROCESSES
 
 from tricc_oo.models import (
-    TriccProject,
+    TriccIntervention,
     OrderedSet,
     TriccNodeActivity,
     TriccNodeGoTo,
@@ -27,6 +27,13 @@ from tricc_oo.models import (
 )
 
 from tricc_oo.strategies.input.base_input_strategy import BaseInputStrategy
+from tricc_oo.strategies.input.param_build import ParamBuild
+from tricc_oo.converters.drawio_params import (
+    drawio_render,
+    drawio_resolver,
+    drawio_template,
+    normalize_types,
+)
 from tricc_oo.parsers.xml import read_drawio
 from tricc_oo.strategies.registry import register_input_strategy
 
@@ -37,6 +44,7 @@ logger = logging.getLogger("default")
 class DrawioStrategy(BaseInputStrategy):
 
     processes = PROCESSES
+    file_extensions = (".drawio",)
 
     def process_pages(self, start_page, project):
         # create the graph
@@ -69,54 +77,66 @@ class DrawioStrategy(BaseInputStrategy):
                 )
         # refresh the edges (were remove by previous code)
 
-    def execute(self, file_content, media_path):
-        project = TriccProject()
-        diagrams = []
+    def execute(self, file_content, media_path, project_config=None, intervention=None):
+        project = self.new_project(project_config, intervention)
+        self.load(file_content, media_path, project)
+        return self.finalize(project, media_path)
+
+    def load(self, file_content, media_path, project):
         # read all project.pages
         logger.info("# Create the activities from diagram project.pages")
-        # if os.path.isdir(in_filepath):
-        #     files = [f for f in os.listdir(in_filepath) if f.endswith('.drawio')]
-        # elif os.path.isfile(in_filepath):
-        #     files = [in_filepath]
-        # else:
-        #     logger.critical(f"no input file found at {in_filepath}")
-        #     exit(1)
-        # for file in files:
+        diagrams = []
         for f in file_content:
-            file_diagrams = read_drawio(f)
-            diagrams += file_diagrams
-            for diagram in file_diagrams:
-                old_page_len = len(project.pages)
-                id_tab = diagram.attrib.get("id")
-                name_tab = diagram.attrib.get("name")
-                if id_tab in project.pages:
-                    logger.critical(f"{id_tab} diagram (drawio tab) already loaded (Duplicate diagram ID ?)")
-                    exit(1)
-                logger.info("Create the activity {0}::{1}".format(id_tab, name_tab))
+            for diagram in read_drawio(f):
+                normalize_types(diagram)
+                diagrams.append(diagram)
+        # every page is a template: one without parameters gets a single copy identical
+        # to the original (same ids); a block is built only where it is used
+        self._load_pages(diagrams, media_path, project)
 
-                create_activity(diagram, media_path, project)
-                if len(project.pages) == old_page_len:
-                    logger.error(f"diagram {id_tab}::{name_tab} was not loaded properly")
+    def _create_page(self, diagram, media_path, project):
+        old_page_len = len(project.pages)
+        id_tab = diagram.attrib.get("id")
+        name_tab = diagram.attrib.get("name")
+        if id_tab in project.pages:
+            logger.critical(f"{id_tab} diagram (drawio tab) already loaded (Duplicate diagram ID ?)")
+            exit(1)
+        logger.info("Create the activity {0}::{1}".format(id_tab, name_tab))
+
+        create_activity(diagram, media_path, project)
+        if len(project.pages) == old_page_len:
+            logger.error(f"diagram {id_tab}::{name_tab} was not loaded properly")
+
+    def _load_pages(self, diagrams, media_path, project):
+        """Build the pages: one copy of each diagram per distinct set of parameter values
+        (feature/20261102-block-params-and-start-node.md)."""
+        templates = {}
+        for diagram in diagrams:
+            template = drawio_template(diagram)
+            if template.id in templates:
+                logger.critical(f"{template.id} diagram (drawio tab) already loaded (Duplicate diagram ID ?)")
+                exit(1)
+            templates[template.id] = template
+
+        def build(template, rendered):
+            self._create_page(rendered, media_path, project)
+
+        ParamBuild(templates, drawio_resolver(templates), project, drawio_render, build).run()
+
+    def finalize(self, project, media_path):
         logger.info("# Create the graph from the start node")
-        for k, v in project.code_systems.items():
-            with open(
-                os.path.join(os.path.dirname(media_path), f"{k}_codesystem.json"),
-                "w",
-                encoding="utf-8",
-            ) as file:
-                file.write(v.json(indent=4))
-
-        for k, v in project.value_sets.items():
-            with open(os.path.join(os.path.dirname(media_path), f"{k}_valueset.json"), "w") as file:
-                file.write(v.json(indent=4))
+        self.write_terminology(project, media_path)
         app = self.execute_linked_process(project)
         if app:
             project.start_pages["main"] = app
             project.pages[app.id] = app
+            self.attach_library_calculates(project, app)
             self.process_pages(app, project)
 
             return project
         elif project.start_pages:
+            first = next(iter(project.start_pages.values()))
+            self.attach_library_calculates(project, first[0] if isinstance(first, list) and first else first)
             for process in project.start_pages:
                 if isinstance(project.start_pages[process], list):
                     for page_to_process in project.start_pages[process]:
@@ -125,15 +145,14 @@ class DrawioStrategy(BaseInputStrategy):
                     self.process_pages(project.start_pages[process], project.pages)
             return project
         return None
-        # Q. how to handle graph output
-        # hardlink with out edge: create a fake node
-        # or should we always create that fake node
-        # *** or should we enfore "next activity node" ****
-        #
 
-        # do the calculation, expression ...
-
-    def linking_nodes(self, node, page, pages, processed_nodes=OrderedSet(), path=[]):
+    def linking_nodes(self, node, page, pages, processed_nodes=None, path=None):
+        # New set per project. A mutable default survives the previous intervention,
+        # and nodes compare equal by draw.io id, so a later project skips shared pages.
+        if processed_nodes is None:
+            processed_nodes = OrderedSet()
+        if path is None:
+            path = []
         # get the edges that have that node as source
         node_edge = list(
             filter(
@@ -218,7 +237,7 @@ class DrawioStrategy(BaseInputStrategy):
                         node = get_node_from_list(processed_nodes, node_id)
                         if node is not None:
                             logger.warning(node.get_name())
-                if isinstance(node, TriccNodeSelectNotAvailable):
+                if isinstance(node, TriccNodeSelectNotAvailable) and node.options:
                     for opt in node.options.values():
                         set_prev_next_node(opt, target_node)
                 else:

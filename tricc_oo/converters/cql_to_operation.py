@@ -3,7 +3,7 @@ from antlr4 import CommonTokenStream, InputStream
 from tricc_oo.converters.cql.cqlLexer import cqlLexer
 from tricc_oo.converters.cql.cqlParser import cqlParser
 from tricc_oo.converters.cql.cqlVisitor import cqlVisitor
-from tricc_oo.converters.utils import clean_name
+from tricc_oo.converters.utils import clean_name, unquote_literal
 from tricc_oo.models.base import (
     TriccOperator,
     TriccOperation,
@@ -88,6 +88,13 @@ def as_concept_reference(arg, function_name):
         return TriccReference(arg.value)
     logger.error(f"{function_name} expects a concept code as first argument, got '{arg}'")
     return arg
+
+
+def as_code_literal(value):
+    """An identifier used as an answer code (``"rash"``) becomes the literal code."""
+    if isinstance(value, TriccReference) and isinstance(value.value, str) and value.value != "$this":
+        return TriccStatic(value=value.value)
+    return value
 
 
 class cqlToXlsFormVisitor(cqlVisitor):
@@ -200,12 +207,14 @@ class cqlToXlsFormVisitor(cqlVisitor):
     def _get_membership_expression(self, ctx, function_name):
         left = self.visit(ctx.expression(0))
         right = self.visit(ctx.expression(1))
+        # The answer side is a code: "rash" in $this names the answer concept, not a
+        # node to read (resolving it would find e.g. the option's own calculate).
         if function_name == "in":
             op = TriccOperation(TriccOperator.SELECTED)
-            op.reference = [right, left]
+            op.reference = [right, as_code_literal(left)]
         elif function_name == "contains":
             op = TriccOperation(TriccOperator.CONTAINS)
-            op.reference = [left, right]
+            op.reference = [left, as_code_literal(right)]
         return op
 
     def visitNegateMembershipExpression(self, ctx):
@@ -296,7 +305,7 @@ class cqlToXlsFormVisitor(cqlVisitor):
         return TriccStatic(value=value_int if value == value_int else value)
 
     def visitStringLiteral(self, ctx):
-        return TriccStatic(value=ctx.getText().strip("'"))
+        return TriccStatic(value=unquote_literal(ctx.getText()))
 
     def visitExpressionComparison(self, ctx):
         left = self.visit(ctx.expression(0))

@@ -102,7 +102,8 @@ Both questions appear. Each value is stored independently.
 
 ```text
 Activity A:  integer  name=weight  repeat=1  → 3.2 kg
-Activity B:  integer  name=weight  repeat=1  → skipped (already captured in slot 1)
+Activity B:  integer  name=weight  repeat=1  → widget hidden (already captured in slot 1);
+                                              questions after it still follow the inherited value
 ```
 
 ### 4.3 Whole activity at one time point
@@ -244,7 +245,7 @@ flowchart LR
     B --> C[Propagate activity repeat to descendants]
     C --> D[Graph visitors / load_calculate]
     D --> E["version_filter: name + repeat"]
-    E --> F[Skip relevance + inheritance scoped by repeat]
+    E --> F[Print-time widget skip + inheritance scoped by repeat]
     F --> G[Output strategies / export names / FHIR CQL]
 ```
 
@@ -255,7 +256,7 @@ flowchart LR
 | `version_filter(name, repeat)` | Match `name` **and** optional `get_repeat(item) == repeat` (includes `-1`) |
 | `get_versions`, `get_last_version` | Scoped by `(name, repeat)` |
 | `set_last_version_false` | Export-name peers: `repeat > 1` isolated; `repeat <= 1` (incl. `-1`) share pool |
-| `load_calculate` skip / inheritance | `all_prev_versions` only same `repeat`; then `get_version_inheritance` |
+| `load_calculate` inheritance | `all_prev_versions` only same `repeat`; then `get_version_inheritance`. Skip-if-already-captured is **not** folded into `node.relevance` (print-time widget NAND + path OR — `fix/20260914-skip-display-not-path.md`) |
 | `get_version_inheritance` | Skip receiver when `repeat=-1`; drop prior `-1` from operands; multi-version merge (see advanced-merge-calc) |
 | `export_proposed_diags` / `export_diags` | Dedup by `(name, repeat)` if applicable |
 
@@ -350,7 +351,7 @@ Apply `_Rr_` suffix **only when `get_repeat(node) > 1`** (not for `0` or `-1`).
 
 - [x] Diagrams without `repeat` pass all existing inheritance tests unchanged.
 - [x] Same `name`, `repeat=1` then `repeat=2`: both inputs active (no cross-repeat skip).
-- [x] Same `name`, same `repeat`: second input gets skip relevance (matches current versioning).
+- [x] Same `name`, same `repeat`: second **widget** is skip-hidden at print time; graph path is not (`fix/20260914-skip-display-not-path.md`, `tests/test_skip_display_not_path.py`).
 - [x] Activity `repeat=3` forces `repeat=3` on all in-scope descendants.
 - [x] `get_export_name`: no `_Rr_` when `repeat<=1` (incl. `0`, `-1`); suffix when `repeat>=2`.
 - [x] No COALESCE / expression merge across different `repeat` values for the same `name`.

@@ -48,7 +48,7 @@ class BaseTestStrategy(abc.ABC):
     def __init__(self, project, output_path, output_strategy=None):
         """
         Args:
-            project: The processed ``TriccProject``.
+            project: The processed ``TriccIntervention``.
             output_path: Directory the output strategy wrote to.
             output_strategy: The output strategy instance that just ran, or
                 ``None`` when the test strategy is used standalone (degraded:
@@ -220,12 +220,6 @@ class BaseTestStrategy(abc.ABC):
         return collected
 
     def form_id(self) -> Optional[str]:
-        """The form id declared on the main start node, if any."""
-        start_pages = getattr(self.project, "start_pages", {}) or {}
-        page = start_pages.get(self.processes[0])
-        # A process may map to a list of activities rather than a single one.
-        for activity in page if isinstance(page, (list, tuple)) else [page]:
-            form_id = getattr(getattr(activity, "root", None), "form_id", None)
-            if form_id:
-                return str(form_id)
-        return None
+        """The form id: the intervention name (``TriccIntervention.intervention_name``)."""
+        resolve = getattr(self.project, "intervention_name", None)
+        return (resolve() if callable(resolve) else None) or None
