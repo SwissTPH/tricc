@@ -27,6 +27,13 @@ from tricc_oo.models import (
 )
 
 from tricc_oo.strategies.input.base_input_strategy import BaseInputStrategy
+from tricc_oo.strategies.input.param_build import ParamBuild
+from tricc_oo.converters.drawio_params import (
+    drawio_render,
+    drawio_resolver,
+    drawio_template,
+    normalize_types,
+)
 from tricc_oo.parsers.xml import read_drawio
 from tricc_oo.strategies.registry import register_input_strategy
 
@@ -37,6 +44,7 @@ logger = logging.getLogger("default")
 class DrawioStrategy(BaseInputStrategy):
 
     processes = PROCESSES
+    file_extensions = (".drawio",)
 
     def process_pages(self, start_page, project):
         # create the graph
@@ -77,20 +85,43 @@ class DrawioStrategy(BaseInputStrategy):
     def load(self, file_content, media_path, project):
         # read all project.pages
         logger.info("# Create the activities from diagram project.pages")
+        diagrams = []
         for f in file_content:
-            file_diagrams = read_drawio(f)
-            for diagram in file_diagrams:
-                old_page_len = len(project.pages)
-                id_tab = diagram.attrib.get("id")
-                name_tab = diagram.attrib.get("name")
-                if id_tab in project.pages:
-                    logger.critical(f"{id_tab} diagram (drawio tab) already loaded (Duplicate diagram ID ?)")
-                    exit(1)
-                logger.info("Create the activity {0}::{1}".format(id_tab, name_tab))
+            for diagram in read_drawio(f):
+                normalize_types(diagram)
+                diagrams.append(diagram)
+        # every page is a template: one without parameters gets a single copy identical
+        # to the original (same ids); a block is built only where it is used
+        self._load_pages(diagrams, media_path, project)
 
-                create_activity(diagram, media_path, project)
-                if len(project.pages) == old_page_len:
-                    logger.error(f"diagram {id_tab}::{name_tab} was not loaded properly")
+    def _create_page(self, diagram, media_path, project):
+        old_page_len = len(project.pages)
+        id_tab = diagram.attrib.get("id")
+        name_tab = diagram.attrib.get("name")
+        if id_tab in project.pages:
+            logger.critical(f"{id_tab} diagram (drawio tab) already loaded (Duplicate diagram ID ?)")
+            exit(1)
+        logger.info("Create the activity {0}::{1}".format(id_tab, name_tab))
+
+        create_activity(diagram, media_path, project)
+        if len(project.pages) == old_page_len:
+            logger.error(f"diagram {id_tab}::{name_tab} was not loaded properly")
+
+    def _load_pages(self, diagrams, media_path, project):
+        """Build the pages: one copy of each diagram per distinct set of parameter values
+        (feature/20261102-block-params-and-start-node.md)."""
+        templates = {}
+        for diagram in diagrams:
+            template = drawio_template(diagram)
+            if template.id in templates:
+                logger.critical(f"{template.id} diagram (drawio tab) already loaded (Duplicate diagram ID ?)")
+                exit(1)
+            templates[template.id] = template
+
+        def build(template, rendered):
+            self._create_page(rendered, media_path, project)
+
+        ParamBuild(templates, drawio_resolver(templates), project, drawio_render, build).run()
 
     def finalize(self, project, media_path):
         logger.info("# Create the graph from the start node")

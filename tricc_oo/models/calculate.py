@@ -260,6 +260,12 @@ class TriccNodeActivityStart(TriccNodeFakeCalculateBase):
     process: Optional[str] = None
 
 
+class TriccNodeBlockStart(TriccNodeActivityStart):
+    """Root of a block page: the page is a template, inlined once per ``block`` node."""
+
+    tricc_type: TriccNodeType = TriccNodeType.block_start
+
+
 def get_node_from_list(in_nodes, node_id):
     nodes = list(filter(lambda x: x.id == node_id, in_nodes))
     if len(nodes) > 0:

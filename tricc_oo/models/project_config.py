@@ -118,6 +118,12 @@ class TriccInterventionConfig(BaseModel):
     start: List[TriccInterventionStart] = Field(
         default_factory=lambda: [TriccInterventionStart(on="demand")]
     )
+    # Parameter values seeding every activity this intervention lists: literals,
+    # {system, code} or "{{ref}}" (feature/20261102-block-params-and-start-node.md §3.4).
+    args: Dict[str, Any] = Field(default_factory=dict)
+    # Interventions whose products are in scope for dead-concept detection (§8.1);
+    # read, not used yet.
+    requires: List[Any] = Field(default_factory=list)
 
     @model_validator(mode="before")
     @classmethod
@@ -196,6 +202,15 @@ class TriccInterventionConfig(BaseModel):
         return None
 
 
+class TriccBlockRef(BaseModel):
+    """A ``blocks:`` entry: a reusable block file (rooted by ``block_start``)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    id: str
+    path: str
+
+
 class TriccProjectConfig(BaseModel):
     """Root `tricc.yaml` document."""
 
@@ -211,6 +226,11 @@ class TriccProjectConfig(BaseModel):
     # CQL libraries; every ``define`` becomes a calculate available to all activities.
     libraries: List[str] = Field(default_factory=list)
     interventions: List[TriccInterventionConfig] = Field(default_factory=list)
+    # Reusable blocks, read with every intervention (never listed on one).
+    blocks: List[TriccBlockRef] = Field(default_factory=list)
+    # The calculate dictionary (CodeSystem url, id or name), as the frontend writes it.
+    # A CodeSystem tagged as the calculate one wins over it (see calculate_code_system_key).
+    calculate_code_system: Optional[str] = None
 
     @field_validator("terminology", "libraries")
     @classmethod

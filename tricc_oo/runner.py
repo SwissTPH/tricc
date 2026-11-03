@@ -31,6 +31,7 @@ from tricc_oo.converters.project_config import (
 from tricc_oo.models.project_config import TriccInterventionConfig, TriccProjectConfig
 from tricc_oo.strategies.input.base_input_strategy import BaseInputStrategy
 from tricc_oo.strategies.registry import (
+    all_input_extensions,
     get_input_strategy,
     get_output_strategy,
     get_test_strategy,
@@ -38,7 +39,6 @@ from tricc_oo.strategies.registry import (
 
 logger = logging.getLogger("default")
 
-LOCAL_EXTS = (".drawio", ".yaml", ".yml")
 Job = Tuple[Optional[TriccInterventionConfig], List[str]]
 # One input strategy and the files it reads.
 InputGroup = Tuple[str, List[str]]
@@ -76,13 +76,13 @@ def collect_local_files(in_filepath: str, skip_listing: bool = False) -> List[st
         if not current or current.startswith("https://"):
             continue
         if os.path.isdir(current):
-            found = list_local_folder_files(current, valid_exts=LOCAL_EXTS)
+            found = list_local_folder_files(current, valid_exts=all_input_extensions())
             if not found:
                 logger.warning("No matching files found in folder: %s", current)
             else:
                 logger.info("Found %s file(s) in folder.", len(found))
                 add_unique_files(files, found)
-        elif os.path.isfile(current) and current.lower().endswith(LOCAL_EXTS):
+        elif os.path.isfile(current) and current.lower().endswith(all_input_extensions()):
             add_unique_files(files, [current])
         elif os.path.exists(current):
             logger.warning("Skipping invalid input (unknown extension): %s", current)
@@ -131,6 +131,7 @@ def build_grouped_jobs(
                     dest_dir=dest_dir,
                 )
                 groups.append((strategy_name, files))
+            _add_block_files(project_root, project_config, groups, dest_dir)
             logger.info(
                 "Intervention %s: %s",
                 intervention.id,
@@ -140,6 +141,23 @@ def build_grouped_jobs(
         return jobs
     files = precollected_files if precollected_files is not None else collect_local_files(in_filepath)
     return [(None, [(input_strategy, files)])]
+
+
+def _add_block_files(project_root, project_config, groups, dest_dir) -> None:
+    """Read the tricc.yaml ``blocks`` with every intervention: each block file joins the
+    first group whose strategy reads its extension (blocks are never listed on one)."""
+    for block in project_config.blocks:
+        for i, (strategy_name, files) in enumerate(groups):
+            exts = valid_exts_for_strategy(strategy_name)
+            if not block.path.lower().endswith(exts):
+                continue
+            for path in resolve_segment_globs(project_root, [block.path], exts, dest_dir=dest_dir):
+                if path not in files:
+                    groups[i] = (strategy_name, files + [path])
+                    files = groups[i][1]
+            break
+        else:
+            raise ValueError(f"block {block.id!r}: no input strategy of the intervention reads {block.path}")
 
 
 def build_jobs(

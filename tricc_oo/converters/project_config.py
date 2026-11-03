@@ -18,7 +18,6 @@ CONFIG_FILENAMES = ("tricc.yaml", "tricc.yml")
 DEFAULT_INPUT_STRATEGY = "DrawioStrategy"
 DEFAULT_OUTPUT_STRATEGY = "XLSFormCHTStrategy"
 DRAWIO_EXTS = (".drawio",)
-YAML_EXTS = (".yaml", ".yml")
 
 
 def get_installed_tricc_version() -> str:
@@ -213,10 +212,11 @@ def _resolve_segment_drive_url(
 
 
 def valid_exts_for_strategy(input_strategy: str) -> Tuple[str, ...]:
-    name = (input_strategy or "").lower()
-    if "yaml" in name:
-        return YAML_EXTS
-    return DRAWIO_EXTS
+    """The extensions ``input_strategy`` reads, as the strategy declares them."""
+    import tricc_oo.strategies  # noqa: F401  — register built-in strategies
+    from tricc_oo.strategies.registry import input_extensions
+
+    return input_extensions(input_strategy)
 
 
 def resolve_output_dir(

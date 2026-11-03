@@ -25,7 +25,7 @@ Usage:
 from __future__ import annotations
 
 import logging
-from typing import Dict, Type, Union, overload
+from typing import Dict, Tuple, Type, Union, overload
 
 logger = logging.getLogger("default")
 
@@ -156,6 +156,20 @@ def get_input_strategy(name_or_cls: Union[str, Type]) -> Type:
         f"Unknown input strategy '{name_or_cls}'. "
         f"Available strategies: {', '.join(available)}"
     )
+
+
+def input_extensions(name_or_cls: Union[str, Type]) -> Tuple[str, ...]:
+    """The file extensions an input strategy reads (its ``file_extensions``)."""
+    return tuple(getattr(get_input_strategy(name_or_cls), "file_extensions", ()) or ())
+
+
+def all_input_extensions() -> Tuple[str, ...]:
+    """Every extension some registered input strategy reads, in registration order."""
+    seen: Dict[str, None] = {}
+    for cls in INPUT_STRATEGIES.values():
+        for ext in getattr(cls, "file_extensions", ()) or ():
+            seen.setdefault(ext, None)
+    return tuple(seen)
 
 
 @overload

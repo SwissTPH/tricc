@@ -390,6 +390,17 @@ class TriccNodeGoTo(TriccNodeBaseModel):
         return instance
 
 
+class TriccNodeBlock(TriccNodeGoTo):
+    """Uses a block: ``link`` names the block instance built for ``args``.
+
+    Linked like a ``goto`` with ``instance == -1``: the block is cloned and inlined.
+    """
+
+    tricc_type: TriccNodeType = TriccNodeType.block
+    instance: int = -1
+    args: Dict[str, Any] = {}
+
+
 class TriccNodeSelectOption(TriccNodeDisplayModel):
     tricc_type: TriccNodeType = TriccNodeType.select_option
     label: DisplayText
@@ -540,11 +551,15 @@ class TriccIntervention(BaseModel):
     image_max_height: Optional[int] = None
     # tricc.yaml entry of this intervention (TriccInterventionConfig); None when implicit
     config: Optional[Any] = None
+    # tricc.yaml ``calculate_code_system``: the calculate dictionary (url, id or name)
+    calculate_code_system: Optional[str] = None
     # legacy form_id values already reported by intervention_name()
     ignored_form_ids: Set[str] = set()
     # Calculates from the tricc.yaml ``libraries`` (CQL defines); attached to the main
     # start page as dangling calculates, i.e. stashed next to the root.
     library_calculates: List[Any] = []
+    # block pages (rooted by block_start), by id: templates, never start pages
+    blocks: Dict[str, Any] = {}
 
     def register_segment(self, segment: TriccSegment) -> None:
         root = getattr(segment, "root", None)

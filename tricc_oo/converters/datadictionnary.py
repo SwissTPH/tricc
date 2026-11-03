@@ -113,8 +113,31 @@ def add_concept_texts(concept, language, hint=None, help=None):
             add_designation(concept, use, language, serialize_injection_for_js_text(value).strip())
 
 
+#: ``meta.tag`` system naming a CodeSystem's role in a project (code ``calculate``: the
+#: calculate dictionary, where calculates and parameter concepts go)
+CODESYSTEM_ROLE_SYSTEM = "http://tricc.org/fhir/CodeSystem/codesystem-role"
+CALCULATE_ROLE = "calculate"
+
+
+def has_role(code_system, role: str) -> bool:
+    """Whether ``code_system`` carries the ``meta.tag`` ``CODESYSTEM_ROLE_SYSTEM|role``."""
+    meta = getattr(code_system, "meta", None)
+    return any(
+        getattr(t, "system", None) == CODESYSTEM_ROLE_SYSTEM and getattr(t, "code", None) == role
+        for t in (getattr(meta, "tag", None) or [])
+    )
+
+
+def role_meta(role: str) -> dict:
+    """The ``meta`` of a new CodeSystem with ``role``."""
+    return {"tag": [{"system": CODESYSTEM_ROLE_SYSTEM, "code": role}]}
+
+
 def init_codesystem(code, name):
+    """A new, empty CodeSystem; the one named ``calculate`` is tagged as the calculate dictionary."""
+    extra = {"meta": role_meta(CALCULATE_ROLE)} if code == CALCULATE_ROLE else {}
     return CodeSystem(
+        **extra,
         id=code.replace("_", "-"),
         url=f"http://example.com/fhir/CodeSystem/{code}",
         version="1.0.0",

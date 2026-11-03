@@ -1,5 +1,6 @@
 import abc
 import os
+from typing import Tuple
 
 from tricc_oo.models.tricc import (
     TriccIntervention,
@@ -24,6 +25,8 @@ class BaseInputStrategy:
     input_path = None
     project = None
     processes = ["main"]
+    #: file extensions this strategy reads (lower case, with the dot)
+    file_extensions: Tuple[str, ...] = ()
 
     def execute_linked_process(self, project):
         # create an overall activity only if not specified
@@ -136,6 +139,7 @@ class BaseInputStrategy:
             project.title = project_config.title
             project.image_max_width = project_config.image_max_width()
             project.image_max_height = project_config.image_max_height()
+            project.calculate_code_system = project_config.calculate_code_system
             default_lang, languages = project_config.languages()
             if default_lang:
                 project.lang_code = default_lang

@@ -40,6 +40,9 @@ class TriccNodeType(StrEnum):
     goto = "goto"  #: start the linked activity within the target activity
     start = "start"  #: main start of the algo
     activity_start = "activity_start"  #: start of an activity (link in)
+    block_start = "block_start"  #: root of a reusable block (a template, never a start page)
+    block = "block"  #: uses a block, inlining one copy of it built with its arguments
+    parameters = "parameters"  #: draw.io only: a page's parameter declarations
     link_in = "link_in"
     link_out = "link_out"
     count = "count"  #: count the number of valid input

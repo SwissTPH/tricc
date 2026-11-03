@@ -16,6 +16,7 @@ from tricc_oo.models.base import (
     TriccStatic, TriccReference, TriccNodeType, TriccEdge, OPERATION_LIST
 )
 from tricc_oo.models.calculate import (
+    TriccNodeBlockStart,
     TriccNodeDisplayBridge,
     TriccNodeBridge,
     TriccNodeActivityEnd,
@@ -353,8 +354,11 @@ def create_activity(diagram, media_path, project):
             logger.warning("experimental page limited to root node {0}".format(name))
         elif root.status == 'archived':
             logger.warning("archived page limited to root node {0}. Skipped processing".format(name))
-        # assign the process
-        if activity is not None:
+        # assign the process (a block is a template: never a start page)
+        if isinstance(root, TriccNodeBlockStart):
+            project.blocks[activity.id] = activity
+            project.pages[activity.id] = activity
+        elif activity is not None:
            assign_activity_process(activity, project)
 
     else:
@@ -677,7 +681,14 @@ def create_root_node(diagram):
             process=elm.attrib.get("process", "registration"),
         )
     else:
-        elm = get_tricc_type(diagram, "object", TriccNodeType.activity_start)
+        # a block page: the same root as an activity, kept out of the start pages
+        root_cls = TriccNodeBlockStart
+        elm = get_tricc_type(diagram, "object", TriccNodeType.block_start)
+        if elm is None:
+            elm = get_tricc_type(diagram, "UserObject", TriccNodeType.block_start)
+        if elm is None:
+            root_cls = TriccNodeActivityStart
+            elm = get_tricc_type(diagram, "object", TriccNodeType.activity_start)
         if elm is None:
             elm = get_tricc_type(diagram, "UserObject", TriccNodeType.activity_start)
         if elm is not None:
@@ -685,7 +696,7 @@ def create_root_node(diagram):
             id = get_id(external_id, diagram.attrib.get("id"))
             # the start node is the activity: it shares the activity name (else act_<id>)
             name = _get_name(elm.attrib.get("name", "act_"), external_id, diagram.attrib.get("id"))
-            node = TriccNodeActivityStart(
+            node = root_cls(
                 id=id,
                 external_id=external_id,
                 # parent=elm.attrib.get("parent"),

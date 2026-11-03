@@ -15,6 +15,7 @@ nodes (with options for selects) and edges. Expressions are provided as strings
 and parsed using the existing expression infrastructure.
 """
 
+import copy
 import logging
 from typing import Any, Dict, List, Optional, Type, Union
 
@@ -22,6 +23,22 @@ import yaml
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, PrivateAttr, ValidationError, model_validator
 
 from tricc_oo.strategies.input.base_input_strategy import BaseInputStrategy
+from tricc_oo.strategies.input.param_build import ParamBuild
+from tricc_oo.models.params import (
+    E_PARAM_CONFLICT,
+    E_PARAM_PLACEHOLDER,
+    E_PARAM_TYPE,
+    E_PARAM_UNKNOWN,
+    EXPRESSION,
+    TEXT,
+    CallSite,
+    ParamSpec,
+    Template,
+    TriccParamError,
+    has_placeholder,
+    placeholder_names,
+    substitute,
+)
 from tricc_oo.converters.utils import generate_id
 from tricc_oo.converters.datadictionnary import concept_text, find_concept
 from tricc_oo.converters.xml_to_tricc import (
@@ -56,6 +73,7 @@ from tricc_oo.models.tricc import (
     TriccNodeQuantity,
     TriccNodeText,
     TriccNodeGoTo,
+    TriccNodeBlock,
 )
 from tricc_oo.models.base import TriccNodeType
 
@@ -64,6 +82,7 @@ from tricc_oo.models.calculate import (
     TriccNodeCalculate,
     TriccNodeRhombus,
     TriccNodeActivityStart,
+    TriccNodeBlockStart,
     TriccNodeActivityEnd,
     TriccNodeEnd,
     TriccNodePopulate,
@@ -134,11 +153,16 @@ class YamlNode(YamlModel):
     expression: Optional[str] = None         # for rhombus / some calculates
     reference: Optional[str] = None          # for rhombus / some calculates
     save: Optional[str] = None
-    min: Optional[Union[int, float]] = None
-    max: Optional[Union[int, float]] = None
+    # a string only while a {{placeholder}} is unrendered (templates)
+    min: Optional[Union[int, float, str]] = None
+    max: Optional[Union[int, float, str]] = None
     options: List[YamlOption] = Field(default_factory=list)
-    # For goto / link nodes
+    # For goto / link / block nodes
     link: Optional[str] = None
+    # block / goto: parameter values for the called page (literals, {system, code}, "{{ref}}")
+    args: Optional[Dict[str, Any]] = None
+    # decision node: a configuration choice resolved at build time (static pruning: not yet)
+    static: Optional[bool] = None
     instance: Optional[int] = 1
     repeat: Optional[int] = None
     context: Optional[str] = None
@@ -162,6 +186,11 @@ class YamlNode(YamlModel):
     trigger: Optional[str] = None
     priority: Optional[int] = None
 
+
+ROOT_TYPES = ("start", "activity_start", "block_start")
+CALL_TYPES = ("block", "goto")
+# first names of block_start / block, still read
+TYPE_ALIASES = {"snippet_start": "block_start", "snippet": "block"}
 
 # Nodes whose label is not display text (it is the parse context of their expression).
 NO_CONCEPT_TEXT_TYPES = {"calculate", "rhombus"}
@@ -194,6 +223,12 @@ class YamlActivity(YamlModel):
     # interventions[].name). Read for a start node that has none. ``formId`` accepted too.
     form_id: Optional[str] = Field(default=None, validation_alias=AliasChoices("form_id", "formId"))
 
+    # declared and computed parameters, ``{name, type, options?, default?, required?}``
+    params: List[Dict[str, Any]] = Field(default_factory=list)
+    # prerequisite concepts (§8.4) and extension contract (§9): read, not used yet
+    requires: List[Any] = Field(default_factory=list)
+    extension: Optional[Dict[str, Any]] = None
+
     # whether ``title`` was written (it defaults to the id)
     _title_given: bool = PrivateAttr(default=False)
 
@@ -220,6 +255,11 @@ NODE_TYPE_MAP: Dict[str, Dict[str, Any]] = {
         "model": TriccNodeActivityStart,
         "attrs": ["label", "name", "relevance", "instance", "repeat"],
         "tricc_type": TriccNodeType.activity_start,
+    },
+    "block_start": {
+        "model": TriccNodeBlockStart,
+        "attrs": ["label", "name", "relevance"],
+        "tricc_type": TriccNodeType.block_start,
     },
     "activity_end": {
         "model": TriccNodeActivityEnd,
@@ -308,6 +348,12 @@ NODE_TYPE_MAP: Dict[str, Dict[str, Any]] = {
         "attrs": ["label", "name", "link", "instance", "repeat"],
         "tricc_type": TriccNodeType.goto,
     },
+    # inlines one copy of the block built for its args (a goto with instance -1)
+    "block": {
+        "model": TriccNodeBlock,
+        "attrs": ["label", "name", "link", "repeat", "args"],
+        "tricc_type": TriccNodeType.block,
+    },
     # Same attributes the model and the draw.io map actually carry. A missing entry
     # makes _create_node return None, so the node is dropped on YAML load.
     "proposed_diagnosis": {
@@ -329,6 +375,8 @@ YAML_TYPE_TO_TRICC_TYPE = {
     "activity_end": TriccNodeType.activity_end,
     "end": TriccNodeType.end,
     "goto": TriccNodeType.goto,
+    "block": TriccNodeType.block,
+    "block_start": TriccNodeType.block_start,
     "note": TriccNodeType.note,
     "integer": TriccNodeType.integer,
     "decimal": TriccNodeType.decimal,
@@ -344,6 +392,115 @@ YAML_TYPE_TO_TRICC_TYPE = {
     "proposed_diagnosis": TriccNodeType.proposed_diagnosis,
     "diagnosis": TriccNodeType.diagnosis,
 }
+
+
+# Node fields a placeholder may appear in, and how it renders there (§4).
+EXPRESSION_FIELDS = {"relevance", "calculate", "expression", "constraint", "min", "max", "reference", "trigger"}
+TEXT_FIELDS = {"name", "label", "hint", "help", "constraint_message", "save"}
+# never rendered: ids, structure, and call arguments (bound by the call instead)
+RAW_FIELDS = {"id", "type", "process", "instance", "link", "args", "options", "ui"}
+
+
+def _normalize_types(act_dict: Dict[str, Any]) -> None:
+    """``snippet_start`` / ``snippet`` (the first names) read as ``block_start`` / ``block``."""
+    for node in act_dict.get("nodes") or []:
+        if isinstance(node, dict) and node.get("type") in TYPE_ALIASES:
+            node["type"] = TYPE_ALIASES[node["type"]]
+
+
+def _walk_strings(value):
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for v in value.values():
+            yield from _walk_strings(v)
+    elif isinstance(value, list):
+        for v in value:
+            yield from _walk_strings(v)
+
+
+def _yaml_template(raw: Dict[str, Any], ya: YamlActivity) -> Template:
+    is_block = any(n.type == "block_start" for n in ya.nodes)
+    template = Template(id=ya.id, name=ya.name, is_block=is_block, raw=raw)
+    declared = {}
+    for entry in ya.params:
+        try:
+            spec = ParamSpec(**entry, owner=template.owner)
+        except ValidationError as exc:
+            raise TriccParamError(E_PARAM_TYPE, f"page {ya.id}: invalid parameter {entry!r}: {exc}") from exc
+        if spec.name in declared:
+            raise TriccParamError(E_PARAM_CONFLICT, f"page {ya.id} declares {spec.name!r} twice")
+        declared[spec.name] = spec
+    template.declared = declared
+    template.calls = [
+        CallSite(caller=ya.id, node_id=n.id, link=n.link, kind=n.type, args=n.args or {})
+        for n in ya.nodes
+        if n.type in CALL_TYPES and n.link
+    ]
+    template.used = sorted({name for text in _walk_strings(raw) for name in placeholder_names(text)})
+    return template
+
+
+def _render_field(key: str, value: Any, env, where: str) -> Any:
+    if key in EXPRESSION_FIELDS:
+        context = EXPRESSION
+    elif key in TEXT_FIELDS or key in ("title", "intent"):
+        context = TEXT
+    else:
+        if any(has_placeholder(t) for t in _walk_strings(value)):
+            raise TriccParamError(E_PARAM_PLACEHOLDER, f"{where}: placeholders are not allowed in {key!r}")
+        return value
+    if isinstance(value, dict):
+        return {k: substitute(v, env, context, f"{where}.{key}") for k, v in value.items()}
+    return substitute(value, env, context, f"{where}.{key}")
+
+
+def _yaml_render(template: Template, env, new_id: str):
+    """The page with placeholders rendered and ids suffixed for ``new_id``; its calls."""
+    suffix = new_id[len(template.id):]
+    raw = template.raw
+    out = {k: (_render_field(k, v, env, template.id) if k in ("applicability", "title", "intent", "name") else v)
+           for k, v in raw.items() if k not in ("nodes", "edges")}
+    out["id"] = new_id
+    out["params"] = []
+    nodes, calls = [], []
+    for node in raw.get("nodes") or []:
+        where = f"{template.id}/{node.get('id')}"
+        rendered = {}
+        for key, value in node.items():
+            if key in RAW_FIELDS:
+                if key not in ("args", "options", "ui") and any(has_placeholder(t) for t in _walk_strings(value)):
+                    raise TriccParamError(E_PARAM_PLACEHOLDER, f"{where}: placeholders are not allowed in {key!r}")
+                rendered[key] = copy.deepcopy(value)
+            else:
+                rendered[key] = _render_field(key, value, env, where)
+        rendered["id"] = f"{node['id']}{suffix}"
+        rendered["options"] = [
+            {
+                **{k: _render_field(k, v, env, f"{where}/{opt.get('id')}") if k in ("name", "label", "relevance")
+                   else v for k, v in opt.items()},
+                "id": f"{opt['id']}{suffix}",
+            }
+            for opt in node.get("options") or []
+        ]
+        if node.get("type") in CALL_TYPES and node.get("link"):
+            call = CallSite(
+                caller=template.id, node_id=node["id"], link=node["link"], kind=node["type"],
+                args=node.get("args") or {},
+            )
+            calls.append((call, lambda new_link, target=rendered: target.__setitem__("link", new_link)))
+        nodes.append(rendered)
+    out["nodes"] = nodes
+    out["edges"] = [
+        {
+            **edge,
+            "source": f"{edge['source']}{suffix}",
+            "target": f"{edge['target']}{suffix}",
+            **({"value": substitute(edge["value"], env, EXPRESSION, f"{template.id} edge")} if edge.get("value") else {}),
+        }
+        for edge in raw.get("edges") or []
+    ]
+    return out, calls
 
 
 @register_input_strategy("YamlStrategy")
@@ -364,6 +521,7 @@ class YamlStrategy(BaseInputStrategy):
     # only the single "main" process. Fixtures that declare `process: main` keep
     # short-circuiting in execute_linked_process and are unaffected.
     processes = PROCESSES
+    file_extensions = (".yaml", ".yml")
 
     def __init__(self, input_path: Union[str, List[str]]):
         super().__init__(input_path)
@@ -384,6 +542,8 @@ class YamlStrategy(BaseInputStrategy):
         return self.finalize(project, media_path)
 
     def load(self, file_content: List[str], media_path: str, project: TriccIntervention) -> None:
+        loaded: List[tuple] = []  # (raw dict, YamlActivity), in file order
+        ids = set()
         for raw_content in file_content:
             if not raw_content or not raw_content.strip():
                 continue
@@ -394,33 +554,72 @@ class YamlStrategy(BaseInputStrategy):
                 logger.error(f"Failed to parse YAML content: {exc}")
                 continue
 
-            for loaded in loaded_docs:
-                if not loaded:
+            for doc in loaded_docs:
+                if not doc:
                     continue
                 # Support either a single activity dict or a list of activities
-                activities_data: List[Dict[str, Any]] = (
-                    loaded if isinstance(loaded, list) else [loaded]
-                )
+                activities_data: List[Dict[str, Any]] = doc if isinstance(doc, list) else [doc]
 
                 for act_dict in activities_data:
                     if not act_dict:
                         continue
+                    _normalize_types(act_dict)
                     try:
                         yaml_activity = YamlActivity(**act_dict)
                     except ValidationError as exc:
                         logger.error(f"Invalid YAML activity definition: {exc}")
                         continue
-                    if yaml_activity.id in project.pages:
+                    if yaml_activity.id in project.pages or yaml_activity.id in ids:
                         # Same rule as DrawioStrategy; matters when a project mixes
                         # drawio pages and yaml activities sharing one id space.
                         raise ValueError(
                             f"activity id {yaml_activity.id!r} is already loaded (duplicate activity / diagram id)"
                         )
+                    ids.add(yaml_activity.id)
+                    loaded.append((act_dict, yaml_activity))
 
-                    activity = self._build_activity(yaml_activity, project)
-                    if activity is not None:
-                        project.pages[activity.id] = activity
-                        self._assign_start_page(activity, project)
+        # every activity is a template: one without parameters gets a single copy identical
+        # to the original (same ids); a block is built only where it is used
+        self._load_pages(loaded, project)
+
+    def _register(self, activity: Optional[TriccNodeActivity], project: TriccIntervention) -> None:
+        if activity is None:
+            return
+        project.pages[activity.id] = activity
+        if isinstance(activity.root, TriccNodeBlockStart):
+            project.blocks[activity.id] = activity
+        else:
+            self._assign_start_page(activity, project)
+
+    # ------------------------------------------------------------------
+    # Parameters (feature/20261102-block-params-and-start-node.md)
+    # ------------------------------------------------------------------
+    def _load_pages(self, loaded: List[tuple], project: TriccIntervention) -> None:
+        """Build the activities: one copy of each per distinct set of parameter values."""
+        templates: Dict[str, Template] = {}
+        for raw, ya in loaded:
+            templates[ya.id] = _yaml_template(raw, ya)
+        blocks_by_name = {}
+        for tid, template in templates.items():
+            if template.is_block:
+                root = next(n for n in template.raw["nodes"] if n.get("type") == "block_start")
+                if root.get("name"):
+                    blocks_by_name.setdefault(root["name"], tid)
+
+        def resolve(call: CallSite) -> Optional[str]:
+            if call.kind == "block":
+                tid = blocks_by_name.get(call.link) or (call.link if call.link in templates else None)
+                if tid is None or not templates[tid].is_block:
+                    raise TriccParamError(E_PARAM_UNKNOWN, f"{call.describe()}: no block {call.link!r}")
+                return tid
+            if call.link in templates and not templates[call.link].is_block:
+                return call.link
+            return None  # a page of another input, or not loaded: linked as before
+
+        def build(template: Template, rendered: Dict[str, Any]) -> None:
+            self._register(self._build_activity(YamlActivity(**rendered), project), project)
+
+        ParamBuild(templates, resolve, project, _yaml_render, build).run()
 
     def finalize(self, project: TriccIntervention, media_path: str) -> Optional[TriccIntervention]:
         # Project CodeSystems (tricc.yaml ``terminology``) are exported like drawio's;
@@ -455,11 +654,11 @@ class YamlStrategy(BaseInputStrategy):
             # options are edge sources too (yes / no, Answer('…')), as in draw.io
             for option in (getattr(node, "options", None) or {}).values():
                 nodes[option.id] = option
-            if ynode.type in ("start", "activity_start"):
+            if ynode.type in ROOT_TYPES:
                 root_node = node
 
         if root_node is None:
-            logger.error(f"Activity '{yaml_act.id}' has no start/activity_start node")
+            logger.error(f"Activity '{yaml_act.id}' has no start/activity_start/block_start node")
             return None
         if yaml_act.form_id and isinstance(root_node, TriccNodeMainStart) and not root_node.form_id:
             root_node.form_id = yaml_act.form_id
@@ -578,6 +777,8 @@ class YamlStrategy(BaseInputStrategy):
         # Copy supported attributes from YAML (with some normalization)
         for attr in allowed_attrs:
             val = getattr(ynode, attr, None)
+            if attr in ("min", "max") and isinstance(val, str):
+                val = float(val)
             if val is not None:
                 if attr == "required":
                     data[attr] = shield_required(val)
@@ -752,7 +953,7 @@ class YamlStrategy(BaseInputStrategy):
     def _assign_start_page(self, activity: TriccNodeActivity, project: TriccIntervention) -> None:
         """Replicate the start page assignment logic from xml_to_tricc."""
         root = activity.root
-        if root is None:
+        if root is None or isinstance(root, TriccNodeBlockStart):
             return
 
         # process lives on the root node (start / activity_start), not on the activity itself

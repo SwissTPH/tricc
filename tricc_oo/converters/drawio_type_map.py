@@ -23,6 +23,7 @@ from tricc_oo.models.tricc import (
     TriccNodeLinkIn,
     TriccNodeLinkOut,
     TriccNodeGoTo,
+    TriccNodeBlock,
     TriccNodeSelectMultiple,
     TriccNodeSelectNotAvailable,
     TriccNodeText,
@@ -295,6 +296,14 @@ TYPE_MAP = {
         "attributes": ["instance", "priority", "repeat"],
         "mandatory_attributes": ["link", "label", "name"],
         "model": TriccNodeGoTo,
+    },
+    # uses a block (feature/20261102-block-params-and-start-node.md); ``link`` is set to
+    # the block instance when the page is built, ``param.<name>`` attributes are its args
+    TriccNodeType.block: {
+        "objects": ["UserObject", "object"],
+        "attributes": ["priority", "repeat", "name"],
+        "mandatory_attributes": ["link", "label"],
+        "model": TriccNodeBlock,
     },
     TriccNodeType.end: {
         "objects": ["UserObject", "object"],
