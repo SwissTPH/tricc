@@ -1,0 +1,63 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "demo-retrieve",
+  "name": "demo-retrieve",
+  "title": "Retrievals",
+  "url": "http://example.org/fhir/CodeSystem/demo-retrieve",
+  "meta": {"tag": [{"system": "http://tricc.org/fhir/CodeSystem/codesystem-role", "code": "retrieve"}]},
+  "status": "draft",
+  "content": "complete",
+  "concept": [
+    {
+      "code": "#age_months",
+      "display": "Age in months",
+      "property": [
+        {"code": "context", "valueCode": "patient"},
+        {"code": "function", "valueCode": "AgeInMonths"}
+      ]
+    },
+    {
+      "code": "#prev_weight",
+      "display": "Weight in the last 30 days",
+      "property": [
+        {"code": "context", "valueCode": "history"},
+        {"code": "function", "valueCode": "Latest"},
+        {"code": "reads", "valueCoding": {"system": "http://example.org/fhir/CodeSystem/demo", "code": "weight"}},
+        {"code": "period", "valueString": "P30D"}
+      ]
+    },
+    {
+      "code": "#weight_trend",
+      "display": "Weight two weeks ago",
+      "property": [
+        {"code": "context", "valueCode": "custom"},
+        {"code": "reads", "valueCoding": {"system": "http://example.org/fhir/CodeSystem/demo", "code": "weight"}},
+        {"code": "period", "valueString": "P2W"}
+      ],
+      "extension": [
+        {
+          "url": "http://tricc.org/fhir/StructureDefinition/retrieve-expression",
+          "valueExpression": {
+            "language": "text/cql",
+            "expression": "Coalesce(ValueAsDecimal(GetHistoryObservationValueSince('weight', Now() - {{period}}, 2, null)), 0)"
+          }
+        },
+        {
+          "url": "http://tricc.org/fhir/StructureDefinition/retrieve-expression",
+          "valueExpression": {
+            "language": "text/x-xlsform",
+            "expression": "coalesce(instance('contact-summary')/context/{{code}}_{{period}}d,'')"
+          }
+        }
+      ]
+    },
+    {
+      "code": "#sex",
+      "display": "Sex (unused)",
+      "property": [
+        {"code": "context", "valueCode": "patient"},
+        {"code": "function", "valueCode": "Sex"}
+      ]
+    }
+  ]
+}

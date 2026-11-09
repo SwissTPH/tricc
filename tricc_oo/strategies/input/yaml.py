@@ -167,6 +167,8 @@ class YamlNode(YamlModel):
     repeat: Optional[int] = None
     context: Optional[str] = None
     period: Optional[str] = None
+    # populate: the concept read, a code or {system, code} (default: the node name; #34)
+    source: Optional[ConceptRef] = None
     # quantity questions (and populate nodes reading one) carry a unit of measure
     unit: Optional[str] = None
     unit_system: Optional[str] = None
@@ -338,7 +340,7 @@ NODE_TYPE_MAP: Dict[str, Dict[str, Any]] = {
     "populate": {
         "model": TriccNodePopulate,
         "attrs": [
-            "label", "name", "context", "period", "repeat", "data_type", "concept_type",
+            "label", "name", "context", "period", "source", "repeat", "data_type", "concept_type",
             "unit", "unit_system", "unit_code",
         ],
         "tricc_type": TriccNodeType.populate,
@@ -779,6 +781,9 @@ class YamlStrategy(BaseInputStrategy):
             val = getattr(ynode, attr, None)
             if attr in ("min", "max") and isinstance(val, str):
                 val = float(val)
+            if attr == "source" and val is not None:
+                # the concept code; its system only narrows the dictionary, the model keeps the code
+                val = self._concept_ref(val)[0]
             if val is not None:
                 if attr == "required":
                     data[attr] = shield_required(val)

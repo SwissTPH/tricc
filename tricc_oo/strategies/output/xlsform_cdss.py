@@ -4,6 +4,7 @@ from typing import List, Set
 
 from tricc_oo.models.tricc import TriccNodeActivity
 from tricc_oo.models.calculate import TriccNodePopulate
+from tricc_oo.converters.retrieval import is_retrieval_node
 from tricc_oo.models.base import (
     TriccOperation,
     TriccOperator,
@@ -218,7 +219,8 @@ class XLSFormCDSSStrategy(XLSFormStrategy):
         for node in activity.nodes.values():
             if isinstance(node, TriccNodeActivity):
                 inputs = self.export_inputs(node, inputs, **kwargs)
-            if isinstance(node, TriccNodePopulate):
+            # retrievals get their own rows (XLSFormStrategy.get_retrieval_lines)
+            if isinstance(node, TriccNodePopulate) and not is_retrieval_node(node):
                 inputs.append(node)
         return inputs
    

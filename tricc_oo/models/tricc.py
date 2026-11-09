@@ -553,6 +553,12 @@ class TriccIntervention(BaseModel):
     config: Optional[Any] = None
     # tricc.yaml ``calculate_code_system``: the calculate dictionary (url, id or name)
     calculate_code_system: Optional[str] = None
+    # tricc.yaml ``retrieve_code_system``: the retrieval dictionary (url, id or name)
+    retrieve_code_system: Optional[str] = None
+    # retrievals the intervention uses, by code (``#name``), and their nodes; built once the
+    # pages are loaded (tricc_oo.converters.retrieval.attach_used_retrievals)
+    retrievals: Dict[str, Any] = {}
+    retrieval_nodes: List[Any] = []
     # legacy form_id values already reported by intervention_name()
     ignored_form_ids: Set[str] = set()
     # Calculates from the tricc.yaml ``libraries`` (CQL defines); attached to the main

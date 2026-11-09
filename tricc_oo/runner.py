@@ -274,6 +274,7 @@ def run_grouped_export(
     OutputStrategyCls = get_output_strategy(output_strategy_name)
     output_strategy = OutputStrategyCls(project, out_dir)
     logger.info("Using strategy %s", OutputStrategyCls.__name__)
+    output_strategy.check_retrievals()
     output_strategy.execute()
     if test_strategy_name:
         TestStrategyCls = get_test_strategy(test_strategy_name)

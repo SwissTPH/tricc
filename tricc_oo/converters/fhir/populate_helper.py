@@ -197,6 +197,9 @@ def patient_field(node: "TriccNodePopulate") -> Optional[tuple]:
 
 def populate_value_type(node: "TriccNodePopulate") -> Optional[str]:
     """Known CQL result type of a populate node's accessor (None: Observation value / unknown)."""
+    retrieval = getattr(node, "retrieval", None)
+    if retrieval is not None:
+        return retrieval_cql_type(retrieval)
     field = patient_field(node)
     return field[1] if field else None
 
@@ -221,6 +224,10 @@ def resolve_populate_reference(
     of its latest answer (``context=history`` only).
     """
     prefix = "Helper." if qualified else ""
+    retrieval = getattr(node, "retrieval", None)
+    if retrieval is not None:
+        # a project retrieval: its define in the Helper library (retrieval_cql_defines)
+        return f'{prefix}"{retrieval.code}"'
     code = populate_source_concept(node).replace("'", "\\'")
     ctx = node.context
     repeat_arg = _repeat_cql_arg(node)
@@ -372,3 +379,149 @@ define function GetEncounterValue(code String, repeatIndex Integer, period Strin
   GetEncounterObservationValue(code, repeatIndex, period)
 """
 
+
+# ── Project retrievals (feature/20261109-project-retrievals.md) ──────────────────────
+# One Helper define per used retrieval, named by its code ("#age_months"). Patient
+# functions reuse the defines context=patient populate nodes read; encounter / history
+# functions the Observation / Condition accessors, with the period as a lookback window.
+
+#: patient function -> CQL (Helper library, unqualified)
+RETRIEVAL_PATIENT_CQL = {
+    "AgeInDays": "AgeInDays",
+    "AgeInWeeks": "CalculateAgeInWeeks(PatientBirthDate)",
+    "AgeInMonths": "AgeInMonths",
+    "AgeInYears": "AgeInYears",
+    "DateOfBirth": "PatientBirthDate",
+    "Sex": "PatientGender",
+    "DeceasedDateTime": "(PatientRecord.deceased as FHIR.dateTime).value",
+    "FullName": (
+        "Combine((First(PatientRecord.name).given) G return G.value, ' ')"
+        " & ' ' & First(PatientRecord.name).family.value"
+    ),
+    "FirstName": "First(First(PatientRecord.name).given).value",
+    "MiddleName": "First(Skip(First(PatientRecord.name).given, 1)).value",
+    "LastName": "First(PatientRecord.name).family.value",
+    "Telecom": "First(PatientRecord.telecom).value.value",
+    "Photo": "First(PatientRecord.photo).url.value",
+}
+#: master-data function -> Helper accessor taking the concept code
+RETRIEVAL_VALUE_CQL = {
+    "FacilityValue": "GetFacilityValue",
+    "PractitionerValue": "GetPractitionerValue",
+    "LocationValue": "GetLocationValue",
+}
+# TRICC data type -> (Questionnaire item type the Observation value is read as, CQL type)
+_RETRIEVAL_VALUE_TYPES = {
+    "integer": ("integer", "integer"),
+    "decimal": ("decimal", "decimal"),
+    "quantity": ("decimal", "decimal"),
+    "boolean": ("boolean", "boolean"),
+    "date": ("date", "date"),
+    "coded": ("string", "string"),
+    "string": ("string", "string"),
+    "text": ("string", "string"),
+}
+
+
+def retrieval_cql_type(retrieval) -> Optional[str]:
+    """CQL result type of a retrieval's define, or None when unknown (custom, dateTime)."""
+    if retrieval.effective_function is None:
+        return None
+    return _RETRIEVAL_VALUE_TYPES.get(retrieval.value_type or "string", (None, None))[1]
+
+
+def _retrieval_observation_value(retrieval, accessor: str) -> str:
+    """An Observation value accessor converted to the retrieval's value type."""
+    from tricc_oo.converters.fhir.cql_value import wrap_cql_for_item_type
+
+    item_type = _RETRIEVAL_VALUE_TYPES.get(retrieval.value_type or "string", ("string", None))[0]
+    return wrap_cql_for_item_type(accessor, item_type, qualified=False)
+
+
+def retrieval_cql_expression(retrieval, strategy: str = "FHIRStrategy") -> str:
+    """CQL body of a retrieval's Helper define (catalogue mapping).
+
+    Args:
+        retrieval: A ``tricc_oo.converters.retrieval.Retrieval``.
+        strategy: Strategy name, for errors.
+
+    Returns:
+        The CQL expression, unqualified (it lives in the Helper library).
+
+    Raises:
+        TriccRetrievalError: No mapping for the function, or a custom retrieval without a
+            ``text/cql`` expression.
+    """
+    from tricc_oo.converters.fhir.concept_mapper import get_fhir_resource
+    from tricc_oo.converters.retrieval import CQL_LANGUAGE, custom_expression, unsupported
+
+    function = retrieval.effective_function
+    if function is None:
+        return custom_expression(retrieval, CQL_LANGUAGE, strategy)
+    code = (retrieval.reads_code or "").replace("'", "\\'")
+    if function in RETRIEVAL_PATIENT_CQL:
+        return RETRIEVAL_PATIENT_CQL[function]
+    if function == "PatientValue":
+        field = PATIENT_FIELDS.get(code.lower())
+        if field:
+            return field[0]
+        logger.warning(
+            f"retrieval {retrieval.code}: patient concept '{code}' is not a supported Patient field "
+            f"({', '.join(sorted(PATIENT_FIELDS))}); it stays empty"
+        )
+        return f"GetPatientValue('{code}')"
+    if function in RETRIEVAL_VALUE_CQL:
+        return f"{RETRIEVAL_VALUE_CQL[function]}('{code}')"
+    resource, _, _ = get_fhir_resource(retrieval.reads_concept_type, None)
+    condition = resource == "Condition"
+    if retrieval.context == ENCOUNTER_CONTEXT:
+        if function == "Latest":
+            if condition:
+                return f"GetEncounterConditionValue('{code}')"
+            return _retrieval_observation_value(retrieval, f"GetEncounterObservationValue('{code}', null, null)")
+        if function == "Exists":
+            return f"GetConditionValue('{code}')" if condition else f"exists(GetObservations('{code}'))"
+        if function == "Count":
+            return f"Count(GetActiveConditions('{code}'))" if condition else f"Count(GetObservations('{code}'))"
+    if retrieval.context == HISTORY_CONTEXT:
+        since = cql_lookback_start(retrieval.period) if retrieval.period else None
+        if retrieval.period and since is None:
+            logger.warning(
+                f"retrieval {retrieval.code}: period '{retrieval.period}' is not a date-only ISO duration; "
+                "reading without a window"
+            )
+        since = since or "null"
+        if condition:
+            if function in ("Latest", "Exists"):
+                return f"GetHistoryConditionValue('{code}')"
+            if function == "Count":
+                return (
+                    f"Count([Condition] C where ConditionHasCode(C, '{code}')"
+                    " and ConditionVerificationCode(C) != 'refuted'"
+                    " and ConditionVerificationCode(C) != 'entered-in-error')"
+                )
+        if function == "Latest":
+            return _retrieval_observation_value(
+                retrieval, f"GetHistoryObservationValueSince('{code}', {since}, 1, null)"
+            )
+        if function == "Exists":
+            return f"GetHistoryObservationSince('{code}', {since}, 1, null) is not null"
+        if function == "Count":
+            return (
+                f"Count([Observation] O where ObservationHasCode(O, '{code}')"
+                " and O.status in {'final', 'amended', 'corrected'}"
+                f" and ({since} is null or (O.effective as FHIR.dateTime).value >= {since}))"
+            )
+    raise unsupported(retrieval, strategy)
+
+
+def retrieval_cql_defines(retrievals, strategy: str = "FHIRStrategy") -> str:
+    """The Helper defines of the used retrievals (empty when there is none)."""
+    defines = [
+        f'define "{retrieval.code}":\n  {retrieval_cql_expression(retrieval, strategy)}'
+        for retrieval in retrievals
+    ]
+    if not defines:
+        return ""
+    header = "// ── Project retrievals (feature/20261109-project-retrievals.md) ─────────────"
+    return header + "\n\n" + "\n\n".join(defines) + "\n"
