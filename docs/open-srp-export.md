@@ -560,6 +560,31 @@ For CHT, the same node picks its binding from where the data comes from: `encoun
 since the inputs field is named after the source document field), every other context reads
 `instance('contact-summary')/context/<key>` and needs no inputs field.
 
+A populate node reads its `source` concept (a code, or `{system, code}` in YAML; the draw.io
+`source` attribute), else the concept named like the node: `t_weight` with `source: weight` reads
+`weight` and keeps its own name.
+
+### Project retrievals (`"#name"`)
+
+`feature/20261109-project-retrievals.md`: a retrieval of the project dictionary that an
+intervention uses becomes one `define "#name"` in the **Helper** library and a hidden item
+`r_<name>` whose `initialExpression` is `Calc_r_<name>: Helper."#name"`. CQL references use
+`Helper."#name"`; FHIRPath references read the `r_<name>` item.
+
+| function | CQL of `define "#name"` |
+|---|---|
+| `AgeInDays` / `AgeInMonths` / `AgeInYears`, `AgeInWeeks` | `AgeInDays` / `AgeInMonths` / `AgeInYears`, `CalculateAgeInWeeks(PatientBirthDate)` |
+| `DateOfBirth`, `Sex` | `PatientBirthDate`, `PatientGender` |
+| `DeceasedDateTime`, names, `Telecom`, `Photo` | read from `PatientRecord` (`deceased`, `name`, `telecom`, `photo.url`) |
+| `PatientValue` | the `PatientGender` / `PatientBirthDate` / `AgeInYears` define for those concepts, else `GetPatientValue('<code>')` |
+| `FacilityValue` / `PractitionerValue` / `LocationValue` | `GetFacilityValue('<code>')` / … |
+| `Latest` (encounter / history) | `ValueAs<type>(GetEncounterObservationValue(…))` / `ValueAs<type>(GetHistoryObservationValueSince('<code>', Now() - <period>, 1, null))`; Condition concepts: `Get…ConditionValue('<code>')` |
+| `Exists`, `Count` | `exists(GetObservations(…))` / `GetHistoryObservationSince(…) is not null`; `Count(…)` over the same Observations (or Conditions) |
+| `custom` | its `text/cql` expression; `{{code}}` → `"<code>"`, `{{period}}` → `30 days` |
+
+`<type>` follows the `dataType` of the concept read (`coded` / text: string). A period with
+several units (`P1Y6M`) cannot fill `{{period}}` in CQL.
+
 ### Inherited values (a question asked on several paths)
 
 **Updated 2026-08-20** (`fix/20260820-opensrp-inherited-value.md`): when the same question or
