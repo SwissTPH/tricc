@@ -11,8 +11,8 @@ nodes:
      source: {system: 'http://example.org/fhir/CodeSystem/demo', code: weight}}
   - {id: end, type: end, name: end_visit, label: End}
 edges:
-  - {source: start, target: t_weight}
-  - {source: t_weight, target: young}
-  - {source: young, target: weight}
-  - {source: weight, target: trend}
-  - {source: trend, target: end}
+  - {id: e1, source: start, target: t_weight}
+  - {id: e2, source: t_weight, target: young}
+  - {id: e3, source: young, target: weight}
+  - {id: e4, source: weight, target: trend}
+  - {id: e5, source: trend, target: end}
