@@ -44,6 +44,13 @@ Display text with `${field}` tokens is parsed to a `TriccMessage` tree at **inpu
 for display models only (see `feature/display-text-injection.md` and
 `feature/20260909-display-message-ast.md`).
 
+**Project retrievals** (`feature/20261109-project-retrievals.md`): once every page is loaded,
+`attach_library_calculates` also reads the retrieval dictionary
+(`tricc_oo/converters/retrieval.py`), collects the `"#name"` references of the loaded pages and
+library calculates, and hangs one `TriccNodeRetrieval` (a populate node named `#name`, exported
+as `r_<name>`) per used retrieval on the main page, like a library calculate. An unknown code is
+an error.
+
 ## 6) Calculate load, versioning, and inheritance
 
 Core walk in `tricc_oo/visitors/tricc.py` (`load_calculate` and related):
@@ -91,6 +98,16 @@ Built-in output strategies (registered in `tricc_oo/strategies/__init__.py`):
 | `OpenMRSStrategy` | OpenMRS form export |
 | `FHIRStrategy` | FHIR SDC (Questionnaire, Library/CQL, StructureMap, ValueSet) |
 | `OpenSRPStrategy` | FHIR-Core / OpenSRP bundle (extends `FHIRStrategy`) |
+
+Each strategy turns a used retrieval into its own input through `retrieval_expression`
+(the runner calls `check_retrievals` first, so an unsupported one fails before any output):
+
+| Strategy | Retrieval export |
+|----------|------------------|
+| `FHIRStrategy`, `OpenSRPStrategy` | `define "#name"` in the Helper library (catalogue in `populate_helper.py`; `custom`: its `text/cql` expression); references read `Helper."#name"` |
+| `XLSFormCHTStrategy`, `XLSFormCHTHFStrategy` | hidden calculate `r_<name>` reading `instance('contact-summary')/context/<name>` (`custom`: its `text/x-xlsform` expression); references become `${r_<name>}` |
+| `XLSFormStrategy`, `XLSFormCDSSStrategy` | `custom` only (`text/x-xlsform`); a function fails with the retrieval code and strategy name |
+| others | fail with the retrieval code and strategy name |
 
 Lookup by name: `get_output_strategy("XLSFormCHTHFStrategy")` or pass the class directly in tests.
 List registered names: `list_output_strategies()` from `tricc_oo.strategies.registry`.

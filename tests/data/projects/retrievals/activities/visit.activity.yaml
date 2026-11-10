@@ -1,0 +1,18 @@
+id: visit
+title: Visit
+process: main
+nodes:
+  - {id: start, type: start, name: start_visit, label: Visit}
+  - {id: young, type: note, name: young_note, label: Young infant, relevance: '"#age_months" < 6'}
+  - {id: weight, type: decimal, name: weight, label: Weight (kg), relevance: '"#prev_weight" is null'}
+  - {id: trend, type: calculate, name: weight_trend, label: Weight trend, calculate: '"#weight_trend"'}
+  # a previous value read from the concept the question records (#34)
+  - {id: t_weight, type: populate, name: t_weight, label: Previous weight, context: history, period: P30D,
+     source: {system: 'http://example.org/fhir/CodeSystem/demo', code: weight}}
+  - {id: end, type: end, name: end_visit, label: End}
+edges:
+  - {id: e1, source: start, target: t_weight}
+  - {id: e2, source: t_weight, target: young}
+  - {id: e3, source: young, target: weight}
+  - {id: e4, source: weight, target: trend}
+  - {id: e5, source: trend, target: end}

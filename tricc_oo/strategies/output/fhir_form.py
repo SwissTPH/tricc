@@ -47,6 +47,7 @@ from tricc_oo.converters.fhir.cql_value import (
     cql_helper_value_block,
     wrap_cql_for_item_type,
 )
+from tricc_oo.converters.retrieval import iter_retrievals
 from tricc_oo.converters.fhir.populate_helper import (
     ENCOUNTER_CONTEXT,
     HISTORY_CONTEXT,
@@ -57,6 +58,8 @@ from tricc_oo.converters.fhir.populate_helper import (
     populate_fhir_item_type,
     populate_unit,
     resolve_populate_reference,
+    retrieval_cql_defines,
+    retrieval_cql_expression,
 )
 from tricc_oo.converters.fhir.repeat_helper import (
     build_questionnaire_repeat_extension,
@@ -2172,6 +2175,10 @@ class FHIRStrategy(BaseOutPutStrategy):
         else:
             raise NotImplementedError(f"This type of node {r.__class__} is not supported within an operation")
 
+    def retrieval_expression(self, retrieval) -> str:
+        """CQL of a project retrieval's Helper define (``retrieval_cql_expression``)."""
+        return retrieval_cql_expression(retrieval, type(self).__name__)
+
     def _populate_is_multiple(self, node) -> bool:
         """True when a populate node reads a select_multiple concept (§10)."""
         return populate_reads_multiple(node, self._select_multiple_concepts)
@@ -2254,6 +2261,9 @@ class FHIRStrategy(BaseOutPutStrategy):
             populate_helpers=cql_helper_populate_block(),
             value_helpers=cql_helper_value_block(),
         )
+        retrievals = retrieval_cql_defines(iter_retrievals(self.project), type(self).__name__)
+        if retrievals:
+            helper_cql += "\n" + retrievals
         self.cql_libraries[helper_key] = helper_cql
 
         # Create FHIR Library resource for helper

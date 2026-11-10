@@ -99,6 +99,12 @@ interventions:
   expression defines are supported: declarations (`library`, `using`, `include`,
   `context`, …) are ignored, functions are rejected, names must be plain identifiers,
   and a name may be defined once across all libraries.
+- **`retrieve_code_system`** names the retrieval dictionary (CodeSystem url, id or
+  name): data read before the consultation, referenced in expressions as `"#name"`.
+  A CodeSystem tagged `meta.tag` `http://tricc.org/fhir/CodeSystem/codesystem-role|retrieve`
+  wins over it; without either, one named `<default>-retrieve` is used. Only the
+  retrievals an intervention uses are exported; an unknown `"#code"` stops the build.
+  See `feature/20261109-project-retrievals.md`.
 - **Image caps** apply when extracting pictures from draw.io (`0` / omitted = no cap).
   A single image object may set `max_width` / `max_height` (Edit Data) to override
   one side; `0` means unlimited for that side.

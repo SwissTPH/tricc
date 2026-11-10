@@ -88,6 +88,19 @@ class TriccNodePopulate(TriccNodeFakeCalculateBase):
     unit_code: Optional[str] = None
 
 
+class TriccNodeRetrieval(TriccNodePopulate):
+    """A used entry of the project retrieval dictionary (``"#name"`` in expressions).
+
+    Built by ``tricc_oo.converters.retrieval`` and hung on the main page like a library
+    calculate: ``name`` is the code (``#age_months``), so references resolve to it, and
+    ``export_name`` is ``r_<name>``. ``retrieval`` holds the dictionary entry
+    (``tricc_oo.converters.retrieval.Retrieval``); each output strategy turns it into its own
+    input (feature/20261109-project-retrievals.md).
+    """
+
+    retrieval: Optional[object] = None
+
+
 class TriccNodeDisplayBridge(TriccNodeDisplayCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.bridge
 

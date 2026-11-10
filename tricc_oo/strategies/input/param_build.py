@@ -58,20 +58,62 @@ def _matches(key, code_system, ref: str) -> bool:
                    getattr(code_system, "name", None))
 
 
-def calculate_code_system_key(codesystems, configured: Optional[str] = None) -> str:
-    """Find the calculate dictionary, where parameter concepts go.
+def role_code_system_key(codesystems, role: str, configured: Optional[str] = None,
+                         setting: Optional[str] = None) -> Optional[str]:
+    """Find the project CodeSystem playing ``role`` (``calculate``, ``retrieve``).
 
     The first found of:
 
-    1. the CodeSystem tagged ``meta.tag`` ``codesystem-role|calculate``
+    1. the CodeSystem tagged ``meta.tag`` ``codesystem-role|<role>``
        (``datadictionnary.CODESYSTEM_ROLE_SYSTEM``);
-    2. ``configured``, tricc.yaml ``calculate_code_system`` (url, id or name);
-    3. one whose key, id or name is ``calculate`` (draw.io) or ends in ``-calculate`` (the
-       frontend's ``<default>-calculate``);
-    4. ``calculate``, created on first use (``init_codesystem`` tags it).
+    2. ``configured``, the tricc.yaml ``<role>_code_system`` (url, id or name);
+    3. one whose key, id or name is ``<role>`` (draw.io) or ends in ``-<role>`` (the
+       frontend's ``<default>-<role>``).
 
     Several tagged CodeSystems (the first by url is used, as in the frontend), or a
     ``configured`` one that is not the tagged one or is not a project CodeSystem, are warnings.
+
+    Args:
+        codesystems: The project CodeSystems, by key (``TriccIntervention.code_systems``).
+        role: The role tag code.
+        configured: The tricc.yaml setting, if any.
+        setting: The setting name, for messages (default ``<role>_code_system``).
+
+    Returns:
+        The key in ``codesystems``, or None when none fits.
+    """
+    from tricc_oo.converters.datadictionnary import has_role
+
+    setting = setting or f"{role}_code_system"
+    # several tagged: the first by url, as the frontend picks it
+    tagged = sorted(
+        (key for key, cs in codesystems.items() if has_role(cs, role)),
+        key=lambda k: str(getattr(codesystems[k], "url", None) or k),
+    )
+    if len(tagged) > 1:
+        logger.warning(f"several CodeSystems are tagged as the {role} dictionary: {tagged}; using {tagged[0]}")
+    if configured:
+        named = next((key for key, cs in codesystems.items() if _matches(key, cs, configured)), None)
+        if named is None:
+            logger.warning(f"{setting} {configured!r} is not a project CodeSystem")
+        elif tagged and named != tagged[0]:
+            logger.warning(f"{setting} {configured!r} differs from the tagged CodeSystem {tagged[0]!r}")
+        if not tagged and named is not None:
+            return named
+    if tagged:
+        return tagged[0]
+    for key, cs in codesystems.items():
+        for label in (key, getattr(cs, "id", None), getattr(cs, "name", None)):
+            if label and (label == role or str(label).endswith(f"-{role}")):
+                return key
+    return None
+
+
+def calculate_code_system_key(codesystems, configured: Optional[str] = None) -> str:
+    """Find the calculate dictionary, where parameter concepts go.
+
+    ``role_code_system_key`` with role ``calculate``; when none fits, ``calculate``, created
+    on first use (``init_codesystem`` tags it).
 
     Args:
         codesystems: The project CodeSystems, by key (``TriccIntervention.code_systems``).
@@ -81,30 +123,9 @@ def calculate_code_system_key(codesystems, configured: Optional[str] = None) -> 
         The key in ``codesystems``, or ``calculate`` when none fits (``add_concept`` then
         creates it).
     """
-    from tricc_oo.converters.datadictionnary import CALCULATE_ROLE, has_role
+    from tricc_oo.converters.datadictionnary import CALCULATE_ROLE
 
-    # several tagged: the first by url, as the frontend picks it
-    tagged = sorted(
-        (key for key, cs in codesystems.items() if has_role(cs, CALCULATE_ROLE)),
-        key=lambda k: str(getattr(codesystems[k], "url", None) or k),
-    )
-    if len(tagged) > 1:
-        logger.warning(f"several CodeSystems are tagged as the calculate dictionary: {tagged}; using {tagged[0]}")
-    if configured:
-        named = next((key for key, cs in codesystems.items() if _matches(key, cs, configured)), None)
-        if named is None:
-            logger.warning(f"calculate_code_system {configured!r} is not a project CodeSystem")
-        elif tagged and named != tagged[0]:
-            logger.warning(f"calculate_code_system {configured!r} differs from the tagged CodeSystem {tagged[0]!r}")
-        if not tagged and named is not None:
-            return named
-    if tagged:
-        return tagged[0]
-    for key, cs in codesystems.items():
-        for label in (key, getattr(cs, "id", None), getattr(cs, "name", None)):
-            if label and (label == CALCULATE_SYSTEM or str(label).endswith("-calculate")):
-                return key
-    return CALCULATE_SYSTEM
+    return role_code_system_key(codesystems, CALCULATE_ROLE, configured) or CALCULATE_SYSTEM
 
 
 def _text(value: Any, lang: str) -> Optional[str]:

@@ -140,6 +140,7 @@ class BaseInputStrategy:
             project.image_max_width = project_config.image_max_width()
             project.image_max_height = project_config.image_max_height()
             project.calculate_code_system = project_config.calculate_code_system
+            project.retrieve_code_system = project_config.retrieve_code_system
             default_lang, languages = project_config.languages()
             if default_lang:
                 project.lang_code = default_lang
@@ -210,9 +211,17 @@ class BaseInputStrategy:
         The walkers schedule a page's prev-less calculates when they reach its root, so
         library defines join the stash next to the root and are processed once their
         references are ready -- exactly like a free-floating calculate drawn on the page.
+
+        The retrievals the loaded pages use (``"#name"``) are hung the same way
+        (feature/20261109-project-retrievals.md).
         """
-        calculates = getattr(project, "library_calculates", None) or []
-        if page is None or not calculates:
+        from tricc_oo.converters.retrieval import build_used_retrievals
+
+        if page is None:
+            return
+        calculates = list(getattr(project, "library_calculates", None) or [])
+        calculates += build_used_retrievals(project)
+        if not calculates:
             return
         for calc in calculates:
             if calc.id in page.nodes:
