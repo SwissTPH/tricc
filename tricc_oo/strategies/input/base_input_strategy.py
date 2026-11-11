@@ -194,11 +194,17 @@ class BaseInputStrategy:
 
     @staticmethod
     def write_terminology(project, media_path) -> None:
-        """Write the project CodeSystems / ValueSets next to the media folder."""
+        """Write the project CodeSystems / ValueSets next to the media folder.
+
+        Abstract (template) concepts are not written: they only exist to build each block
+        use's concrete concepts (feature/20261111-block-params-and-start-node.md §18.8).
+        """
+        from tricc_oo.converters.datadictionnary import exportable_code_system
+
         out_dir = os.path.dirname(media_path)
         for k, v in project.code_systems.items():
             with open(os.path.join(out_dir, f"{k}_codesystem.json"), "w", encoding="utf-8") as file:
-                file.write(v.json(indent=4))
+                file.write(exportable_code_system(v).json(indent=4))
         for k, v in project.value_sets.items():
             with open(os.path.join(out_dir, f"{k}_valueset.json"), "w") as file:
                 file.write(v.json(indent=4))

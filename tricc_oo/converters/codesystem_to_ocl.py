@@ -1,5 +1,6 @@
 from typing import Dict, List, Any
 from fhir.resources.codesystem import CodeSystem
+from tricc_oo.converters.datadictionnary import is_template_concept
 from tricc_oo.models.ocl import (
     OCLConcept,
     OCLSource,
@@ -143,6 +144,8 @@ def transform_fhir_to_ocl(
     # Transform concepts
     if hasattr(fhir_cs, "concept") and fhir_cs.concept:
         for concept in fhir_cs.concept:
+            if is_template_concept(concept):
+                continue  # abstract: never emitted (§18.8 of the block-params spec)
             datatype = get_fhir_concept_datatype(concept)
             ocl_concept = OCLConcept(
                 id=concept.code,

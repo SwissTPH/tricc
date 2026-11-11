@@ -119,7 +119,7 @@ class TriccInterventionConfig(BaseModel):
         default_factory=lambda: [TriccInterventionStart(on="demand")]
     )
     # Parameter values seeding every activity this intervention lists: literals,
-    # {system, code} or "{{ref}}" (feature/20261102-block-params-and-start-node.md §3.4).
+    # {system, code} or "{{ref}}" (feature/20261111-block-params-and-start-node.md §3.4).
     args: Dict[str, Any] = Field(default_factory=dict)
     # Interventions whose products are in scope for dead-concept detection (§8.1);
     # read, not used yet.

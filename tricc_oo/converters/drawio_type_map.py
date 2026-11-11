@@ -297,7 +297,7 @@ TYPE_MAP = {
         "mandatory_attributes": ["link", "label", "name"],
         "model": TriccNodeGoTo,
     },
-    # uses a block (feature/20261102-block-params-and-start-node.md); ``link`` is set to
+    # uses a block (feature/20261111-block-params-and-start-node.md); ``link`` is set to
     # the block instance when the page is built, ``param.<name>`` attributes are its args
     TriccNodeType.block: {
         "objects": ["UserObject", "object"],

@@ -2,9 +2,9 @@
 
 | Field             | Value |
 |-------------------|-------|
-| **Status**        | Rev 2 approved 2026-10-29 (Patrick); **phases 1–5 Implemented 2026-11-03** (blocks inlined at linking, the interim of §18.7). Phases 6–9 not started. **Rev 3 (§18, closed blocks) Draft, 2026-11-02** |
+| **Status**        | Rev 2 approved 2026-10-29 (Patrick); **phases 1–5 Implemented 2026-11-03** (blocks inlined at linking, the interim of §18.7). Phases 6–9 not started. **Rev 3 (§18, closed blocks) Draft, 2026-11-02; §18.8 (RFC tricc-frontend#12) Approved 2026-11-08 (Patrick), Implemented 2026-11-11 on the interim (§18.8.1)** |
 | **Branch target** | TBD |
-| **Related**       | `feature/goto-snippet-injection.md` (the `instance = -1` mechanism this generalizes and replaces), `feature/concept-repeat.md` (`repeat = -1` local-only capture, which snippet injection relies on), `feature/advanced-merge-calc.md` (same-name versioning after multi-inject), `../tricc_frontend/feature/20260825-guided-authoring.md` (the authoring surface that consumes this), `../tricc_frontend/feature/20261028-blocks-tab-and-params.md` (frontend counterpart of rev 2) |
+| **Related**       | `../tricc-frontend/feature/20261106-block-outputs-and-abstract-concepts.md` (frontend counterpart of §18.8, RFC tricc-frontend#12), `feature/goto-snippet-injection.md` (the `instance = -1` mechanism this generalizes and replaces), `feature/concept-repeat.md` (`repeat = -1` local-only capture, which snippet injection relies on), `feature/advanced-merge-calc.md` (same-name versioning after multi-inject), `../tricc_frontend/feature/20260825-guided-authoring.md` (the authoring surface that consumes this), `../tricc_frontend/feature/20261028-blocks-tab-and-params.md` (frontend counterpart of rev 2) |
 | **Origin**        | Drafted during `tricc_frontend` v1 planning, 2026-08-25. Rev 2 extends it with call-site-defined parameters on processes, static decisions, dead-concept resolution and extension points. |
 
 Valid status values: `Draft` → `Approved` → `Implemented` → `Superseded`.
@@ -698,3 +698,123 @@ that name already exists (the project dictionary wins, as in §5).
 Phases 1–5 are finished and shipped first, with blocks inlined at linking as an interim.
 Rev 3, once approved, replaces only that step (inner graph stored at linking, injected at
 export); the block file format does not change.
+
+#### 18.8 Revision 2026-11-06: expression arguments, abstract concepts, outputs (Implemented)
+
+Source: frontend RFC [SwissTPH/tricc-frontend#12](https://github.com/SwissTPH/tricc-frontend/issues/12)
+("Block calls: expression arguments, outputs and abstract concepts"), points agreed by Patrick on
+2026-11-05 / 2026-11-06. It refines §18.1 to §18.5. Implemented on the interim (blocks still
+inlined at linking, §18.7); see §18.8.1 for what that changes.
+
+**1. Expression arguments (refines §18.1).** A dynamic argument is explicit, an object with the
+expression shape used elsewhere; a bare string stays a literal:
+
+```yaml
+args:
+  site: axillary                                # static: a literal
+  threshold: "{{fever_threshold}}"              # static: bound to a caller parameter
+  age: { expression: AgeInDays(), intent: { en: Age of the child in days } }  # dynamic
+```
+
+- draw.io: the JSON form, `param.age = {"expression":"AgeInDays()"}`. It cannot be mistaken for
+  a concept (`{system, code}`).
+- The expression is evaluated at the use, in the caller's scope (§18.4: it is what makes the use
+  wait, like a calculate's references). Inside the block it is read through `{{age}}`, rendered
+  as a reference to that per-use value.
+- A dynamic value passed on to an inner block as `{{age}}` is bound, not re-evaluated: it is
+  evaluated once, at the outermost call. A dynamic value is never inherited by name.
+- Effective parameters (§3.3) are unchanged: a dynamic argument binds its parameter like a
+  literal.
+- **Static-only parameters.** A parameter may not receive a dynamic value
+  (`E_ARG_DYNAMIC_STATIC`, naming the use and the parameter) when, anywhere down the call
+  chain, it is used in a node or option `name`, in a static decision (§7), or has type `name`
+  or `concept`. tricc_oo adds two cases the frontend list should share: a `{{p|raw}}`
+  placeholder (it builds a name) and the `save` field (a concept code).
+- An intervention's `args` stay static (nothing is collected yet at that point).
+
+**2. Abstract concepts (new; refines §18.3).** A node whose name holds a placeholder
+(`fever_{{site}}`) has an **abstract concept**:
+
+- code: the template name verbatim (`fever_{{site}}`), so the node links to it by name;
+- in the same dictionary as a concrete concept of that node type (the calculate dictionary for
+  a calculate, else the node's usual one);
+- properties `notSelectable = true` (FHIR), `kind = template`, `owner = <block id>`;
+- its texts (display, designations) may use `{{param}}`, rendered per instance in text mode (§4).
+  A `choice` value renders as its option's label in the target language when the option has a
+  concept, and as the code otherwise.
+- It is never emitted (form, FHIR CodeSystem export, OCL) and never referenced from outside its
+  block (`E_ABSTRACT_SELECTED`).
+- At linking (§18.3), each output at each use gets its **concrete concept** (`fever_axillary`),
+  built from the abstract concept with the use's values rendered into its texts. A concrete
+  concept already in the project dictionary wins (§5); the frontend stores one only when the
+  author overrides it.
+- The terminology export (`write_terminology`, the FHIR / OCL CodeSystem outputs) must therefore
+  skip concepts with `kind = template`.
+
+**3. Outputs (refines §18.2).** No `outputs` key: every inner input and calculate is an output
+(unchanged). **`outputs: []` (explicit) means none**, for a block that only displays or advises.
+Names in the list are template names (`fever_{{site}}`). `E_BLOCK_PRIVATE` applies only when
+`outputs` is written.
+
+**4. Stored-data functions, shared list (refines §18.5).** The CQL functions that retrieve stored
+data are kept in one JSON file, the authority for tricc_oo and the test fixture for the frontend's
+advisory check (its validator has a tokenizer, not an operation tree):
+
+- path: `tricc_oo/converters/cql/stored_data_functions.json` (inside the package, so the parser
+  reads it at runtime to set `retrieves_stored_data`; the frontend tests copy or fetch it);
+- shape: `{"version": 1, "functions": [{"name": "AgeInDays", "reads": "patient"}, ...]}`;
+  `reads` is `patient`, `encounter`, `history` or `context`;
+- initial content, from the functions tricc_oo's CQL helpers define today:
+  - patient: `AgeInDays`, `AgeInMonths`, `AgeInYears`, `GetPatientValue`;
+  - encounter: `GetEncounterValue`, `GetEncounterObservationValue`,
+    `GetEncounterConditionValue`, `GetObservationValue`, `GetConditionValue`, `GetRepeatedValue`;
+  - history: `GetHistoryObservation`, `GetHistoryObservationValue`,
+    `GetHistoryObservationSince`, `GetHistoryObservationValueSince`,
+    `GetHistoryObservationCodesSince`, `GetHistoryCondition`, `GetHistoryConditionValue`
+    (`GetHistory` dropped: no helper of that name exists, only the resource-level names in
+    the generated Helper CQL);
+  - context: `GetPractitionerValue`, `GetLocationValue`, `GetFacilityValue`;
+- a tricc_oo test checks that every listed name is a helper the library knows, and that the
+  parser flags each one; `populate` nodes are a separate rule (§18.6 decision 5), not on the list.
+
+**Decisions (§18.8, Patrick 2026-11-06).**
+
+1. `Today()` / `Now()` are **allowed** inside a block. They read no stored data, so they are not
+   on the list; they are still non-static (§7.1), so a static decision or a static argument
+   cannot use them.
+2. `GetPractitionerValue` / `GetLocationValue` / `GetFacilityValue` are **forbidden** like the
+   patient, encounter and history readers. They stay on the list with `reads: context`; a block
+   that needs one takes its value as an argument.
+
+##### 18.8.1 Implementation (2026-11-11)
+
+Built on the interim of §18.7: a block is still a page instance inlined at linking, so "at
+linking" below means when the instance is built (`strategies/input/param_build.py`).
+
+- **Expression arguments.** `bind` (`models/params.py`) takes `add_dynamic`; an expression
+  argument becomes a calculate `arg_<param>_<digest of the use>` on the *calling* page (a free
+  calculate, label from `intent`), added by the input strategy (`_yaml_add_calculate`,
+  `drawio_add_calculate`). The bound value is `{"dynamic": <calculate name>}`; `{{p}}` renders
+  as `"<name>"` in an expression and `${<name>}` in a text, and never `|raw`. A `{{p}}` argument
+  passes the same value on; inheritance by name skips it. `compute_static_only` gives each
+  page's static-only parameters through the call chain (from `Template.static_used`: node and
+  option names, `save`, `{{p|raw}}`, the page name, `static: true` decisions, literal call
+  arguments). An expression in an intervention's `args` is `E_ARG_DYNAMIC_STATIC`.
+- **Stored data.** `stored_data_functions.json` is loaded by `cql_to_operation`; the parser sets
+  `TriccOperation.retrieves_stored_data`, and `get_stored_data()` walks the tree. The stored-data
+  half of `E_BLOCK_SCOPE` (§18.1) is enforced on each built block instance, `populate` nodes
+  included. The outside-name half of `E_BLOCK_SCOPE`, `E_BLOCK_GOTO` and the `NATIVE_CQL`
+  operator stay with rev 3.
+- **Abstract concepts.** Read from the project terminology (the frontend writes them).
+  `concretize_concepts` adds each use's concrete concept before the instance is built, so node
+  texts come from it. tricc_oo does not synthesize abstract concepts for draw.io-only projects:
+  they would never be emitted. `write_terminology` and `transform_fhir_to_ocl` skip
+  `kind = template`; `E_ABSTRACT_SELECTED` is raised where YAML resolves a node or option
+  concept (a placeholder outside a block already fails earlier, as an unknown parameter).
+- **Outputs.** YAML `outputs`, draw.io `outputs` attribute on `block_start`. A block with
+  private fields gets one instance per use (`__u<digest>`), so each use's private fields are
+  its own; after the build, private names get `_<digest of the instance>`, references inside the
+  instance follow (expression attributes; not `${}` text injections), and the concepts the build
+  added for them are removed. `E_BLOCK_PRIVATE` is checked over every built page;
+  `E_OUTPUT_UNKNOWN` when `outputs` lists a name no inner input or calculate has.
+- Tests: `tests/test_block_calls.py`.

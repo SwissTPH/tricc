@@ -1,6 +1,6 @@
 """Block and activity parameters: declaration, binding and placeholder substitution.
 
-Input-agnostic part of feature/20261102-block-params-and-start-node.md (§2 to §5). The input
+Input-agnostic part of feature/20261111-block-params-and-start-node.md (§2 to §5). The input
 strategies use it in four steps:
 
 1. **Read** each page as a ``Template``: its declared parameters (``ParamSpec``), its calls
@@ -22,7 +22,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
@@ -58,6 +58,17 @@ E_PARAM_TYPE = "E_PARAM_TYPE"  # a value or declaration of the wrong type
 E_PARAM_PLACEHOLDER = "E_PARAM_PLACEHOLDER"  # a placeholder where none is allowed
 E_BLOCK_CYCLE = "E_BLOCK_CYCLE"  # a block that uses itself, directly or not
 W_PARAM_UNREFERENCED = "W_PARAM_UNREFERENCED"  # a declared parameter nothing uses
+# §18.8 (expression arguments, abstract concepts, outputs)
+E_ARG_DYNAMIC_STATIC = "E_ARG_DYNAMIC_STATIC"  # an expression argument for a parameter that shapes the drawing
+E_BLOCK_PRIVATE = "E_BLOCK_PRIVATE"  # a reference from outside a block to one of its private nodes
+E_OUTPUT_UNKNOWN = "E_OUTPUT_UNKNOWN"  # ``outputs`` lists a name no inner input or calculate has
+E_ABSTRACT_SELECTED = "E_ABSTRACT_SELECTED"  # an abstract (template) concept used outside its block
+E_BLOCK_SCOPE = "E_BLOCK_SCOPE"  # a block reads stored data (it must come in as an argument)
+
+#: parameter types whose value is only ever static (§18.8 point 1)
+STATIC_ONLY_TYPES = ("name", "concept")
+#: key of a bound dynamic value: ``{"dynamic": <name of the calculate holding it>}``
+DYNAMIC = "dynamic"
 
 
 class TriccParamError(ValueError):
@@ -238,6 +249,19 @@ def coerce_value(spec: ParamSpec, value: Any, where: str) -> Any:
     return text
 
 
+def is_expression_arg(arg: Any) -> bool:
+    """Whether a call argument, as written, is a dynamic one: ``{expression, intent?}``.
+
+    A bare string is always a literal; a concept is ``{system, code}``, never this form.
+    """
+    return isinstance(arg, dict) and "expression" in arg and "code" not in arg
+
+
+def is_dynamic(value: Any) -> bool:
+    """Whether a bound value is dynamic: ``{"dynamic": <calculate name>}`` (``bind``)."""
+    return isinstance(value, dict) and DYNAMIC in value
+
+
 def _number_text(value) -> str:
     """A number as text, ``38.0`` written ``38``."""
     return str(int(value)) if isinstance(value, float) and value.is_integer() else str(value)
@@ -257,6 +281,10 @@ def render_value(spec: ParamSpec, value: Any, context: str, raw: bool, where: st
     ``raw`` (``{{p|raw}}``) gives the plain text in an expression too, to build a name
     inside one (``"temp_{{site|raw}}"``); it must then be a name fragment.
 
+    A dynamic value (an expression argument, §18.8) is the calculate evaluated at the use:
+    a reference to it in an expression (``"arg_age_1a2b3c4d"``), its display injection in a
+    text (``${arg_age_1a2b3c4d}``). It never renders raw: it cannot build a name.
+
     Args:
         spec: The parameter.
         value: Its bound value (``coerce_value`` output); None when nothing bound it.
@@ -274,6 +302,13 @@ def render_value(spec: ParamSpec, value: Any, context: str, raw: bool, where: st
     """
     if value is None:
         raise TriccParamError(E_PARAM_REQUIRED, f"{where}: parameter {spec.name!r} has no value")
+    if is_dynamic(value):
+        if raw:
+            raise TriccParamError(
+                E_ARG_DYNAMIC_STATIC,
+                f"{where}: {{{{{spec.name}|raw}}}} builds a name, so {spec.name!r} needs a fixed value",
+            )
+        return f'"{value[DYNAMIC]}"' if context == EXPRESSION else f"${{{value[DYNAMIC]}}}"
     if spec.type == "boolean":
         text = "true" if value else "false"
     elif spec.type == "number":
@@ -345,6 +380,24 @@ def placeholder_names(text: Any) -> List[str]:
     return [m.group(1) for m in PLACEHOLDER.finditer(text)] if isinstance(text, str) else []
 
 
+def raw_placeholder_names(text: Any) -> List[str]:
+    """The parameter names used as ``{{name|raw}}`` in ``text`` (they build a name)."""
+    return [m.group(1) for m in PLACEHOLDER.finditer(text) if m.group(2)] if isinstance(text, str) else []
+
+
+def literal_arg_names(args: Dict[str, Any]) -> Set[str]:
+    """Caller parameters rendered as text into a literal call argument (``"x_{{site}}"``).
+
+    Such a value is fixed when the call is bound, so these parameters need a fixed value
+    (``Template.static_used``). A plain ``{{x}}`` passes the value on instead: not counted.
+    """
+    names: Set[str] = set()
+    for arg in args.values():
+        if isinstance(arg, str) and not REFERENCE.match(arg):
+            names.update(placeholder_names(arg))
+    return names
+
+
 class CallSite(BaseModel):
     """A use of another page: a ``block`` or ``goto`` node, read from the raw source.
 
@@ -380,6 +433,15 @@ class Template(BaseModel):
         declared: Its own parameters, by name.
         calls: Its ``block`` and ``goto`` nodes.
         used: Parameter names its placeholders use (for ``W_PARAM_UNREFERENCED``).
+        static_used: Parameter names it uses where only a fixed value fits (§18.8 point 1):
+            in a node or option ``name``, a ``save``, a ``{{p|raw}}``, the page name, a static
+            decision, or inside a literal call argument. ``compute_static_only`` adds the
+            ones the pages it calls need.
+        fields: Template names of its inputs and calculates: a block's default outputs.
+        outputs: A block's ``outputs`` as written (template names); None when the key is
+            absent (every field is an output), ``[]`` for none (§18.8 point 3).
+        templated_names: Node names holding a placeholder (``fever_{{site}}``): each may
+            have an abstract concept (§18.8 point 2).
         raw: The source the input strategy renders: a YAML dict, or a draw.io diagram.
     """
 
@@ -391,7 +453,34 @@ class Template(BaseModel):
     declared: Dict[str, ParamSpec] = {}
     calls: List[CallSite] = []
     used: List[str] = []
+    static_used: List[str] = []
+    fields: List[str] = []
+    outputs: Optional[List[str]] = None
+    templated_names: List[str] = []
     raw: Any = None
+
+    def private_fields(self) -> List[str]:
+        """Template names of the fields that are not outputs (none without ``outputs``)."""
+        if self.outputs is None:
+            return []
+        return [name for name in self.fields if name not in self.outputs]
+
+    def check_outputs(self) -> None:
+        """Check ``outputs`` names fields of the block.
+
+        Raises:
+            TriccParamError: ``E_OUTPUT_UNKNOWN`` for a listed name no inner input or
+                calculate has, or ``outputs`` on a page that is not a block.
+        """
+        if self.outputs is None:
+            return
+        if not self.is_block:
+            raise TriccParamError(E_OUTPUT_UNKNOWN, f"page {self.id}: only a block has outputs")
+        for name in self.outputs:
+            if name not in self.fields:
+                raise TriccParamError(
+                    E_OUTPUT_UNKNOWN, f"block {self.id} lists an output {name!r} that it does not have"
+                )
 
     @property
     def owner(self) -> str:
@@ -509,23 +598,71 @@ def compute_effective(
     return effective
 
 
+def compute_static_only(
+    templates: Dict[str, Template], resolve: Callable[[CallSite], Optional[str]]
+) -> Dict[str, Set[str]]:
+    """The parameters of each page that may not receive an expression argument (§18.8 point 1).
+
+    A parameter is static-only on a page when the page uses it where only a fixed value fits
+    (``Template.static_used``), or passes it to a page below that needs it fixed: by
+    ``{{name}}`` in an argument, or by leaving the argument out (it is then inherited). The
+    ``name`` and ``concept`` types are static-only too; ``bind`` checks those by type.
+
+    Args:
+        templates: Every page, by id.
+        resolve: As for ``compute_effective`` (already checked there).
+
+    Returns:
+        ``{page id: parameter names}`` for every template.
+    """
+    static: Dict[str, Set[str]] = {tid: set(t.static_used) for tid, t in templates.items()}
+    callees = {tid: [(call, resolve(call)) for call in t.calls] for tid, t in templates.items()}
+    changed = True
+    while changed:  # a fixpoint: goto cycles between activities are allowed
+        changed = False
+        for tid, calls in callees.items():
+            for call, callee in calls:
+                if callee is None:
+                    continue
+                for name in static[callee]:
+                    if name not in call.args:
+                        found = {name}
+                    else:
+                        arg = call.args[name]
+                        ref = REFERENCE.match(arg) if isinstance(arg, str) else None
+                        found = {ref.group(1)} if ref else set()
+                    if not found <= static[tid]:
+                        static[tid] |= found
+                        changed = True
+    return static
+
+
 def bind(
     callee_params: Dict[str, ParamSpec],
     args: Dict[str, Any],
     caller_env: Env,
     chain: str,
+    static_only: Iterable[str] = (),
+    add_dynamic: Optional[Callable[[str, Dict[str, Any], Env], str]] = None,
 ) -> Env:
     """Bind the parameters of a called page (§3.2).
 
     Each parameter takes the first value found among:
 
     1. the call's argument: a literal (a placeholder inside it is rendered as text from
-       the caller's environment), or ``{{x}}``, the caller's value of ``x``;
-    2. the caller's value of the same name (inheritance);
+       the caller's environment), ``{{x}}``, the caller's value of ``x``, or an expression
+       ``{expression, intent?}`` (dynamic, §18.8 point 1);
+    2. the caller's value of the same name (inheritance), unless that value is dynamic: a
+       dynamic value is only ever passed on explicitly, by ``{{x}}``;
     3. the parameter's default.
 
     A value set at the call replaces the inherited one for the callee only: the caller's
     environment is not changed.
+
+    An expression argument is evaluated once, at the use, in the caller's scope:
+    ``add_dynamic`` creates that calculate and names it, and the bound value is
+    ``{"dynamic": <its name>}``. Passed on to a page below by ``{{x}}``, the same calculate
+    is used: it is not evaluated again.
 
     Args:
         callee_params: The callee's effective parameters (``compute_effective``).
@@ -534,6 +671,11 @@ def bind(
         caller_env: The calling instance's environment; empty at the root.
         chain: The calls from the root to this one, for error messages
             (``intervention > triage > block t-ax in triage``).
+        static_only: The callee's parameters that need a fixed value
+            (``compute_static_only``).
+        add_dynamic: ``(parameter name, argument, caller_env) -> calculate name``: adds the
+            calculate of an expression argument to the calling page. None where no
+            expression argument is allowed (the intervention's ``args``).
 
     Returns:
         The callee's environment, one entry per parameter of ``callee_params``. An
@@ -543,8 +685,11 @@ def bind(
         TriccParamError: ``E_PARAM_REQUIRED`` for a required parameter with no value (the
             message extends ``chain`` with the parameter's ``via``, down to the use that
             needs it); ``E_PARAM_UNKNOWN`` for ``{{x}}`` naming no caller parameter;
-            ``E_PARAM_TYPE`` from ``coerce_value``.
+            ``E_PARAM_TYPE`` from ``coerce_value``; ``E_ARG_DYNAMIC_STATIC`` for an
+            expression argument where none is allowed, or for a parameter that needs a
+            fixed value.
     """
+    static_only = set(static_only)
     env: Env = {}
     for name, spec in callee_params.items():
         where = f"{chain}: parameter {name!r}"
@@ -556,14 +701,25 @@ def bind(
                 if ref.group(1) not in caller_env:
                     raise TriccParamError(E_PARAM_UNKNOWN, f"{where}: {{{{{ref.group(1)}}}}} is not a caller parameter")
                 value = caller_env[ref.group(1)][1]
-                if value is not None:
+                if value is not None and not is_dynamic(value):
                     value = coerce_value(spec, value, where)
+            elif is_expression_arg(arg):
+                if add_dynamic is None:
+                    raise TriccParamError(
+                        E_ARG_DYNAMIC_STATIC, f"{where}: an intervention argument is a fixed value, not an expression"
+                    )
+                if not str(arg.get("expression") or "").strip():
+                    raise TriccParamError(E_PARAM_TYPE, f"{where}: expression argument with no expression")
+                _check_dynamic_allowed(spec, static_only, where)
+                value = {DYNAMIC: add_dynamic(name, arg, caller_env)}
             else:
                 if isinstance(arg, str) and has_placeholder(arg):
                     arg = substitute(arg, caller_env, TEXT, where)
                 value = coerce_value(spec, arg, where)
-        elif name in caller_env and caller_env[name][1] is not None:
+        elif name in caller_env and caller_env[name][1] is not None and not is_dynamic(caller_env[name][1]):
             value = coerce_value(spec, caller_env[name][1], where)
+        if is_dynamic(value):
+            _check_dynamic_allowed(spec, static_only, where)
         if value is None and spec.default is not None:
             value = spec.default
         if value is None and spec.required:
@@ -574,6 +730,20 @@ def bind(
             )
         env[name] = (spec, value)
     return env
+
+
+def _check_dynamic_allowed(spec: ParamSpec, static_only: Set[str], where: str) -> None:
+    """Refuse a dynamic value for a parameter that shapes the drawing (§18.8 point 1).
+
+    Raises:
+        TriccParamError: ``E_ARG_DYNAMIC_STATIC`` for a ``name`` / ``concept`` parameter,
+            or one in ``static_only``.
+    """
+    if spec.type in STATIC_ONLY_TYPES or spec.name in static_only:
+        why = f"is of type {spec.type}" if spec.type in STATIC_ONLY_TYPES else "shapes the drawing (a name, a save "
+        if spec.type not in STATIC_ONLY_TYPES:
+            why += "or a configuration choice uses it)"
+        raise TriccParamError(E_ARG_DYNAMIC_STATIC, f"{where}: {spec.name!r} {why}, so it needs a fixed value")
 
 
 def env_key(env: Env) -> Tuple[Tuple[str, str], ...]:
@@ -610,6 +780,8 @@ def unreferenced(template: Template, effective: Dict[str, ParamSpec]) -> Iterabl
     fed = set()
     for call in template.calls:
         for arg in call.args.values():
+            if is_expression_arg(arg):
+                arg = arg.get("expression")
             if isinstance(arg, str):
                 fed.update(placeholder_names(arg))
     for name in template.declared:
