@@ -1,6 +1,6 @@
 """draw.io surface of block and activity parameters.
 
-feature/20261102-block-params-and-start-node.md §2 to §4. In a drawing:
+feature/20261111-block-params-and-start-node.md §2 to §4. In a drawing:
 
 - a ``parameters`` shape (at most one per page) declares the page's parameters, one
   attribute ``param.<name>`` each, holding JSON or the shorthand ``type[(a|b)][!][=default]``
@@ -10,7 +10,11 @@ feature/20261102-block-params-and-start-node.md §2 to §4. In a drawing:
   ``data:page/id,<diagram id>``); a ``goto`` shape calls an activity as before. Either may
   carry ``param.<name>`` attributes: the values for that use;
 - ``{{param}}`` / ``{{param|raw}}`` placeholders may appear in node attributes (rendered as
-  text or as an expression, see ``_context``), in edge labels and in the page name.
+  text or as an expression, see ``_context``), in edge labels and in the page name;
+- a call argument may be an expression, ``param.age = {"expression": "AgeInDays()"}``: a
+  calculate of the calling page, added by ``drawio_add_calculate`` (§18.8 point 1);
+- an input or calculate of a block marked ``output = true`` is an output; when no field of
+  the block is marked, every input and calculate is an output.
 
 This module gives ``strategies.input.param_build.ParamBuild`` what it needs from a drawing:
 ``drawio_template`` reads a diagram as a ``Template``, ``drawio_resolver`` resolves its calls,
@@ -28,6 +32,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from tricc_oo.converters.xml_to_tricc import clean_link, get_id
 from tricc_oo.models.params import (
+    E_OUTPUT_UNKNOWN,
     E_PARAM_CONFLICT,
     E_PARAM_PLACEHOLDER,
     E_PARAM_UNKNOWN,
@@ -37,8 +42,10 @@ from tricc_oo.models.params import (
     Template,
     TriccParamError,
     has_placeholder,
+    literal_arg_names,
     parse_param_shorthand,
     placeholder_names,
+    raw_placeholder_names,
     substitute,
 )
 from tricc_oo.parsers.xml import type_name
@@ -53,6 +60,11 @@ SHAPES = ("object", "UserObject")
 ROOT_TYPES = ("start", "activity_start", "block_start")
 #: shapes that call another page
 CALL_TYPES = ("block", "goto")
+#: the inputs and calculates of a block: its outputs unless some are marked ``output = true`` (§18.2)
+FIELD_TYPES = (
+    "integer", "decimal", "quantity", "text", "date", "select_one", "select_multiple", "select_yesno",
+    "calculate", "add", "count", "diagnosis", "proposed_diagnosis",
+)
 #: first names of block_start / block, still read
 TYPE_ALIASES = {"snippet_start": "block_start", "snippet": "block"}
 
@@ -177,7 +189,77 @@ def drawio_template(diagram) -> Template:
             if not key.startswith(PARAM_PREFIX):
                 used.update(placeholder_names(value))
     template.used = sorted(used)
+    template.static_used = sorted(_static_used(diagram))
+    shapes = list(_shapes(diagram))
+    template.fields = [
+        s.attrib["name"] for s in shapes if s.attrib.get(type_name) in FIELD_TYPES and s.attrib.get("name")
+    ]
+    template.outputs = _outputs(shapes, type_name) if is_block else None
+    template.templated_names = [s.attrib["name"] for s in shapes if has_placeholder(s.attrib.get("name"))]
     return template
+
+
+def _outputs(shapes, type_name) -> Optional[List[str]]:
+    """The names of the block's fields marked ``output = true``; None when none is marked
+    (every input and calculate is an output). A marked shape that is not a named input or
+    calculate is ``E_OUTPUT_UNKNOWN``."""
+    marked = [s for s in shapes if str(s.attrib.get("output", "")).strip().lower() in ("true", "1", "yes")]
+    if not marked:
+        return None
+    outputs = []
+    for shape in marked:
+        if shape.attrib.get(type_name) not in FIELD_TYPES or not shape.attrib.get("name"):
+            raise TriccParamError(
+                E_OUTPUT_UNKNOWN,
+                f"shape {shape.attrib.get('id')!r} is marked output but is not a named input or calculate",
+            )
+        outputs.append(shape.attrib["name"])
+    return outputs
+
+
+def _static_used(diagram) -> set:
+    """Parameters a diagram uses where only a fixed value fits (§18.8 point 1): the page name,
+    shape ``name`` / ``save``, ``{{p|raw}}``, static decisions, literal call arguments."""
+    names = set(placeholder_names(diagram.attrib.get("name")))
+    for element in diagram.iter():
+        for key, value in element.attrib.items():
+            if not key.startswith(PARAM_PREFIX):
+                names.update(raw_placeholder_names(value))
+    for shape in _shapes(diagram):
+        for key in ("name", "save"):
+            names.update(placeholder_names(shape.attrib.get(key)))
+        if str(shape.attrib.get("static", "")).lower() == "true":
+            for key in EXPRESSION_ATTRIBUTES:
+                names.update(placeholder_names(shape.attrib.get(key)))
+        if shape.attrib.get(type_name) in CALL_TYPES:
+            names.update(literal_arg_names(call_args(shape)))
+    return names
+
+
+def drawio_add_calculate(diagram, call: CallSite, name: str, expression: str, label: str) -> None:
+    """Add to a rendered diagram the calculate of an expression argument (§18.8 point 1).
+
+    A calculate shape with no incoming edge, beside the call shape: evaluated once its
+    references are, like any free calculate of the page, and read in the block through
+    ``{{param}}``.
+    """
+    from lxml import etree
+
+    call_shape = next(
+        (s for s in _shapes(diagram) if s.attrib.get("id", "").startswith(call.node_id)
+         and s.attrib.get(type_name) in CALL_TYPES),
+        None,
+    )
+    cell = call_shape.find("mxCell") if call_shape is not None else None
+    parent = cell.attrib.get("parent", "1") if cell is not None else "1"
+    container = call_shape.getparent() if call_shape is not None else next(diagram.iter("root"))
+    shape = etree.SubElement(container, "object")
+    shape.attrib.update({
+        type_name: "calculate", "label": label, "name": name, "reference": expression,
+        "id": f"{call.node_id}-{name}",
+    })
+    geometry = etree.SubElement(etree.SubElement(shape, "mxCell", parent=parent, vertex="1"), "mxGeometry")
+    geometry.attrib["as"] = "geometry"
 
 
 def _context(element, key: str, edge_ids) -> Optional[str]:

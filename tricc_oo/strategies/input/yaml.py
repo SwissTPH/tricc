@@ -25,6 +25,7 @@ from pydantic import AliasChoices, BaseModel, ConfigDict, Field, PrivateAttr, Va
 from tricc_oo.strategies.input.base_input_strategy import BaseInputStrategy
 from tricc_oo.strategies.input.param_build import ParamBuild
 from tricc_oo.models.params import (
+    E_ABSTRACT_SELECTED,
     E_PARAM_CONFLICT,
     E_PARAM_PLACEHOLDER,
     E_PARAM_TYPE,
@@ -36,11 +37,13 @@ from tricc_oo.models.params import (
     Template,
     TriccParamError,
     has_placeholder,
+    literal_arg_names,
     placeholder_names,
+    raw_placeholder_names,
     substitute,
 )
 from tricc_oo.converters.utils import generate_id
-from tricc_oo.converters.datadictionnary import concept_text, find_concept
+from tricc_oo.converters.datadictionnary import concept_text, find_concept, is_template_concept
 from tricc_oo.converters.xml_to_tricc import (
     _get_name,
     assign_rhombus_path,
@@ -190,6 +193,11 @@ class YamlNode(YamlModel):
 
 
 ROOT_TYPES = ("start", "activity_start", "block_start")
+# the inputs and calculates of a block: its outputs unless ``outputs`` says otherwise (§18.2)
+FIELD_TYPES = (
+    "integer", "decimal", "quantity", "text", "date", "select_one", "select_multiple", "select_yesno",
+    "calculate", "add", "count", "diagnosis", "proposed_diagnosis",
+)
 CALL_TYPES = ("block", "goto")
 # first names of block_start / block, still read
 TYPE_ALIASES = {"snippet_start": "block_start", "snippet": "block"}
@@ -227,6 +235,8 @@ class YamlActivity(YamlModel):
 
     # declared and computed parameters, ``{name, type, options?, default?, required?}``
     params: List[Dict[str, Any]] = Field(default_factory=list)
+    # a block's outputs (template names of inner inputs / calculates); None: all, []: none
+    outputs: Optional[List[str]] = None
     # prerequisite concepts (§8.4) and extension contract (§9): read, not used yet
     requires: List[Any] = Field(default_factory=list)
     extension: Optional[Dict[str, Any]] = None
@@ -440,7 +450,44 @@ def _yaml_template(raw: Dict[str, Any], ya: YamlActivity) -> Template:
         if n.type in CALL_TYPES and n.link
     ]
     template.used = sorted({name for text in _walk_strings(raw) for name in placeholder_names(text)})
+    template.static_used = sorted(_static_used(raw))
+    template.fields = [n.name for n in ya.nodes if n.type in FIELD_TYPES and n.name]
+    template.outputs = list(ya.outputs) if ya.outputs is not None else None
+    template.templated_names = [n.name for n in ya.nodes if has_placeholder(n.name)]
     return template
+
+
+def _static_used(raw: Dict[str, Any]) -> set:
+    """Parameters a YAML page uses where only a fixed value fits (§18.8 point 1): its name,
+    node / option names, ``save``, ``{{p|raw}}``, static decisions, literal call arguments."""
+    names = set(placeholder_names(raw.get("name")))
+    names.update(n for text in _walk_strings(raw) for n in raw_placeholder_names(text))
+    for node in raw.get("nodes") or []:
+        for key in ("name", "save"):
+            names.update(placeholder_names(node.get(key)))
+        for option in node.get("options") or []:
+            names.update(placeholder_names(option.get("name")))
+        if node.get("static"):
+            for key in EXPRESSION_FIELDS:
+                names.update(placeholder_names(node.get(key)))
+        if node.get("type") in CALL_TYPES and isinstance(node.get("args"), dict):
+            names.update(literal_arg_names(node["args"]))
+    return names
+
+
+def _yaml_add_calculate(rendered: Dict[str, Any], call: CallSite, name: str, expression: str, label: str) -> None:
+    """Add to a rendered YAML page the calculate of an expression argument (§18.8 point 1).
+
+    A calculate with no incoming edge: evaluated once its references are, like any free
+    calculate of the page, and read in the block through ``{{param}}``.
+    """
+    rendered["nodes"].append({
+        "id": f"{call.node_id}__{name}",
+        "type": "calculate",
+        "name": name,
+        "label": label,
+        "calculate": expression,
+    })
 
 
 def _render_field(key: str, value: Any, env, where: str) -> Any:
@@ -594,7 +641,7 @@ class YamlStrategy(BaseInputStrategy):
             self._assign_start_page(activity, project)
 
     # ------------------------------------------------------------------
-    # Parameters (feature/20261102-block-params-and-start-node.md)
+    # Parameters (feature/20261111-block-params-and-start-node.md)
     # ------------------------------------------------------------------
     def _load_pages(self, loaded: List[tuple], project: TriccIntervention) -> None:
         """Build the activities: one copy of each per distinct set of parameter values."""
@@ -621,7 +668,7 @@ class YamlStrategy(BaseInputStrategy):
         def build(template: Template, rendered: Dict[str, Any]) -> None:
             self._register(self._build_activity(YamlActivity(**rendered), project), project)
 
-        ParamBuild(templates, resolve, project, _yaml_render, build).run()
+        ParamBuild(templates, resolve, project, _yaml_render, build, _yaml_add_calculate).run()
 
     def finalize(self, project: TriccIntervention, media_path: str) -> Optional[TriccIntervention]:
         # Project CodeSystems (tricc.yaml ``terminology``) are exported like drawio's;
@@ -888,6 +935,11 @@ class YamlStrategy(BaseInputStrategy):
         if not code:
             return None
         found = find_concept(project.code_systems, code, system)
+        if found is not None and is_template_concept(found):
+            raise TriccParamError(
+                E_ABSTRACT_SELECTED,
+                f"{where}: {code!r} is an abstract concept, only used inside its block",
+            )
         if found is None:
             # A missing explicit link is worth noticing; a name without concept is common.
             (logger.info if concept is not None else logger.debug)(

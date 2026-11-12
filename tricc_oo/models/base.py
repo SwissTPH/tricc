@@ -597,6 +597,8 @@ class TriccOperation(BaseModel):
             ],
         ]
     ] = []
+    # set by the CQL parser on a call to a function that retrieves stored data (§18.5)
+    retrieves_stored_data: bool = False
     _struct_hash: Optional[int] = PrivateAttr(default=None)
     _origin_sig: Optional[int] = PrivateAttr(default=None)
 
@@ -729,6 +731,27 @@ class TriccOperation(BaseModel):
                 predecessor.add(s)
         elif issubclass(reference.__class__, (TriccNodeBaseModel, TriccReference)):
             predecessor.add(reference)
+
+    def get_stored_data(self) -> bool:
+        """Whether this operation, or any operation inside it, retrieves stored data.
+
+        ``retrieves_stored_data`` is set by the CQL parser on a call to a function of
+        ``converters/cql/stored_data_functions.json`` (patient, encounter, history or
+        context readers; feature/20261111-block-params-and-start-node.md §18.5).
+
+        Returns:
+            True when this operation's own flag is set or a child operation's is.
+        """
+        if self.retrieves_stored_data:
+            return True
+        pending = list(self.reference or [])
+        while pending:
+            item = pending.pop()
+            if isinstance(item, list):
+                pending.extend(item)
+            elif isinstance(item, TriccOperation) and item.get_stored_data():
+                return True
+        return False
 
     def append(self, value):
         self.reference.append(value)

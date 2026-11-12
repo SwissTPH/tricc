@@ -43,6 +43,7 @@ exclude = ["locales"]
 
 [tool.setuptools.package-data]
 "tricc_oo.data.anthro" = ["*.json"]
+"tricc_oo.converters.cql" = ["*.json"]
 
 [project.scripts]
 tricc = "tricc_oo.cli:main"
