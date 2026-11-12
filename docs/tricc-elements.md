@@ -241,8 +241,8 @@ name. A block can narrow that with `outputs` (template names) beside `params`:
 outputs: ["fever_{{site}}"]     # only these; outputs: [] for none
 ```
 
-draw.io: an `outputs` attribute on the `block_start` (`fever_{{site}},temp_{{site}}`, or a JSON
-list, `[]` for none). A field not listed is **private**: each use gets its own copy, named with
+draw.io: set `output = true` on each input or calculate that is an output; when no field of
+the block has it, all are outputs (draw.io has no "none"). A field not listed or marked is **private**: each use gets its own copy, named with
 a per-use suffix (`temp_axillary_3fa2c1`), without a dictionary concept. A reference to it from
 outside the block is `E_BLOCK_PRIVATE`. A listed name the block does not have is
 `E_OUTPUT_UNKNOWN`.

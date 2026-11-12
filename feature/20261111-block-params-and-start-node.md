@@ -811,7 +811,9 @@ linking" below means when the instance is built (`strategies/input/param_build.p
   they would never be emitted. `write_terminology` and `transform_fhir_to_ocl` skip
   `kind = template`; `E_ABSTRACT_SELECTED` is raised where YAML resolves a node or option
   concept (a placeholder outside a block already fails earlier, as an unknown parameter).
-- **Outputs.** YAML `outputs`, draw.io `outputs` attribute on `block_start`. A block with
+- **Outputs.** YAML `outputs`. draw.io: an `output = true` attribute on each input or calculate
+  that is an output; when no field is marked, all are (decided 2026-11-12; draw.io cannot say
+  "none"). `output = true` on a shape that is not a named input or calculate is `E_OUTPUT_UNKNOWN`. A block with
   private fields gets one instance per use (`__u<digest>`), so each use's private fields are
   its own; after the build, private names get `_<digest of the instance>`, references inside the
   instance follow (expression attributes; not `${}` text injections), and the concepts the build

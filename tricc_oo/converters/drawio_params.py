@@ -13,8 +13,8 @@ feature/20261111-block-params-and-start-node.md §2 to §4. In a drawing:
   text or as an expression, see ``_context``), in edge labels and in the page name;
 - a call argument may be an expression, ``param.age = {"expression": "AgeInDays()"}``: a
   calculate of the calling page, added by ``drawio_add_calculate`` (§18.8 point 1);
-- a ``block_start`` may list its outputs, ``outputs = fever_{{site}},temp_{{site}}`` (or a
-  JSON list; ``[]`` for none). Without it every input and calculate is an output.
+- an input or calculate of a block marked ``output = true`` is an output; when no field of
+  the block is marked, every input and calculate is an output.
 
 This module gives ``strategies.input.param_build.ParamBuild`` what it needs from a drawing:
 ``drawio_template`` reads a diagram as a ``Template``, ``drawio_resolver`` resolves its calls,
@@ -60,7 +60,7 @@ SHAPES = ("object", "UserObject")
 ROOT_TYPES = ("start", "activity_start", "block_start")
 #: shapes that call another page
 CALL_TYPES = ("block", "goto")
-#: the inputs and calculates of a block: its outputs unless ``outputs`` says otherwise (§18.2)
+#: the inputs and calculates of a block: its outputs unless some are marked ``output = true`` (§18.2)
 FIELD_TYPES = (
     "integer", "decimal", "quantity", "text", "date", "select_one", "select_multiple", "select_yesno",
     "calculate", "add", "count", "diagnosis", "proposed_diagnosis",
@@ -194,24 +194,27 @@ def drawio_template(diagram) -> Template:
     template.fields = [
         s.attrib["name"] for s in shapes if s.attrib.get(type_name) in FIELD_TYPES and s.attrib.get("name")
     ]
-    template.outputs = _outputs(root) if is_block else None
+    template.outputs = _outputs(shapes, type_name) if is_block else None
     template.templated_names = [s.attrib["name"] for s in shapes if has_placeholder(s.attrib.get("name"))]
     return template
 
 
-def _outputs(root) -> Optional[List[str]]:
-    """A ``block_start``'s ``outputs`` attribute: a JSON list or comma-separated names; None
-    when absent (every input and calculate is an output), ``[]`` for ``[]`` or empty."""
-    text = root.attrib.get("outputs") if root is not None else None
-    if text is None:
+def _outputs(shapes, type_name) -> Optional[List[str]]:
+    """The names of the block's fields marked ``output = true``; None when none is marked
+    (every input and calculate is an output). A marked shape that is not a named input or
+    calculate is ``E_OUTPUT_UNKNOWN``."""
+    marked = [s for s in shapes if str(s.attrib.get("output", "")).strip().lower() in ("true", "1", "yes")]
+    if not marked:
         return None
-    text = text.strip()
-    if text.startswith("["):
-        try:
-            return [str(n) for n in json.loads(text)]
-        except json.JSONDecodeError as exc:
-            raise TriccParamError(E_OUTPUT_UNKNOWN, f"block outputs {text!r}: invalid JSON ({exc})") from exc
-    return [n.strip() for n in text.split(",") if n.strip()]
+    outputs = []
+    for shape in marked:
+        if shape.attrib.get(type_name) not in FIELD_TYPES or not shape.attrib.get("name"):
+            raise TriccParamError(
+                E_OUTPUT_UNKNOWN,
+                f"shape {shape.attrib.get('id')!r} is marked output but is not a named input or calculate",
+            )
+        outputs.append(shape.attrib["name"])
+    return outputs
 
 
 def _static_used(diagram) -> set:

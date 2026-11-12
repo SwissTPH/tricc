@@ -348,11 +348,26 @@ class TestDrawio:
         rows = drawio_survey(tmp_path / "ok", text)
         assert len([n for n in rows if n.startswith("arg_age_")]) == 2
 
-    def test_outputs_attribute(self, tmp_path):
+    def test_output_flag(self, tmp_path):
         from tests.test_block_params import DRAWIO, drawio_survey
 
         text = open(DRAWIO, encoding="utf-8").read()
-        text = text.replace('odk_type="block_start"', 'odk_type="block_start" outputs="[]"')
-        rows = drawio_survey(tmp_path, text)
-        assert "temp_axillary" not in rows
-        assert [n for n in rows if n.startswith("temp_axillary_")]
+        rows = drawio_survey(tmp_path / "marked", text.replace(
+            'name="temp_{{site}}"', 'name="temp_{{site}}" output="true"'))
+        assert "temp_axillary" in rows and "temp_rectal" in rows
+        with pytest.raises(TriccParamError) as err:  # a note is not an input or calculate
+            drawio_survey(tmp_path / "note", text.replace(
+                'name="fever_{{site}}"', 'name="fever_{{site}}" output="true"'))
+        assert err.value.code == E_OUTPUT_UNKNOWN
+
+    def test_output_flag_selects_marked_fields(self):
+        import xml.etree.ElementTree as ET
+        from tricc_oo.converters.drawio_params import _outputs
+
+        shapes = [ET.fromstring(x) for x in (
+            '<object odk_type="decimal" name="temp_{{site}}" output="true"/>',
+            '<object odk_type="calculate" name="fever_{{site}}"/>',
+            '<object odk_type="note" name="info"/>',
+        )]
+        assert _outputs(shapes, "odk_type") == ["temp_{{site}}"]
+        assert _outputs(shapes[1:], "odk_type") is None  # none marked: all are outputs
