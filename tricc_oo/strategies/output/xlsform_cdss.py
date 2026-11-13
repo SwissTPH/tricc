@@ -215,12 +215,21 @@ class XLSFormCDSSStrategy(XLSFormStrategy):
         else:
             node.trigger = new_trigger
 
-    def export_inputs(self, activity, inputs=[], **kwargs):
+    def export_inputs(self, activity, inputs=None, _visited=None, **kwargs):
+        """The populate nodes of ``activity`` and of the activities it contains, each page once.
+
+        An activity can list itself, or a page already walked, among its nodes (a page reached
+        by ``goto``); those are skipped so the walk ends."""
+        inputs = [] if inputs is None else inputs
+        visited = set() if _visited is None else _visited
+        visited.add(id(activity))
         for node in activity.nodes.values():
             if isinstance(node, TriccNodeActivity):
-                inputs = self.export_inputs(node, inputs, **kwargs)
+                if id(node) not in visited:
+                    inputs = self.export_inputs(node, inputs, visited, **kwargs)
             # retrievals get their own rows (XLSFormStrategy.get_retrieval_lines)
-            if isinstance(node, TriccNodePopulate) and not is_retrieval_node(node):
+            elif isinstance(node, TriccNodePopulate) and not is_retrieval_node(node) \
+                    and all(n is not node for n in inputs):
                 inputs.append(node)
         return inputs
    
