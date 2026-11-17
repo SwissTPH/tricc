@@ -134,7 +134,9 @@ from tricc_oo.models.calculate import TriccNodeDisplayCalculateBase, TriccNodePo
 from tricc_oo.strategies.output.base_output_strategy import BaseOutPutStrategy
 from tricc_oo.strategies.registry import register_output_strategy
 from tricc_oo.visitors.tricc import (
+    get_applicability_expression,
     get_node_expressions,
+    get_prev_instance_skip_expression,
     get_process,
     is_ready_to_process,
     serialize_display_relevance,
@@ -377,6 +379,9 @@ class FHIRStrategy(BaseOutPutStrategy):
         # (fix/20260828-answer-reference-on-non-answerable-node.md).
         self._inlining_relevance: set[int] = set()
         self._reference_node_index_cache: Optional[Dict[str, object]] = None
+        # id(activity) -> group relevance with the previous-instance skip applied
+        # (feature/20261117-activity-procedure-dedup.md §1a).
+        self._activity_group_relevance: Dict[int, object] = {}
 
     def get_tricc_operation_expression(self, operation):
         # For CQL
@@ -1113,6 +1118,7 @@ class FHIRStrategy(BaseOutPutStrategy):
         """Attach enableWhenExpression / option toggles (or hide the item)."""
         self._attach_option_toggles(node)
 
+        self._compose_activity_group_relevance(node, processed_nodes, process)
         relevance = self._effective_relevance(node)
         if is_display_skip_widget(node):
             base = relevance if self._is_effective_relevance(relevance) else TriccStatic(True)
@@ -1151,6 +1157,67 @@ class FHIRStrategy(BaseOutPutStrategy):
         return True
 
     @staticmethod
+    def _is_activity_group_node(node) -> bool:
+        """True for the start node of an activity instance (the activity's Questionnaire group)."""
+        act = getattr(node, "activity", None)
+        return (
+            getattr(node, "tricc_type", None) == "activity_start"
+            and act is not None
+            and getattr(act, "root", None) is node
+            and getattr(act, "base_instance", None) is not None
+        )
+
+    def _compose_activity_group_relevance(self, node, processed_nodes, process) -> None:
+        """Apply the XLSForm group rule to an activity group: applicability, then
+        "no earlier instance of this activity with the same repeat was shown".
+
+        "Earlier" is the order of the groups in the Questionnaire, not the walk order (the
+        relevance walk can reach a later call first). Only instances in the **same**
+        Questionnaire count; one in another Questionnaire is not readable from FHIRPath
+        (feature/20261117-activity-procedure-dedup.md §1a). The result is cached so
+        ``_effective_relevance`` (and so any inlined copy of the group relevance) sees it.
+        """
+        if not self._is_activity_group_node(node) or processed_nodes is None:
+            return
+        act = node.activity
+        if id(act) in self._activity_group_relevance:
+            return
+        position = self._group_position(node)
+        past_instances = []
+        if position is not None:
+            for past in act.base_instance.instances.values():
+                root = getattr(past, "root", None)
+                if past is act or root is None:
+                    continue
+                past_position = self._group_position(root)
+                if past_position is not None and past_position[0] == position[0] and past_position[1] < position[1]:
+                    past_instances.append(past)
+
+        relevance = act.relevance if self._is_effective_relevance(act.relevance) else None
+        relevance = get_applicability_expression(act, processed_nodes, process, relevance)
+        relevance = get_prev_instance_skip_expression(
+            act, processed_nodes, process, relevance, past_instances=past_instances
+        )
+        self._activity_group_relevance[id(act)] = relevance
+
+    def _group_position(self, node) -> Optional[Tuple[str, int]]:
+        """(Questionnaire key, depth-first index) of ``node``'s item, or None if not exported."""
+        try:
+            link_id = get_export_name(node)
+        except Exception:
+            return None
+        for segment, q in (self.questionnaires or {}).items():
+            index = 0
+            stack = list(reversed(q.get("item") or []))
+            while stack:
+                item = stack.pop()
+                if item.get("linkId") == link_id:
+                    return segment, index
+                index += 1
+                stack.extend(reversed(item.get("item") or []))
+        return None
+
+    @staticmethod
     def _is_effective_relevance(rel) -> bool:
         if rel is None or rel is True or rel == "":
             return False
@@ -1168,6 +1235,8 @@ class FHIRStrategy(BaseOutPutStrategy):
         tricc_type = getattr(node, "tricc_type", None)
         act = getattr(node, "activity", None)
         act_rel = getattr(act, "relevance", None) if act is not None else None
+        if self._is_activity_group_node(node):
+            act_rel = self._activity_group_relevance.get(id(act), act_rel)
         if (
             isinstance(tricc_type, str)
             and tricc_type in ("start", "activity_start", "page")

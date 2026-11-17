@@ -3768,11 +3768,29 @@ def get_applicability_expression(node, processed_nodes, process, expression=None
     return expression
 
 
-def get_prev_instance_skip_expression(node, processed_nodes, process, expression=None):
+def get_prev_instance_skip_expression(node, processed_nodes, process, expression=None, past_instances=None):
+    """AND ``expression`` with "no earlier instance of this activity, same repeat, was shown".
+
+    Args:
+        node: the activity instance (group) being exported.
+        processed_nodes: nodes already processed by the current walkthrough.
+        process: current process name (mutable single-item list).
+        expression: the group's own relevance, or None.
+        past_instances: the earlier instances to check; by default the instances of the same
+            base activity already in ``processed_nodes`` (the XLSForm walk order). FHIR passes
+            the ones placed before ``node`` in the same Questionnaire.
+
+    Returns:
+        The combined expression, or ``expression`` unchanged when there is no earlier instance.
+    """
     if node.base_instance is not None:
         expression_inputs = []
         node_repeat = get_repeat(node)
-        past_instances = [n for n in processed_nodes if getattr(n.base_instance, "id", None) == node.base_instance.id and node != n]
+        if past_instances is None:
+            past_instances = [
+                n for n in processed_nodes
+                if getattr(n.base_instance, "id", None) == node.base_instance.id and node != n
+            ]
         for past_instance in [n for n in past_instances if get_repeat(n) == node_repeat]:
             add_sub_expression(
                 expression_inputs,
