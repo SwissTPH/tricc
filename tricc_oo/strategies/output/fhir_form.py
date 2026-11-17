@@ -31,6 +31,7 @@ from tricc_oo.converters.utils import quoted_literal
 from tricc_oo.converters.fhir.structuremap import (
     apply_questionnaire_item_to_rule,
     build_extraction_rule,
+    build_procedure_extraction_rule,
     build_extraction_structuremap,
     extraction_rule_link_ids,
     extraction_rules_conflict,
@@ -382,6 +383,8 @@ class FHIRStrategy(BaseOutPutStrategy):
         # id(activity) -> group relevance with the previous-instance skip applied
         # (feature/20261117-activity-procedure-dedup.md §1a).
         self._activity_group_relevance: Dict[int, object] = {}
+        # activity instances exported as a Questionnaire group, in relevance-walk order
+        self._activity_groups: List[object] = []
 
     def get_tricc_operation_expression(self, operation):
         # For CQL
@@ -462,6 +465,8 @@ class FHIRStrategy(BaseOutPutStrategy):
         self.process_display_text(self.project.start_pages, pages=self.project.pages)
         logger.info("FHIRStrategy: generating export (StructureMap)")
         self.process_export(self.project.start_pages, pages=self.project.pages)
+
+        self._add_activity_done_items()
 
         logger.info("FHIRStrategy: writing output files")
         self._sanitize_questionnaires()
@@ -1199,6 +1204,110 @@ class FHIRStrategy(BaseOutPutStrategy):
             act, processed_nodes, process, relevance, past_instances=past_instances
         )
         self._activity_group_relevance[id(act)] = relevance
+        self._activity_groups.append(act)
+
+    # ── Activity done → Procedure (feature/20261117-activity-procedure-dedup.md §1b) ──
+
+    @staticmethod
+    def _activity_repeat(act) -> int:
+        """Repeat slot of an activity instance: the goto's, else the activity_start's."""
+        if getattr(act, "repeat", None) is not None:
+            return get_repeat(act)
+        return get_repeat(getattr(act, "root", None))
+
+    @staticmethod
+    def _activity_code(act) -> Optional[str]:
+        """Procedure code of an activity: the name of its base activity (start node first)."""
+        base = getattr(act, "base_instance", None) or act
+        return getattr(getattr(base, "root", None), "name", None) or getattr(base, "name", None)
+
+    @staticmethod
+    def _activity_done_link_id(code: str, repeat: int) -> str:
+        suffix = "" if repeat == 1 else f"_Rr_{str(repeat).replace('-', 'n')}"
+        return f"{code}{suffix}_done"
+
+    def _activity_groups_by_base(self) -> Dict[int, List[Tuple[str, object]]]:
+        """{id(base activity): [(Questionnaire key, instance), …]} for activities exported in
+        more than one Questionnaire: only those need a cross-Questionnaire record."""
+        by_base: Dict[int, List[Tuple[str, object]]] = {}
+        for act in self._activity_groups:
+            position = self._group_position(act.root)
+            if position is not None:
+                by_base.setdefault(id(act.base_instance), []).append((position[0], act))
+        return {key: entries for key, entries in by_base.items() if len({s for s, _ in entries}) > 1}
+
+    def _add_activity_done_items(self) -> None:
+        """Record "activity shown" as a Procedure for activities used by several Questionnaires.
+
+        One hidden boolean ``<code>_done`` item per activity code and repeat slot in each
+        Questionnaire, true when any of its instances there is shown (the group
+        ``enableWhenExpression``: sequence logic and the previous-instance skip). A
+        ``procedure`` extraction rule writes the Procedure when it is true.
+        """
+        codesystems = getattr(self.project, "code_systems", None)
+        for entries in self._activity_groups_by_base().values():
+            slots: Dict[Tuple[str, int], List[object]] = {}
+            for segment, act in entries:
+                slots.setdefault((segment, self._activity_repeat(act)), []).append(act)
+            for (segment, repeat), acts in slots.items():
+                code = self._activity_code(acts[0])
+                if not code:
+                    logger.warning(
+                        "FHIRStrategy: activity %s has no name; it is not recorded as a Procedure",
+                        acts[0].get_name(),
+                    )
+                    continue
+                expression = self._activity_shown_fhirpath(acts)
+                if expression is None:
+                    continue
+                link_id = self._activity_done_link_id(code, repeat)
+                q = self.questionnaires[segment]
+                if self._find_item_by_link_id(q.get("item", []), link_id) is not None:
+                    continue
+                q.setdefault("item", []).append({
+                    "linkId": link_id,
+                    "text": link_id,
+                    "type": "boolean",
+                    "extension": [
+                        build_hidden_extension(),
+                        build_calculated_expression_fhirpath(expression),
+                    ],
+                })
+                label = getattr(getattr(acts[0], "root", None), "label", None)
+                # Not in the project terminology: same default system as any other concept
+                # (CodeSystems are written at load, so none is added here).
+                self.extraction_rules.setdefault(segment, []).append(
+                    build_procedure_extraction_rule(
+                        link_id,
+                        code,
+                        label if isinstance(label, str) else code,
+                        repeat,
+                        codesystems=codesystems,
+                        default_code_system=f"{self.base_url}/CodeSystem/tricc",
+                    )
+                )
+
+    def _activity_shown_fhirpath(self, acts) -> Optional[str]:
+        """FHIRPath true when one of ``acts`` (same Questionnaire) is shown, or None when one
+        group relevance cannot be written in FHIRPath (no record rather than a wrong one)."""
+        terms = []
+        for act in acts:
+            relevance = self._activity_group_relevance.get(id(act))
+            if not self._is_effective_relevance(relevance):
+                return "true"
+            self._enter_serialisation_context(act.root)
+            try:
+                terms.append(self.convert_expression_to_fhirpath(relevance))
+            except NotImplementedError as exc:
+                logger.warning(
+                    "FHIRStrategy: activity %s is not recorded as a Procedure - %s", act.get_name(), exc
+                )
+                return None
+            finally:
+                self._leave_serialisation_context()
+        if "true" in terms:
+            return "true"
+        return terms[0] if len(terms) == 1 else " or ".join(f"({t})" for t in terms)
 
     def _group_position(self, node) -> Optional[Tuple[str, int]]:
         """(Questionnaire key, depth-first index) of ``node``'s item, or None if not exported."""

@@ -13,9 +13,19 @@ import unittest
 
 import pandas as pd
 
+from tricc_oo.converters.fhir.structuremap import (
+    ExtractionRule,
+    build_extraction_fml,
+    build_procedure_extraction_rule,
+    merge_extraction_rules,
+)
+
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 YAML_DIR = os.path.join(REPO, "tests", "data", "yaml")
 ENABLE_WHEN = "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-enableWhenExpression"
+CALCULATED = "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-calculatedExpression"
+HIDDEN = "http://hl7.org/fhir/StructureDefinition/questionnaire-hidden"
+PROCESSES = ("triage", "history-and-physical")
 
 
 def _build(fixture, output_strategy, out):
@@ -39,23 +49,41 @@ def _items(items):
         yield from _items(item.get("item"))
 
 
-def _questionnaires(fixture, output_strategy="FHIRStrategy"):
-    """{file name: {linkId: item}} for each Questionnaire the build writes."""
+def _export(fixture, output_strategy="FHIRStrategy"):
+    """({Questionnaire file: {linkId: item}}, {StructureMap .map file: FML}) of a build."""
     with tempfile.TemporaryDirectory() as out:
         _build(fixture, output_strategy, out)
-        result = {}
+        questionnaires, maps = {}, {}
         for path in glob.glob(os.path.join(out, "**", "Questionnaire-*.json"), recursive=True):
             with open(path) as f:
                 q = json.load(f)
-            result[os.path.basename(path)] = {item["linkId"]: item for item in _items(q.get("item"))}
-    return result
+            questionnaires[os.path.basename(path)] = {item["linkId"]: item for item in _items(q.get("item"))}
+        for path in glob.glob(os.path.join(out, "**", "StructureMap-*.map"), recursive=True):
+            with open(path) as f:
+                maps[os.path.basename(path)] = f.read()
+    return questionnaires, maps
+
+
+def _questionnaires(fixture, output_strategy="FHIRStrategy"):
+    """{file name: {linkId: item}} for each Questionnaire the build writes."""
+    return _export(fixture, output_strategy)[0]
+
+
+def _by_process(named, process):
+    """The entry of a {file name: …} dict whose file is for ``process``."""
+    (value,) = [v for k, v in named.items() if f"-{process}" in k]
+    return value
+
+
+def _expression(item, url):
+    for ext in item.get("extension", []):
+        if ext.get("url") == url:
+            return ext["valueExpression"]["expression"]
+    return None
 
 
 def _enable_when(item):
-    for ext in item.get("extension", []):
-        if ext.get("url") == ENABLE_WHEN:
-            return ext["valueExpression"]["expression"]
-    return None
+    return _expression(item, ENABLE_WHEN)
 
 
 def _trigger(name):
@@ -89,6 +117,64 @@ class TestSameQuestionnaire(unittest.TestCase):
         groups = survey[(survey["type"] == "begin group") & survey["name"].str.startswith("module_c")]
         self.assertNotIn("not(", groups.iloc[0]["relevance"])
         self.assertIn("not(coalesce(${trigger_a},'')=1)", groups.iloc[1]["relevance"])
+
+    def test_no_procedure_when_every_call_is_in_one_questionnaire(self):
+        # nothing to carry to another Questionnaire: no _done item, no Procedure
+        self.assertNotIn("module_c_done", self.items)
+
+
+class TestRecordedAsProcedure(unittest.TestCase):
+    """§1b: a Questionnaire that shows the activity records it as a Procedure."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.questionnaires, cls.maps = _export("activity_called_across_processes.yaml")
+
+    def test_done_item_is_the_group_condition(self):
+        for process in PROCESSES:
+            items = _by_process(self.questionnaires, process)
+            group = next(i for i in items.values() if i["type"] == "group" and i["linkId"].startswith("module_c"))
+            done = items["module_c_done"]
+            self.assertEqual(done["type"], "boolean")
+            self.assertIn({"url": HIDDEN, "valueBoolean": True}, done["extension"])
+            self.assertEqual(_expression(done, CALCULATED), _enable_when(group), process)
+
+    def test_procedure_written_only_when_shown(self):
+        for process in PROCESSES:
+            fml = _by_process(self.maps, process)
+            self.assertIn(
+                "item as q where(linkId = 'module_c_done' and answer.valueBoolean = true) then {\n"
+                "    q.answer as answer then extract_procedure_module_c(answer, src, bundle)",
+                fml,
+            )
+            group = fml[fml.index("group extract_procedure_module_c("):]
+            self.assertIn("create('Procedure') as tgt", group)
+            self.assertIn("src -> tgt.status = 'completed' \"status\";", group)
+            self.assertIn("cc('https://fhir.tricc.io/CodeSystem/tricc', 'module_c', 'Danger signs')", group)
+            self.assertIn("src.encounter as enc -> tgt.encounter = enc", group)
+            self.assertIn("src.authored as authored -> tgt.performed = authored", group)
+            self.assertNotIn("observation-repeat-index", group)
+
+
+class TestProcedureExtractionRule(unittest.TestCase):
+    """Procedure rules keep the repeat slot and their own group name."""
+
+    def test_repeat_slot_is_stamped(self):
+        rule = build_procedure_extraction_rule("module_c_Rr_2_done", "module_c", "Danger signs", 2)
+        fml = build_extraction_fml([rule], "https://example.org/StructureMap/x", "x")
+        self.assertIn("group extract_procedure_module_c_Rr_2(", fml)
+        self.assertIn("observation-repeat-index", fml)
+        self.assertIn("ext.valueInteger = 2", fml)
+
+    def test_never_merged_with_an_observation_of_the_same_code(self):
+        procedure = build_procedure_extraction_rule("module_c_done", "module_c", "Danger signs", 1)
+        observation = ExtractionRule(
+            link_id="module_c", concept_code="module_c", display="x", concept_type="finding",
+            kind="observation", qr_value_field="valueBoolean", item_type="boolean", repeat=None,
+            code_system_url="https://fhir.tricc.io/CodeSystem/tricc", group_name="extract_module_c",
+        )
+        names = sorted(r.group_name for r in merge_extraction_rules([procedure, observation]))
+        self.assertEqual(names, ["extract_module_c", "extract_procedure_module_c"])
 
 
 if __name__ == "__main__":
