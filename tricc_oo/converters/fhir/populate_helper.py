@@ -201,7 +201,18 @@ def populate_value_type(node: "TriccNodePopulate") -> Optional[str]:
     if retrieval is not None:
         return retrieval_cql_type(retrieval)
     field = patient_field(node)
-    return field[1] if field else None
+    if field:
+        return field[1]
+    return _procedure_value_type(node)
+
+
+def _procedure_value_type(node) -> Optional[str]:
+    """``boolean`` (done this encounter) or ``date`` (last done) for a Procedure populate (#74)."""
+    if getattr(node, "context", None) not in (ENCOUNTER_CONTEXT, HISTORY_CONTEXT):
+        return None
+    if populate_fhir_target(node) != "Procedure":
+        return None
+    return "boolean" if node.context == ENCOUNTER_CONTEXT else "date"
 
 
 def populate_reads_multiple(node: "TriccNodePopulate", select_multiple_concepts=None) -> bool:
@@ -254,6 +265,8 @@ def resolve_populate_reference(
     if ctx == ENCOUNTER_CONTEXT:
         if target == "Condition":
             return f"{prefix}GetEncounterConditionValue('{code}')"
+        if target == "Procedure":
+            return f"{prefix}GetEncounterProcedureValue('{code}', {repeat_arg})"
         return (
             f"{prefix}GetEncounterObservationValue('{code}', {repeat_arg}, "
             f"{_cql_string_literal(node.period)})"
@@ -262,6 +275,8 @@ def resolve_populate_reference(
         period = node.period or DEFAULT_HISTORY_PERIOD
         if target == "Condition":
             return f"{prefix}GetHistoryConditionValue('{code}')"
+        if target == "Procedure":
+            return f"{prefix}GetHistoryProcedureDate('{code}')"
         since = cql_lookback_start(period)
         if multiple and target == "Observation":
             return f"{prefix}GetHistoryObservationCodesSince('{code}', {since or 'null'})"
@@ -290,12 +305,15 @@ def populate_fhir_item_type(node) -> Optional[str]:
     Args:
         node: A ``TriccNodePopulate``.
 
+    A Procedure populate has a fixed shape (#74): ``boolean`` in the encounter, ``date``
+    in history.
+
     Returns:
         FHIR item type string (e.g. ``"quantity"``), or None when unset/unknown.
     """
     declared = (getattr(node, "data_type", None) or "").strip().lower()
     if not declared:
-        return None
+        return _procedure_value_type(node)
     item_type = _POPULATE_DATA_TYPE_TO_FHIR_ITEM.get(declared)
     if item_type is None:
         logger.warning(
