@@ -1,0 +1,189 @@
+# Two activities (module_c, module_d) whose start nodes share the name module_c, each
+# called from triage and history-and-physical. They would skip each other, so neither
+# is recorded as a Procedure. See feature/20261117-activity-procedure-dedup.md §2.
+
+id: triage_page
+title: "Triage"
+process: triage
+
+nodes:
+  - id: t_start
+    type: start
+    form_id: activity_across
+    label: "Triage"
+    name: start_triage
+
+  - id: trigger_a
+    type: select_yesno
+    name: trigger_a
+    label: "Danger signs check at triage?"
+    required: true
+    options:
+      - id: opt_a_yes
+        name: "yes"
+        label: "Yes"
+      - id: opt_a_no
+        name: "no"
+        label: "No"
+
+  - id: rhombus_a
+    type: rhombus
+    label: "Check at triage?"
+    reference: "trigger_a = true"
+
+  - id: goto_c1
+    type: goto
+    name: goto_c1
+    label: "Triage calls module C"
+    link: module_c
+    instance: 1
+
+  - id: goto_d1
+    type: goto
+    name: goto_d1
+    label: "Triage calls module D"
+    link: module_d
+    instance: 1
+
+  - id: t_end
+    type: end
+    label: "End triage"
+    name: end_triage
+
+edges:
+  - source: t_start
+    target: trigger_a
+  - source: trigger_a
+    target: rhombus_a
+    value: follow
+  - source: rhombus_a
+    target: goto_c1
+    value: "yes"
+  - source: goto_c1
+    target: goto_d1
+  - source: goto_d1
+    target: t_end
+  - source: rhombus_a
+    target: t_end
+    value: "no"
+
+---
+id: assess_page
+title: "Assessment"
+process: history-and-physical
+
+nodes:
+  - id: a_start
+    type: start
+    label: "Assessment"
+    name: start_assess
+
+  - id: trigger_d
+    type: select_yesno
+    name: trigger_d
+    label: "Danger signs check at assessment?"
+    required: true
+    options:
+      - id: opt_d_yes
+        name: "yes"
+        label: "Yes"
+      - id: opt_d_no
+        name: "no"
+        label: "No"
+
+  - id: rhombus_d
+    type: rhombus
+    label: "Check at assessment?"
+    reference: "trigger_d = true"
+
+  - id: goto_c2
+    type: goto
+    name: goto_c2
+    label: "Assessment calls module C"
+    link: module_c
+    instance: 2
+
+  - id: goto_d2
+    type: goto
+    name: goto_d2
+    label: "Assessment calls module D"
+    link: module_d
+    instance: 2
+
+  - id: a_end
+    type: end
+    label: "End assessment"
+    name: end_assess
+
+edges:
+  - source: a_start
+    target: trigger_d
+  - source: trigger_d
+    target: rhombus_d
+    value: follow
+  - source: rhombus_d
+    target: goto_c2
+    value: "yes"
+  - source: goto_c2
+    target: goto_d2
+  - source: goto_d2
+    target: a_end
+  - source: rhombus_d
+    target: a_end
+    value: "no"
+
+---
+id: module_c
+title: "Danger signs"
+process: triage
+
+nodes:
+  - id: mc_start
+    type: activity_start
+    label: "Danger signs"
+    name: module_c
+
+  - id: mc_val
+    type: integer
+    name: mc_val
+    label: "Respiratory rate"
+    required: true
+
+  - id: mc_end
+    type: activity_end
+    label: "Module C end"
+    name: mc_end
+
+edges:
+  - source: mc_start
+    target: mc_val
+  - source: mc_val
+    target: mc_end
+
+---
+id: module_d
+title: "Danger signs"
+process: triage
+
+nodes:
+  - id: md_start
+    type: activity_start
+    label: "Danger signs"
+    name: module_c
+
+  - id: md_val
+    type: integer
+    name: md_val
+    label: "Respiratory rate"
+    required: true
+
+  - id: md_end
+    type: activity_end
+    label: "Module C end"
+    name: mc_end
+
+edges:
+  - source: md_start
+    target: md_val
+  - source: md_val
+    target: md_end
