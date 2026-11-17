@@ -1237,12 +1237,17 @@ class FHIRStrategy(BaseOutPutStrategy):
         return {key: entries for key, entries in by_base.items() if len({s for s, _ in entries}) > 1}
 
     def _add_activity_done_items(self) -> None:
-        """Record "activity shown" as a Procedure for activities used by several Questionnaires.
+        """Run an activity used by several Questionnaires once per encounter (§1b, §1c).
 
-        One hidden boolean ``<code>_done`` item per activity code and repeat slot in each
-        Questionnaire, true when any of its instances there is shown (the group
-        ``enableWhenExpression``: sequence logic and the previous-instance skip). A
-        ``procedure`` extraction rule writes the Procedure when it is true.
+        In each Questionnaire, per activity code and repeat slot:
+
+        - a hidden boolean ``<code>_done_prev`` item reads, at ``$populate``, whether a
+          completed Procedure with that code and repeat is already in this encounter
+          (``GetEncounterProcedureValue``); its negation is ANDed into the enableWhen of
+          every group of that activity here.
+        - a hidden boolean ``<code>_done`` item is true when one of those groups is shown
+          (its whole enableWhen), and a ``procedure`` extraction rule writes the Procedure
+          when it is true. A group skipped because it was already done writes nothing.
         """
         codesystems = getattr(self.project, "code_systems", None)
         for entries in self._activity_groups_by_base().values():
@@ -1257,13 +1262,22 @@ class FHIRStrategy(BaseOutPutStrategy):
                         acts[0].get_name(),
                     )
                     continue
-                expression = self._activity_shown_fhirpath(acts)
-                if expression is None:
-                    continue
                 link_id = self._activity_done_link_id(code, repeat)
                 q = self.questionnaires[segment]
                 if self._find_item_by_link_id(q.get("item", []), link_id) is not None:
                     continue
+                not_done_before = None
+                if any(other != segment and slot == repeat for other, slot in slots):
+                    not_done_before = self._add_activity_done_before_item(segment, code, repeat, link_id)
+                    for act in acts:
+                        self._and_group_enable_when(segment, act.root, not_done_before)
+                expression = self._activity_shown_fhirpath(acts)
+                if expression is None:
+                    continue
+                if not_done_before:
+                    expression = (
+                        not_done_before if expression == "true" else f"({expression}) and {not_done_before}"
+                    )
                 q.setdefault("item", []).append({
                     "linkId": link_id,
                     "text": link_id,
@@ -1286,6 +1300,49 @@ class FHIRStrategy(BaseOutPutStrategy):
                         default_code_system=f"{self.base_url}/CodeSystem/tricc",
                     )
                 )
+
+    def _add_activity_done_before_item(self, segment: str, code: str, repeat: int, done_link_id: str) -> str:
+        """Add the hidden ``<done>_prev`` populate item; return FHIRPath "not done before"."""
+        link_id = f"{done_link_id}_prev"
+        q = self.questionnaires[segment]
+        item = {
+            "linkId": link_id,
+            "text": link_id,
+            "type": "boolean",
+            "extension": [build_hidden_extension()],
+        }
+        q.setdefault("item", []).append(item)
+        safe_code = code.replace("'", "\\'")
+        repeat_arg = "null" if repeat == 1 else str(repeat)
+        self._attach_cql_initial_expression(
+            segment,
+            item,
+            f"ActivityDone_{link_id}",
+            f"Helper.GetEncounterProcedureValue('{safe_code}', {repeat_arg})",
+            source_type="boolean",
+        )
+        return (
+            f"(%resource.item.where(linkId='{link_id}').answer.where($this.exists()).value = true).not()"
+        )
+
+    def _and_group_enable_when(self, segment: str, root, term: str) -> None:
+        """AND ``term`` into the enableWhenExpression of ``root``'s group in ``segment``."""
+        group = self._find_item_by_link_id(
+            self.questionnaires[segment].get("item", []), get_export_name(root)
+        )
+        if group is None:
+            return
+        current = next(
+            (
+                (ext.get("valueExpression") or {}).get("expression")
+                for ext in group.get("extension") or []
+                if ext.get("url") == SDC_EXT_ENABLE_WHEN_EXPR
+            ),
+            None,
+        )
+        set_item_extension(
+            group, build_enable_when_expression(f"{current} and {term}" if current else term)
+        )
 
     def _activity_shown_fhirpath(self, acts) -> Optional[str]:
         """FHIRPath true when one of ``acts`` (same Questionnaire) is shown, or None when one

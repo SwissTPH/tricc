@@ -25,6 +25,8 @@ YAML_DIR = os.path.join(REPO, "tests", "data", "yaml")
 ENABLE_WHEN = "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-enableWhenExpression"
 CALCULATED = "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-calculatedExpression"
 HIDDEN = "http://hl7.org/fhir/StructureDefinition/questionnaire-hidden"
+INITIAL = "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression"
+NOT_DONE_BEFORE = "(%resource.item.where(linkId='module_c_done_prev').answer.where($this.exists()).value = true).not()"
 PROCESSES = ("triage", "history-and-physical")
 
 
@@ -130,14 +132,16 @@ class TestRecordedAsProcedure(unittest.TestCase):
     def setUpClass(cls):
         cls.questionnaires, cls.maps = _export("activity_called_across_processes.yaml")
 
-    def test_done_item_is_the_group_condition(self):
+    def test_done_item_is_true_when_the_group_is_shown(self):
         for process in PROCESSES:
             items = _by_process(self.questionnaires, process)
             group = next(i for i in items.values() if i["type"] == "group" and i["linkId"].startswith("module_c"))
             done = items["module_c_done"]
             self.assertEqual(done["type"], "boolean")
             self.assertIn({"url": HIDDEN, "valueBoolean": True}, done["extension"])
-            self.assertEqual(_expression(done, CALCULATED), _enable_when(group), process)
+            # the group's whole enableWhen: a call skipped because it was done before records nothing
+            own = _enable_when(group).split(f" and {NOT_DONE_BEFORE}")[0]
+            self.assertEqual(_expression(done, CALCULATED), f"({own}) and {NOT_DONE_BEFORE}", process)
 
     def test_procedure_written_only_when_shown(self):
         for process in PROCESSES:
@@ -154,6 +158,49 @@ class TestRecordedAsProcedure(unittest.TestCase):
             self.assertIn("src.encounter as enc -> tgt.encounter = enc", group)
             self.assertIn("src.authored as authored -> tgt.performed = authored", group)
             self.assertNotIn("observation-repeat-index", group)
+
+
+class TestReadBack(unittest.TestCase):
+    """§1c: a Questionnaire skips the activity when this encounter already has its Procedure."""
+
+    @classmethod
+    def setUpClass(cls):
+        with tempfile.TemporaryDirectory() as out:
+            _build("activity_called_across_processes.yaml", "FHIRStrategy", out)
+            cls.questionnaires = {}
+            for path in glob.glob(os.path.join(out, "**", "Questionnaire-*.json"), recursive=True):
+                with open(path) as f:
+                    cls.questionnaires[os.path.basename(path)] = json.load(f)
+            cls.cql = {}
+            for path in glob.glob(os.path.join(out, "**", "library", "*.cql"), recursive=True):
+                with open(path) as f:
+                    cls.cql[os.path.basename(path)] = f.read()
+
+    def test_populate_reads_the_procedure_of_this_encounter(self):
+        # both ways: the process order of a visit is not fixed, whichever runs first records it
+        for process in PROCESSES:
+            q = _by_process(self.questionnaires, process)
+            items = {i["linkId"]: i for i in _items(q["item"])}
+            prev = items["module_c_done_prev"]
+            self.assertEqual(prev["type"], "boolean")
+            self.assertIn({"url": HIDDEN, "valueBoolean": True}, prev["extension"])
+            self.assertEqual(_expression(prev, INITIAL), "ActivityDone_module_c_done_prev")
+            self.assertIn(
+                "define ActivityDone_module_c_done_prev: Helper.GetEncounterProcedureValue('module_c', null)",
+                _by_process(self.cql, process),
+            )
+
+    def test_group_is_skipped_when_done_before(self):
+        for process, trigger in zip(PROCESSES, ("trigger_a", "trigger_d")):
+            items = {i["linkId"]: i for i in _items(_by_process(self.questionnaires, process)["item"])}
+            group = next(i for i in items.values() if i["type"] == "group" and i["linkId"].startswith("module_c"))
+            expr = _enable_when(group)
+            self.assertIn(_trigger(trigger), expr)
+            self.assertTrue(expr.endswith(f" and {NOT_DONE_BEFORE}"), expr)
+
+    def test_no_read_back_when_every_call_is_in_one_questionnaire(self):
+        (items,) = _questionnaires("activity_called_twice.yaml").values()
+        self.assertNotIn("module_c_done_prev", items)
 
 
 class TestProcedureExtractionRule(unittest.TestCase):
