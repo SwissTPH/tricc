@@ -1234,7 +1234,24 @@ class FHIRStrategy(BaseOutPutStrategy):
             position = self._group_position(act.root)
             if position is not None:
                 by_base.setdefault(id(act.base_instance), []).append((position[0], act))
-        return {key: entries for key, entries in by_base.items() if len({s for s, _ in entries}) > 1}
+        by_base = {key: entries for key, entries in by_base.items() if len({s for s, _ in entries}) > 1}
+        # Two activities with one code would skip each other: record neither.
+        bases_by_code: Dict[str, List[int]] = {}
+        for key, entries in by_base.items():
+            code = self._activity_code(entries[0][1])
+            if code:
+                bases_by_code.setdefault(code, []).append(key)
+        for code, keys in bases_by_code.items():
+            if len(keys) > 1:
+                logger.error(
+                    "FHIRStrategy: %s activities have the code '%s'; none of them is recorded as a "
+                    "Procedure (they would skip each other)",
+                    len(keys),
+                    code,
+                )
+                for key in keys:
+                    del by_base[key]
+        return by_base
 
     def _add_activity_done_items(self) -> None:
         """Run an activity used by several Questionnaires once per encounter (§1b, §1c).

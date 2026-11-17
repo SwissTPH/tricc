@@ -2,7 +2,7 @@
 
 | Field             | Value |
 | ----------------- | ----- |
-| **Status**        | Approved (2026-11-17, RFC #81) |
+| **Status**        | Implemented (2026-11-17, RFC #81) |
 | **RFC**           | #81 |
 | **Branch target** | `feature/activity-procedure-dedup` → `develop` |
 | **Scope**         | `FHIRStrategy` → `OpenSRPStrategy`, `visitors/tricc` (`get_prev_instance_skip_expression`), `converters/fhir` (`structuremap`, `concept_mapper`, `populate_helper`) |
@@ -39,11 +39,11 @@ Nothing in the drawing. In the openSRP export:
 
 - Within one form, the same rule as CHT applies: a later call of an activity is skipped when an
   earlier call with the same repeat was shown.
-- When a form shows an activity, it saves a record for the visit that says "this activity, with
-  this repeat, was done". That record is a FHIR **Procedure** whose code is the activity's
-  code.
-- A later form in the same visit reads those records when it opens. An activity, with a given
-  repeat, that was already done in this visit is skipped.
+- When an activity is called from more than one form and a form shows it, that form saves a
+  record for the visit that says "this activity, with this repeat, was done". That record is a
+  FHIR **Procedure** whose code is the activity's code.
+- The other forms of the visit read those records when they open. An activity, with a given
+  repeat, that was already done in this visit is skipped. Whichever form runs first does it.
 
 ### Out of scope
 
@@ -58,94 +58,93 @@ Nothing in the drawing. In the openSRP export:
 ### 1. Design
 
 **a. Same rule inside one Questionnaire.** `get_prev_instance_skip_expression`
-(`tricc_oo/visitors/tricc.py`) is only called from the XLSForm serializer
-(`tricc_oo/serializers/xls_form.py`, group relevance). `FHIRStrategy._effective_relevance`
-(`tricc_oo/strategies/output/fhir_form.py`) returns `activity.relevance` for an activity group
-without it. Apply the same composition there (applicability, then the previous-instance skip),
-so that the group's `enableWhenExpression` matches the XLSForm `relevant`. Earlier instances
-that were exported in **another** Questionnaire are not in this one, so they are left out here
-and handled by (c).
+(`tricc_oo/visitors/tricc.py`) was only called from the XLSForm serializer
+(`tricc_oo/serializers/xls_form.py`, group relevance). `FHIRStrategy.generate_relevance`
+(`tricc_oo/strategies/output/fhir_form.py`) now composes, for an activity group
+(`_compose_activity_group_relevance`), applicability and the previous-instance skip, and caches
+the result so `_effective_relevance` (and any inlined copy) returns it. *Earlier* is the
+depth-first order of the groups in the Questionnaire (`_group_position`), not the relevance walk
+order, which can reach a later call first; the function takes the earlier instances as
+`past_instances`. Instances in **another** Questionnaire are left out here and handled by (b, c).
 
-**b. Save "activity done" as a Procedure.** "Done" means the group was shown. For each
-activity instance in a Questionnaire, add a hidden boolean calculate
-`<activity export name>_done` whose `calculatedExpression` is the two parts of the group's
-`enableWhenExpression` from (a):
+**b. Save "activity shown" as a Procedure.** Only for an activity whose instances are in more
+than one Questionnaire (`_activity_groups_by_base`); one used in a single Questionnaire needs
+nothing more than (a). Each of those Questionnaires gets, per activity code and repeat slot, one
+hidden boolean `<code>_done` item (`<code>_Rr_<n>_done` for slot `n != 1`), added after the
+export walk (`_add_activity_done_items`). Its `calculatedExpression` is "one of the activity's
+groups here is shown", i.e. their whole `enableWhenExpression`:
 
 ```
-<activity>_done = sequence logic (applicability and activity.relevance)
-                  and not (earlier same-repeat instance in this Questionnaire was shown)
-                                                      # get_prev_instance_skip_expression
+<code>_done = (sequence logic and not earlier same-repeat group here)   # (a), OR over the groups
+              and not <code>_done_prev                                  # (c)
 ```
 
-The read-back term from (c) is left out: an activity skipped because an earlier Questionnaire
-already did it must not write a second Procedure, and it does not need to.
+A group skipped because the activity was done earlier in the encounter is not shown, so it
+writes no second Procedure.
 
-Add a new extraction kind `procedure` to `classify_extraction`
-(`converters/fhir/concept_mapper.py`) and a StructureMap rule
-(`converters/fhir/structuremap.py`) that runs only when the value is `true` (the existing
-`only_when_true` path) and writes:
+A new extraction kind `procedure` (`build_procedure_extraction_rule`,
+`converters/fhir/structuremap.py`) dispatches only when the answer is `true` and writes:
 
 ```
 Procedure
   status    = completed
-  code      = <activity code> (project CodeSystem)
-  subject   = patient
-  encounter = current encounter
-  performed = now
+  code      = <activity code>
+  subject   = QuestionnaireResponse.subject
+  encounter = QuestionnaireResponse.encounter
+  performed = QuestionnaireResponse.authored
   extension = TRICC_OBSERVATION_REPEAT_EXT, only when repeat != 1
               (fml_repeat_extension_on_target, converters/fhir/repeat_helper.py)
 ```
 
-The repeat slot is written exactly as on an Observation, so a CQL filter written for one works
-for the other.
+Its group is `extract_procedure_<code>` (`_rule_group_name`), so it never merges with an
+Observation group of the same code.
 
-**c. Read it back in the next Questionnaire.** For each activity instance whose base activity
-has an instance in an earlier process (`PROCESSES` order, `visitors/utils.py`), add a hidden
-populate item whose `initialExpression` is
-`Helper.GetEncounterProcedureValue('<activity code>', <repeat>)`. That helper comes from #74,
-which is not on `develop` yet: `resolve_populate_reference`
-(`converters/fhir/populate_helper.py`) still sends a `Procedure` target to the Observation
-accessor. #74 lands first, and its encounter helper takes a repeat index the same way
-`GetEncounterObservationValue(code, repeatIndex, period)` does (`null` for slot 1). AND the
-negation of that populate item into the group's `enableWhenExpression`:
+**c. Read it back.** In the same Questionnaires, when another one holds an instance with the same
+repeat, a hidden boolean `<code>_done_prev` item gets the CQL `initialExpression`
+`ActivityDone_<linkId>` = `Helper.GetEncounterProcedureValue('<code>', <repeat>)`, and
+`(… linkId='<code>_done_prev' … = true).not()` is ANDed into each of the activity's groups there.
+The read-back goes both ways: the process order of a visit is not fixed, so whichever form runs
+first records the activity and the other skips it.
 
-```
-enableWhen(group) = applicability and own relevance
-                    and not (earlier instance in this Questionnaire was shown)
-                    and not (%resource…linkId='<activity>_done_prev'…answer = true)
-```
+`GetEncounterProcedureValue(code, repeatIndex)` and `GetHistoryProcedureDate(code)` are the #74
+helpers (`cql_helper_repeat_block`, `converters/fhir/repeat_helper.py`): a Procedure counts when
+`status = completed` and its outcome is not *Unsuccessful* (`385671000`, matched by code across
+any system, `fix/20260914-cql-retrieve-codesystem.md`). `resolve_populate_reference`
+(`converters/fhir/populate_helper.py`) dispatches `Procedure` concept types to them, typed
+`boolean` (encounter) and `date` (history).
 
-The populate item is pruned like any other unused hidden calculate when nothing reads it.
-
-**d. Activity code.** Use the activity's `name` (the code the YAML / drawio activity carries) as
-the Procedure code in the project CodeSystem, with `concept_type: procedure`. If the CodeSystem
-has no concept for it, add one at export, as for other generated concepts. Authors do not add
-one per activity.
+**d. Activity code.** The name of the activity's start node (else the activity name), of the base
+activity. A code missing from the project terminology uses `{base_url}/CodeSystem/tricc`, like
+any other concept. No concept is added at export: project CodeSystems are written when the input
+is loaded, before any output strategy runs.
 
 ### 2. Validation and errors
 
-- An activity with no `name` / code cannot be saved: log a warning and keep only the rule
-  inside the Questionnaire (a).
-- Two activities that resolve to the same code: export error, since they would skip each other.
+- An activity with no code: warning; only the rule inside the Questionnaire (a) applies.
+- Two activities with the same code: error logged; neither is recorded nor read back, since they
+  would skip each other. The export goes on.
+- A group relevance that cannot be written in FHIRPath: warning; no `<code>_done` for it (no
+  record rather than a wrong one).
 
 ### 3. Tests
 
-- YAML fixture `tests/data/yaml/activity_called_twice.yaml`: one activity called from two
-  processes (and twice within one process, once with another repeat).
-- `tests/test_strategies/test_opensrp_strategy.py`:
-  - inside one Questionnaire, the second same-repeat group's `enableWhenExpression` negates
-    the first; another repeat is not negated.
-  - the first Questionnaire has `<activity>_done` and a StructureMap rule creating a Procedure
-    with the activity code, encounter and repeat.
-  - the second Questionnaire's group negates the `GetEncounterProcedureValue` populate item.
-- `tests/test_strategies/test_fhir_helper_cql_compile.py`: the helper with `repeat` compiles.
+- Fixtures: `tests/data/yaml/activity_called_twice.yaml` (two calls in one process),
+  `activity_called_across_processes.yaml` (triage and history-and-physical),
+  `activity_code_clash.yaml` (two activities, one code).
+- `tests/test_activity_procedure_dedup.py`: the second same-repeat group negates the first, as
+  in XLSForm; no `_done` for a single-Questionnaire activity; `<code>_done` equals the group
+  enableWhen; the Procedure FML group; the `_done_prev` populate and its CQL define; the group
+  negates it; the code clash; the repeat extension and group naming of a procedure rule.
+- `tests/test_populate_context.py`: Procedure dispatch and types (#74).
+- `tests/test_strategies/test_fhir_helper_cql_compile.py`: the Procedure helpers, their
+  encounter scoping and the "done" rule.
 
 ### 4. Phases
 
 1. (a) Same rule inside one FHIR Questionnaire.
-2. #74 lands, with the encounter helper taking a repeat index.
-3. (b) Procedure extraction of `<activity>_done`.
-4. (c) Populate and enableWhen in later Questionnaires; docs in `docs/open-srp-export.md`.
+2. #74 helpers, the encounter one taking a repeat index.
+3. (b) Procedure extraction of `<code>_done`.
+4. (c) Read-back populate and enableWhen; docs in `docs/open-srp-export.md`.
 
 ---
 
@@ -163,3 +162,15 @@ None.
   (@delcroip)
 - 2026-11-17: #74 lands first. Checked in code: it is not on `develop`. Its encounter helper takes a
   repeat index. (@delcroip)
+- 2026-11-17 (implementation): `<code>_done` also carries the read-back term. Without it, a
+  call skipped because another form already did the activity would still write a Procedure;
+  with it, `_done` is exactly "the group is shown". The read-back goes both ways, since the
+  process order of a visit is not fixed.
+- 2026-11-17 (implementation): only activities used by more than one Questionnaire get
+  `_done` / `_done_prev`, one pair per code and repeat slot per Questionnaire.
+- 2026-11-17 (implementation): no concept is added to the CodeSystem at export (they are
+  written at load); a missing code uses `{base_url}/CodeSystem/tricc`. Supersedes the first line
+  above until the load step adds activity concepts.
+- 2026-11-17 (implementation): the "Unsuccessful" outcome is matched by code alone, like every
+  code in the Helper library. `GetHistoryProcedureDate` has no lookback period (as
+  `GetHistoryConditionValue`); the #74 open point stays open.

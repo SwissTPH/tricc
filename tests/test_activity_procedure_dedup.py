@@ -203,6 +203,16 @@ class TestReadBack(unittest.TestCase):
         self.assertNotIn("module_c_done_prev", items)
 
 
+class TestCodeClash(unittest.TestCase):
+    """§2: two activities with one code are not recorded (they would skip each other)."""
+
+    def test_neither_is_recorded(self):
+        questionnaires = _questionnaires("activity_code_clash.yaml")
+        for process in PROCESSES:
+            items = _by_process(questionnaires, process)
+            self.assertFalse([lid for lid in items if lid.endswith(("_done", "_done_prev"))], process)
+
+
 class TestProcedureExtractionRule(unittest.TestCase):
     """Procedure rules keep the repeat slot and their own group name."""
 
