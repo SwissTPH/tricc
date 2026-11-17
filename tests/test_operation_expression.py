@@ -94,21 +94,21 @@ CASES = [
         op(TriccOperator.ISTRUE, ref("has_symptom")),
         "${has_symptom}>=1",
         "(Helper.GetObservationValue('has_symptom') is true)",
-        "(%resource.repeat(item).where(linkId='has_symptom').answer.where($this.exists()).value = true)",
+        "(%resource.repeat(item).where(linkId='has_symptom').answer.where($this.exists()).value.where($this = true).exists())",
     ),
     (
         "isfalse",
         op(TriccOperator.ISFALSE, ref("has_symptom")),
         "${has_symptom}=0",
         "(Helper.GetObservationValue('has_symptom') is false)",
-        "(%resource.repeat(item).where(linkId='has_symptom').answer.where($this.exists()).value = false)",
+        "(%resource.repeat(item).where(linkId='has_symptom').answer.where($this.exists()).value.where($this = false).exists())",
     ),
     (
         "isnottrue",
         op(TriccOperator.ISNOTTRUE, ref("has_symptom")),
         "${has_symptom}<1",
         "(Helper.GetObservationValue('has_symptom') is not true)",
-        "(%resource.repeat(item).where(linkId='has_symptom').answer.where($this.exists()).value != true)",
+        "(%resource.repeat(item).where(linkId='has_symptom').answer.where($this.exists()).value.where($this = true).empty())",
     ),
     (
         "selected_int",
@@ -199,7 +199,7 @@ CASES = [
         op(TriccOperator.IF, op(TriccOperator.ISTRUE, ref("x")), st(1), st(0)),
         "if(${x}>=1,1,0)",
         "if (Helper.GetObservationValue('x') is true) then 1 else 0",
-        "iif((%resource.repeat(item).where(linkId='x').answer.where($this.exists()).value = true), 1.0, 0.0)",
+        "iif((%resource.repeat(item).where(linkId='x').answer.where($this.exists()).value.where($this = true).exists()), 1.0, 0.0)",
     ),
     (
         "count",

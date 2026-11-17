@@ -175,6 +175,22 @@ _LINK_ID_IN_EXPRESSION = re.compile(r"""linkId\s*=\s*['"]([^'"]+)['"]""")
 # linkId whose `.answer` an expression reads: the last `where(linkId=…)` of the path.
 _ANSWER_LINK_ID_IN_EXPRESSION = re.compile(r"""linkId\s*=\s*['"]([^'"]+)['"]\s*\)\s*\.answer""")
 _NUMERIC_LITERAL = re.compile(r"^-?\d+(\.\d+)?$")
+# An answer path not already followed by the `.where($this.exists())` wrapper.
+_NOT_WRAPPED_YET = r"(?!\.where\(\$this\.exists\(\)\))"
+# Bare reference to a calculate's own CQL define (see _cql_node_reference).
+_CALC_DEFINE_REFERENCE = re.compile(r"^Calc_\w+$")
+# Calls the CQL grammar keeps as `native` (xpath_to_cql writes `Zscore`, FUNCTION_MAP
+# knows `ZScore`): numeric, and not expressible in FHIRPath or CQL here.
+_NATIVE_ZSCORE_FUNCTIONS = frozenset({"zscore", "izscore"})
+
+
+def _native_function_name(expr) -> Optional[str]:
+    """Lower-cased function name of a ``native`` operation, else None."""
+    if isinstance(expr, TriccOperation) and expr.operator == TriccOperator.NATIVE and expr.reference:
+        name = expr.reference[0]
+        if isinstance(name, str):
+            return name.lower()
+    return None
 # Choice EQUAL wraps as ``…answer.where($this.exists()).value.code = 'x'``.
 # HAPI does not resolve that chain; membership ``answer.where($this.value.code = 'x')`` does.
 # See fix/20260824-fhirpath-choice-equality.md.
@@ -2696,7 +2712,10 @@ class FHIRStrategy(BaseOutPutStrategy):
         if self._should_wrap_first(original_ref):
             search = self.get_tricc_operation_operand_fhirpath(original_ref)
             replace = f"{search}.where($this.exists()){self._answer_value_suffix(original_ref)}"
-            return r_expr.replace(search, replace)
+            # Only occurrences not wrapped yet: a list can name the same reference twice
+            # (display text injecting one value twice), and a second plain replace
+            # turned `….value` into `….value.where($this.exists()).value`.
+            return re.sub(re.escape(search) + _NOT_WRAPPED_YET, lambda _: replace, r_expr)
 
         return r_expr
 
@@ -2977,8 +2996,38 @@ class FHIRStrategy(BaseOutPutStrategy):
         if isinstance(expr, TriccOperation):
             if expr.operator in (TriccOperator.IF, TriccOperator.IFS, TriccOperator.CASE):
                 return self._conditional_returns_boolean(expr, _seen)
+            if expr.operator == TriccOperator.COALESCE:
+                return self._coalesce_returns_boolean(expr, _seen)
             return self._operation_returns_boolean(expr)
         return False
+
+    def _coalesce_returns_boolean(self, expr: TriccOperation, _seen=None) -> bool:
+        """True when a COALESCE has a boolean operand and no known non-boolean one.
+
+        ``Coalesce(<boolean rule>, <value recorded earlier>)`` keeps the earlier answer
+        when the rule cannot be computed; that fallback (the node itself, a populate, a
+        hidden text calculate) has no type of its own, so it does not decide.
+        """
+        operands = list(expr.reference or [])
+        known = [self._operand_boolean_kind(operand, _seen) for operand in operands]
+        return any(kind is True for kind in known) and not any(kind is False for kind in known)
+
+    def _operand_boolean_kind(self, operand, _seen=None) -> Optional[bool]:
+        """True: boolean. False: known to be another type. None: type unknown."""
+        if self._operand_returns_boolean(operand, _seen):
+            return True
+        operand = self._unwrap_operation(operand)
+        if isinstance(operand, TriccReference):  # subclasses TriccStatic: check it first
+            return None
+        if isinstance(operand, TriccStatic) or isinstance(operand, (str, int, float)):
+            return False
+        if isinstance(operand, TriccOperation):
+            return False if operand.get_datatype() in ("number", "date", "list") else None
+        if isinstance(operand, TriccNodeBaseModel) and not isinstance(operand, TriccNodePopulate):
+            item = self._find_item_anywhere(get_export_name(operand))
+            item_type = (item or {}).get("type")
+            return None if item_type in (None, "string", "text") else False
+        return None
 
     def _conditional_returns_boolean(self, expr: TriccOperation, _seen=None) -> bool:
         """True when every then/else / CASE value of ``expr`` is boolean."""
@@ -3007,11 +3056,19 @@ class FHIRStrategy(BaseOutPutStrategy):
         return False
 
     def _unwrap_operation(self, expr):
-        """Strip parenthesis wrappers from a TriccOperation."""
+        """Strip wrappers that forward one operand's value unchanged (for type checks).
+
+        Parenthesis, and ``get_inherited_value`` with a single operand: a calculate's
+        ``coalesce(get_inherited_value(<rule>), get_inherited_value(<itself>))`` has the
+        type of ``<rule>``.
+        """
         while (
             isinstance(expr, TriccOperation)
-            and expr.operator == TriccOperator.PARENTHESIS
             and expr.reference
+            and (
+                expr.operator == TriccOperator.PARENTHESIS
+                or (expr.operator == TriccOperator.GET_INHERITED_VALUE and len(expr.reference) == 1)
+            )
         ):
             expr = expr.reference[0]
         return expr
@@ -3032,6 +3089,8 @@ class FHIRStrategy(BaseOutPutStrategy):
             TriccOperator.IF,
         ):
             return self._conditional_fhir_number_type(expr)
+        if _native_function_name(expr) in _NATIVE_ZSCORE_FUNCTIONS:
+            return "decimal"
         if not isinstance(expr, TriccOperation) or expr.operator not in RETURNS_NUMBER:
             return None
         if expr.operator in _RETURNS_INTEGER:
@@ -3384,7 +3443,9 @@ class FHIRStrategy(BaseOutPutStrategy):
 
         A node read as text (a hidden string calculate holding 'true' / 'yes' / '1') is
         converted with ``ToBoolean(String)`` — ``String is true`` does not translate.
-        CQL has no ``ToBoolean(Boolean)``, so anything else is passed through.
+        CQL has no ``ToBoolean(Boolean)``, so anything else is passed through — including
+        the node's own ``Calc_`` define when it computes a Boolean, whatever type its item
+        has (a ToBoolean there failed the whole library).
         """
         operand = (original_references or [None])[0]
         expr = ref_expressions[0]
@@ -3393,6 +3454,8 @@ class FHIRStrategy(BaseOutPutStrategy):
             and not isinstance(operand, TriccNodePopulate)
             and self._cql_reference_item_type(operand) == "string"
         ):
+            if _CALC_DEFINE_REFERENCE.match(str(expr).strip()) and self._expression_returns_boolean(operand):
+                return expr
             return f"ToBoolean({expr})"
         return expr
 
@@ -3646,6 +3709,10 @@ class FHIRStrategy(BaseOutPutStrategy):
     # ADDITIONAL / FALLBACK
     # ============================================================
     def tricc_operation_native(self, ref_expressions, original_references=None):
+        name = (original_references or [None])[0]
+        if isinstance(name, str) and name.lower() in _NATIVE_ZSCORE_FUNCTIONS:
+            # Passed through, this was the text 'Zscore' as the item's value.
+            raise NotImplementedError(f"{name} is not supported yet")
         # Raw expression passthrough
         return ref_expressions[0] if ref_expressions else ""
 
@@ -3761,21 +3828,24 @@ class FHIRStrategy(BaseOutPutStrategy):
             return f"({parts[0]} mod {parts[1]})"
         return parts[0] if parts else ""
 
+    # FHIRPath has no "is true"; `X = true` / `X != false` are empty when X has no answer,
+    # and one empty operand blanks a whole `and` (a calculatedExpression then sets no
+    # value). These follow CQL instead: `is true` / `is false` are false for null,
+    # `is not true` / `is not false` are true for null.
     def tricc_operation_fhirpath_istrue(self, ref_expressions, original_references=None):
-        # FHIRPath has no "is true" — CQL's tricc_operation_istrue() is not reused here.
-        r_expr = f"({ref_expressions[0]} = true)"
+        r_expr = f"({self._fhirpath_atom(ref_expressions[0])}.where($this = true).exists())"
         return self._wrap_operand_if_needed(r_expr, original_references)
 
     def tricc_operation_fhirpath_isnottrue(self, ref_expressions, original_references=None):
-        r_expr = f"({ref_expressions[0]} != true)"
+        r_expr = f"({self._fhirpath_atom(ref_expressions[0])}.where($this = true).empty())"
         return self._wrap_operand_if_needed(r_expr, original_references)
 
     def tricc_operation_fhirpath_isfalse(self, ref_expressions, original_references=None):
-        r_expr = f"({ref_expressions[0]} = false)"
+        r_expr = f"({self._fhirpath_atom(ref_expressions[0])}.where($this = false).exists())"
         return self._wrap_operand_if_needed(r_expr, original_references)
 
     def tricc_operation_fhirpath_isnotfalse(self, ref_expressions, original_references=None):
-        r_expr = f"({ref_expressions[0]} != false)"
+        r_expr = f"({self._fhirpath_atom(ref_expressions[0])}.where($this = false).empty())"
         return self._wrap_operand_if_needed(r_expr, original_references)
 
     def tricc_operation_fhirpath_isnull(self, ref_expressions, original_references=None):
