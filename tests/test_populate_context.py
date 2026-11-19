@@ -8,7 +8,9 @@ from tricc_oo.converters.fhir.populate_helper import (
     get_cht_contact_summary_expression,
     is_valid_period,
     normalize_populate_node,
+    populate_fhir_item_type,
     populate_participates_in_skip,
+    populate_value_type,
     resolve_populate_reference,
 )
 from tricc_oo.converters.fhir.repeat_helper import cql_helper_repeat_block
@@ -71,6 +73,35 @@ class TestPopulateReferences(unittest.TestCase):
             resolve_populate_reference(node, qualified=True),
             "Helper.GetEncounterObservationValue('weight', null, null)",
         )
+
+    def test_encounter_procedure_reads_done_in_this_encounter(self):
+        # #74: a Procedure concept used to fall back to the Observation accessor
+        node = TriccNodePopulate(
+            id="r5", name="danger_signs", label="D", context="encounter", concept_type="procedure"
+        )
+        normalize_populate_node(node)
+        self.assertEqual(
+            resolve_populate_reference(node, qualified=True),
+            "Helper.GetEncounterProcedureValue('danger_signs', null)",
+        )
+        self.assertEqual(populate_value_type(node), "boolean")
+        self.assertEqual(populate_fhir_item_type(node), "boolean")
+
+    def test_encounter_procedure_keeps_the_repeat_slot(self):
+        node = TriccNodePopulate(
+            id="r6", name="danger_signs", label="D", context="encounter", concept_type="procedure", repeat=2
+        )
+        normalize_populate_node(node)
+        self.assertEqual(resolve_populate_reference(node), "GetEncounterProcedureValue('danger_signs', 2)")
+
+    def test_history_procedure_reads_the_last_date(self):
+        node = TriccNodePopulate(
+            id="r7", name="deworming", label="D", context="history", concept_type="intervention"
+        )
+        normalize_populate_node(node)
+        self.assertEqual(resolve_populate_reference(node), "GetHistoryProcedureDate('deworming')")
+        self.assertEqual(populate_value_type(node), "date")
+        self.assertEqual(populate_fhir_item_type(node), "date")
 
     def test_cht_contact_summary_expression(self):
         node = TriccNodePopulate(id="r4", name="p_age", label="Age", context="patient")

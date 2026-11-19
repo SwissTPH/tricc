@@ -135,6 +135,10 @@ class TestHelperCqlIsTranslatable(unittest.TestCase):
             "GetEncounterObservationValue",
             "GetEncounterConditionValue",
             "GetEncounterValue",
+            "GetProcedures",
+            "GetEncounterProcedureValue",
+            "GetHistoryProcedure",
+            "GetHistoryProcedureDate",
         ):
             self.assertIn(f"define function {fn}(", self.helper, f"missing {fn}")
 
@@ -142,6 +146,21 @@ class TestHelperCqlIsTranslatable(unittest.TestCase):
         self.assertIn("parameter encounterid String default null", self.helper)
         self.assertIn("O.encounter.reference = 'Encounter/' + encounterid", self.helper)
         self.assertIn("C.encounter.reference = 'Encounter/' + encounterid", self.helper)
+        self.assertIn("P.encounter.reference = 'Encounter/' + encounterid", self.helper)
+
+    def test_procedure_counts_only_completed_and_not_unsuccessful(self):
+        # #74: completed, and outcome not SNOMED 385671000 (a missing outcome counts);
+        # matched by code alone (fix/20260914-cql-retrieve-codesystem.md)
+        self.assertRegex(
+            self.helper,
+            r"define function IsDoneProcedure\(P Procedure\):\s+P\.status = 'completed'\s+"
+            r"and not exists\(P\.outcome\.coding O where O\.code = '385671000'\)",
+        )
+        self.assertEqual(self.helper.count("IsDoneProcedure(P)"), 2)
+
+    def test_procedure_repeat_slot_uses_the_observation_extension(self):
+        self.assertIn("define function ProcedureRepeatIndex(P Procedure):", self.helper)
+        self.assertIn("Coalesce(ProcedureRepeatIndex(P), 1) = Coalesce(repeatIndex, 1)", self.helper)
 
 
 class TestLibraryCanonicalUrl(unittest.TestCase):

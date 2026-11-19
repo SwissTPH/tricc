@@ -1,0 +1,124 @@
+# One activity (module_c) called twice in the same process: instance 1 gated by
+# trigger_a, instance 2 gated by trigger_d, same repeat. The second call must be
+# skipped when the first was shown (get_prev_instance_skip_expression), in XLSForm
+# and in the FHIR Questionnaire. See feature/20261117-activity-procedure-dedup.md.
+
+id: parent_main
+title: "Parent Main"
+process: main
+
+nodes:
+  - id: start
+    type: start
+    form_id: parent_main
+    label: "Start"
+    name: start_parent
+
+  - id: trigger_a
+    type: select_yesno
+    name: trigger_a
+    label: "Enter via caller A?"
+    required: true
+    options:
+      - id: opt_a_yes
+        name: "yes"
+        label: "Yes"
+      - id: opt_a_no
+        name: "no"
+        label: "No"
+
+  - id: trigger_d
+    type: select_yesno
+    name: trigger_d
+    label: "Enter via caller D?"
+    required: true
+    options:
+      - id: opt_d_yes
+        name: "yes"
+        label: "Yes"
+      - id: opt_d_no
+        name: "no"
+        label: "No"
+
+  - id: rhombus_a
+    type: rhombus
+    label: "Caller A?"
+    reference: "trigger_a = true"
+
+  - id: rhombus_d
+    type: rhombus
+    label: "Caller D?"
+    reference: "trigger_d = true"
+
+  - id: goto_c1
+    type: goto
+    name: goto_c1
+    label: "Caller A calls module C"
+    link: module_c
+    instance: 1
+
+  - id: goto_c2
+    type: goto
+    name: goto_c2
+    label: "Caller D calls module C"
+    link: module_c
+    instance: 2
+
+  - id: end
+    type: end
+    label: "End"
+    name: end_parent
+
+edges:
+  - source: start
+    target: trigger_a
+  - source: trigger_a
+    target: trigger_d
+    value: follow
+  - source: trigger_d
+    target: rhombus_a
+    value: follow
+  - source: rhombus_a
+    target: goto_c1
+    value: "yes"
+  - source: goto_c1
+    target: rhombus_d
+  - source: rhombus_a
+    target: rhombus_d
+    value: "no"
+  - source: rhombus_d
+    target: goto_c2
+    value: "yes"
+  - source: goto_c2
+    target: end
+  - source: rhombus_d
+    target: end
+    value: "no"
+
+---
+id: module_c
+title: "Module C"
+process: main
+
+nodes:
+  - id: mc_start
+    type: activity_start
+    label: "Module C start"
+    name: module_c
+
+  - id: mc_val
+    type: integer
+    name: mc_val
+    label: "Value captured in module C"
+    required: true
+
+  - id: mc_end
+    type: activity_end
+    label: "Module C end"
+    name: mc_end
+
+edges:
+  - source: mc_start
+    target: mc_val
+  - source: mc_val
+    target: mc_end

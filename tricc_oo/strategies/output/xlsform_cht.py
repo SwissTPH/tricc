@@ -69,6 +69,17 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
     def get_empty_label(self):
         return "NO_LABEL"
 
+    def retrieval_expression(self, retrieval) -> str:
+        """CHT calculation of a project retrieval.
+
+        Every catalogue function reads the contact summary, like populate nodes:
+        ``instance('contact-summary')/context/<name>`` (the deployment's contact-summary
+        script provides ``<name>``). ``custom`` uses its ``text/x-xlsform`` expression.
+        """
+        if retrieval.effective_function is None:
+            return super().retrieval_expression(retrieval)
+        return f"coalesce(instance('contact-summary')/context/{retrieval.name},'')"
+
     def get_cht_input(self, start_pages, **kwargs):
         empty = langs.get_trads("", force_dict=True)
         df_input = pd.DataFrame(columns=SURVEY_MAP.keys())
@@ -520,6 +531,10 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             else:
                 # reads instance('contact-summary')/context/<key>
                 df_input.loc[len(df_input)] = get_populate_calc_line(input)
+        # project retrievals, next to the populate values (feature/20261109-project-retrievals.md)
+        for row in self.get_retrieval_lines():
+            df_input.loc[len(df_input)] = row
+        self._retrievals_injected = True
 
         return df_input
 

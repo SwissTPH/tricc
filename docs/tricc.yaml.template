@@ -54,6 +54,11 @@ parameters:
 # libraries:
 #   - cql/*.cql
 
+# Retrieval dictionary (CodeSystem url, id or name): data read before the consultation,
+# referenced in expressions as "#name" (e.g. "#age_months" < 2). A CodeSystem tagged
+# codesystem-role|retrieve wins; else <default>-retrieve. feature/20261109-project-retrievals.md
+# retrieve_code_system: http://example.org/fhir/CodeSystem/demo-retrieve
+
 # Each entry is one algorithm. Omit this list to keep today's behaviour
 # (every top-level drawing in -i is one implicit on-demand intervention).
 #

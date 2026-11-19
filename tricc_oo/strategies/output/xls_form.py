@@ -188,6 +188,43 @@ class XLSFormStrategy(BaseOutPutStrategy):
             **kwargs,
         )
 
+    def retrieval_expression(self, retrieval) -> str:
+        """XLSForm calculation of a project retrieval (feature/20261109-project-retrievals.md).
+
+        Plain XLSForm has no record to read from: only ``custom`` retrievals, with their
+        ``text/x-xlsform`` expression, are exported; strategies with a data source override it.
+
+        Raises:
+            TriccRetrievalError: A function without mapping, or no ``text/x-xlsform`` expression.
+        """
+        from tricc_oo.converters.retrieval import XLSFORM_LANGUAGE, custom_expression, unsupported
+
+        if retrieval.effective_function is None:
+            return custom_expression(retrieval, XLSFORM_LANGUAGE, type(self).__name__)
+        raise unsupported(retrieval, type(self).__name__)
+
+    def get_retrieval_lines(self) -> list:
+        """One hidden ``calculate`` row ``r_<name>`` per used retrieval."""
+        from tricc_oo.serializers.xls_form import get_input_calc_line
+
+        calculation = list(SURVEY_MAP).index("calculation")
+        rows = []
+        for node in getattr(self.project, "retrieval_nodes", None) or []:
+            row = get_input_calc_line(node)
+            row[calculation] = self.retrieval_expression(node.retrieval)
+            rows.append(row)
+        return rows
+
+    def inject_retrievals(self) -> None:
+        """Put the retrieval rows at the top of the survey (once)."""
+        if getattr(self, "_retrievals_injected", False):
+            return
+        self._retrievals_injected = True
+        rows = self.get_retrieval_lines()
+        if rows:
+            df_rows = pd.DataFrame(rows, columns=SURVEY_MAP.keys())
+            self.df_survey = pd.concat([df_rows, self.df_survey], ignore_index=True)
+
     def inject_version(self):
         # Add hidden version field using ODK's version()
         empty = langs.get_trads("", force_dict=True)
@@ -241,6 +278,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
         if not os.path.exists(self.output_path):
             os.makedirs(self.output_path)
 
+        self.inject_retrievals()
         self.inject_version()
         self.apply_translations()
 

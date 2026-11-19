@@ -549,6 +549,11 @@ Observation value:
 | `context=encounter`, Observation concept | `Helper.GetEncounterObservationValue('<code>', <slot>, <period>)` |
 | `context=encounter`, Condition concept (`diagnosis` / `proposed_diagnosis`) | `Helper.GetEncounterConditionValue('<code>')` |
 | `context=history`, Observation / Condition | `Helper.GetHistoryObservationValue(…)` / `Helper.GetHistoryConditionValue('<code>')` |
+| `context=encounter`, Procedure concept (`procedure` / `intervention`) | `Helper.GetEncounterProcedureValue('<code>', <slot>)` → boolean |
+| `context=history`, Procedure concept | `Helper.GetHistoryProcedureDate('<code>')` → date of the last one |
+
+A Procedure counts only when `status = completed` and its `outcome` is not *Unsuccessful*
+(`385671000`, matched by code across any system); a missing outcome counts (#74).
 
 Both encounter accessors resolve to `GetObservationValue` / `GetConditionValue`, which filter on
 the library's `encounterid` parameter through `GetObservations` / `GetConditions` — i.e. the value
@@ -559,6 +564,31 @@ For CHT, the same node picks its binding from where the data comes from: `encoun
 `../inputs/contact/<field>` through the form `inputs` group (with a `load.`-prefixed calculate,
 since the inputs field is named after the source document field), every other context reads
 `instance('contact-summary')/context/<key>` and needs no inputs field.
+
+A populate node reads its `source` concept (a code, or `{system, code}` in YAML; the draw.io
+`source` attribute), else the concept named like the node: `t_weight` with `source: weight` reads
+`weight` and keeps its own name.
+
+### Project retrievals (`"#name"`)
+
+`feature/20261109-project-retrievals.md`: a retrieval of the project dictionary that an
+intervention uses becomes one `define "#name"` in the **Helper** library and a hidden item
+`r_<name>` whose `initialExpression` is `Calc_r_<name>: Helper."#name"`. CQL references use
+`Helper."#name"`; FHIRPath references read the `r_<name>` item.
+
+| function | CQL of `define "#name"` |
+|---|---|
+| `AgeInDays` / `AgeInMonths` / `AgeInYears`, `AgeInWeeks` | `AgeInDays` / `AgeInMonths` / `AgeInYears`, `CalculateAgeInWeeks(PatientBirthDate)` |
+| `DateOfBirth`, `Sex` | `PatientBirthDate`, `PatientGender` |
+| `DeceasedDateTime`, names, `Telecom`, `Photo` | read from `PatientRecord` (`deceased`, `name`, `telecom`, `photo.url`) |
+| `PatientValue` | the `PatientGender` / `PatientBirthDate` / `AgeInYears` define for those concepts, else `GetPatientValue('<code>')` |
+| `FacilityValue` / `PractitionerValue` / `LocationValue` | `GetFacilityValue('<code>')` / … |
+| `Latest` (encounter / history) | `ValueAs<type>(GetEncounterObservationValue(…))` / `ValueAs<type>(GetHistoryObservationValueSince('<code>', Now() - <period>, 1, null))`; Condition concepts: `Get…ConditionValue('<code>')` |
+| `Exists`, `Count` | `exists(GetObservations(…))` / `GetHistoryObservationSince(…) is not null`; `Count(…)` over the same Observations (or Conditions) |
+| `custom` | its `text/cql` expression; `{{code}}` → `"<code>"`, `{{period}}` → `30 days` |
+
+`<type>` follows the `dataType` of the concept read (`coded` / text: string). A period with
+several units (`P1Y6M`) cannot fill `{{period}}` in CQL.
 
 ### Inherited values (a question asked on several paths)
 
@@ -578,6 +608,32 @@ process are already prefilled by the encounter dedup `initialExpression`.
 The trailing value suffix follows the item type (`.value.code` for choice/open-choice, `.value`
 otherwise), which is what lets `SELECTED` / `CONTAINS` re-append
 `.where($this.value.code = '<code>').exists()` on top of the merged value.
+
+### An activity called more than once
+
+**Added 2026-11-17** (`feature/20261117-activity-procedure-dedup.md`, RFC #81). An activity
+runs at most once per encounter for a given repeat slot, as in XLSForm / CHT:
+
+- **In one Questionnaire**, an activity group's `enableWhenExpression` is its own condition
+  (applicability and sequence logic) AND "no earlier group of the same activity, same repeat,
+  is shown". *Earlier* is the order of the groups in the Questionnaire. It is the
+  `get_prev_instance_skip_expression` rule of the XLSForm group `relevant`.
+- **Across Questionnaires** (an activity called from two processes), each of them gets, per
+  activity code and repeat slot:
+
+  | item (hidden boolean) | expression |
+  |---|---|
+  | `<code>_done_prev` | CQL `initialExpression` `ActivityDone_<linkId>` = `Helper.GetEncounterProcedureValue('<code>', <slot>)` |
+  | `<code>_done` | `calculatedExpression` = one of the activity's groups here is shown (their whole `enableWhenExpression`) |
+
+  The negation of `<code>_done_prev` is ANDed into each of those groups, and `<code>_done`
+  is extracted as a `Procedure` (table under *StructureMap*). Whichever process runs first in
+  the visit records the activity; the other skips it, and records nothing since its group is
+  not shown. `<code>` is the activity's name (its start node); a code not in the project
+  terminology uses `{base_url}/CodeSystem/tricc` like any other concept. Slot `n != 1` adds
+  `_Rr_<n>` before `_done`.
+
+An activity whose calls are all in one Questionnaire gets neither item.
 
 ### Concept repeat (FHIR / CQL)
 
@@ -799,6 +855,7 @@ narrative in `text.div`. The export `.map` is compiled at push time. Classificat
 | `proposed_diagnosis` / `Diagnosis` (proposed node) | `Condition` | `clinicalStatus=active`, `verificationStatus=provisional` (only when the hidden boolean is true) |
 | AcceptDiag (`pre_final.{code}`) | `Condition` | Accept → `verificationStatus=confirmed`; Reject → `refuted` + `clinicalStatus=inactive`. Same concept code as the proposed diagnosis. |
 | Node with `repeat != 1` | Observation extension | `https://fhir.tricc.io/StructureDefinition/observation-repeat-index` (`valueInteger`) |
+| Hidden `<code>_done` (an activity shown, see below) | `Procedure` (`status=completed`) | Only when true; `code` = activity code, `performed` = authored, same repeat extension when `repeat != 1`. Group `extract_procedure_<code>`. |
 | `Calculation` (`final.{code}`), `InteractSet` (notes), `Value` (options), diagnosis anchors | *(not extracted)* | Confirmed status is the AcceptDiag extract (and CQL `HasConfirmedCondition`) |
 
 `final.{code}` stays an in-form calculate (FHIRPath from Accept/manual) for the

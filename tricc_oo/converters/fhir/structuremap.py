@@ -155,6 +155,13 @@ def _extract_group_name(concept_code: str, repeat: Optional[int]) -> str:
     return _group_name("extract", str(base))
 
 
+def _rule_group_name(rule: ExtractionRule) -> str:
+    """Group name of a rule; a Procedure group never meets an Observation group of the same code."""
+    if rule.kind == "procedure":
+        return _extract_group_name(f"procedure_{rule.concept_code}", rule.repeat)
+    return _extract_group_name(rule.concept_code, rule.repeat)
+
+
 def _rule_rank(rule: ExtractionRule) -> tuple:
     """Newest-first rank, same as GET_INHERITED_VALUE: (path_len, version)."""
     return (int(rule.path_len or 0), int(rule.version or 0))
@@ -230,7 +237,7 @@ def merge_extraction_rules(rules: List[ExtractionRule]) -> List[ExtractionRule]:
                     seen_ids.append(lid)
         winner.link_ids = seen_ids
         winner.link_id = seen_ids[0]
-        winner.group_name = _extract_group_name(winner.concept_code, winner.repeat)
+        winner.group_name = _rule_group_name(winner)
         out.append(winner)
     return out
 
@@ -324,6 +331,37 @@ def build_extraction_rule(
         version=int(getattr(node, "version", None) or 1),
         path_len=int(getattr(node, "path_len", None) or 0),
     )
+
+
+def build_procedure_extraction_rule(
+    link_id: str,
+    concept_code: str,
+    display: str,
+    repeat: int,
+    codesystems=None,
+    default_code_system: str = "",
+) -> ExtractionRule:
+    """Rule writing a completed Procedure when the boolean item ``link_id`` is true.
+
+    Used for "this activity was shown" (feature/20261117-activity-procedure-dedup.md §1b).
+    The group name carries ``procedure`` (``_rule_group_name``).
+    """
+    slot_repeat = None if repeat == 1 else int(repeat)
+    rule = ExtractionRule(
+        link_id=link_id,
+        concept_code=str(concept_code),
+        display=display or str(concept_code),
+        concept_type="procedure",
+        kind="procedure",
+        qr_value_field="valueBoolean",
+        item_type="boolean",
+        repeat=slot_repeat,
+        code_system_url=_concept_system_url(codesystems, concept_code, default_code_system),
+        group_name="",
+        link_ids=[link_id],
+    )
+    rule.group_name = _rule_group_name(rule)
+    return rule
 
 
 SDC_QUESTIONNAIRE_HIDDEN = "http://hl7.org/fhir/StructureDefinition/questionnaire-hidden"
@@ -460,6 +498,25 @@ def _condition_group(rule: ExtractionRule, verification: str, clinical: str, gro
     )
 
 
+def _procedure_group(rule: ExtractionRule) -> str:
+    inner = [
+        "      src -> tgt.status = 'completed' \"status\";",
+        f"      src -> tgt.code = {_cc(rule.code_system_url, rule.concept_code, rule.display)} \"code\";",
+        '      src.authored as authored -> tgt.performed = authored "performed";',
+    ]
+    if rule.repeat is not None:
+        inner.append(
+            fml_repeat_extension_on_target("tgt", rule.repeat, rule.group_name).rstrip("\n")
+        )
+    body = "\n".join(_create_resource_entry("Procedure", inner))
+    return (
+        f"group {rule.group_name}"
+        f"(source answer, source src : QuestionnaireResponse, target bundle : Bundle) {{\n"
+        f"{body}\n"
+        f"}}\n"
+    )
+
+
 def _and_where(*parts: str) -> str:
     return " and ".join(p for p in parts if p)
 
@@ -514,7 +571,7 @@ def _item_dispatch_rule(rule: ExtractionRule) -> str:
             lines.append(
                 _dispatch_block(escaped, rule.group_name, extra, rule.group_name + suffix)
             )
-        elif rule.kind == "proposed_condition":
+        elif rule.kind in ("proposed_condition", "procedure"):
             extra = _and_where(preferred, "answer.valueBoolean = true")
             lines.append(
                 _dispatch_block(escaped, rule.group_name, extra, rule.group_name + suffix)
@@ -553,6 +610,7 @@ def build_extraction_fml(
         'uses "http://hl7.org/fhir/StructureDefinition/Bundle" as target',
         'uses "http://hl7.org/fhir/StructureDefinition/Observation" as target',
         'uses "http://hl7.org/fhir/StructureDefinition/Condition" as target',
+        'uses "http://hl7.org/fhir/StructureDefinition/Procedure" as target',
         "",
         "// Extraction driven by CodeSystem conceptType (Symptom-Finding → Observation,",
         "// Diagnosis / proposed_diagnosis → Condition provisional, AcceptDiag → confirmed/refuted).",
@@ -580,6 +638,8 @@ def build_extraction_fml(
         elif rule.kind == "accept_condition":
             groups.append(_condition_group(rule, "confirmed", "active", f"{rule.group_name}_confirmed"))
             groups.append(_condition_group(rule, "refuted", "inactive", f"{rule.group_name}_refuted"))
+        elif rule.kind == "procedure":
+            groups.append(_procedure_group(rule))
     return "\n".join(uses) + "\n" + "\n".join(groups)
 
 

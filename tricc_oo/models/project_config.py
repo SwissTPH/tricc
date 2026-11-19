@@ -231,6 +231,9 @@ class TriccProjectConfig(BaseModel):
     # The calculate dictionary (CodeSystem url, id or name), as the frontend writes it.
     # A CodeSystem tagged as the calculate one wins over it (see calculate_code_system_key).
     calculate_code_system: Optional[str] = None
+    # The retrieval dictionary (CodeSystem url, id or name): data read before the
+    # consultation, referenced as "#code" (feature/20261109-project-retrievals.md).
+    retrieve_code_system: Optional[str] = None
 
     @field_validator("terminology", "libraries")
     @classmethod

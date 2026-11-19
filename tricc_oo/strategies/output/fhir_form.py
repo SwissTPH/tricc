@@ -31,6 +31,7 @@ from tricc_oo.converters.utils import quoted_literal
 from tricc_oo.converters.fhir.structuremap import (
     apply_questionnaire_item_to_rule,
     build_extraction_rule,
+    build_procedure_extraction_rule,
     build_extraction_structuremap,
     extraction_rule_link_ids,
     extraction_rules_conflict,
@@ -47,6 +48,7 @@ from tricc_oo.converters.fhir.cql_value import (
     cql_helper_value_block,
     wrap_cql_for_item_type,
 )
+from tricc_oo.converters.retrieval import iter_retrievals
 from tricc_oo.converters.fhir.populate_helper import (
     ENCOUNTER_CONTEXT,
     HISTORY_CONTEXT,
@@ -57,6 +59,8 @@ from tricc_oo.converters.fhir.populate_helper import (
     populate_fhir_item_type,
     populate_unit,
     resolve_populate_reference,
+    retrieval_cql_defines,
+    retrieval_cql_expression,
 )
 from tricc_oo.converters.fhir.repeat_helper import (
     build_questionnaire_repeat_extension,
@@ -131,7 +135,9 @@ from tricc_oo.models.calculate import TriccNodeDisplayCalculateBase, TriccNodePo
 from tricc_oo.strategies.output.base_output_strategy import BaseOutPutStrategy
 from tricc_oo.strategies.registry import register_output_strategy
 from tricc_oo.visitors.tricc import (
+    get_applicability_expression,
     get_node_expressions,
+    get_prev_instance_skip_expression,
     get_process,
     is_ready_to_process,
     serialize_display_relevance,
@@ -374,6 +380,11 @@ class FHIRStrategy(BaseOutPutStrategy):
         # (fix/20260828-answer-reference-on-non-answerable-node.md).
         self._inlining_relevance: set[int] = set()
         self._reference_node_index_cache: Optional[Dict[str, object]] = None
+        # id(activity) -> group relevance with the previous-instance skip applied
+        # (feature/20261117-activity-procedure-dedup.md §1a).
+        self._activity_group_relevance: Dict[int, object] = {}
+        # activity instances exported as a Questionnaire group, in relevance-walk order
+        self._activity_groups: List[object] = []
 
     def get_tricc_operation_expression(self, operation):
         # For CQL
@@ -454,6 +465,8 @@ class FHIRStrategy(BaseOutPutStrategy):
         self.process_display_text(self.project.start_pages, pages=self.project.pages)
         logger.info("FHIRStrategy: generating export (StructureMap)")
         self.process_export(self.project.start_pages, pages=self.project.pages)
+
+        self._add_activity_done_items()
 
         logger.info("FHIRStrategy: writing output files")
         self._sanitize_questionnaires()
@@ -1109,6 +1122,7 @@ class FHIRStrategy(BaseOutPutStrategy):
         """Attach enableWhenExpression / option toggles (or hide the item)."""
         self._attach_option_toggles(node)
 
+        self._compose_activity_group_relevance(node, processed_nodes, process)
         relevance = self._effective_relevance(node)
         if is_display_skip_widget(node):
             base = relevance if self._is_effective_relevance(relevance) else TriccStatic(True)
@@ -1147,6 +1161,245 @@ class FHIRStrategy(BaseOutPutStrategy):
         return True
 
     @staticmethod
+    def _is_activity_group_node(node) -> bool:
+        """True for the start node of an activity instance (the activity's Questionnaire group)."""
+        act = getattr(node, "activity", None)
+        return (
+            getattr(node, "tricc_type", None) == "activity_start"
+            and act is not None
+            and getattr(act, "root", None) is node
+            and getattr(act, "base_instance", None) is not None
+        )
+
+    def _compose_activity_group_relevance(self, node, processed_nodes, process) -> None:
+        """Apply the XLSForm group rule to an activity group: applicability, then
+        "no earlier instance of this activity with the same repeat was shown".
+
+        "Earlier" is the order of the groups in the Questionnaire, not the walk order (the
+        relevance walk can reach a later call first). Only instances in the **same**
+        Questionnaire count; one in another Questionnaire is not readable from FHIRPath
+        (feature/20261117-activity-procedure-dedup.md §1a). The result is cached so
+        ``_effective_relevance`` (and so any inlined copy of the group relevance) sees it.
+        """
+        if not self._is_activity_group_node(node) or processed_nodes is None:
+            return
+        act = node.activity
+        if id(act) in self._activity_group_relevance:
+            return
+        position = self._group_position(node)
+        past_instances = []
+        if position is not None:
+            for past in act.base_instance.instances.values():
+                root = getattr(past, "root", None)
+                if past is act or root is None:
+                    continue
+                past_position = self._group_position(root)
+                if past_position is not None and past_position[0] == position[0] and past_position[1] < position[1]:
+                    past_instances.append(past)
+
+        relevance = act.relevance if self._is_effective_relevance(act.relevance) else None
+        relevance = get_applicability_expression(act, processed_nodes, process, relevance)
+        relevance = get_prev_instance_skip_expression(
+            act, processed_nodes, process, relevance, past_instances=past_instances
+        )
+        self._activity_group_relevance[id(act)] = relevance
+        self._activity_groups.append(act)
+
+    # ── Activity done → Procedure (feature/20261117-activity-procedure-dedup.md §1b) ──
+
+    @staticmethod
+    def _activity_repeat(act) -> int:
+        """Repeat slot of an activity instance: the goto's, else the activity_start's."""
+        if getattr(act, "repeat", None) is not None:
+            return get_repeat(act)
+        return get_repeat(getattr(act, "root", None))
+
+    @staticmethod
+    def _activity_code(act) -> Optional[str]:
+        """Procedure code of an activity: the name of its base activity (start node first)."""
+        base = getattr(act, "base_instance", None) or act
+        return getattr(getattr(base, "root", None), "name", None) or getattr(base, "name", None)
+
+    @staticmethod
+    def _activity_done_link_id(code: str, repeat: int) -> str:
+        suffix = "" if repeat == 1 else f"_Rr_{str(repeat).replace('-', 'n')}"
+        return f"{code}{suffix}_done"
+
+    def _activity_groups_by_base(self) -> Dict[int, List[Tuple[str, object]]]:
+        """{id(base activity): [(Questionnaire key, instance), …]} for activities exported in
+        more than one Questionnaire: only those need a cross-Questionnaire record."""
+        by_base: Dict[int, List[Tuple[str, object]]] = {}
+        for act in self._activity_groups:
+            position = self._group_position(act.root)
+            if position is not None:
+                by_base.setdefault(id(act.base_instance), []).append((position[0], act))
+        by_base = {key: entries for key, entries in by_base.items() if len({s for s, _ in entries}) > 1}
+        # Two activities with one code would skip each other: record neither.
+        bases_by_code: Dict[str, List[int]] = {}
+        for key, entries in by_base.items():
+            code = self._activity_code(entries[0][1])
+            if code:
+                bases_by_code.setdefault(code, []).append(key)
+        for code, keys in bases_by_code.items():
+            if len(keys) > 1:
+                logger.error(
+                    "FHIRStrategy: %s activities have the code '%s'; none of them is recorded as a "
+                    "Procedure (they would skip each other)",
+                    len(keys),
+                    code,
+                )
+                for key in keys:
+                    del by_base[key]
+        return by_base
+
+    def _add_activity_done_items(self) -> None:
+        """Run an activity used by several Questionnaires once per encounter (§1b, §1c).
+
+        In each Questionnaire, per activity code and repeat slot:
+
+        - a hidden boolean ``<code>_done_prev`` item reads, at ``$populate``, whether a
+          completed Procedure with that code and repeat is already in this encounter
+          (``GetEncounterProcedureValue``); its negation is ANDed into the enableWhen of
+          every group of that activity here.
+        - a hidden boolean ``<code>_done`` item is true when one of those groups is shown
+          (its whole enableWhen), and a ``procedure`` extraction rule writes the Procedure
+          when it is true. A group skipped because it was already done writes nothing.
+        """
+        codesystems = getattr(self.project, "code_systems", None)
+        for entries in self._activity_groups_by_base().values():
+            slots: Dict[Tuple[str, int], List[object]] = {}
+            for segment, act in entries:
+                slots.setdefault((segment, self._activity_repeat(act)), []).append(act)
+            for (segment, repeat), acts in slots.items():
+                code = self._activity_code(acts[0])
+                if not code:
+                    logger.warning(
+                        "FHIRStrategy: activity %s has no name; it is not recorded as a Procedure",
+                        acts[0].get_name(),
+                    )
+                    continue
+                link_id = self._activity_done_link_id(code, repeat)
+                q = self.questionnaires[segment]
+                if self._find_item_by_link_id(q.get("item", []), link_id) is not None:
+                    continue
+                not_done_before = None
+                if any(other != segment and slot == repeat for other, slot in slots):
+                    not_done_before = self._add_activity_done_before_item(segment, code, repeat, link_id)
+                    for act in acts:
+                        self._and_group_enable_when(segment, act.root, not_done_before)
+                expression = self._activity_shown_fhirpath(acts)
+                if expression is None:
+                    continue
+                if not_done_before:
+                    expression = (
+                        not_done_before if expression == "true" else f"({expression}) and {not_done_before}"
+                    )
+                q.setdefault("item", []).append({
+                    "linkId": link_id,
+                    "text": link_id,
+                    "type": "boolean",
+                    "extension": [
+                        build_hidden_extension(),
+                        build_calculated_expression_fhirpath(expression),
+                    ],
+                })
+                label = getattr(getattr(acts[0], "root", None), "label", None)
+                # Not in the project terminology: same default system as any other concept
+                # (CodeSystems are written at load, so none is added here).
+                self.extraction_rules.setdefault(segment, []).append(
+                    build_procedure_extraction_rule(
+                        link_id,
+                        code,
+                        label if isinstance(label, str) else code,
+                        repeat,
+                        codesystems=codesystems,
+                        default_code_system=f"{self.base_url}/CodeSystem/tricc",
+                    )
+                )
+
+    def _add_activity_done_before_item(self, segment: str, code: str, repeat: int, done_link_id: str) -> str:
+        """Add the hidden ``<done>_prev`` populate item; return FHIRPath "not done before"."""
+        link_id = f"{done_link_id}_prev"
+        q = self.questionnaires[segment]
+        item = {
+            "linkId": link_id,
+            "text": link_id,
+            "type": "boolean",
+            "extension": [build_hidden_extension()],
+        }
+        q.setdefault("item", []).append(item)
+        safe_code = code.replace("'", "\\'")
+        repeat_arg = "null" if repeat == 1 else str(repeat)
+        self._attach_cql_initial_expression(
+            segment,
+            item,
+            f"ActivityDone_{link_id}",
+            f"Helper.GetEncounterProcedureValue('{safe_code}', {repeat_arg})",
+            source_type="boolean",
+        )
+        return (
+            f"(%resource.item.where(linkId='{link_id}').answer.where($this.exists()).value = true).not()"
+        )
+
+    def _and_group_enable_when(self, segment: str, root, term: str) -> None:
+        """AND ``term`` into the enableWhenExpression of ``root``'s group in ``segment``."""
+        group = self._find_item_by_link_id(
+            self.questionnaires[segment].get("item", []), get_export_name(root)
+        )
+        if group is None:
+            return
+        current = next(
+            (
+                (ext.get("valueExpression") or {}).get("expression")
+                for ext in group.get("extension") or []
+                if ext.get("url") == SDC_EXT_ENABLE_WHEN_EXPR
+            ),
+            None,
+        )
+        set_item_extension(
+            group, build_enable_when_expression(f"{current} and {term}" if current else term)
+        )
+
+    def _activity_shown_fhirpath(self, acts) -> Optional[str]:
+        """FHIRPath true when one of ``acts`` (same Questionnaire) is shown, or None when one
+        group relevance cannot be written in FHIRPath (no record rather than a wrong one)."""
+        terms = []
+        for act in acts:
+            relevance = self._activity_group_relevance.get(id(act))
+            if not self._is_effective_relevance(relevance):
+                return "true"
+            self._enter_serialisation_context(act.root)
+            try:
+                terms.append(self.convert_expression_to_fhirpath(relevance))
+            except NotImplementedError as exc:
+                logger.warning(
+                    "FHIRStrategy: activity %s is not recorded as a Procedure - %s", act.get_name(), exc
+                )
+                return None
+            finally:
+                self._leave_serialisation_context()
+        if "true" in terms:
+            return "true"
+        return terms[0] if len(terms) == 1 else " or ".join(f"({t})" for t in terms)
+
+    def _group_position(self, node) -> Optional[Tuple[str, int]]:
+        """(Questionnaire key, depth-first index) of ``node``'s item, or None if not exported."""
+        try:
+            link_id = get_export_name(node)
+        except Exception:
+            return None
+        for segment, q in (self.questionnaires or {}).items():
+            index = 0
+            stack = list(reversed(q.get("item") or []))
+            while stack:
+                item = stack.pop()
+                if item.get("linkId") == link_id:
+                    return segment, index
+                index += 1
+                stack.extend(reversed(item.get("item") or []))
+        return None
+
+    @staticmethod
     def _is_effective_relevance(rel) -> bool:
         if rel is None or rel is True or rel == "":
             return False
@@ -1164,6 +1417,8 @@ class FHIRStrategy(BaseOutPutStrategy):
         tricc_type = getattr(node, "tricc_type", None)
         act = getattr(node, "activity", None)
         act_rel = getattr(act, "relevance", None) if act is not None else None
+        if self._is_activity_group_node(node):
+            act_rel = self._activity_group_relevance.get(id(act), act_rel)
         if (
             isinstance(tricc_type, str)
             and tricc_type in ("start", "activity_start", "page")
@@ -2171,6 +2426,10 @@ class FHIRStrategy(BaseOutPutStrategy):
         else:
             raise NotImplementedError(f"This type of node {r.__class__} is not supported within an operation")
 
+    def retrieval_expression(self, retrieval) -> str:
+        """CQL of a project retrieval's Helper define (``retrieval_cql_expression``)."""
+        return retrieval_cql_expression(retrieval, type(self).__name__)
+
     def _populate_is_multiple(self, node) -> bool:
         """True when a populate node reads a select_multiple concept (§10)."""
         return populate_reads_multiple(node, self._select_multiple_concepts)
@@ -2253,6 +2512,9 @@ class FHIRStrategy(BaseOutPutStrategy):
             populate_helpers=cql_helper_populate_block(),
             value_helpers=cql_helper_value_block(),
         )
+        retrievals = retrieval_cql_defines(iter_retrievals(self.project), type(self).__name__)
+        if retrievals:
+            helper_cql += "\n" + retrievals
         self.cql_libraries[helper_key] = helper_cql
 
         # Create FHIR Library resource for helper

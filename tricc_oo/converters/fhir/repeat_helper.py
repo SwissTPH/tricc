@@ -299,4 +299,51 @@ define function GetHistoryCondition(code String):
 
 define function GetHistoryConditionValue(code String):
   GetHistoryCondition(code) is not null
+
+// ── Procedure family (#74; an activity done, feature/20261117-activity-procedure-dedup.md).
+// A Procedure counts only when completed and its outcome is not Unsuccessful
+// (SNOMED 385671000, matched by code across any system like every code here); a missing
+// outcome counts. The repeat slot uses the Observation repeat extension. ──
+
+define function ProcedureHasCode(P Procedure, conceptCode String):
+  exists(P.code.coding C where C.code = conceptCode)
+
+define function IsDoneProcedure(P Procedure):
+  P.status = 'completed'
+    and not exists(P.outcome.coding O where O.code = '385671000')
+
+define function ProcedureRepeatIndex(P Procedure):
+  singleton from (
+    P.extension E
+      where E.url = '{TRICC_OBSERVATION_REPEAT_EXT}'
+      return FHIRHelpers.ToInteger(E.value as FHIR.integer)
+  )
+
+define function GetProcedures(code String):
+  if encounterid is null then {{}} as List<Procedure>
+  else
+    [Procedure] P
+      where ProcedureHasCode(P, code)
+        and IsDoneProcedure(P)
+        and P.encounter.reference = 'Encounter/' + encounterid
+
+define function GetEncounterProcedureValue(code String, repeatIndex Integer):
+  exists(
+    (GetProcedures(code)) P
+      where Coalesce(ProcedureRepeatIndex(P), 1) = Coalesce(repeatIndex, 1)
+  )
+
+define function GetHistoryProcedure(code String):
+  First(
+    [Procedure] P
+      where ProcedureHasCode(P, code)
+        and IsDoneProcedure(P)
+      sort by (performed as FHIR.dateTime).value desc
+  )
+
+define function GetHistoryProcedureDate(code String):
+  date from Coalesce(
+    (GetHistoryProcedure(code).performed as FHIR.dateTime).value,
+    (GetHistoryProcedure(code).performed as FHIR.Period).start.value
+  )
 """

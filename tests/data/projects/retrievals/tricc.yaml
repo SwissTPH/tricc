@@ -1,0 +1,14 @@
+# Project retrieval dictionary (feature/20261109-project-retrievals.md) and populate `source` (#34).
+title: Retrievals
+input_strategy: YamlStrategy
+output_strategies:
+  - XLSFormCHTStrategy
+terminology:
+  - terminology/*.codesystem.json
+retrieve_code_system: http://example.org/fhir/CodeSystem/demo-retrieve
+interventions:
+  - id: visit
+    name: visit
+    title: Visit
+    activity:
+      - activities/visit.activity.yaml
