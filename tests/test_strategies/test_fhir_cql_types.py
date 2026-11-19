@@ -18,6 +18,7 @@ Run with:
 import unittest
 from unittest.mock import MagicMock
 
+from tricc_oo.converters.cql_library import FunctionSignature
 from tricc_oo.models.base import TriccOperation, TriccOperator, TriccReference, TriccStatic
 from tricc_oo.models.calculate import TriccNodeCalculate
 from tricc_oo.strategies.output.fhir_form import FHIRStrategy
@@ -28,6 +29,7 @@ def _make_strategy():
     project.start_pages = {}
     project.pages = {}
     project.code_systems = {}
+    project.function_signatures = {}
     return FHIRStrategy(project, "/tmp/fhir_cql_types_test_out")
 
 
@@ -57,6 +59,8 @@ class TestBooleanCalculate(unittest.TestCase):
         self.calc = _boolean_calculate_with_fallback("danger")
         # The calculate's item is still the default hidden string item
         self.strategy._find_item_anywhere = lambda link_id: {"linkId": link_id, "type": "string"}
+        self.strategy._current_segment = "main"
+        self.strategy.cql_defines = {"main": ["define Calc_danger: true"]}
 
     def test_coalesce_with_self_fallback_returns_boolean(self):
         self.assertTrue(self.strategy._expression_returns_boolean(self.calc))
@@ -69,6 +73,11 @@ class TestBooleanCalculate(unittest.TestCase):
     def test_no_toboolean_on_boolean_calc_define(self):
         operand = self.strategy._cql_boolean_operand(["Calc_danger"], [self.calc])
         self.assertEqual(operand, "Calc_danger")
+
+    def test_no_define_in_library_still_converted(self):
+        self.strategy.cql_defines = {"main": []}
+        operand = self.strategy._cql_boolean_operand(["Calc_danger"], [self.calc])
+        self.assertEqual(operand, "ToBoolean(Calc_danger)")
 
     def test_text_value_still_converted(self):
         text_calc = TriccNodeCalculate(id="label", name="label", export_name="label")
@@ -94,6 +103,27 @@ class TestNativeZscore(unittest.TestCase):
         self.zscore = TriccOperation(
             TriccOperator.NATIVE, ["Zscore", TriccStatic("wfa"), TriccReference("sex"), TriccReference("weight")]
         )
+
+    def test_undeclared_native_is_not_typed(self):
+        op = TriccOperation(TriccOperator.NATIVE, ["Foo", TriccStatic(1)])
+        self.assertIsNone(self.strategy._expression_fhir_number_type(op))
+        self.assertFalse(self.strategy._expression_returns_boolean(op))
+
+    def test_project_declared_native_types(self):
+        # define function IsPreterm(...) returns FHIR.boolean: external
+        self.strategy.project.function_signatures = {
+            "IsPreterm": FunctionSignature("IsPreterm", "boolean"),
+            "Score": FunctionSignature("Score", "integer"),
+        }
+        preterm = TriccOperation(TriccOperator.NATIVE, ["IsPreterm", TriccStatic(1)])
+        self.assertTrue(self.strategy._expression_returns_boolean(preterm))
+        self.assertIsNone(self.strategy._expression_fhir_number_type(preterm))
+        score = TriccOperation(TriccOperator.NATIVE, ["Score", TriccStatic(1)])
+        self.assertEqual(self.strategy._expression_fhir_number_type(score), "integer")
+
+    def test_project_declaration_overrides_builtin(self):
+        self.strategy.project.function_signatures = {"ZScore": FunctionSignature("ZScore", "integer")}
+        self.assertEqual(self.strategy._expression_fhir_number_type(self.zscore), "integer")
 
     def test_zscore_is_decimal(self):
         self.assertEqual(self.strategy._expression_fhir_number_type(self.zscore), "decimal")

@@ -182,11 +182,20 @@ class BaseInputStrategy:
 
     @staticmethod
     def load_libraries(project, sources) -> None:
-        """Parse tricc.yaml ``libraries`` (``[(path, cql text)]``) into calculates."""
-        from tricc_oo.converters.cql_library import build_library_calculates
+        """Parse tricc.yaml ``libraries`` (``[(path, cql text)]``) into calculates.
+
+        Function declarations go to ``project.function_signatures``.
+        """
+        from tricc_oo.converters.cql_library import build_library_calculates, parse_cql_library_functions
 
         seen = {}
+        declared = {}
         for path, text in sources:
+            for name, signature in parse_cql_library_functions(text, path).items():
+                if name in declared:
+                    raise ValueError(f"{path}: function {name!r} is already declared in {declared[name]}")
+                declared[name] = path
+                project.function_signatures[name] = signature
             for calc in build_library_calculates(text, path):
                 if calc.name in seen:
                     raise ValueError(f"{path}: define {calc.name!r} is already defined in {seen[calc.name]}")

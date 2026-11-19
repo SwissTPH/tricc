@@ -10,7 +10,13 @@ import os
 import pandas as pd
 import pytest
 
-from tricc_oo.converters.cql_library import build_library_calculates, parse_cql_library
+from tricc_oo.converters.cql_library import (
+    build_library_calculates,
+    function_signature,
+    native_function_type,
+    parse_cql_library,
+    parse_cql_library_functions,
+)
 from tricc_oo.models.project_config import TriccProjectConfig
 from tricc_oo.models.tricc import TriccIntervention
 from tricc_oo.runner import run_project_build
@@ -115,7 +121,7 @@ def test_parse_library_accepts_quoted_identifiers():
 @pytest.mark.parametrize(
     "text, message",
     [
-        ("define function Double(x Integer): x * 2", "functions are not supported"),
+        ("define function Double(x Integer): x * 2", "functions with a body are not supported"),
         ('define "Has fever": temperature > 37.5', "plain identifier"),
         ("define a: 1\ndefine a: 2", "appears twice"),
         ("define a:\n", "no expression"),
@@ -124,6 +130,79 @@ def test_parse_library_accepts_quoted_identifiers():
 def test_parse_library_rejects_unsupported_defines(text, message):
     with pytest.raises(ValueError, match=message):
         parse_cql_library(text, "bad.cql")
+
+
+EXTERNALS = """
+library Ext version '1.0'
+/*
+@description: Is the child born before 37 weeks
+  of gestation
+@retrieve: false
+*/
+define function IsPreterm(weeks Integer) returns FHIR.boolean: external
+
+// a line comment is not a tag block
+define function Score(a Decimal, b List<Decimal>) returns System.Integer : external
+
+/* @retrieve: true */
+define public function LastWeight() returns Decimal: external
+/* @retrieve: true */
+define is_older: age > 5
+"""
+
+
+def test_functions_are_signatures_not_calculates():
+    functions = parse_cql_library_functions(EXTERNALS)
+    assert list(functions) == ["IsPreterm", "Score", "LastWeight"]
+    preterm = functions["IsPreterm"]
+    assert preterm.return_type == "boolean"
+    assert preterm.arguments == (("weeks", "Integer"),)
+    assert preterm.tags == {"description": "Is the child born before 37 weeks of gestation", "retrieve": "false"}
+    assert preterm.external and not preterm.retrieve
+    assert functions["Score"].return_type == "integer"
+    assert functions["Score"].arguments == (("a", "Decimal"), ("b", "List<Decimal>"))
+    assert functions["Score"].tags == {}
+    assert functions["LastWeight"].retrieve
+    assert parse_cql_library(EXTERNALS) == [("is_older", "age > 5")]
+
+
+@pytest.mark.parametrize(
+    "text, message",
+    [
+        ("define function F(x Integer): external", "must declare its type"),
+        ("define function F(x Integer) returns Tuple: external", "returns 'Tuple'"),
+        (
+            "define function F() returns Boolean: external\ndefine function F() returns Boolean: external",
+            "appears twice",
+        ),
+        ("define function F(x Integer) returns Integer: x * 2", "body are not supported yet"),
+        ("/* @retrieve: maybe */\ndefine function F() returns Boolean: external", "must be true or false"),
+        ("/* @retrieve: true\n@retrieve: false */\ndefine function F() returns Boolean: external", "twice"),
+        ("define function F(x) returns Boolean: external", "needs a name and a type"),
+    ],
+)
+def test_function_errors(text, message):
+    with pytest.raises(ValueError, match=message):
+        parse_cql_library_functions(text, "bad.cql")
+
+
+def test_libraries_fill_project_function_signatures():
+    project = TriccIntervention()
+    BaseInputStrategy.load_libraries(project, [("ext.cql", EXTERNALS)])
+    assert project.function_signatures["LastWeight"].retrieve
+    assert [c.name for c in project.library_calculates] == ["is_older"]
+    # case-insensitive, project first, then TRICC's own zscore / izscore
+    assert function_signature(project, "ispreterm").return_type == "boolean"
+    assert native_function_type(project, "ispreterm") == "boolean"
+    assert native_function_type(TriccIntervention(), "Zscore") == "decimal"
+    assert native_function_type(TriccIntervention(), "Foo") is None
+
+
+def test_same_function_in_two_libraries_is_rejected():
+    project = TriccIntervention()
+    ext = "define function F() returns Boolean: external"
+    with pytest.raises(ValueError, match="already declared"):
+        BaseInputStrategy.load_libraries(project, [("a.cql", ext), ("b.cql", ext)])
 
 
 def test_library_defines_become_calculates():

@@ -50,7 +50,11 @@ parameters:
 # CQL libraries: every `define name: <expression>` becomes a calculate that any
 # activity (draw.io or YAML) can reference by name, as if it were drawn free-floating
 # on the main page. library / using / include / context lines are ignored; functions
-# are not supported; names must be plain identifiers.
+# with a body are not supported yet; names must be plain identifiers. An `external`
+# function declares the FHIR type of a function called as written; CQL documentation
+# tags before it add data (@retrieve: true = reads recorded data, never a constant), e.g.
+#   /* @retrieve: false */
+#   define function Zscore(chart String, sex String, value Decimal) returns FHIR.decimal: external
 # libraries:
 #   - cql/*.cql
 

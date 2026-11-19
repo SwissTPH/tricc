@@ -49,6 +49,7 @@ from tricc_oo.converters.fhir.cql_value import (
     wrap_cql_for_item_type,
 )
 from tricc_oo.converters.retrieval import iter_retrievals
+from tricc_oo.converters.cql_library import native_function_type
 from tricc_oo.converters.fhir.populate_helper import (
     ENCOUNTER_CONTEXT,
     HISTORY_CONTEXT,
@@ -177,20 +178,11 @@ _ANSWER_LINK_ID_IN_EXPRESSION = re.compile(r"""linkId\s*=\s*['"]([^'"]+)['"]\s*\
 _NUMERIC_LITERAL = re.compile(r"^-?\d+(\.\d+)?$")
 # An answer path not already followed by the `.where($this.exists())` wrapper.
 _NOT_WRAPPED_YET = r"(?!\.where\(\$this\.exists\(\)\))"
-# Bare reference to a calculate's own CQL define (see _cql_node_reference).
-_CALC_DEFINE_REFERENCE = re.compile(r"^Calc_\w+$")
-# Calls the CQL grammar keeps as `native` (xpath_to_cql writes `Zscore`, FUNCTION_MAP
-# knows `ZScore`): numeric, and not expressible in FHIRPath or CQL here.
-_NATIVE_ZSCORE_FUNCTIONS = frozenset({"zscore", "izscore"})
+# `native` calls with no FHIRPath or CQL rendering here (xpath_to_cql writes `Zscore`,
+# FUNCTION_MAP knows `ZScore`): passed through, they became the text 'Zscore'.
+_NATIVE_UNSUPPORTED_FUNCTIONS = frozenset({"zscore", "izscore"})
 
 
-def _native_function_name(expr) -> Optional[str]:
-    """Lower-cased function name of a ``native`` operation, else None."""
-    if isinstance(expr, TriccOperation) and expr.operator == TriccOperator.NATIVE and expr.reference:
-        name = expr.reference[0]
-        if isinstance(name, str):
-            return name.lower()
-    return None
 # Choice EQUAL wraps as ``…answer.where($this.exists()).value.code = 'x'``.
 # HAPI does not resolve that chain; membership ``answer.where($this.value.code = 'x')`` does.
 # See fix/20260824-fhirpath-choice-equality.md.
@@ -2473,13 +2465,10 @@ class FHIRStrategy(BaseOutPutStrategy):
         """
         from tricc_oo.converters.fhir.concept_mapper import resolve_concept_type
 
-        name = get_export_name(node)
-        calc_name = f"Calc_{name}"
-        segment = getattr(self, "_current_segment", None)
-        if segment and any(
-            statement.startswith(f"define {calc_name}:") for statement in self.cql_defines.get(segment, [])
-        ):
+        calc_name = self._calc_define_name(node)
+        if calc_name:
             return calc_name
+        name = get_export_name(node)
         concept_type = resolve_concept_type(node, getattr(self.project, "code_systems", None))
         resource, _, _ = get_fhir_resource(concept_type, getattr(node, "tricc_type", None))
         if resource == "Condition":
@@ -2488,6 +2477,16 @@ class FHIRStrategy(BaseOutPutStrategy):
         return wrap_cql_for_item_type(
             get_observation_cql_accessor_for_node(node), self._cql_reference_item_type(node)
         )
+
+    def _calc_define_name(self, node) -> Optional[str]:
+        """Name of the node's own ``Calc_`` define when this library already has it, else None."""
+        calc_name = f"Calc_{get_export_name(node)}"
+        segment = getattr(self, "_current_segment", None)
+        if segment and any(
+            statement.startswith(f"define {calc_name}:") for statement in self.cql_defines.get(segment, [])
+        ):
+            return calc_name
+        return None
 
     def _cql_reference_item_type(self, node) -> str:
         """Answer type a referenced node's recorded value is read as in CQL."""
@@ -3089,8 +3088,9 @@ class FHIRStrategy(BaseOutPutStrategy):
             TriccOperator.IF,
         ):
             return self._conditional_fhir_number_type(expr)
-        if _native_function_name(expr) in _NATIVE_ZSCORE_FUNCTIONS:
-            return "decimal"
+        native_type = self._native_return_type(expr)
+        if native_type in ("integer", "decimal"):
+            return native_type
         if not isinstance(expr, TriccOperation) or expr.operator not in RETURNS_NUMBER:
             return None
         if expr.operator in _RETURNS_INTEGER:
@@ -3424,11 +3424,19 @@ class FHIRStrategy(BaseOutPutStrategy):
             return f"{answers}.value.code"
         return f"{answer_expr}.value.code" if answer_expr else answer_expr
 
+    def _native_return_type(self, expr) -> Optional[str]:
+        """FHIR type a ``native`` call returns (a project ``external`` declaration), else None."""
+        if isinstance(expr, TriccOperation) and expr.operator == TriccOperator.NATIVE and expr.reference:
+            return native_function_type(self.project, expr.reference[0])
+        return None
+
     def _operation_returns_boolean(self, expr) -> bool:
         """True when ``expr`` is a boolean TriccOperation (walks parenthesis)."""
         if isinstance(expr, TriccOperation):
             if expr.operator == TriccOperator.PARENTHESIS and expr.reference:
                 return self._operation_returns_boolean(expr.reference[0])
+            if self._native_return_type(expr) == "boolean":
+                return True
             return expr.operator in RETURNS_BOOLEAN or expr.operator in (
                 TriccOperator.ISNULL,
                 TriccOperator.CAST_BOOLEAN,
@@ -3454,7 +3462,8 @@ class FHIRStrategy(BaseOutPutStrategy):
             and not isinstance(operand, TriccNodePopulate)
             and self._cql_reference_item_type(operand) == "string"
         ):
-            if _CALC_DEFINE_REFERENCE.match(str(expr).strip()) and self._expression_returns_boolean(operand):
+            # The operand is read through its own define (see _cql_node_reference)
+            if self._calc_define_name(operand) and self._expression_returns_boolean(operand):
                 return expr
             return f"ToBoolean({expr})"
         return expr
@@ -3710,7 +3719,7 @@ class FHIRStrategy(BaseOutPutStrategy):
     # ============================================================
     def tricc_operation_native(self, ref_expressions, original_references=None):
         name = (original_references or [None])[0]
-        if isinstance(name, str) and name.lower() in _NATIVE_ZSCORE_FUNCTIONS:
+        if isinstance(name, str) and name.lower() in _NATIVE_UNSUPPORTED_FUNCTIONS:
             # Passed through, this was the text 'Zscore' as the item's value.
             raise NotImplementedError(f"{name} is not supported yet")
         # Raw expression passthrough
