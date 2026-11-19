@@ -263,6 +263,24 @@ def drawio_add_calculate(diagram, call: CallSite, name: str, expression: str, la
     geometry.attrib["as"] = "geometry"
 
 
+def drawio_calculates(diagram) -> Dict[str, Optional[str]]:
+    """The calculates of a rendered diagram, ``{name: expression}`` (RFC #86).
+
+    A name given to two shapes maps to None: its value depends on the order they run in.
+    """
+    found: Dict[str, Optional[str]] = {}
+    for shape in _shapes(diagram):
+        name = shape.attrib.get("name")
+        if not name:
+            continue
+        expression = shape.attrib.get("reference") or shape.attrib.get("expression")
+        if shape.attrib.get(type_name) != "calculate" or not expression or name in found:
+            found[name] = None
+        else:
+            found[name] = expression
+    return found
+
+
 def _context(element, key: str, edge_ids) -> Optional[str]:
     """How a placeholder in ``element``'s attribute ``key`` renders.
 

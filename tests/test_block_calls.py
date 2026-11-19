@@ -372,9 +372,23 @@ class TestDrawio:
         text = text.replace('param.site="rectal"', 'param.site="rectal" param.age="{{lab_available}}"')
         with pytest.raises(TriccParamError):  # a boolean passed to a number
             drawio_survey(tmp_path, text)
-        text = text.replace('param.age="{{lab_available}}"', 'param.age="Round(1.4)"')
+        # reads a node of the page: dynamic, one calculate at the use
+        text = text.replace('param.age="{{lab_available}}"', 'param.age="&quot;lab_note&quot; + 1"')
         rows = drawio_survey(tmp_path / "ok", text)
-        assert len([n for n in rows if n.startswith("arg_age_")]) == 2
+        assert len([n for n in rows if n.startswith("arg_age_")]) == 1  # Round(40.2) is evaluated (RFC #86)
+
+    def test_calculates(self):
+        from lxml import etree
+
+        from tricc_oo.converters.drawio_params import drawio_calculates
+
+        diagram = etree.fromstring(
+            '<root><object odk_type="calculate" name="a" reference="37 + 1" id="1"/>'
+            '<object odk_type="decimal" name="w" id="2"/>'
+            '<object odk_type="calculate" name="b" reference="1" id="3"/>'
+            '<object odk_type="calculate" name="b" reference="2" id="4"/></root>'
+        )
+        assert drawio_calculates(diagram) == {"a": "37 + 1", "w": None, "b": None}
 
     def test_output_flag(self, tmp_path):
         from tests.test_block_params import DRAWIO, drawio_survey
@@ -399,3 +413,119 @@ class TestDrawio:
         )]
         assert _outputs(shapes, "odk_type") == ["temp_{{site}}"]
         assert _outputs(shapes[1:], "odk_type") is None  # none marked: all are outputs
+
+
+# ---------------------------------------------------------------------------
+# Constant arguments evaluated at build time (RFC #86)
+# ---------------------------------------------------------------------------
+
+
+class TestConstantArguments:
+    def no_dynamic(self, *args):
+        pytest.fail("a constant argument got a calculate")
+
+    def test_placeholder_arithmetic_is_a_literal(self):
+        caller = {"t": (spec("t", "number"), 38)}
+        env = bind({"n": spec("n", "number")}, {"n": "{{t}} + 1"}, caller, "use", add_dynamic=self.no_dynamic)
+        assert env["n"][1] == 39
+
+    def test_constant_calculate_of_the_caller(self):
+        calcs = {"base": "37 + 1", "w": None}
+        env = bind({"n": spec("n", "number")}, {"n": '"base" + 0.5'}, {}, "use",
+                   add_dynamic=self.no_dynamic, resolve=calcs.get)
+        assert env["n"][1] == 38.5
+        env = bind({"n": spec("n", "number")}, {"n": '"w" + 0.5'}, {}, "use",
+                   add_dynamic=lambda *a: "arg_n_x", resolve=calcs.get)
+        assert env["n"][1] == {DYNAMIC: "arg_n_x"}
+
+    def test_accepted_where_a_fixed_value_is_needed(self):
+        caller = {"lab": (spec("lab", "boolean"), True)}
+        site = spec("site", "choice", options=["axillary", "rectal"])
+        env = bind({"site": site}, {"site": "if {{lab}} then 'axillary' else 'rectal'"}, caller, "use",
+                   static_only={"site"}, add_dynamic=self.no_dynamic)
+        assert env["site"][1] == "axillary"
+
+    def test_type_still_checked(self):
+        with pytest.raises(TriccParamError) as err:
+            bind({"n": spec("n", "number")}, {"n": "1 < 2"}, {}, "use", add_dynamic=self.no_dynamic)
+        assert err.value.code == E_PARAM_TYPE
+
+    def test_null_stays_dynamic(self):
+        env = bind({"n": spec("n", "number", default=1)}, {"n": "1 / 0"}, {}, "use", add_dynamic=lambda *a: "c")
+        assert env["n"][1] == {DYNAMIC: "c"}
+
+    def test_unsupported_operator_warns_and_stays_dynamic(self, caplog):
+        env = bind({"n": spec("n", "number")}, {"n": "case when 1 > 0 then 38 else 37 end"}, {}, "a > b",
+                   add_dynamic=lambda *a: "c")
+        assert env["n"][1] == {DYNAMIC: "c"}
+        assert "W_ARG_EVAL" in caplog.text and "a > b" in caplog.text and "case" in caplog.text
+
+    def test_unsupported_where_a_fixed_value_is_needed(self):
+        with pytest.raises(TriccParamError) as err:
+            bind({"s": spec("s", "string")}, {"s": "case when 1 > 0 then 'a' else 'b' end"}, {}, "use",
+                 static_only={"s"}, add_dynamic=lambda *a: "c")
+        assert err.value.code == E_ARG_DYNAMIC_STATIC and "cannot evaluate case" in str(err.value)
+
+    @staticmethod
+    def declared(retrieve):
+        from tricc_oo.converters.cql_library import FunctionSignature
+
+        found = {} if retrieve == "undeclared" else {
+            "bmi": FunctionSignature("Bmi", "decimal", tags={} if retrieve is None else {"retrieve": retrieve})}
+        return lambda name: found.get(name.lower())
+
+    # @retrieve: false is static, computed by the form; true or no tag is data: no warning either way
+    @pytest.mark.parametrize("retrieve,warned", [("true", False), ("false", False), (None, False),
+                                                 ("undeclared", True)])
+    def test_function_retrieve_tag(self, caplog, retrieve, warned):
+        env = bind({"n": spec("n", "number")}, {"n": "Bmi(70, 1.7)"}, {}, "use",
+                   add_dynamic=lambda *a: "c", functions=self.declared(retrieve))
+        assert env["n"][1] == {DYNAMIC: "c"}  # the build cannot run Bmi: the form computes it
+        assert ("W_ARG_EVAL" in caplog.text) is warned
+
+    def test_static_function_where_a_fixed_value_is_needed(self):
+        with pytest.raises(TriccParamError) as err:
+            bind({"s": spec("s", "string")}, {"s": "Bmi(70, 1.7)"}, {}, "use", static_only={"s"},
+                 add_dynamic=lambda *a: "c", functions=self.declared("false"))
+        assert err.value.code == E_ARG_DYNAMIC_STATIC and "only the form can compute it" in str(err.value)
+
+    def test_intervention_argument(self):
+        env = bind({"p": spec("p", "number")}, {"p": "37 + 1"}, {}, "intervention")
+        assert env["p"][1] == 38
+
+    def test_project(self, tmp_path):
+        root = copy_fixture(tmp_path)
+
+        def change(d):
+            d["nodes"].insert(1, {"id": "t-c", "type": "calculate", "name": "base_t", "calculate": "37 + 1"})
+            node(d, "t-ax")["args"]["site"] = "if {{lab_available}} then 'axillary' else 'rectal'"
+            node(d, "t-re")["args"]["threshold"] = '"base_t" + 0.5'
+
+        edit_yaml(root / "activities" / "triage.activity.yaml", change)
+        edit_yaml(root / "tricc.yaml", lambda d: d["interventions"][0]["args"].update(lab_available="1 < 2"))
+        rows = survey(root)
+        assert not [n for n in rows if n.startswith("arg_")]
+        assert "temp_axillary" in rows and "temp_rectal" in rows  # a folded value names a node
+        assert "38.5" in rows["fever_rectal"]["label"]
+
+    def test_project_functions(self, tmp_path, caplog):
+        root = copy_fixture(tmp_path)
+        (root / "cql").mkdir()
+        (root / "cql" / "functions.cql").write_text(
+            "/*\n@retrieve: false\n*/\n"
+            "define function Bmi(weight Decimal, height Decimal) returns FHIR.decimal: external\n"
+            "/*\n@retrieve: true\n*/\n"
+            "define function LastWeight() returns FHIR.decimal: external\n",
+            encoding="utf-8",
+        )
+        edit_yaml(root / "tricc.yaml", lambda d: d.update(libraries=["cql/*"]))
+        edit_yaml(root / "activities" / "triage.activity.yaml", lambda d: (
+            node(d, "t-ax")["args"].update(threshold="LastWeight() / 2"),
+            node(d, "t-re")["args"].update(threshold="Bmi(70, 1.7) + Undeclared()"),
+        ))
+        rows = survey(root)
+        args = [n for n in rows if n.startswith("arg_threshold_")]
+        assert len(args) == 2 and any("Bmi(70" in rows[n]["calculation"] for n in args)
+        warnings = [r.getMessage() for r in caplog.records if "W_ARG_EVAL" in r.getMessage()]
+        # Bmi (@retrieve: false) and LastWeight (true) are declared; only Undeclared warns
+        assert len(warnings) == 1 and "t-re" in warnings[0] and "Undeclared" in warnings[0]

@@ -491,6 +491,22 @@ def _yaml_add_calculate(rendered: Dict[str, Any], call: CallSite, name: str, exp
     })
 
 
+def _yaml_calculates(rendered: Dict[str, Any]) -> Dict[str, Optional[str]]:
+    """The calculates of a rendered YAML page, ``{name: expression}`` (RFC #86).
+
+    A name given to two nodes maps to None: its value depends on the order they run in.
+    """
+    found: Dict[str, Optional[str]] = {}
+    for node in rendered.get("nodes") or []:
+        name = node.get("name")
+        if not name:
+            continue
+        expression = node.get("calculate")
+        ok = node.get("type") == "calculate" and isinstance(expression, str) and name not in found
+        found[name] = expression if ok else None
+    return found
+
+
 def _render_field(key: str, value: Any, env, where: str) -> Any:
     if key in EXPRESSION_FIELDS:
         context = EXPRESSION
@@ -669,7 +685,8 @@ class YamlStrategy(BaseInputStrategy):
         def build(template: Template, rendered: Dict[str, Any]) -> None:
             self._register(self._build_activity(YamlActivity(**rendered), project), project)
 
-        ParamBuild(templates, resolve, project, _yaml_render, build, _yaml_add_calculate).run()
+        ParamBuild(templates, resolve, project, _yaml_render, build, _yaml_add_calculate,
+                   _yaml_calculates).run()
 
     def finalize(self, project: TriccIntervention, media_path: str) -> Optional[TriccIntervention]:
         # Project CodeSystems (tricc.yaml ``terminology``) are exported like drawio's;
