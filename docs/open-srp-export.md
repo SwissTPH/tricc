@@ -427,6 +427,14 @@ In-form calculation (e.g. BMI from weight + height both answered in the same Que
   exists. Same for `ROUND(a + b)`, `ABS(a - b)` and the `exists()` / `empty()`
   tests. See `fix/20260902-fhirpath-suffix-precedence.md`.
 
+### Content version
+
+`GetContentVersion()` is defined in the Helper library as the build version
+(`%Y%m%d%H%M`, the same value the export logs). A calculate that calls it becomes a hidden
+`string` item with a CQL `initialExpression`; in FHIRPath it is the version literal. `${version}`
+alone is an XLSForm-only row and does not resolve here
+(`fix/20261116-content-version-reference.md`).
+
 ### Dynamic display text (`${REF}` injection)
 
 Text authored with `${field}` tokens — note labels, question labels, `hint` and `help`
