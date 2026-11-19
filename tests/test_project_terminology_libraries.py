@@ -162,6 +162,7 @@ def test_functions_are_signatures_not_calculates():
     assert functions["Score"].return_type == "integer"
     assert functions["Score"].arguments == (("a", "Decimal"), ("b", "List<Decimal>"))
     assert functions["Score"].tags == {}
+    assert functions["Score"].retrieve  # no tag: assumed to read data
     assert functions["LastWeight"].retrieve
     assert parse_cql_library(EXTERNALS) == [("is_older", "age > 5")]
 

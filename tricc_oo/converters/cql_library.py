@@ -21,9 +21,9 @@ so outputs can type a call TRICC passes through as written (a ``native`` operati
 * The ``returns`` type is a FHIR data type (``FHIR.decimal``) or its CQL System name
   (``Decimal``, ``System.Decimal``); see :data:`CQL_TO_FHIR_TYPE`.
 * CQL documentation tags (``@name: value`` in the ``/* */`` comment just before the
-  definition) are kept as written. ``@retrieve: true`` marks a function whose value reads
-  recorded data, so it is never folded as a constant; the default ``false`` means its value
-  depends only on its arguments.
+  definition) are kept as written. Only ``@retrieve: false`` marks a function whose value
+  depends only on its arguments (foldable as a constant). Without the tag, or with
+  ``@retrieve: true``, it is assumed to read recorded data and is never folded.
 """
 
 from __future__ import annotations
@@ -98,8 +98,8 @@ class FunctionSignature:
 
     @property
     def retrieve(self) -> bool:
-        """True when the value reads recorded data (never a constant)."""
-        return self.tags.get("retrieve", "false").lower() == "true"
+        """True unless ``@retrieve: false``: the value may read recorded data (never a constant)."""
+        return self.tags.get("retrieve", "true").lower() != "false"
 
 
 def _blank_comments(text: str) -> str:

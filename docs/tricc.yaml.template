@@ -52,7 +52,8 @@ parameters:
 # on the main page. library / using / include / context lines are ignored; functions
 # with a body are not supported yet; names must be plain identifiers. An `external`
 # function declares the FHIR type of a function called as written; CQL documentation
-# tags before it add data (@retrieve: true = reads recorded data, never a constant), e.g.
+# tags before it add data (only @retrieve: false = depends on its arguments alone, foldable
+# as a constant; without it the function is assumed to read recorded data), e.g.
 #   /* @retrieve: false */
 #   define function Zscore(chart String, sex String, value Decimal) returns FHIR.decimal: external
 # libraries:

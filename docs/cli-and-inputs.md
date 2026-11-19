@@ -116,8 +116,9 @@ interventions:
     name (`Decimal`).
   - `external` means a declaration only, never written into generated CQL. Functions with
     a body (real CQL) are not supported yet.
-  - `@retrieve: true` marks a value read from recorded data, never folded as a constant;
-    the default `false` means it depends only on its arguments.
+  - Only `@retrieve: false` marks a value that depends only on its arguments, so it can
+    be folded as a constant. Without the tag (or with `@retrieve: true`) the function is
+    assumed to read recorded data and is never folded.
   - Names match case-insensitively; `zscore` / `izscore` are `decimal` unless declared.
 - **`retrieve_code_system`** names the retrieval dictionary (CodeSystem url, id or
   name): data read before the consultation, referenced in expressions as `"#name"`.

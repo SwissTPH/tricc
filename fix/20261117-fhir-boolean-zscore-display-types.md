@@ -69,10 +69,10 @@ Valid status values: `Draft` → `Approved` → `Implemented` → `Superseded`.
   as `(name, type as written)`; `tags` as written; `external`) in
   `TriccIntervention.function_signatures`. `external` (CQL: implemented elsewhere) is a
   declaration only and is never written into a generated library; a function with a body
-  (real CQL to copy into the generated library) is rejected for now. `@retrieve: true`
-  (`FunctionSignature.retrieve`) marks a value read from recorded data, never a constant;
-  the default `false` means it depends only on its arguments (for the constant evaluator,
-  #86). `native_function_type` looks a name up there (case-insensitive), then in
+  (real CQL to copy into the generated library) is rejected for now. Only `@retrieve: false`
+  makes `FunctionSignature.retrieve` false: the value depends only on its arguments, so the
+  constant evaluator (#86) may fold it. Without the tag, or with `@retrieve: true`, the
+  function is assumed to read recorded data. `native_function_type` looks a name up there (case-insensitive), then in
   `BUILTIN_FUNCTION_TYPES` (`zscore` / `izscore`: `decimal`, since `xpath_to_cql` writes
   them). The native passthrough raises `NotImplementedError` for `zscore` /
   `izscore` like `ZSCORE` does (no `'Zscore'` text; the calculate gets no expression until
@@ -120,3 +120,5 @@ Valid status values: `Draft` → `Approved` → `Implemented` → `Superseded`.
 - 2026-11-19: extra data about a function goes in CQL documentation tags (`@retrieve: true`
   for a value read from recorded data); `external` marks a declaration that is not CQL to
   write out, a body marks real CQL (supported later). Shared with #86 (@delcroip).
+- 2026-11-19: a function without `@retrieve` is dynamic (assumed to read data); only an
+  explicit `@retrieve: false` makes it static (#86 / #87, @delcroip).
