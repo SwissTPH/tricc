@@ -7,11 +7,13 @@ from tricc_oo.converters.tricc_to_xls_form import (
 )
 from tricc_oo.visitors.text_injection import serialize_injection_for_js_text
 from tricc_oo.models.lang import SingletonLangClass
+from tricc_oo.serializers.xls_form_translations import MORE_INFO_TEXT_USES, remember_row
 from tricc_oo.converters.utils import clean_name, remove_html, remove_html_full, generate_id
 from tricc_oo.models.base import (
     TriccOperator,
     TriccOperation, TriccStatic, TriccReference, and_join, TriccNodeType
 )
+from tricc_oo.models.message import TriccMessage
 from tricc_oo.models.calculate import (
     TriccNodeDisplayCalculateBase,
     TriccNodeCalculate
@@ -35,6 +37,8 @@ from tricc_oo.visitors.tricc import (
     get_prev_instance_skip_expression,
     get_process_skip_expression,
     process_operation_reference,
+    serialize_display_relevance,
+    is_display_skip_widget,
     NO_LABEL,
 )
 
@@ -44,11 +48,39 @@ langs = SingletonLangClass()
 TRICC_CALC_EXPRESSION = "${{{0}}}>0"
 
 
+def _printed_relevance_string(strategy, node, processed_nodes, process=None, **kwargs):
+    """Survey relevant for a capture/note: arrival NAND already-captured."""
+    if process is not None and "process" not in kwargs:
+        kwargs = {**kwargs, "process": process}
+    if not is_display_skip_widget(node):
+        return get_xfrom_trad(strategy, node, "relevance", SURVEY_MAP)
+    expression = serialize_display_relevance(node, processed_nodes)
+    if expression is None or expression is True or expression == TriccStatic(True):
+        return get_xfrom_trad(strategy, node, "relevance", SURVEY_MAP)
+    resolved = process_operation_reference(
+        expression,
+        node,
+        processed_nodes=processed_nodes,
+        calculates=kwargs.get("calculates", None),
+        used_calculates=kwargs.get("used_calculates", None),
+        replace_reference=True,
+        warn=False,
+        codesystems=kwargs.get("codesystems", None),
+    ) or expression
+    if isinstance(resolved, (TriccOperation, TriccStatic, TriccReference)):
+        return strategy.get_tricc_operation_expression(resolved)
+    return get_xfrom_trad(strategy, node, "relevance", SURVEY_MAP)
+
+
 def extract_help_title(help_message):
     """
     Extract title from help message if it starts with [title].
     Returns (title, stripped_help_message) or (None, help_message)
     """
+    if help_message is None:
+        return None, None
+    if not isinstance(help_message, str):
+        help_message = serialize_injection_for_js_text(help_message)
     if help_message and isinstance(help_message, str) and remove_html_full(help_message).startswith('**[') or remove_html_full(help_message).startswith('['):
         if remove_html_full(help_message).startswith('**['):
             end = remove_html_full(help_message).find(']**')
@@ -335,16 +367,15 @@ def get_xfrom_trad(strategy, node, column, mapping, clean_html=False):
         and node.expression.get_datatype() in ("number", "boolean")
     ):
         value = f"number({value})" if str(value) not in ["0", "1"] else value
-    # ODK/CHT display columns: CONCATENATE injection → "text ${export} text" (not concat())
-    if new_column in TRAD_MAP and isinstance(
-        value, (TriccOperation, TriccReference, TriccStatic)
-    ):
+    # ODK/CHT display columns: TriccMessage / leftover CONCATENATE → "text ${export} text"
+    _display_types = (TriccOperation, TriccReference, TriccStatic, TriccMessage)
+    if new_column in TRAD_MAP and isinstance(value, _display_types):
         value = serialize_injection_for_js_text(value, get_export_name)
     elif new_column in TRAD_MAP and isinstance(value, dict):
         value = {
             k: (
                 serialize_injection_for_js_text(v, get_export_name)
-                if isinstance(v, (TriccOperation, TriccReference, TriccStatic))
+                if isinstance(v, _display_types)
                 else v
             )
             for k, v in value.items()
@@ -577,8 +608,10 @@ def get_more_info_choice(strategy, counter,title=None):
     return values
 
 
-def inject_more_info(strategy, base_name, relevance, message, df_survey, df_choice):
+def inject_more_info(strategy, base_name, relevance, message, df_survey, df_choice, node=None):
     title, stripped_message = extract_help_title(message)
+    if node is not None:
+        remember_row(strategy, ("survey", base_name), node, MORE_INFO_TEXT_USES)
     counter = len(df_choice[(df_choice["list_name"].str.startswith("more_info"))])
     df_survey.loc[len(df_survey)] = get_more_info_select(strategy, base_name, relevance, counter)
     df_survey.loc[len(df_survey)] = get_more_info_message(strategy, base_name, stripped_message)
@@ -614,10 +647,11 @@ def generate_xls_form_export(
                 inject_more_info(
                     strategy,
                     base_name,
-                    get_xfrom_trad(strategy, node, "relevance", SURVEY_MAP),
+                    _printed_relevance_string(strategy, node, processed_nodes, **kwargs),
                     node.help,
                     df_survey,
-                    df_choice)
+                    df_choice,
+                    node=node)
             add_calculate(calculates, node)
             if node.group != cur_group and not isinstance(node, TriccNodeSelectOption):
                 return False
@@ -644,11 +678,18 @@ def generate_xls_form_export(
                         == 0
                     ):
                         df_choice.loc[len(df_choice)] = values
+                        remember_row(
+                            strategy,
+                            ("choices", node.list_name, BOOLEAN_MAP.get(str(node.name), node.name)),
+                            node,
+                        )
                 elif isinstance(node, TriccNodeMoreInfo):
                     inject_more_info(
                         strategy,
                         get_export_name(node),
-                        get_xfrom_trad(strategy, node.parent, "relevance", SURVEY_MAP),
+                        _printed_relevance_string(
+                            strategy, node.parent, processed_nodes, **kwargs
+                        ),
                         node.label,
                         df_survey,
                         df_choice
@@ -675,9 +716,16 @@ def generate_xls_form_export(
                         for column in SURVEY_MAP:
                             if column == 'trigger' and isinstance(node.expression, TriccOperation):
                                 values.append(strategy._get_trigger(node.expression) or "")
+                            elif column == "relevance":
+                                values.append(
+                                    _printed_relevance_string(
+                                        strategy, node, processed_nodes, **kwargs
+                                    )
+                                )
                             else:
                                 values.append(get_xfrom_trad(strategy, node, column, SURVEY_MAP))
                         df_survey.loc[len(df_survey)] = values
+                        remember_row(strategy, ("survey", get_export_name(node)), node)
                     else:
                         logger.warning("node {} have an unmapped type {}".format(node.get_name(), node.tricc_type))
                     
@@ -688,10 +736,11 @@ def generate_xls_form_export(
                 inject_more_info(
                     strategy,
                     base_name,
-                    get_xfrom_trad(strategy, node, "relevance", SURVEY_MAP),
+                    _printed_relevance_string(strategy, node, processed_nodes, **kwargs),
                 node.help,
                     df_survey,
-                    df_choice
+                    df_choice,
+                    node=node,
                 )
             # continue walk °
             return True

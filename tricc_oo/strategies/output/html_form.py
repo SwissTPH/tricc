@@ -113,7 +113,7 @@ class HTMLStrategy(BaseOutPutStrategy):
         return True
 
     def export(self, start_pages, version):
-        form_id = start_pages["main"].root.form_id or "openmrs_form"
+        form_id = self.project.intervention_name() or "openmrs_form"
         file_name = f"{form_id}.html"
         newpath = os.path.join(self.output_path, file_name)
         if not os.path.exists(self.output_path):

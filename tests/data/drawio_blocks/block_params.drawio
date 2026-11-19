@@ -1,0 +1,105 @@
+<mxfile host="tricc-tests">
+  <diagram name="Triage" id="triagePage0000000001">
+    <mxGraphModel dx="1000" dy="800" grid="1" gridSize="10">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <object odk_type="start" label="Triage" id="tr-start-000000001">
+          <mxCell parent="1" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1">
+            <mxGeometry height="40" width="120" x="0" y="0" as="geometry" />
+          </mxCell>
+        </object>
+        <object odk_type="parameters" label="Parameters" param.lab_available="boolean=true" id="tr-params-00000001">
+          <mxCell parent="1" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1">
+            <mxGeometry height="40" width="120" x="0" y="0" as="geometry" />
+          </mxCell>
+        </object>
+        <object odk_type="block" label="Axillary temperature" link="measure_temperature" param.site="axillary" id="tr-ax-000000000001">
+          <mxCell parent="1" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1">
+            <mxGeometry height="40" width="120" x="0" y="0" as="geometry" />
+          </mxCell>
+        </object>
+        <object odk_type="block" label="Rectal temperature" link="measure_temperature" param.site="rectal" param.threshold="38" id="tr-re-000000000001">
+          <mxCell parent="1" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1">
+            <mxGeometry height="40" width="120" x="0" y="0" as="geometry" />
+          </mxCell>
+        </object>
+        <object odk_type="note" label="Lab: {{lab_available}}" name="lab_note" relevance="{{lab_available}}" id="tr-lab-00000000001">
+          <mxCell parent="1" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1">
+            <mxGeometry height="40" width="120" x="0" y="0" as="geometry" />
+          </mxCell>
+        </object>
+        <object odk_type="end" label="End" name="the_end" id="tr-end-00000000001">
+          <mxCell parent="1" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1">
+            <mxGeometry height="40" width="120" x="0" y="0" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="tr-e1-000000000001" edge="1" parent="1" source="tr-start-000000001" target="tr-ax-000000000001" style="edgeStyle=orthogonalEdgeStyle;html=1;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="tr-e2-000000000001" edge="1" parent="1" source="tr-ax-000000000001" target="tr-re-000000000001" style="edgeStyle=orthogonalEdgeStyle;html=1;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="tr-e3-000000000001" edge="1" parent="1" source="tr-re-000000000001" target="tr-lab-00000000001" style="edgeStyle=orthogonalEdgeStyle;html=1;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="tr-e4-000000000001" edge="1" parent="1" source="tr-lab-00000000001" target="tr-end-00000000001" style="edgeStyle=orthogonalEdgeStyle;html=1;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram name="Measure temperature" id="tempBlockPage0000001">
+    <mxGraphModel dx="1000" dy="800" grid="1" gridSize="10">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <object odk_type="parameters" label="Parameters" param.site="choice(axillary|rectal)!" param.threshold="number=37.5" id="mt-params-00000001">
+          <mxCell parent="1" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1">
+            <mxGeometry height="40" width="120" x="0" y="0" as="geometry" />
+          </mxCell>
+        </object>
+        <object odk_type="block_start" label="Measure temperature" name="measure_temperature" id="mt-start-000000001">
+          <mxCell parent="1" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1">
+            <mxGeometry height="40" width="120" x="0" y="0" as="geometry" />
+          </mxCell>
+        </object>
+        <object odk_type="decimal" label="Temperature ({{site}})" name="temp_{{site}}" min="30" max="45" id="mt-temp-0000000001">
+          <mxCell parent="1" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1">
+            <mxGeometry height="40" width="120" x="0" y="0" as="geometry" />
+          </mxCell>
+        </object>
+        <object odk_type="rhombus" label="Fever ({{site}})" name="r_" reference='"temp_{{site|raw}}" &gt; {{threshold}}' id="mt-r-00000000000001">
+          <mxCell parent="1" style="rhombus;whiteSpace=wrap;html=1;" vertex="1">
+            <mxGeometry height="40" width="120" x="0" y="0" as="geometry" />
+          </mxCell>
+        </object>
+        <object odk_type="note" label="Fever above {{threshold}}" name="fever_{{site}}" id="mt-fever-000000001">
+          <mxCell parent="1" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1">
+            <mxGeometry height="40" width="120" x="0" y="0" as="geometry" />
+          </mxCell>
+        </object>
+        <object odk_type="activity_end" label="End" name="next_" id="mt-end-00000000001">
+          <mxCell parent="1" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1">
+            <mxGeometry height="40" width="120" x="0" y="0" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="mt-e1-000000000001" edge="1" parent="1" source="mt-start-000000001" target="mt-temp-0000000001" style="edgeStyle=orthogonalEdgeStyle;html=1;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="mt-e2-000000000001" edge="1" parent="1" source="mt-temp-0000000001" target="mt-r-00000000000001" style="edgeStyle=orthogonalEdgeStyle;html=1;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="mt-e3-000000000001" edge="1" parent="1" source="mt-r-00000000000001" target="mt-fever-000000001" style="edgeStyle=orthogonalEdgeStyle;html=1;" value="yes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="mt-e4-000000000001" edge="1" parent="1" source="mt-r-00000000000001" target="mt-end-00000000001" style="edgeStyle=orthogonalEdgeStyle;html=1;" value="no">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="mt-e5-000000000001" edge="1" parent="1" source="mt-fever-000000001" target="mt-end-00000000001" style="edgeStyle=orthogonalEdgeStyle;html=1;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

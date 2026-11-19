@@ -17,6 +17,9 @@ ACTIVITY_END_NODE_FORMAT = "aend_{}"
 
 class TriccNodeDisplayCalculateBase(TriccNodeCalculateBase):
     save: Optional[str] = None  # contribute to another calculate
+    # Declared by drawio_type_map for calculates; e.g. "observation" persists a computed
+    # status so a later form can read it (feature/20260929-cql-populate-wiring.md §8).
+    concept_type: Optional[str] = None
     hint: Optional[str] = None  # for diagnostic display
     help: Optional[str] = None  # for diagnostic display
     trigger: Optional[Union[Expression, TriccOperation, TriccReference]] = None
@@ -71,6 +74,8 @@ class TriccNodePopulate(TriccNodeFakeCalculateBase):
     tricc_type: TriccNodeType = TriccNodeType.populate
     context: str = "patient"
     period: Optional[str] = None
+    # Concept read instead of ``name`` (FHIR export; feature/20260929-cql-populate-wiring.md §5)
+    source: Optional[str] = None
     # FHIR item type of the value read back (e.g. "quantity", "integer"). The
     # Questionnaire item must carry the same type as the value the CQL accessor
     # returns, otherwise the client cannot seed it as an `initial` answer.
@@ -82,6 +87,19 @@ class TriccNodePopulate(TriccNodeFakeCalculateBase):
     unit: Optional[str] = None
     unit_system: Optional[str] = None
     unit_code: Optional[str] = None
+
+
+class TriccNodeRetrieval(TriccNodePopulate):
+    """A used entry of the project retrieval dictionary (``"#name"`` in expressions).
+
+    Built by ``tricc_oo.converters.retrieval`` and hung on the main page like a library
+    calculate: ``name`` is the code (``#age_months``), so references resolve to it, and
+    ``export_name`` is ``r_<name>``. ``retrieval`` holds the dictionary entry
+    (``tricc_oo.converters.retrieval.Retrieval``); each output strategy turns it into its own
+    input (feature/20261109-project-retrievals.md).
+    """
+
+    retrieval: Optional[object] = None
 
 
 class TriccNodeDisplayBridge(TriccNodeDisplayCalculateBase):
@@ -254,6 +272,12 @@ class TriccNodeActivityStart(TriccNodeFakeCalculateBase):
     relevance: Optional[Union[Expression, TriccOperation]] = None
     status: Optional[str] = None
     process: Optional[str] = None
+
+
+class TriccNodeBlockStart(TriccNodeActivityStart):
+    """Root of a block page: the page is a template, inlined once per ``block`` node."""
+
+    tricc_type: TriccNodeType = TriccNodeType.block_start
 
 
 def get_node_from_list(in_nodes, node_id):

@@ -2,9 +2,10 @@
 
 ## 1) Input collection
 
-`tests/build.py` parses CLI args, resolves inputs, and loads file content strings.
+`tests/build.py` and the `tricc` CLI parse inputs and load file content strings.
 
-For URLs (Google Drive), it downloads to temp first, then reads local content.
+Google Drive file/folder URLs (CLI `-i`, or `segment:` in `tricc.yaml`) are
+downloaded first, then read as local files.
 
 ## 2) XML parsing
 
@@ -39,8 +40,16 @@ This allows draft pages to stay in the model without entering full downstream ge
 - `link_out` to `link_in` resolution
 - loop warnings and edge validation
 
-Display text with `${field}` tokens is converted to concatenate operations at **input load**
-for display models only (see `feature/display-text-injection.md`).
+Display text with `${field}` tokens is parsed to a `TriccMessage` tree at **input load**
+for display models only (see `feature/display-text-injection.md` and
+`feature/20260909-display-message-ast.md`).
+
+**Project retrievals** (`feature/20261109-project-retrievals.md`): once every page is loaded,
+`attach_library_calculates` also reads the retrieval dictionary
+(`tricc_oo/converters/retrieval.py`), collects the `"#name"` references of the loaded pages and
+library calculates, and hangs one `TriccNodeRetrieval` (a populate node named `#name`, exported
+as `r_<name>`) per used retrieval on the main page, like a library calculate. An unknown code is
+an error.
 
 ## 6) Calculate load, versioning, and inheritance
 
@@ -56,7 +65,17 @@ Core walk in `tricc_oo/visitors/tricc.py` (`load_calculate` and related):
    - origin-signature grouping when calculate formulas differ
    - `repeat=-1` excluded as source and receiver of value inheritance
    - `populate` with `context=history` skips value inheritance
-4. **Relevance / skip** — same-slot prior captures can suppress re-asking; different `repeat` slots do not.
+4. **Relevance / skip (three layers)** — see `fix/20260914-skip-display-not-path.md`:
+   - Graph `node.relevance` is **arrival / flowchart only**. `load_calculate` does **not**
+     NAND “already captured” onto it (that used to hide everything after a skipped widget).
+   - Printed question/note `relevant` (XLSForm) and FHIR `enableWhen` NAND skip:
+     arrival **and not** already captured in the **same author slot**. Calculate/bridge
+     **rows** do not get this NAND. Helpers: `serialize_display_relevance`,
+     `get_already_captured_expression` in `visitors/tricc.py`.
+   - Path/bridge calculates (`TriccNodeDisplayBridge` / `TriccNodeBridge`, e.g. `pFPb…`)
+     use arrival **or** already captured (`pass_skipped` on `get_node_expression`).
+   - Same slot (omitted `repeat` = 1) suppresses re-asking; `repeat=2` does not.
+     Cross-activity skip also requires the earlier activity was entered (`gcalc_…`).
 5. **`process_reference` / `process_operation_reference`** — resolve refs; for value expressions,
    multi-version display models expand to `GET_INHERITED_VALUE` (newer-first). Relevance keeps a
    single last-version ref. `GET_REPEATED_VALUE` (authored as `GetRepeatedValue`) pins resolution
@@ -79,6 +98,16 @@ Built-in output strategies (registered in `tricc_oo/strategies/__init__.py`):
 | `OpenMRSStrategy` | OpenMRS form export |
 | `FHIRStrategy` | FHIR SDC (Questionnaire, Library/CQL, StructureMap, ValueSet) |
 | `OpenSRPStrategy` | FHIR-Core / OpenSRP bundle (extends `FHIRStrategy`) |
+
+Each strategy turns a used retrieval into its own input through `retrieval_expression`
+(the runner calls `check_retrievals` first, so an unsupported one fails before any output):
+
+| Strategy | Retrieval export |
+|----------|------------------|
+| `FHIRStrategy`, `OpenSRPStrategy` | `define "#name"` in the Helper library (catalogue in `populate_helper.py`; `custom`: its `text/cql` expression); references read `Helper."#name"` |
+| `XLSFormCHTStrategy`, `XLSFormCHTHFStrategy` | hidden calculate `r_<name>` reading `instance('contact-summary')/context/<name>` (`custom`: its `text/x-xlsform` expression); references become `${r_<name>}` |
+| `XLSFormStrategy`, `XLSFormCDSSStrategy` | `custom` only (`text/x-xlsform`); a function fails with the retrieval code and strategy name |
+| others | fail with the retrieval code and strategy name |
 
 Lookup by name: `get_output_strategy("XLSFormCHTHFStrategy")` or pass the class directly in tests.
 List registered names: `list_output_strategies()` from `tricc_oo.strategies.registry`.

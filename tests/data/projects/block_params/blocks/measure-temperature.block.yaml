@@ -1,0 +1,23 @@
+id: measure-temperature
+name: measure_temperature
+title: Measure temperature
+params:
+  - {name: site, type: choice, options: [axillary, rectal], required: true}
+  - {name: threshold, type: number, default: 37.5}
+nodes:
+  - {id: mt-s, type: block_start, name: measure_temperature}
+  - id: mt-t
+    type: decimal
+    name: "temp_{{site}}"
+    label: "Temperature ({{site}})"
+    min: 30
+    max: 45
+  - {id: mt-r, type: rhombus, label: "Fever ({{site}})", reference: "\"temp_{{site|raw}}\" > {{threshold}}"}
+  - {id: mt-f, type: note, name: "fever_{{site}}", label: "Fever above {{threshold}}"}
+  - {id: mt-e, type: activity_end}
+edges:
+  - {source: mt-s, target: mt-t}
+  - {source: mt-t, target: mt-r}
+  - {source: mt-r, target: mt-f, value: "yes"}
+  - {source: mt-r, target: mt-e, value: "no"}
+  - {source: mt-f, target: mt-e}

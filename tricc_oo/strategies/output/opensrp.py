@@ -21,7 +21,8 @@ Output folder structure (matches fhircore expected layout)::
 
     output/<form_id>/
     ├── Composition.json
-    ├── plan-definition/   # single Intervention PD
+    ├── plan-definition/   # Intervention PD (on-demand + follow-up actions)
+    ├── activity-definition/  # follow-up Task ActivityDefinitions (start.on: follow_up)
     ├── structure-map/     # extraction maps (QR → Observation/Condition) + optional Task maps
     ├── binary/
     ├── contract/          # related-person-contract.json
@@ -42,6 +43,7 @@ import stat
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from tricc_oo.converters.duration import to_fhir_duration
 from tricc_oo.converters.fhir.ids import (
     fhir_resource_id,
     readable_resource_filename,
@@ -88,12 +90,19 @@ FHIRCORE_EXT_CQL_INPUT = (
 FHIRCORE_EXT_PLAN_DEFINITIONS = (
     "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-planDefinitions"
 )
+# The only extension fhircore reads to evaluate CQL initialExpressions
+# (feature/20260929-cql-populate-wiring.md §1).
+CQF_EXT_LIBRARY = "http://hl7.org/fhir/StructureDefinition/cqf-library"
 
 # App package tag — Android/cdss shell sync pulls content with:
 #   ResourceType?_tag=https://smartregister.org/app-id|{app_id}
 # Override via OPENSRP_APP_ID or FHIR_APP_ID (default ``cdss``).
 APP_ID_TAG_SYSTEM = "https://smartregister.org/app-id"
 DEFAULT_OPENSRP_APP_ID = "cdss"
+
+# Questionnaire.item types that hold no answer. A tree built only from these renders
+# nothing, so it does not make a questionnaire worth emitting.
+STRUCTURAL_ITEM_TYPES = frozenset({"group", "display"})
 
 
 @register_output_strategy("OpenSRPStrategy")
@@ -131,6 +140,7 @@ class OpenSRPStrategy(FHIRStrategy):
         """
         super().__init__(project, output_path, base_url)
         self.plan_definitions: Dict[str, dict] = {}
+        self.activity_definitions: Dict[str, dict] = {}
         self.composition: Optional[dict] = None
         self.process_chain: List[str] = []
         # App id for meta.tag (content delivery) — not the package Composition identifier.
@@ -199,6 +209,7 @@ class OpenSRPStrategy(FHIRStrategy):
 
         # Write openSRP-specific resources (JSON only — no FSH)
         self._write_plan_definitions(base, version)
+        self._write_activity_definitions(base)
         self._write_structure_maps(base)
         self._write_composition(base)
         self._write_image_binaries(base)
@@ -248,6 +259,16 @@ class OpenSRPStrategy(FHIRStrategy):
             for action in child_actions:
                 process = action.get("id") or "?"
                 def_can = action.get("definitionCanonical") or ""
+                is_follow_up = bool(action.get("relatedAction"))
+                if is_follow_up:
+                    if "ActivityDefinition/" not in def_can:
+                        logger.warning(
+                            "Intervention PlanDefinition follow-up action '%s' "
+                            "definitionCanonical should reference an ActivityDefinition (got %r)",
+                            process,
+                            def_can,
+                        )
+                    continue
                 # Start care / openSRP: launch Questionnaire directly
                 if "Questionnaire/" not in def_can:
                     logger.warning(
@@ -291,21 +312,38 @@ class OpenSRPStrategy(FHIRStrategy):
 
     @staticmethod
     def is_questionnaire_empty(q: Optional[dict]) -> bool:
-        """Return True when the questionnaire has no items (``item: []`` or missing).
+        """Return True when the questionnaire holds no answerable item at any depth.
+
+        ``group`` and ``display`` items are structural — they carry no answer — so a tree
+        built only from them has nothing to render. A single childless ``group`` also
+        violates FHIR invariant ``que-1`` ("Group items must have nested items"), so such
+        a questionnaire must never be emitted. See
+        ``fix/20260909-opensrp-empty-main-questionnaire-dangling-library.md``.
 
         Args:
             q: Questionnaire resource dict, or None.
 
         Returns:
-            True if empty / missing; False if at least one top-level item exists.
+            True if missing / itemless / structural-only; False as soon as one item of an
+            answerable type is found anywhere in the tree.
         """
         if not isinstance(q, dict):
             return True
-        items = q.get("item")
-        return not items
+
+        def has_answerable(items) -> bool:
+            for item in items or []:
+                if not isinstance(item, dict):
+                    continue
+                if item.get("type") not in STRUCTURAL_ITEM_TYPES:
+                    return True
+                if has_answerable(item.get("item")):
+                    return True
+            return False
+
+        return not has_answerable(q.get("item"))
 
     def _prune_empty_questionnaires(self) -> None:
-        """Remove questionnaires with ``item: []`` and drop orphan per-process assets."""
+        """Drop questionnaires with no answerable item, plus their per-process assets."""
         empty_processes = [
             process
             for process, q in list(self.questionnaires.items())
@@ -313,7 +351,8 @@ class OpenSRPStrategy(FHIRStrategy):
         ]
         for process in empty_processes:
             logger.warning(
-                "OpenSRPStrategy: dropping empty Questionnaire for process '%s' (item: [])",
+                "OpenSRPStrategy: dropping Questionnaire for process '%s' "
+                "(no answerable item — only groups/displays or item: [])",
                 process,
             )
             del self.questionnaires[process]
@@ -364,6 +403,29 @@ class OpenSRPStrategy(FHIRStrategy):
         if "example.com" in q_url or not q_url.startswith("http"):
             q_url = f"{self.base_url}/Questionnaire/{q_id}"
         return q_id, q_url
+
+    def _process_library_url(self, process: str) -> Optional[str]:
+        """Return the canonical Library URL for a process, or None when none exists.
+
+        Deliberately has **no** uuid5 fallback: the per-process CQL Library is only
+        generated when the process has calculates, and a computed id for a Library that
+        was never generated is exactly the dangling reference this guards against — it is
+        absent from disk, from ``Composition``, and from anything ``push-to-fhir.sh``
+        uploads. See ``fix/20260909-opensrp-empty-main-questionnaire-dangling-library.md``.
+
+        Args:
+            process: Process name from the graph.
+
+        Returns:
+            Absolute Library URL, or None when this process has no generated Library.
+        """
+        libs = getattr(self, "libraries", None) or {}
+        lib = libs.get(process) or libs.get(to_fhir_id(process))
+        if not isinstance(lib, dict) or not lib.get("id"):
+            return None
+        # The Library's own canonical (ends in its CQL name), never rebuilt from the id:
+        # CQL engines resolve the library from the last URL segment.
+        return lib.get("url") or f"{self.base_url}/Library/{lib['id']}"
 
     def _process_resource_ids(self, process: str) -> dict:
         """Return UUID FHIR ids for a process's openSRP resources (stable uuid5).
@@ -448,7 +510,9 @@ class OpenSRPStrategy(FHIRStrategy):
         unlike the old wrapping catalog PD (removed 2026-08-12) whose cross-resource
         ``definitionCanonical`` link caused every child to be resolved unconditionally.
 
-        No applicability/eligibility ``condition`` is emitted yet.
+        No applicability/eligibility ``condition`` is emitted unless the project
+        was built from ``tricc.yaml`` with an intervention ``start.condition``
+        (``on: demand``). See ``feature/20260915-intervention-start.md``.
 
         Args:
             version: Build version string.
@@ -464,14 +528,8 @@ class OpenSRPStrategy(FHIRStrategy):
         lib_urls: List[str] = []
         custom_orders: Dict[str, int] = {}
         for process in self.process_chain:
-            proc_ids = self._process_resource_ids(process)
-            lib_id = proc_ids["lib_id"]
-            libs = getattr(self, "libraries", None) or {}
-            lib = libs.get(process) or libs.get(to_fhir_id(process))
-            if isinstance(lib, dict) and lib.get("id"):
-                lib_id = lib["id"]
-            lib_url = f"{self.base_url}/Library/{lib_id}"
-            if lib_url not in lib_urls:
+            lib_url = self._process_library_url(process)
+            if lib_url and lib_url not in lib_urls:
                 lib_urls.append(lib_url)
 
             q_id, q_url = self._questionnaire_ref(process)
@@ -520,6 +578,23 @@ class OpenSRPStrategy(FHIRStrategy):
             ],
             "action": child_actions,
         }
+        intervention = getattr(self.project, "config", None)
+        demand_cql = None
+        if intervention is not None:
+            demand_cql = intervention.demand_condition()
+        if demand_cql:
+            wrapper_action["condition"] = [
+                {
+                    "kind": "applicability",
+                    "expression": {
+                        "language": "text/cql",
+                        "expression": demand_cql,
+                    },
+                }
+            ]
+        pd_title = f"{form_label} – Intervention"
+        if intervention is not None and getattr(intervention, "title", None):
+            pd_title = intervention.title
 
         return {
             "resourceType": "PlanDefinition",
@@ -527,7 +602,7 @@ class OpenSRPStrategy(FHIRStrategy):
             "meta": {"profile": [OPENSRP_PLANDEFINITION_PROFILE]},
             "url": f"{self.base_url}/PlanDefinition/{pd_id}",
             "name": ids["pd_name"],
-            "title": f"{form_label} – Intervention",
+            "title": pd_title,
             "version": version or "1.0.0",
             # active: Android named-event discovery loads local PDs after tag-sync
             "status": "active",
@@ -543,6 +618,134 @@ class OpenSRPStrategy(FHIRStrategy):
             "library": lib_urls,
             "action": [wrapper_action],
         }
+
+    def link_follow_up(self, child_strategy, start) -> None:
+        """Attach a follow-up action + ActivityDefinition to this parent PlanDefinition."""
+        child_intervention = getattr(getattr(child_strategy, "project", None), "config", None)
+        child_id = getattr(child_intervention, "id", None)
+        if not child_id:
+            raise ValueError("follow-up intervention is missing an id")
+        pd = self.plan_definitions.get("intervention")
+        if not pd:
+            logger.warning("No Intervention PlanDefinition to attach follow-up %s", child_id)
+            return
+        wrapper = (pd.get("action") or [{}])[0]
+        process_actions = wrapper.get("action") or []
+        parent_action_id = process_actions[-1]["id"] if process_actions else "available-care"
+        parent_form = getattr(self, "_form_id", None) or self.fhir_form_id
+        ad_id = fhir_resource_id(parent_form, "ActivityDefinition", child_id, "task")
+        q_id, q_url = self._first_questionnaire_ref(child_strategy)
+        due_duration = to_fhir_duration(start.due or 0)
+        window = start.window_or_default()
+        bounds = to_fhir_duration((start.due or 0) + window.after)
+        follow_action = {
+            "id": fhir_resource_id(parent_form, "action", child_id),
+            "title": getattr(child_intervention, "title", None) or child_id,
+            "relatedAction": [
+                {
+                    "actionId": parent_action_id,
+                    "relationship": "after-end",
+                    "offsetDuration": due_duration,
+                }
+            ],
+            "timingTiming": {
+                "repeat": {
+                    "boundsDuration": bounds,
+                }
+            },
+            "definitionCanonical": f"{self.base_url}/ActivityDefinition/{ad_id}",
+        }
+        if window.before:
+            follow_action["extension"] = [
+                {
+                    "url": f"{self.base_url}/StructureDefinition/tricc-window-before",
+                    "valueDuration": to_fhir_duration(window.before),
+                }
+            ]
+        if start.condition:
+            follow_action["condition"] = [
+                {
+                    "kind": "applicability",
+                    "expression": {
+                        "language": "text/cql",
+                        "expression": start.condition,
+                    },
+                }
+            ]
+        process_actions.append(follow_action)
+        wrapper["action"] = process_actions
+        ad = {
+            "resourceType": "ActivityDefinition",
+            "id": ad_id,
+            "url": f"{self.base_url}/ActivityDefinition/{ad_id}",
+            "name": to_fhir_id(self.fhir_form_id, child_id, "task-activity"),
+            "title": getattr(child_intervention, "title", None) or child_id,
+            "status": "active",
+            "kind": "Task",
+            "code": {"text": child_id},
+            "dynamicValue": [
+                {
+                    "path": "focus",
+                    "expression": {
+                        "language": "text/fhirpath",
+                        "expression": f"'{q_url}'",
+                    },
+                },
+                {
+                    "path": "reasonReference",
+                    "expression": {
+                        "language": "text/fhirpath",
+                        "expression": "%questionnaire-response",
+                    },
+                },
+            ],
+        }
+        self.activity_definitions[child_id] = ad
+        self._rewrite_follow_up_artifacts()
+
+    def _first_questionnaire_ref(self, child_strategy) -> tuple:
+        questionnaires = getattr(child_strategy, "questionnaires", None) or {}
+        for process in getattr(child_strategy, "process_chain", None) or list(questionnaires):
+            q = questionnaires.get(process) or {}
+            q_id = q.get("id")
+            if q_id:
+                q_url = q.get("url") or f"{self.base_url}/Questionnaire/{q_id}"
+                return q_id, q_url
+        child_form = getattr(child_strategy, "_form_id", None) or getattr(child_strategy, "fhir_form_id", "form")
+        q_id = fhir_resource_id(child_form, "Questionnaire", "main")
+        return q_id, f"{self.base_url}/Questionnaire/{q_id}"
+
+    def _rewrite_follow_up_artifacts(self) -> None:
+        base = Path(self.output_path)
+        self._write_plan_definitions(base, "")
+        self._write_activity_definitions(base)
+        if self.composition is not None:
+            ad_entries = [
+                {"reference": f"ActivityDefinition/{ad['id']}"}
+                for ad in self.activity_definitions.values()
+                if isinstance(ad, dict) and ad.get("id")
+            ]
+            if ad_entries:
+                sections = self.composition.setdefault("section", [])
+                existing = next((s for s in sections if s.get("title") == "ActivityDefinitions"), None)
+                if existing is None:
+                    sections.append(
+                        {
+                            "title": "ActivityDefinitions",
+                            "code": {
+                                "coding": [
+                                    {
+                                        "system": "http://hl7.org/fhir/resource-types",
+                                        "code": "ActivityDefinition",
+                                    }
+                                ]
+                            },
+                            "entry": ad_entries,
+                        }
+                    )
+                else:
+                    existing["entry"] = ad_entries
+                self._write_composition(base)
 
     def generate_task_structuremap(self, process: str, version: str) -> Optional[dict]:
         """Build a StructureMap that creates Tasks wrapping Questionnaires.
@@ -888,7 +1091,13 @@ class OpenSRPStrategy(FHIRStrategy):
     # ── Questionnaire wiring ──────────────────────────────────────────────────
 
     def _wire_questionnaire_extensions(self, process: str, pd: dict, version: str):
-        """Add cqlInputResources and planDefinitions extensions to a Questionnaire.
+        """Add cqf-library, cqlInputResources and planDefinitions extensions to a Questionnaire.
+
+        ``cqlInputResources`` is emitted only when this process actually has a generated
+        CQL Library — pointing it at a Library that was never generated leaves fhircore
+        with an unresolvable reference. ``cqf-library`` follows the same rule and is
+        additionally emitted only when an item carries a CQL expression: it is what makes
+        fhircore evaluate ``text/cql-identifier`` initialExpressions.
 
         Args:
             process: The cpg-common-process name.
@@ -899,17 +1108,27 @@ class OpenSRPStrategy(FHIRStrategy):
         if q is None:
             return
 
-        lib_id = self._process_resource_ids(process)["lib_id"]
-        lib_url = f"{self.base_url}/Library/{lib_id}"
+        lib_url = self._process_library_url(process)
         pd_url = f"{self.base_url}/PlanDefinition/{pd['id']}"
 
         extensions = q.setdefault("extension", [])
 
-        # cqlInputResources
-        extensions.append({
-            "url": FHIRCORE_EXT_CQL_INPUT,
-            "valueReference": {"reference": lib_url},
-        })
+        # cqf-library — the canonical fhircore evaluates CQL initialExpressions against
+        if lib_url and self._questionnaire_has_cql(q.get("item")):
+            extensions.append({"url": CQF_EXT_LIBRARY, "valueCanonical": lib_url})
+
+        # cqlInputResources — only when the Library exists in this package
+        if lib_url:
+            extensions.append({
+                "url": FHIRCORE_EXT_CQL_INPUT,
+                "valueReference": {"reference": lib_url},
+            })
+        else:
+            logger.info(
+                "OpenSRPStrategy: no CQL Library for process '%s'; "
+                "omitting cqlInputResources on its Questionnaire",
+                process,
+            )
 
         # planDefinitions
         extensions.append({
@@ -920,6 +1139,18 @@ class OpenSRPStrategy(FHIRStrategy):
         extract_sm = (self.extraction_maps or {}).get(process)
         if isinstance(extract_sm, dict) and extract_sm.get("url"):
             extensions.append(target_structuremap_extension(extract_sm["url"]))
+
+    @classmethod
+    def _questionnaire_has_cql(cls, items) -> bool:
+        """True when any item (at any depth) carries a ``text/cql*`` expression."""
+        for item in items or []:
+            for ext in item.get("extension") or []:
+                language = (ext.get("valueExpression") or {}).get("language") or ""
+                if language.startswith("text/cql"):
+                    return True
+            if cls._questionnaire_has_cql(item.get("item")):
+                return True
+        return False
 
     # ── File writers ──────────────────────────────────────────────────────────
 
@@ -991,8 +1222,21 @@ class OpenSRPStrategy(FHIRStrategy):
                 pd, prefix="PlanDefinition", fallback=f"{process}-PD"
             )
             path = pd_dir / fname
-            path.write_text(json.dumps(pd, indent=2, ensure_ascii=False))
+            path.write_text(json.dumps(pd, indent=2, ensure_ascii=False), encoding="utf-8")
             logger.debug(f"Wrote PlanDefinition: {path} (id={pd.get('id')})")
+
+    def _write_activity_definitions(self, base: Path):
+        if not self.activity_definitions:
+            return
+        ad_dir = base / "activity-definition"
+        ad_dir.mkdir(parents=True, exist_ok=True)
+        for key, ad in self.activity_definitions.items():
+            fname = readable_resource_filename(
+                ad, prefix="ActivityDefinition", fallback=f"{key}-AD"
+            )
+            path = ad_dir / fname
+            path.write_text(json.dumps(ad, indent=2, ensure_ascii=False), encoding="utf-8")
+            logger.debug("Wrote ActivityDefinition: %s (id=%s)", path, ad.get("id"))
 
     def _write_structure_maps(self, base: Path):
         """Write Task StructureMap JSON (+ companion .map FML) under structure-map/.
@@ -1013,13 +1257,13 @@ class OpenSRPStrategy(FHIRStrategy):
                 sm, prefix="StructureMap", fallback=f"{process}-task"
             )
             path = sm_dir / fname
-            path.write_text(json.dumps(payload, indent=2, ensure_ascii=False))
+            path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
             logger.debug(f"Wrote StructureMap: {path} (id={sm.get('id')})")
             fml = sm.get("_fml")
             if fml:
                 map_stem = fname[: -len(".json")] if fname.endswith(".json") else fname
                 map_path = sm_dir / f"{map_stem}.map"
-                map_path.write_text(fml)
+                map_path.write_text(fml, encoding="utf-8")
                 logger.debug(f"Wrote StructureMap FML: {map_path}")
 
     def _copy_push_scripts(self, base: Path):
@@ -1103,7 +1347,7 @@ class OpenSRPStrategy(FHIRStrategy):
             },
         }
         path = out_dir / "related-person-contract.json"
-        path.write_text(json.dumps(plain, indent=2, ensure_ascii=False))
+        path.write_text(json.dumps(plain, indent=2, ensure_ascii=False), encoding="utf-8")
         logger.debug(f"Wrote RelatedPerson contract: {path}")
 
     def _write_composition(self, base: Path):
@@ -1119,7 +1363,8 @@ class OpenSRPStrategy(FHIRStrategy):
             # Prefer stable package-root name for the manifest
             path = base / "Composition.json"
             path.write_text(
-                json.dumps(self.composition, indent=2, ensure_ascii=False)
+                json.dumps(self.composition, indent=2, ensure_ascii=False),
+                encoding="utf-8",
             )
             logger.debug(
                 "Wrote Composition: %s (id=%s, logical=%s)",
@@ -1147,7 +1392,7 @@ class OpenSRPStrategy(FHIRStrategy):
                 binary, prefix="Binary", fallback=binary.get("id", "image")
             )
             path = bin_dir / fname
-            path.write_text(json.dumps(binary, indent=2, ensure_ascii=False))
+            path.write_text(json.dumps(binary, indent=2, ensure_ascii=False), encoding="utf-8")
             logger.debug("Wrote image Binary: %s (id=%s)", path, binary.get("id"))
 
     # ── Utilities ─────────────────────────────────────────────────────────────

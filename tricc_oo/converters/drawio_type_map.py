@@ -23,6 +23,7 @@ from tricc_oo.models.tricc import (
     TriccNodeLinkIn,
     TriccNodeLinkOut,
     TriccNodeGoTo,
+    TriccNodeBlock,
     TriccNodeSelectMultiple,
     TriccNodeSelectNotAvailable,
     TriccNodeText,
@@ -38,14 +39,15 @@ from tricc_oo.models.tricc import (
 TYPE_MAP = {
     TriccNodeType.start: {
         "objects": ["UserObject", "object"],
-        "attributes": ["process", "parent", "form_id", "relevance", "priority"],
+        "attributes": ["process", "parent", "relevance", "priority"],
         "mandatory_attributes": ["label"],
         "model": TriccNodeMainStart,
     },
     TriccNodeType.activity_start: {
         "objects": ["UserObject", "object"],
         "attributes": ["parent", "parent", "instance", "repeat", "relevance", "priority"],
-        "mandatory_attributes": ["label", "name"],
+        # a sequence node: no business name; it shares the activity's (see create_root_node)
+        "mandatory_attributes": ["label"],
         "model": TriccNodeActivityStart,
     },
     TriccNodeType.note: {
@@ -295,6 +297,14 @@ TYPE_MAP = {
         "mandatory_attributes": ["link", "label", "name"],
         "model": TriccNodeGoTo,
     },
+    # uses a block (feature/20261102-block-params-and-start-node.md); ``link`` is set to
+    # the block instance when the page is built, ``param.<name>`` attributes are its args
+    TriccNodeType.block: {
+        "objects": ["UserObject", "object"],
+        "attributes": ["priority", "repeat", "name"],
+        "mandatory_attributes": ["link", "label"],
+        "model": TriccNodeBlock,
+    },
     TriccNodeType.end: {
         "objects": ["UserObject", "object"],
         "attributes": ["process", "name", "label", "hint"],
@@ -346,6 +356,7 @@ TYPE_MAP = {
             "concept_type",
             "context",
             "period",
+            "source",
             "repeat",
         ],
         "mandatory_attributes": ["name", "label"],
@@ -361,6 +372,7 @@ TYPE_MAP = {
             "concept_type",
             "context",
             "period",
+            "source",
             "repeat",
         ],
         "mandatory_attributes": ["name", "label"],

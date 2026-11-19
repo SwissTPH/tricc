@@ -22,6 +22,37 @@ class BaseOutPutStrategy(abc.ABC):
     def get_tricc_operation_expression(self, operation):
         raise NotImplementedError("get_tricc_operation_expression not implemented")
 
+    def retrieval_expression(self, retrieval) -> str:
+        """The expression loading a project retrieval in this strategy's language.
+
+        Strategies that export retrievals override it (feature/20261109-project-retrievals.md);
+        by default every retrieval is unsupported.
+
+        Args:
+            retrieval: A used ``tricc_oo.converters.retrieval.Retrieval``.
+
+        Returns:
+            The expression.
+
+        Raises:
+            TriccRetrievalError: This strategy cannot export the retrieval.
+        """
+        from tricc_oo.converters.retrieval import TriccRetrievalError, unsupported
+
+        if retrieval.effective_function is None:
+            raise TriccRetrievalError(
+                f"retrieval {retrieval.code}: {type(self).__name__} does not support custom retrievals"
+            )
+        raise unsupported(retrieval, type(self).__name__)
+
+    def check_retrievals(self) -> None:
+        """Fail early, naming the retrieval and the strategy, when a used retrieval cannot be
+        exported."""
+        from tricc_oo.converters.retrieval import iter_retrievals
+
+        for retrieval in iter_retrievals(self.project):
+            self.retrieval_expression(retrieval)
+
     def execute(self):
 
         version = datetime.datetime.now().strftime("%Y%m%d%H%M")
@@ -240,3 +271,13 @@ class BaseOutPutStrategy(abc.ABC):
 
     def get_kwargs(self):
         return {}
+
+    def link_follow_up(self, child_strategy, start) -> None:
+        """Wire a follow-up intervention onto this (parent) export. Default: ignore."""
+        child_id = getattr(getattr(child_strategy, "project", None), "config", None)
+        child_id = getattr(child_id, "id", None) or "?"
+        logger.info(
+            "%s ignores start.on=follow_up for intervention %s",
+            self.__class__.__name__,
+            child_id,
+        )

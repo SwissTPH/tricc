@@ -392,12 +392,13 @@ class TestOpenSRPStrategyInit(unittest.TestCase):
     """Smoke tests for OpenSRPStrategy instantiation."""
 
     def _make_mock_project(self):
-        """Build a minimal mock TriccProject."""
+        """Build a minimal mock TriccIntervention."""
         project = MagicMock()
         project.nodes = {}
         project.edges = {}
         project.form_id = "demo"
         project.version = "1.0.0"
+        project.config = None
         return project
 
     def test_instantiation(self):
@@ -457,6 +458,98 @@ class TestOpenSRPStrategyInit(unittest.TestCase):
         self.assertIsNone(actions[0].get("transform"))
         self.assertTrue(is_uuid_id(pd["id"]), pd["id"])
         self.assertFalse(pd.get("contained") or [])
+
+    def test_generate_intervention_plandefinition_cql_applicability(self):
+        from tricc_oo.strategies.output.opensrp import OpenSRPStrategy
+        from tricc_oo.models.project_config import TriccInterventionConfig
+
+        project = self._make_mock_project()
+        project.config = TriccInterventionConfig(
+            id="pediatrics",
+            title="Pediatrics",
+            activity=["child/*"],
+            start=[{"on": "demand", "condition": "AgeInMonths() >= 2"}],
+        )
+        strategy = OpenSRPStrategy(project, "/tmp/opensrp_test_out")
+        strategy._form_id = "demo"
+        strategy.questionnaires = {
+            "registration": {
+                "id": "questionnaire-registration",
+                "title": "Registration",
+                "item": [{"linkId": "a", "type": "boolean"}],
+            }
+        }
+        strategy.process_chain = ["registration"]
+        pd = strategy.generate_intervention_plandefinition("1.0.0")
+        self.assertEqual(pd["title"], "Pediatrics")
+        wrapper = pd["action"][0]
+        condition = wrapper.get("condition") or []
+        self.assertEqual(len(condition), 1)
+        self.assertEqual(condition[0]["kind"], "applicability")
+        self.assertEqual(condition[0]["expression"]["language"], "text/cql")
+        self.assertEqual(condition[0]["expression"]["expression"], "AgeInMonths() >= 2")
+
+    def test_link_follow_up_related_action(self):
+        import tempfile
+        from tricc_oo.models.project_config import TriccInterventionConfig
+        from tricc_oo.strategies.output.opensrp import OpenSRPStrategy
+
+        with tempfile.TemporaryDirectory() as tmp:
+            parent_project = self._make_mock_project()
+            parent_project.config = TriccInterventionConfig(
+                id="pediatrics", title="Pediatrics", activity=["a/*"]
+            )
+            parent = OpenSRPStrategy(parent_project, tmp)
+            parent._form_id = "demo"
+            parent.questionnaires = {
+                "registration": {
+                    "id": "demo-registration",
+                    "title": "Registration",
+                    "item": [{"linkId": "a", "type": "boolean"}],
+                }
+            }
+            parent.process_chain = ["registration"]
+            parent.plan_definitions["intervention"] = parent.generate_intervention_plandefinition("1.0.0")
+            child_cfg = TriccInterventionConfig(
+                id="pediatrics_followup",
+                title="Pediatrics follow-up",
+                activity=["b/*"],
+                start=[
+                    {
+                        "on": "follow_up",
+                        "intervention": "pediatrics",
+                        "condition": "classification = 'pneumonia'",
+                        "due": "3 d",
+                        "window": {"after": "4 d"},
+                    }
+                ],
+            )
+            child_project = self._make_mock_project()
+            child_project.config = child_cfg
+            child = OpenSRPStrategy(child_project, tmp)
+            child._form_id = "fup"
+            child.questionnaires = {
+                "registration": {
+                    "id": "fup-q",
+                    "url": "https://fhir.tricc.io/Questionnaire/fup-q",
+                }
+            }
+            child.process_chain = ["registration"]
+            parent.link_follow_up(child, child_cfg.start[0])
+            follow = parent.plan_definitions["intervention"]["action"][0]["action"][-1]
+            self.assertEqual(follow["relatedAction"][0]["relationship"], "after-end")
+            self.assertEqual(follow["relatedAction"][0]["offsetDuration"]["value"], 3)
+            self.assertEqual(follow["relatedAction"][0]["offsetDuration"]["code"], "d")
+            self.assertIn("ActivityDefinition/", follow["definitionCanonical"])
+            self.assertEqual(
+                follow["condition"][0]["expression"]["expression"],
+                "classification = 'pneumonia'",
+            )
+            self.assertTrue(parent.activity_definitions)
+            from pathlib import Path
+            ad_files = list(Path(tmp).glob("activity-definition/*.json"))
+            self.assertTrue(ad_files, "ActivityDefinition JSON should be written")
+            parent.validate()
 
     def test_generate_intervention_plandefinition_multi_process(self):
         from tricc_oo.strategies.output.opensrp import OpenSRPStrategy
@@ -536,6 +629,34 @@ class TestOpenSRPStrategyInit(unittest.TestCase):
         self.assertIn("main", strategy.questionnaires)
         self.assertNotIn("registration", strategy.cql_defines)
 
+    def test_prune_drops_questionnaire_whose_only_item_is_an_empty_group(self):
+        """A start-node-only page renders nothing and violates que-1 — never emit it.
+
+        See fix/20260909-opensrp-empty-main-questionnaire-dangling-library.md.
+        """
+        from tricc_oo.strategies.output.opensrp import OpenSRPStrategy
+        project = self._make_mock_project()
+        strategy = OpenSRPStrategy(project, "/tmp/opensrp_test_out")
+        strategy._form_id = "demo"
+        strategy.questionnaires = {
+            "main": {
+                "id": "q-main",
+                # Exactly what a "Main Start" page produced before this fix
+                "item": [{"linkId": "nstart", "text": "Main Start", "type": "group"}],
+            },
+            "registration": {
+                "id": "q-reg",
+                "item": [{"linkId": "grp", "type": "group", "item": [
+                    {"linkId": "age", "type": "integer"},
+                ]}],
+            },
+        }
+        strategy.cql_defines = {"main": ["define Y: true"]}
+        strategy._prune_empty_questionnaires()
+        self.assertNotIn("main", strategy.questionnaires)
+        self.assertNotIn("main", strategy.cql_defines)
+        self.assertIn("registration", strategy.questionnaires)
+
     def test_task_structuremap_chains_next_process(self):
         from tricc_oo.strategies.output.opensrp import OpenSRPStrategy
         project = self._make_mock_project()
@@ -579,6 +700,81 @@ class TestOpenSRPStrategyInit(unittest.TestCase):
             OpenSRPStrategy.is_questionnaire_empty(
                 {"item": [{"linkId": "x", "type": "boolean"}]}
             )
+        )
+
+    def test_is_questionnaire_empty_is_recursive(self):
+        """Only group/display items anywhere in the tree == nothing to render."""
+        from tricc_oo.strategies.output.opensrp import OpenSRPStrategy
+        # single childless group (the "Main Start" shape)
+        self.assertTrue(
+            OpenSRPStrategy.is_questionnaire_empty(
+                {"item": [{"linkId": "g", "type": "group"}]}
+            )
+        )
+        # nested groups + a display, still no answer anywhere
+        self.assertTrue(
+            OpenSRPStrategy.is_questionnaire_empty({"item": [
+                {"linkId": "g1", "type": "group", "item": [
+                    {"linkId": "g2", "type": "group", "item": [
+                        {"linkId": "note", "type": "display", "text": "hello"},
+                    ]},
+                ]},
+            ]})
+        )
+        # one answerable item deep in the tree is enough to keep it
+        self.assertFalse(
+            OpenSRPStrategy.is_questionnaire_empty({"item": [
+                {"linkId": "g1", "type": "group", "item": [
+                    {"linkId": "g2", "type": "group", "item": [
+                        {"linkId": "q", "type": "string"},
+                    ]},
+                ]},
+            ]})
+        )
+
+    def test_no_cql_input_extension_when_library_missing(self):
+        """cqlInputResources must not point at a Library that was never generated."""
+        from tricc_oo.strategies.output.opensrp import (
+            OpenSRPStrategy,
+            FHIRCORE_EXT_CQL_INPUT,
+            FHIRCORE_EXT_PLAN_DEFINITIONS,
+        )
+        project = self._make_mock_project()
+        strategy = OpenSRPStrategy(project, "/tmp/opensrp_test_out")
+        strategy._form_id = "demo"
+        strategy.questionnaires = {
+            "main": {"id": "q-main", "item": [{"linkId": "a", "type": "string"}]},
+            "registration": {"id": "q-reg", "item": [{"linkId": "b", "type": "string"}]},
+        }
+        # only 'registration' produced CQL
+        strategy.libraries = {"registration": {"id": "lib-reg"}}
+        pd = {"id": "pd-1"}
+
+        strategy._wire_questionnaire_extensions("main", pd, "1.0.0")
+        main_urls = [e["url"] for e in strategy.questionnaires["main"]["extension"]]
+        self.assertNotIn(FHIRCORE_EXT_CQL_INPUT, main_urls)
+        self.assertIn(FHIRCORE_EXT_PLAN_DEFINITIONS, main_urls)
+
+        strategy._wire_questionnaire_extensions("registration", pd, "1.0.0")
+        reg_exts = strategy.questionnaires["registration"]["extension"]
+        cql = [e for e in reg_exts if e["url"] == FHIRCORE_EXT_CQL_INPUT]
+        self.assertEqual(len(cql), 1)
+        self.assertTrue(cql[0]["valueReference"]["reference"].endswith("/Library/lib-reg"))
+
+    def test_plandefinition_library_lists_only_generated_libraries(self):
+        from tricc_oo.strategies.output.opensrp import OpenSRPStrategy
+        project = self._make_mock_project()
+        strategy = OpenSRPStrategy(project, "/tmp/opensrp_test_out")
+        strategy._form_id = "demo"
+        strategy.questionnaires = {
+            "registration": {"id": "q-reg", "item": [{"linkId": "b", "type": "string"}]},
+            "main": {"id": "q-main", "item": [{"linkId": "a", "type": "string"}]},
+        }
+        strategy.process_chain = ["registration", "main"]
+        strategy.libraries = {"registration": {"id": "lib-reg"}}
+        pd = strategy.generate_intervention_plandefinition("1.0.0")
+        self.assertEqual(
+            pd["library"], [f"{strategy.base_url}/Library/lib-reg"]
         )
 
     def test_generate_composition_structure(self):

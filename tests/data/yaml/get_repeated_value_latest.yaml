@@ -8,6 +8,7 @@ process: main
 nodes:
   - id: start
     type: start
+    form_id: get_repeated_value_latest
     label: "Start"
     name: start_grv
 

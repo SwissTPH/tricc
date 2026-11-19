@@ -8,6 +8,7 @@ process: main
 nodes:
   - id: start
     type: start
+    form_id: select_example
     label: "Start"
 
   - id: q_fever

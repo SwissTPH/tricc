@@ -1,0 +1,18 @@
+id: triage
+name: triage
+title: Triage
+process: main
+params:
+  - {name: lab_available, type: boolean, default: false}
+nodes:
+  - {id: t-s, type: start}
+  - {id: t-ax, type: block, link: measure-temperature, args: {site: axillary}}
+  - {id: t-re, type: block, link: measure-temperature, args: {site: rectal, threshold: 38}}
+  - {id: t-lab, type: note, name: lab_note, label: "Lab: {{lab_available}}",
+     relevance: "{{lab_available}}"}
+  - {id: t-e, type: end, name: the_end}
+edges:
+  - {source: t-s, target: t-ax}
+  - {source: t-ax, target: t-re}
+  - {source: t-re, target: t-lab}
+  - {source: t-lab, target: t-e}

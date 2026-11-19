@@ -8,7 +8,7 @@ from tricc_oo.models.calculate import TriccNodeActivityStart
 from tricc_oo.models.tricc import (
     TriccNodeActivity,
     TriccNodeMainStart,
-    TriccProject,
+    TriccIntervention,
     TriccSegment,
     node_container_for_root,
 )
@@ -55,7 +55,7 @@ def test_yaml_two_main_starts_same_process_both_indexed():
     # Build pages only (no execute_linked_process / walk).
     path = Path("tests/data/yaml/inheritance_versioning_basic.yaml")
     strategy = YamlStrategy(str(path))
-    project = TriccProject()
+    project = TriccIntervention()
     for doc in yaml_lib.safe_load_all(path.read_text(encoding="utf-8")):
         if not doc:
             continue

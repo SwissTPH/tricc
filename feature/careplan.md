@@ -2,12 +2,16 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft |
+| **Status** | Superseded |
 | **Branch target** | TBD (design discussion only — no implementation branch yet) |
-| **Related** | `feature/carePlan.md` (user's own draft — merged into this document, see §0), `docs/open-srp-export.md`, `feature/careplan-intervention-plandefinition.md` (Implemented — process-level nesting), `docs/desing/FHIRcore.md`, `docs/tricc-elements.md`, `docs/visual-authoring-concepts.md` |
+| **Related** | **Superseded by `feature/20260915-intervention-start.md`** (YAML `start:` on-demand + follow-up). `feature/carePlan.md` (user's own draft — merged into this document, see §0), `docs/open-srp-export.md`, `feature/careplan-intervention-plandefinition.md` (Implemented — process-level nesting), `docs/desing/FHIRcore.md`, `docs/tricc-elements.md`, `docs/visual-authoring-concepts.md` |
 | **Authoring surface** | draw.io (new node types), YAML fixtures (for future tests) |
 
 Valid status values: `Draft` → `Approved` → `Implemented` → `Superseded`.
+
+**Superseded 2026-09-15.** On-demand launch and follow-up tasks are authored in `tricc.yaml`
+`start:` (`on: demand` / `on: follow_up`), not as drawing-level `schedule` nodes. See
+`feature/20260915-intervention-start.md`.
 
 ---
 

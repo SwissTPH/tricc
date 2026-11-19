@@ -28,6 +28,7 @@ import re
 import unittest
 from unittest.mock import MagicMock
 
+from tricc_oo.converters.fhir.cql_value import cql_helper_value_block
 from tricc_oo.converters.fhir.populate_helper import cql_helper_populate_block
 from tricc_oo.converters.fhir.repeat_helper import cql_helper_repeat_block
 from tricc_oo.strategies.output.fhir_form import (
@@ -45,6 +46,7 @@ def _helper_cql() -> str:
         fhir_version=FHIR_VERSION,
         repeat_helpers=cql_helper_repeat_block(FHIR_VERSION),
         populate_helpers=cql_helper_populate_block(),
+        value_helpers=cql_helper_value_block(),
     )
 
 
@@ -70,13 +72,15 @@ class TestHelperCqlIsTranslatable(unittest.TestCase):
 
     def test_no_undeclared_codesystem_reference(self):
         # Nothing may reference a `codesystem` the library does not declare.
-        self.assertNotIn("codesystem", self.helper.lower().split("define")[0])
-        self.assertNotIn('~ "active"', self.helper)
+        # Comments are stripped: they legitimately explain why these constructs are gone.
+        code = re.sub(r"//[^\n]*", "", self.helper)
+        self.assertNotIn("codesystem", code.lower().split("define")[0])
+        self.assertNotIn('~ "active"', code)
 
     def test_codes_matched_against_coding_at_runtime(self):
-        self.assertIn("define function ObservationHasCode(O Observation, code String)", self.helper)
-        self.assertIn("define function ConditionHasCode(C Condition, code String)", self.helper)
-        self.assertIn("exists (O.code.coding C where C.code = code)", self.helper)
+        self.assertIn("define function ObservationHasCode(O Observation, conceptCode String)", self.helper)
+        self.assertIn("define function ConditionHasCode(C Condition, conceptCode String)", self.helper)
+        self.assertIn("exists(O.code.coding C where C.code = conceptCode)", self.helper)
 
     def test_function_query_sources_are_parenthesized(self):
         # `GetObservations(code) O where …` is a syntax error; the source needs parens.
@@ -88,12 +92,13 @@ class TestHelperCqlIsTranslatable(unittest.TestCase):
     def test_repeat_index_casts_through_fhir_integer(self):
         # `extension.value as Integer` cannot cast a FHIR choice to System.Integer.
         self.assertNotIn("value as Integer", self.helper)
-        self.assertIn("(E.value as FHIR.integer).value", self.helper)
+        self.assertIn("FHIRHelpers.ToInteger(E.value as FHIR.integer)", self.helper)
 
     def test_sort_by_casts_choice_elements(self):
         self.assertNotIn("sort by effective", self.helper)
-        self.assertIn("sort by (effective as FHIR.dateTime)", self.helper)
-        self.assertIn("sort by (recordedDate as FHIR.dateTime)", self.helper)
+        # Sorted on the System value so the key is comparable.
+        self.assertIn("sort by (effective as FHIR.dateTime).value desc", self.helper)
+        self.assertIn("sort by recordedDate.value desc", self.helper)
 
     def test_history_lookback_uses_skip_function_not_query_clauses(self):
         # CQL has no `skip`/`take` query clauses.
@@ -102,7 +107,7 @@ class TestHelperCqlIsTranslatable(unittest.TestCase):
         self.assertIn("Skip(", self.helper)
 
     def test_verification_status_compared_as_string(self):
-        self.assertIn("First(C.verificationStatus.coding CC return CC.code.value)", self.helper)
+        self.assertIn("First(C.verificationStatus.coding.code)", self.helper)
 
     def test_public_accessor_surface_is_unchanged(self):
         # The author-facing accessors are what generated Questionnaires reference;
@@ -130,6 +135,10 @@ class TestHelperCqlIsTranslatable(unittest.TestCase):
             "GetEncounterObservationValue",
             "GetEncounterConditionValue",
             "GetEncounterValue",
+            "GetProcedures",
+            "GetEncounterProcedureValue",
+            "GetHistoryProcedure",
+            "GetHistoryProcedureDate",
         ):
             self.assertIn(f"define function {fn}(", self.helper, f"missing {fn}")
 
@@ -137,6 +146,21 @@ class TestHelperCqlIsTranslatable(unittest.TestCase):
         self.assertIn("parameter encounterid String default null", self.helper)
         self.assertIn("O.encounter.reference = 'Encounter/' + encounterid", self.helper)
         self.assertIn("C.encounter.reference = 'Encounter/' + encounterid", self.helper)
+        self.assertIn("P.encounter.reference = 'Encounter/' + encounterid", self.helper)
+
+    def test_procedure_counts_only_completed_and_not_unsuccessful(self):
+        # #74: completed, and outcome not SNOMED 385671000 (a missing outcome counts);
+        # matched by code alone (fix/20260914-cql-retrieve-codesystem.md)
+        self.assertRegex(
+            self.helper,
+            r"define function IsDoneProcedure\(P Procedure\):\s+P\.status = 'completed'\s+"
+            r"and not exists\(P\.outcome\.coding O where O\.code = '385671000'\)",
+        )
+        self.assertEqual(self.helper.count("IsDoneProcedure(P)"), 2)
+
+    def test_procedure_repeat_slot_uses_the_observation_extension(self):
+        self.assertIn("define function ProcedureRepeatIndex(P Procedure):", self.helper)
+        self.assertIn("Coalesce(ProcedureRepeatIndex(P), 1) = Coalesce(repeatIndex, 1)", self.helper)
 
 
 class TestLibraryCanonicalUrl(unittest.TestCase):

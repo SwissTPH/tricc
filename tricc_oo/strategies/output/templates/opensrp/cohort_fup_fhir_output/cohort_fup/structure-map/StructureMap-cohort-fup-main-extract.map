@@ -1,0 +1,20 @@
+map "https://fhir.tricc.io/StructureMap/45c80721-8c5f-5760-87d6-e0df470265d4" = '45c80721-8c5f-5760-87d6-e0df470265d4'
+
+uses "http://hl7.org/fhir/StructureDefinition/QuestionnaireResponse" as source
+uses "http://hl7.org/fhir/StructureDefinition/Bundle" as target
+uses "http://hl7.org/fhir/StructureDefinition/Observation" as target
+uses "http://hl7.org/fhir/StructureDefinition/Condition" as target
+
+// Extraction driven by CodeSystem conceptType (Symptom-Finding → Observation,
+// Diagnosis / proposed_diagnosis → Condition provisional, AcceptDiag → confirmed/refuted).
+// Repeat slot (when repeat != 1) is written to https://fhir.tricc.io/StructureDefinition/observation-repeat-index.
+
+group extract(source src : QuestionnaireResponse, target bundle : Bundle) {
+  src -> bundle.type = 'transaction' "type";
+  src.item as item then extractItems(item, src, bundle) "walkItems";
+}
+
+group extractItems(source item, source src : QuestionnaireResponse, target bundle : Bundle) {
+  item.item as child then extractItems(child, src, bundle) "walkChildren";
+}
+

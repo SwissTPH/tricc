@@ -40,7 +40,7 @@ class OpenMRSStrategy(BaseOutPutStrategy):
 
     def __init__(self, project, output_path):
         super().__init__(project, output_path)
-        form_id = getattr(self.project.start_pages["main"], 'form_id', 'openmrs_form')
+        form_id = self.project.intervention_name() or "openmrs_form"
         self.form_data = {
             "$schema": "http://json.openmrs.org/form.schema.json",
             "name": form_id,
@@ -368,11 +368,12 @@ class OpenMRSStrategy(BaseOutPutStrategy):
         if hasattr(self.project.start_pages["main"], 'label') and self.project.start_pages["main"].label:
             self.form_data["name"] = self.project.start_pages["main"].label.strip()
         elif hasattr(node, 'label') and node.label:
-            self.form_data["name"] = node.label.strip()
+            name = node.label if isinstance(node.label, str) else str(node.label)
+            self.form_data["name"] = name.strip()
         return True
 
     def export(self, start_pages, version):
-        form_id = start_pages["main"].root.form_id or "openmrs_form"
+        form_id = self.project.intervention_name() or "openmrs_form"
         file_name = f"{form_id}.json"
         newpath = os.path.join(self.output_path, file_name)
         if not os.path.exists(self.output_path):

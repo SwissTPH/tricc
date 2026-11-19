@@ -17,10 +17,11 @@ This page documents TRICC modeling elements and their meaning based on:
 - `note`: informational text shown to users. Display fields (`label`, `hint`,
   `help`, `constraint_message`, `required_message`) on **display models only**
   may embed ODK/JS-style value injection with `${field_name}` (e.g.
-  `Patient is ${age} years`). Parsed at input load into concatenate operations,
-  resolved during processing, re-exported as `${export_name}` for ODK/CHT and as
-  concatenate expressions for FHIR. Not applied to calculates or rhombus.
-  See `feature/display-text-injection.md`.
+  `Patient is ${age} years`). Parsed at input load into a message tree (`TriccMessage`)
+  that keeps bold/italic/lists around live values, resolved during processing,
+  re-exported as Markdown with `${export_name}` for ODK/CHT and as static Markdown plus
+  a serialize-time concatenate FHIRPath for FHIR. Not applied to calculates or rhombus.
+  See `feature/display-text-injection.md` and `feature/20260909-display-message-ast.md`.
 - `select_one`: single-choice question.
 - `select_multiple`: multiple-choice question.
 - `select_yesno`: yes/no convenience selection. In FHIR output this typically becomes a native `boolean` item type (preferred over `choice` for simple yes/no questions). OpenSRP export also attaches `questionnaire-choiceOrientation` = `horizontal` on visible boolean/yes-no items so Yes/No render side by side; hidden booleans (calculates, diagnoses, waits) do not.
@@ -34,6 +35,27 @@ This page documents TRICC modeling elements and their meaning based on:
   optional `period` (ISO Duration/Period; default `P1Y` for `history` only),
   optional `repeat` (read slot). Excluded from activity `repeat` propagation.
   See `feature/populate-context.md`.
+  - **Carrying a value across forms / visits** (FHIR / openSRP): use `context=history`. It
+    reads the most recent stored value within `period` (e.g. `P3M` = last 3 months), from
+    any earlier form or visit; `encounter` only sees the current visit.
+  - optional `source`: the concept to read, when it differs from the node's `name` — e.g. a
+    "previous weight" node `t_weight` with `source="weight_c"` reads what the Weight question
+    `weight_c` recorded, while flows keep referring to `t_weight`. Do not rename the node to
+    the question's name instead: two nodes with one name are merged as versions of one
+    concept. (FHIR / openSRP export only.)
+  - to carry a **computed status** (`X` calculated from today's answers and `t_X`), mark the
+    calculate `X` with `concept_type="observation"` so it is saved, and give `t_X`
+    `context=history source="X"`.
+  - `context=patient` reads the Patient record (FHIR / openSRP): `sex` / `gender` →
+    `Patient.gender` as the FHIR code (`female`, `male`, `other`, `unknown` — compare with these,
+    not `'1'`), `age` → whole years from `Patient.birthDate`, `birthdate` / `dob` → the birth
+    date. Other names stay empty (warning at export).
+  - a `context=history` node whose `source` is a **select_multiple** gets every option code of
+    the latest answer, space-separated (`metformin glibenclamide`); individual options can
+    also be carried on their own (`t_heart_failure` with `source="heart_failure"`).
+  - populate values are never written back on submit; the export warns when a populate node
+    reads a concept no form of the project records.
+  See `feature/20260929-cql-populate-wiring.md`.
 
 ## Option and list elements
 
@@ -72,7 +94,8 @@ This page documents TRICC modeling elements and their meaning based on:
 - `goto`: jump to another page/activity.
   - `instance` (default `1`): nested activity instance number; `0` auto-unique nested instance;
     **`-1` injects the target activity as a snippet** into the caller (inline nodes; no nested
-    activity / wait). See `feature/goto-snippet-injection.md`.
+    activity / wait). See `feature/goto-snippet-injection.md`. A [block](#blocks-and-parameters)
+    is the declared form of this reuse.
   - When two different `goto`s target the **same** `instance` number of the same activity
     (e.g. two callers both call `link: shared_module, instance: 1`), they resolve to the
     **identical shared `TriccNodeActivity` object** — see `TriccNodeActivity.make_instance`'s
@@ -81,6 +104,107 @@ This page documents TRICC modeling elements and their meaning based on:
     anyone" — see the `wait` entry below.
 - `link_in`, `link_out`: explicit cross-flow links.
 - `bridge`: bridge/helper connector.
+- `block`: use a [block](#blocks-and-parameters), with `link` and `args`.
+- `goto` may also carry `args` for a parameterized activity (see below).
+
+## Blocks and parameters
+
+A **block** is a reusable piece of flow, written once and used in many places with
+different settings. Spec: `feature/20261102-block-params-and-start-node.md`.
+
+- A block file (`blocks/<id>.block.yaml`, listed in tricc.yaml `blocks: [{id, path}]`)
+  has the shape of an activity. Its root is **`block_start`** and it ends at an
+  `activity_end`. A block is a template: never a start page, never exported on its own.
+- A **`block`** node uses it: `link` is the block's `block_start` name or its id, and
+  `args` gives the parameter values. Each use inlines one copy of the block.
+- `snippet_start` / `snippet` (the first names) are still read as `block_start` / `block`.
+
+### Parameters
+
+Any block, activity or process can have parameters, in a page-level `params` list:
+
+```yaml
+params:
+  - {name: site, type: choice, options: [axillary, rectal], required: true}
+  - {name: threshold, type: number, default: 37.5}
+```
+
+| `type` | Value | Becomes a dictionary concept |
+|--------|-------|:---:|
+| `boolean` | `true` / `false` | yes |
+| `number` | a number | yes |
+| `string` | text | yes |
+| `choice` | one of `options` | yes |
+| `name` | a name fragment (`[a-z0-9_]+`) | no |
+| `concept` | `{system, code}` or a code | no |
+| `expression` | a CQL expression | no |
+
+Values work like **function arguments**. For each parameter of a called page, the value is
+the first of: the call's `args` entry, the **caller's value of the same name** (inherited),
+the parameter's `default`. `args: {setting: "{{care_setting}}"}` passes a caller parameter
+under another name. At the top, the intervention's `args` (tricc.yaml) give the values.
+A parameter that a page's calls leave unbound is a parameter of that page too (computed),
+so it can come from further up. Errors stop the build and name the call chain: a required
+value missing, an argument the callee does not have, a value of the wrong type, the same name
+with two different types along a chain.
+
+Each primitive parameter is a concept `param_<owner>_<name>` of the calculate dictionary
+(`<owner>`: the declaring page's name, else its id). The project dictionary wins: tricc_oo
+only adds the concepts it lacks (kind `parameter`, `dataType`, `option`, `default`).
+The calculate dictionary is the CodeSystem tagged `meta.tag`
+`http://tricc.org/fhir/CodeSystem/codesystem-role|calculate`; else tricc.yaml
+`calculate_code_system`; else one named `calculate` or `<default>-calculate`.
+
+**draw.io.** A page declares its parameters on one `parameters` shape, one attribute
+`param.<name>` per parameter: JSON (`{"type": "string", "label": {"en": "Note"}}`) or the
+shorthand `type[(a|b)][!][=default]`, `!` meaning required (`choice(axillary|rectal)!`,
+`number=37.5`, `boolean=false`). A `block` (or `goto`) shape gives its values as
+`param.<name>` attributes too (`param.site = axillary`, `param.setting = {{care_setting}}`).
+(Not `param:<name>`: in XML a `:` starts a namespace prefix.)
+
+### Placeholders
+
+`{{name}}` puts a value in a node field. In expression fields (`relevance`, `calculate`,
+`expression`, `reference`, `constraint`, `min`, `max`, edge values) it becomes a literal:
+`'axillary'`, `37.5`, `true`, `"concept_code"`, `(expression)`. In text fields (`name`,
+`label`, `hint`, `help`, `save`, `constraint_message`) it is the plain text.
+`{{name|raw}}` puts plain text in an expression, for example to build a name:
+`"temp_{{site|raw}}" > {{threshold}}`. Placeholders are not allowed in `id`, `type`,
+`process`, `instance` or `link`.
+
+### A block used several times
+
+Each use inlines a new copy of the block, so its nodes exist once per use. Their **names**
+say whether the uses are the same concept or not ([Instance vs repeat](#instance-vs-repeat)):
+
+1. **Different things** (two measurements that must both be kept): the names must differ,
+   so put a parameter in them. One that already tells the uses apart can do it
+   (`temp_{{site}}` gives `temp_axillary` and `temp_rectal`). When none does, add one only
+   for the name, of type `name`:
+
+   ```yaml
+   params:
+     - {name: prefix, type: name, required: true}
+   nodes:
+     - {id: t, type: decimal, name: "{{prefix}}_temp"}
+   ```
+
+   used with `args: {prefix: admission}` and `args: {prefix: discharge}`.
+2. **The same concept, collected once** (the block is reached from several places, the value
+   is the same): keep the same names. This is an instance: same name, same `repeat`. At node
+   level, TRICC keeps each copy as a version of the one concept (`_Vv_<n>`); a later copy is
+   not asked again once the concept is captured, and readers see the merged value. (A `goto`
+   to an activity handles the same case by reuse instead: one activity instance, wrapped
+   between a bridge and a wait for each call site.)
+3. **The same concept, collected again** (the same measurement repeated later in the visit):
+   keep the same names and give each use its own `repeat` slot on the `block` node
+   (`repeat: 1`, `repeat: 2`). The fields become `temp_axillary` and `temp_axillary_Rr_2`,
+   following [Concept repeat](#concept-repeat). Its skip rule currently keys on the slot
+   drawn on the node, not on a `repeat` set on the call, so today the second slot is only
+   asked when the first is empty.
+
+Names without a placeholder keep the earlier behaviour (each copy gets its own
+instance-band suffix).
 
 ## Diagnosis/classification elements
 
@@ -94,6 +218,12 @@ Scratchpad includes reusable patterns for:
 - `container_hint_media` container blocks.
 - `hint-message` and `help-message`.
 - image-linked enrichment blocks.
+
+A picture attached to a question or option is stored under `media-tmp/images/`.
+Project-level `parameters.image_max_width` / `image_max_height` in `tricc.yaml`
+shrink oversized bitmaps (aspect ratio kept, never upscaled). On the image shape
+itself, `max_width` / `max_height` override that cap for one side (`0` = no cap).
+See `feature/20260907-project-config.md`.
 
 These are attached through edges and enrich target question nodes during conversion.
 
@@ -111,7 +241,9 @@ Examples used across element families:
 - `constraint`, `constraint_message`
 - `relevance`, `priority`
 - `save`, `expression`, `trigger`
-- `reference`, `instance`, `process`, `form_id`
+- `reference`, `instance`, `process`
+- `form_id` — deprecated: names the form only for a project without `tricc.yaml`
+  `interventions` (otherwise ignored with a warning; use `interventions[].name`)
 - `repeat` — concept capture slot (see [Concept repeat](#concept-repeat) below)
 
 ## Instance vs repeat
@@ -148,7 +280,17 @@ integer `repeat` on a capture node or on `activity_start`.
 **Defaults and rules:**
 
 - Omitted `repeat` behaves as **`repeat=1`** (backward compatible with existing diagrams).
-- Same `name` + same `repeat` in a later activity is skipped if already captured (encounter-wide).
+- Same `name` + same `repeat` in a later activity is **not re-asked** if already captured
+  (encounter-wide). Different `repeat` values (e.g. `1` then `2`) **are** re-asked — that is
+  how ETAT re-enters age after “estimated weight does not make sense?” = No.
+- That hide applies when the **widget is printed** (`relevant` / FHIR `enableWhen`), not on
+  graph `node.relevance`. Path/bridge calculates (`pFPb…`) stay true if you arrived **or** the
+  earlier slot already has a value, so glucose and treatments still follow the inherited Yes/No.
+  Issue write-up: `fix/20260914-skip-display-not-path.md`.
+- Skip keys on the **author slot** (`repeat_authored`): omitted/`1` vs `2` on the node, not on
+  `instance` (second page instance) and not only on the export `_Rr_` suffix. An activity-level
+  `repeat` still overrides effective `repeat` for export names; skip keeps the drawing’s slot.
+- `repeat=-1` is never skip-suppressed and is never a skip source.
 - **No cross-repeat inheritance** — a value at `repeat=1` is not merged into logic at `repeat=2`.
 - Export suffix **`_Rr_<n>` only when `repeat > 1`** (alongside `_Vv_<n>` version and `_Ii_<n>` instance suffixes). Values `0` and `-1` do not get `_Rr_`.
 - `repeat=0` on `populate` / pre-filled nodes forces in-form collection even when pre-encounter data exists.
@@ -216,8 +358,9 @@ Full concept-repeat specification: `feature/concept-repeat.md` (status: Implemen
 
 ## Edge labels (conditional flow)
 
-During draw.io conversion (`process_edges` in `xml_to_tricc.py`), arrow labels are
-interpreted as branch semantics. Labels are case-insensitive unless noted.
+Arrow labels (draw.io) and edge `value`s (YAML) are interpreted as branch semantics by
+the same routine (`process_edge_label` in `xml_to_tricc.py`). Labels are case-insensitive
+unless noted.
 
 | Label pattern | Meaning | Typical source node |
 |---------------|---------|---------------------|
@@ -227,6 +370,14 @@ interpreted as branch semantics. Labels are case-insensitive unless noted.
 | *(empty)* | Treated as **yes** on `rhombus` out-edges | `rhombus` |
 | Integer factor (`-1`, `+2`, `3`, …) | **Yes** branch with optional score factor | `rhombus`, selects, calculates |
 | Reserved expression tokens | Condition edge → may insert a nested `rhombus` | Any calculate-capable node |
+| `Answer("<code>")` | Condition on the answer, as CQL; `<code>` is the answer concept (option concept code or name): `"<option name>" in $this` (select_one / select_multiple), `$this is true` / `$this is false` for `Answer("yes")` / `Answer("no")` (select_yesno); inserts a rhombus like any condition edge. `Answer('<code>')` is still read | `select_one`, `select_multiple`, `select_yesno` |
+
+In a CQL condition, the answer side of `in` / `contains` is a code: `"rash" in $this` and
+`'rash' in $this` both mean `selected(${q}, 'rash')`. The identifier is never read as a node.
+
+Every out-edge of a `select_yesno` needs `yes`, `no` or `follow`: an unlabelled one stops
+the conversion. In YAML, a `select_yesno` without `options` gets the built-in yes / no
+options (list `yes_no`), as in draw.io.
 
 **Integer factors on rhombus:** a numeric out-edge label (for example `-1` on a
 condition gate feeding a `count` node) is treated as an affirmative (**yes**) path.

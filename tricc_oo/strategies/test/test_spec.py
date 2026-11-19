@@ -107,7 +107,7 @@ def expression_text(value: Any) -> Optional[str]:
 
 
 def label_text(label: Any, lang_code: str = "en") -> Optional[str]:
-    """Flatten a ``DisplayText`` (str, multi-language dict or operation) to one string.
+    """Flatten a ``DisplayText`` (str, multi-language dict or message) to one string.
 
     Args:
         label: The node label.
@@ -126,6 +126,12 @@ def label_text(label: Any, lang_code: str = "en") -> Optional[str]:
             # Fall back to any language rather than losing the label entirely.
             chosen = next(iter(label.values()))
         return label_text(chosen, lang_code)
+    from tricc_oo.models.message import TriccMessage
+    from tricc_oo.visitors.text_injection import serialize_injection_for_js_text
+
+    if isinstance(label, TriccMessage):
+        text = serialize_injection_for_js_text(label).strip()
+        return text or None
     return str(label).strip() or None
 
 
@@ -517,14 +523,24 @@ class TestSpecStrategy(BaseTestStrategy):
 
     @staticmethod
     def edges(observed: Dict[str, Any]) -> List[dict]:
-        """Derive edges between exported nodes from ``next_nodes``."""
+        """Derive edges between exported nodes from ``next_nodes``.
+
+        A node the model does not hold (path bridge, exclusive, …) is walked through
+        to the next exported nodes, so every edge ends on a known node.
+        """
         result: List[dict] = []
         seen = set()
         by_id = {id(node): name for name, node in observed.items()}
         for source_name, node in observed.items():
-            for target in getattr(node, "next_nodes", None) or []:
-                target_name = by_id.get(id(target)) or safe_export_name(target)
+            queue = list(getattr(node, "next_nodes", None) or [])
+            walked = set()
+            while queue:
+                target = queue.pop(0)
+                target_name = by_id.get(id(target))
                 if not target_name:
+                    if id(target) not in walked:
+                        walked.add(id(target))
+                        queue.extend(getattr(target, "next_nodes", None) or [])
                     continue
                 key = (source_name, target_name)
                 if key in seen:

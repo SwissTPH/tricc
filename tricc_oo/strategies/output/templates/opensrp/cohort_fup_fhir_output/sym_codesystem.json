@@ -1,0 +1,43 @@
+{
+    "resourceType": "CodeSystem",
+    "id": "sym",
+    "url": "http://example.com/fhir/CodeSystem/sym",
+    "version": "1.0.0",
+    "name": "sym",
+    "title": "sym",
+    "status": "draft",
+    "description": "Code system for sym",
+    "content": "complete",
+    "concept": [
+        {
+            "id": "ef3a3b80-ae8e-5766-bfe2-03b043a18c80",
+            "code": "sym.s.ds",
+            "display": "danger sign",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        },
+        {
+            "id": "66d7614d-2190-5e26-b3af-86dbb296dcc1",
+            "code": "sym.s.dsp",
+            "display": "danger sign during pregnancy",
+            "property": [
+                {
+                    "code": "dataType",
+                    "valueString": "Boolean"
+                },
+                {
+                    "code": "conceptType",
+                    "valueString": "Calculation"
+                }
+            ]
+        }
+    ]
+}

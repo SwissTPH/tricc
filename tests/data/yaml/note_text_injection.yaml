@@ -7,6 +7,7 @@ process: main
 nodes:
   - id: start
     type: start
+    form_id: note_injection
     label: "Start"
 
   - id: age

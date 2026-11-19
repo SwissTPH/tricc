@@ -1,18 +1,40 @@
 from collections import OrderedDict
 from collections.abc import Iterable, Sequence
+from itertools import islice
+
 from pydantic import GetCoreSchemaHandler
 from pydantic_core import CoreSchema
 
 
 class OrderedSet(Sequence):
+    """Insertion-ordered unique collection.
+
+    Backed by ``OrderedDict`` so ``insert_at_top`` / ``pop`` from the front stay
+    O(1). Copy, union, and search avoid allocating a full key list on each call.
+    """
+
+    __slots__ = ("_od",)
+
     def __init__(self, iterable=None):
-        self._od = OrderedDict.fromkeys(iterable or [])
+        if isinstance(iterable, OrderedSet):
+            self._od = iterable._od.copy()
+        elif iterable:
+            self._od = OrderedDict.fromkeys(iterable)
+        else:
+            self._od = OrderedDict()
 
     def copy(self):
-        return OrderedSet(list(self._od.keys()))
+        clone = OrderedSet.__new__(OrderedSet)
+        clone._od = self._od.copy()
+        return clone
 
     def add(self, item):
         self.insert_at_bottom(item)
+
+    append = add
+
+    def discard(self, item):
+        self._od.pop(item, None)
 
     def remove(self, item):
         del self._od[item]
@@ -20,10 +42,11 @@ class OrderedSet(Sequence):
     def pop(self):
         return self._od.popitem(last=False)[0]
 
+    def clear(self):
+        self._od.clear()
+
     def insert_at_top(self, item):
-        # Add item if not already present
         self.insert_at_bottom(item)
-        # Move item to the top
         self._od.move_to_end(item, last=False)
 
     def insert_at_bottom(self, item):
@@ -36,30 +59,54 @@ class OrderedSet(Sequence):
     def __iter__(self):
         return iter(self._od)
 
+    def __reversed__(self):
+        return reversed(self._od)
+
     def __len__(self):
         return len(self._od)
+
+    def __bool__(self):
+        return bool(self._od)
 
     def __repr__(self):
         return f"{type(self).__name__}({list(self._od.keys())})"
 
     def _add_items(self, items):
+        od = self._od
+        if isinstance(items, OrderedSet):
+            items = items._od
         for item in items:
-            if item not in self:
-                self.insert_at_bottom(item)
+            if item not in od:
+                od[item] = None
 
     def __eq__(self, other):
-        if not isinstance(other, self.__class__):
+        if not isinstance(other, OrderedSet):
             return False
-        else:
-            return self._od.keys() == other._od.keys()
+        # KeysView equality is set-like (order-insensitive), matching the previous
+        # OrderedDict.keys() comparison.
+        return self._od.keys() == other._od.keys()
 
-    # Union method (| operator)
+    def same_members(self, other):
+        """True if both collections contain the same items, ignoring order."""
+        if other is self:
+            return True
+        if len(self._od) != len(other):
+            return False
+        od = self._od
+        return all(item in od for item in other)
+
     def __or__(self, other):
         if not isinstance(other, Iterable):
             raise TypeError(f"Unsupported operand type(s) for |: 'OrderedSet' and '{type(other).__name__}'")
         new_set = self.copy()
         new_set._add_items(other)
         return new_set
+
+    def __ior__(self, other):
+        if not isinstance(other, Iterable):
+            raise TypeError(f"Unsupported operand type(s) for |=: 'OrderedSet' and '{type(other).__name__}'")
+        self._add_items(other)
+        return self
 
     def union(self, other):
         return self.__or__(other)
@@ -74,48 +121,41 @@ class OrderedSet(Sequence):
         return self.__getitem__(index)
 
     def __getitem__(self, index):
-        try:
+        n = len(self._od)
+        if isinstance(index, slice):
             return list(self._od.keys())[index]
-        except IndexError:
+        if index < 0:
+            index += n
+        if index < 0 or index >= n:
             raise IndexError("Index out of range") from None
+        return next(islice(self._od, index, index + 1))
 
     def sort(self, key=None, reverse=False):
-        sorted_keys = sorted(self._od.keys(), key=key, reverse=reverse)
-        self._od = OrderedDict.fromkeys(sorted_keys)
+        self._od = OrderedDict.fromkeys(sorted(self._od, key=key, reverse=reverse))
 
     def find_last(self, filter: callable):
-        # Iterate over items in reverse order
-        for item in reversed(list(self._od.keys())):
+        for item in reversed(self._od):
             if filter(item):
                 return item
-        return None  # Return None if no matching item is found
+        return None
 
     def find_first(self, filter: callable):
-        for item in list(self._od.keys()):
+        for item in self._od:
             if filter(item):
                 return item
-        return None  # Return None if no matching item is found
+        return None
 
     def find_prev(self, obj, filter: callable):
-        # Get the list of keys (items) in the OrderedSet
-        keys = list(self._od.keys())
-
-        # If the object is not in the OrderedSet, start from the end
-        if obj not in self._od:
-            start_index = len(keys)
-        else:
-            # Find the index of the given object
-            start_index = keys.index(obj)
-
-        # Iterate backward from the start_index
-        for i in range(start_index - 1, -1, -1):
-            item = keys[i]
+        seen_obj = obj not in self._od
+        for item in reversed(self._od):
+            if not seen_obj:
+                if item == obj:
+                    seen_obj = True
+                continue
             if filter(item):
                 return item
-
-        return None  # Return None if no matching item is found before the object
+        return None
 
     @classmethod
     def __get_pydantic_core_schema__(cls, source_type: type, handler: GetCoreSchemaHandler) -> CoreSchema:
-        # Define how Pydantic should handle this type
-        return handler.generate_schema(list)  # Treat it as a list for validation purposes
+        return handler.generate_schema(list)

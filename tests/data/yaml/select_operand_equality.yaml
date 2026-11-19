@@ -57,6 +57,7 @@ edges:
     target: q_yn
   - source: q_yn
     target: q_sel
+    value: follow
   - source: q_sel
     target: q_on_yes
   - source: q_on_yes

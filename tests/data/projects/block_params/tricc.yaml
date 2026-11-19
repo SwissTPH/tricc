@@ -1,0 +1,16 @@
+# Parameterized blocks and activities (feature/20261102-block-params-and-start-node.md).
+title: Block params
+input_strategy: YamlStrategy
+output_strategies:
+  - XLSFormStrategy
+blocks:
+  - id: measure-temperature
+    path: blocks/measure-temperature.block.yaml
+interventions:
+  - id: sick
+    name: sick
+    title: Sick child
+    activity:
+      - activities/triage.activity.yaml
+    args:
+      lab_available: true
