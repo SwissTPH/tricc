@@ -93,12 +93,34 @@ interventions:
   - A row's concept is its node's explicit YAML `concept`, else the concept whose code
     is the node name. Designation text is used as is (`${name}` tokens are not remapped
     to export names).
-- **`libraries`** lists CQL files. Each `define name: <expression>` becomes a
+- **`libraries`** lists CQL files, parsed with the CQL grammar (a syntax error stops the
+  build with the file and line). Each `define name: <expression>` becomes a
   calculate that any activity can reference by name, processed like a free-floating
   calculate on the main page (computed once its references are available). Only
   expression defines are supported: declarations (`library`, `using`, `include`,
-  `context`, …) are ignored, functions are rejected, names must be plain identifiers,
-  and a name may be defined once across all libraries.
+  `context`, …) are ignored, functions with a body are rejected, names must be plain
+  identifiers, and a name may be defined once across all libraries.
+  A function declares what a call written as is returns, so outputs can type its value
+  (the FHIR item type of a calculate using it). CQL documentation tags in the comment just
+  before it add data about it:
+
+  ```cql
+  /*
+  @description: Weight-for-age z-score from the WHO tables
+  @retrieve: false
+  */
+  define function Zscore(chart String, sex String, value Decimal) returns FHIR.decimal: external
+  ```
+
+  - `returns` is required: a FHIR data type (`FHIR.boolean`, `FHIR.integer`,
+    `FHIR.decimal`, `FHIR.string`, `FHIR.date`, `FHIR.dateTime`, …) or its CQL System
+    name (`Decimal`).
+  - `external` means a declaration only, never written into generated CQL. Functions with
+    a body (real CQL) are not supported yet.
+  - Only `@retrieve: false` marks a value that depends only on its arguments, so it can
+    be folded as a constant. Without the tag (or with `@retrieve: true`) the function is
+    assumed to read recorded data and is never folded.
+  - Names match case-insensitively; `zscore` / `izscore` are `decimal` unless declared.
 - **`retrieve_code_system`** names the retrieval dictionary (CodeSystem url, id or
   name): data read before the consultation, referenced in expressions as `"#name"`.
   A CodeSystem tagged `meta.tag` `http://tricc.org/fhir/CodeSystem/codesystem-role|retrieve`

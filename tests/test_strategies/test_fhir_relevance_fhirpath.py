@@ -57,11 +57,13 @@ class TestConvertExpressionToFhirpath(unittest.TestCase):
         self.assertIn(".value", expr)
         self.assertNotIn("valueCoding", expr)
 
-    def test_isnottrue_uses_not_equal(self):
+    def test_isnottrue_is_true_when_unanswered(self):
+        # `X != true` is empty for an unanswered X; CQL `is not true` is true for null.
         op = TriccOperation(TriccOperator.ISNOTTRUE, [TriccReference("smoker")])
         expr = self.strategy.convert_expression_to_fhirpath(op)
         self.assertNotIn("is not true", expr)
-        self.assertIn("!= true", expr)
+        self.assertNotIn("!= true", expr)
+        self.assertIn(".where($this = true).empty()", expr)
 
     def test_isnull_uses_empty_not_cql_is_null(self):
         op = TriccOperation(TriccOperator.ISNULL, [TriccReference("age")])
@@ -867,7 +869,7 @@ class TestNonAnswerableOperandInlinesRelevance(unittest.TestCase):
         )
 
         self.assertNotIn(".answer", expr)
-        self.assertEqual(expr, "(true = true)")
+        self.assertEqual(expr, "(true.where($this = true).exists())")
 
     def test_relevance_cycle_fails_open_to_true(self):
         first = self._activity("first")
@@ -882,7 +884,10 @@ class TestNonAnswerableOperandInlinesRelevance(unittest.TestCase):
         self.assertNotIn(".answer", expr)
         self.assertNotIn("linkId='first'", expr)
         self.assertNotIn("linkId='second'", expr)
-        self.assertEqual(expr, "(((((true = true)) = true)) = true)")
+        self.assertEqual(
+            expr,
+            "(((((true.where($this = true).exists())).where($this = true).exists())).where($this = true).exists())",
+        )
 
     # ---------------------------------------------------------------- regressions
     def test_answerable_node_operand_is_unchanged(self):
@@ -896,7 +901,7 @@ class TestNonAnswerableOperandInlinesRelevance(unittest.TestCase):
         )
         self.assertEqual(
             calc_expr,
-            "(%resource.repeat(item).where(linkId='danger').answer.where($this.exists()).value = true)",
+            "(%resource.repeat(item).where(linkId='danger').answer.where($this.exists()).value.where($this = true).exists())",
         )
 
         select_expr = self.strategy.convert_expression_to_fhirpath(

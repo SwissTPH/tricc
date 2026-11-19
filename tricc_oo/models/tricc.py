@@ -566,6 +566,10 @@ class TriccIntervention(BaseModel):
     # Calculates from the tricc.yaml ``libraries`` (CQL defines); attached to the main
     # start page as dangling calculates, i.e. stashed next to the root.
     library_calculates: List[Any] = []
+    # Functions the tricc.yaml ``libraries`` declare, by name: FunctionSignature (return
+    # type, arguments, CQL documentation tags such as @retrieve); see
+    # tricc_oo.converters.cql_library.function_signature
+    function_signatures: Dict[str, Any] = {}
     # block pages (rooted by block_start), by id: templates, never start pages
     blocks: Dict[str, Any] = {}
 
