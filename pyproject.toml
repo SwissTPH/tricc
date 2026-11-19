@@ -27,6 +27,7 @@ dependencies = [
     "antlr4-tools==0.2.1",
     "beautifulsoup4",
     "ocldev",
+    "six",  # ocldev imports six without declaring it
     "pyxform",
     "Sympy",
     "PyYAML",
