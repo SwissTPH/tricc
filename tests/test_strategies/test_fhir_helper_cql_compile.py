@@ -47,6 +47,7 @@ def _helper_cql() -> str:
         repeat_helpers=cql_helper_repeat_block(FHIR_VERSION),
         populate_helpers=cql_helper_populate_block(),
         value_helpers=cql_helper_value_block(),
+        content_version="1.0.0",
     )
 
 

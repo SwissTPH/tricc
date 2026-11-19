@@ -98,6 +98,7 @@ class TestFHIRStrategyRepeatCQL(unittest.TestCase):
             repeat_helpers=cql_helper_repeat_block(FHIR_VERSION),
             populate_helpers=cql_helper_populate_block(),
             value_helpers=cql_helper_value_block(),
+            content_version="1.0.0",
         )
         self.assertIn("define function GetRepeated", helper)
         self.assertIn("define function GetNumberOfRepeat", helper)
@@ -163,6 +164,7 @@ class TestHelperCQLConceptRetrieval(unittest.TestCase):
             repeat_helpers=cql_helper_repeat_block(FHIR_VERSION),
             populate_helpers=cql_helper_populate_block(),
             value_helpers=cql_helper_value_block(),
+            content_version="1.0.0",
         )
 
     def test_no_hardcoded_code_system(self):

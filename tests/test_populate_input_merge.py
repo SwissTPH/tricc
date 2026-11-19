@@ -294,6 +294,7 @@ class TestPatientDemographics(unittest.TestCase):
             library_id="demo-Helper", fhir_version=FHIR_VERSION,
             repeat_helpers=cql_helper_repeat_block(FHIR_VERSION),
             populate_helpers=cql_helper_populate_block(), value_helpers=cql_helper_value_block(),
+            content_version="1.0.0",
         )
         code = "\n".join(line for line in helper.splitlines() if not line.strip().startswith("//"))
         self.assertIsNone(re.search(r"(?<![\w.\[])Patient\.", code))
