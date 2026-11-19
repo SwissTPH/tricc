@@ -964,7 +964,8 @@ class YamlStrategy(BaseInputStrategy):
             # load_expressions is defensive; ignore non-fatal issues in test data
             pass
 
-        # Also handle direct string fields that may still be present
+        # Also handle direct string fields that may still be present (keep aligned with
+        # param_build.EXPRESSION_ATTRS)
         for field in ("relevance", "expression", "calculate"):
             raw = getattr(node, field, None)
             if isinstance(raw, str):

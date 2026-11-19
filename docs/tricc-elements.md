@@ -77,9 +77,9 @@ This page documents TRICC modeling elements and their meaning based on:
   Only tables referenced by the form are injected into the choices sheet.
   See `feature/cdss-zscore.md`.
 - `rhombus`: decision/condition gate using `reference` and labeled out-edges. The tested value
-  is a `"quoted"` reference: a bare name is text in CQL. A legacy bare name (`weight` with the
-  label `weight > 38?`) is read as the reference `"weight"` with a warning; any other constant
-  tested by a rhombus stops the build.
+  is a `"quoted"` reference: a bare name is text in CQL. A legacy reference that is a bare name
+  alone (`weight` with the label `weight > 38?`) is read as `"weight"` with a warning; a reference
+  that is any other constant alone (`38`) stops the build. CQL starting with a literal is accepted.
 - `factor`: sequence scoring node (non-display calculate). Created from numeric edge
   labels; stores the factor in `reference`, uses `path` for the branch condition.
   Expression semantics: **if path then factor else 0** (feeds `count` / `add` nodes).

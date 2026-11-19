@@ -41,17 +41,21 @@ class TestRhombus:
         assert isinstance(rh.expression_reference, TriccOperation)
         assert rh.expression_reference.reference[0] == TriccReference("weight")
 
-    @pytest.mark.parametrize("reference,label,expected", [
-        ("weight", "weight > 38?", '"weight"'),              # legacy: name + label condition
-        ("weight > 38", "Weight above 38", '"weight" > 38'),  # bare name in a comparison
-    ])
-    def test_bare_name_is_quoted_with_a_warning(self, caplog, reference, label, expected):
-        rh = rhombus(reference, label)
+    def test_legacy_bare_name_is_quoted_with_a_warning(self, caplog):
+        rh = rhombus("weight", "weight > 38?")
         with caplog.at_level(logging.WARNING):
             load_expressions(rh)
+        # quoted, the name is a reference again and takes the label's condition
+        assert isinstance(rh.expression_reference, TriccOperation)
         assert rh.expression_reference.reference[0] == TriccReference("weight")
-        assert any("bare name" in r.getMessage() and expected in r.getMessage() for r in caplog.records)
+        assert any("bare name" in r.getMessage() and '"weight"' in r.getMessage() for r in caplog.records)
+
+    def test_cql_starting_with_a_literal_is_accepted(self):
+        rh = rhombus('38 < "weight"', "Weight above 38")
+        load_expressions(rh)
+        assert isinstance(rh.expression_reference, TriccOperation)
+        assert TriccReference("weight") in rh.expression_reference.reference
 
     def test_constant_that_is_no_name_fails(self):
         with pytest.raises(TriccRhombusError):
-            load_expressions(rhombus("38 > 1", "Always"))
+            load_expressions(rhombus("38", "Always"))

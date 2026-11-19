@@ -790,8 +790,10 @@ advisory check (its validator has a tokenizer, not an operation tree):
 
 - 2026-11-19: no `{expression}` object: every argument is parsed, an operation or a `"quoted"`
   reference is dynamic, the rest is a literal. A bare identifier is text in all CQL
-  (`resolve_scv`). A rhombus whose tested value is a bare name (the legacy `weight` with the
-  label `weight > 38?`) has it quoted, with a warning; any other constant is `TriccRhombusError`.
+  (`resolve_scv`). A rhombus reference that is a bare name alone (the legacy `weight` with the
+  label `weight > 38?`) is quoted, with a warning; any other reference that parses to a constant
+  alone is `TriccRhombusError`. CQL that starts with a literal (`38 < "weight"`) is not refused
+  (@delcroip, PR #79 review).
   `TriccReference` no longer subclasses `TriccStatic` (`TriccValueMixin`). Safe: no project uses the YAML input
   yet (@delcroip, in conversation)
 

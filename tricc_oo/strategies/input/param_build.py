@@ -69,10 +69,12 @@ CALCULATE_SYSTEM = "calculate"
 #: a call of a rendered page, and the setter pointing it at the instance it must use
 RenderedCall = Tuple[CallSite, Callable[[str], None]]
 
-#: node attributes holding a parsed expression (references are read and renamed there)
+#: node attributes holding a parsed expression (references are read and renamed there).
+#: Keep aligned with the attributes the input strategies parse as CQL:
+#: ``converters/xml_to_tricc.load_expressions`` and the YAML input (``strategies/input/yaml.py``).
 EXPRESSION_ATTRS = (
     "relevance", "expression", "expression_reference", "reference", "constraint", "applicability",
-    "trigger", "calculate",
+    "trigger", "calculate", "default", "required",
 )
 #: concept properties that make a concept abstract; not copied to its concrete concepts
 ABSTRACT_PROPERTIES = ("notSelectable", "kind", "owner")
