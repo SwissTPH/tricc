@@ -138,8 +138,9 @@ class cqlToXlsFormVisitor(cqlVisitor):
         elif arg.lower() in ["true", "false"]:
             return TriccStatic(arg.lower() == "true")
         elif arg != "runner":
-            self.errors.append(f"'{arg}' will be poccessed as reference ")
-            return TriccReference(arg)
+            # A bare identifier is text: a reference is a "quoted" CQL identifier, a text
+            # literal 'quoted'; the legacy bare rhombus name is refused by its caller.
+            return TriccStatic(arg)
 
         else:
             return "runner"
@@ -250,7 +251,7 @@ class cqlToXlsFormVisitor(cqlVisitor):
 
     def visitInvocationExpressionTerm(self, ctx):
         result = super().visitInvocationExpressionTerm(ctx)
-        if isinstance(result, list) and all(isinstance(x, TriccStatic) for x in result):
+        if isinstance(result, list) and all(isinstance(x, (TriccStatic, TriccReference)) for x in result):
             value = ".".join([x.value for x in result])
             logger.warning(f"guessed reference for '{value}'")
             return TriccReference(value)
@@ -464,7 +465,19 @@ class CQLErrorListener(ErrorListener):
         self.errors.append(error)
 
 
-def transform_cql_to_operation(cql_input, context=None):
+def transform_cql_to_operation(cql_input, context=None, quiet=False):
+    """Parse a CQL expression into a TriccOperation / TriccReference / TriccStatic.
+
+    A bare identifier is text (``TriccStatic``); a reference is a ``"quoted"`` identifier.
+
+    Args:
+        cql_input: The expression.
+        context: Shown in error messages.
+        quiet: Do not report grammar errors (the caller treats unparsable input as text).
+
+    Returns:
+        The parsed expression, or None when it does not parse.
+    """
     lib_input = f"""
     library runner
 
@@ -486,7 +499,7 @@ def transform_cql_to_operation(cql_input, context=None):
 
     # Check for errors
     if error_listener.errors:
-        for error in error_listener.errors:
+        for error in [] if quiet else error_listener.errors:
             print(f"CQL Grammar Error: {error} \n in:\n {cql_input}")
         return None  # Or handle errors as appropriate for your use case
 

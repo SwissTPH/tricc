@@ -76,7 +76,10 @@ This page documents TRICC modeling elements and their meaning based on:
   filtered by `sex` + `y_min`/`y_max`. Phase 1 table: `wfa` (weight-for-age).
   Only tables referenced by the form are injected into the choices sheet.
   See `feature/cdss-zscore.md`.
-- `rhombus`: decision/condition gate using `reference` and labeled out-edges.
+- `rhombus`: decision/condition gate using `reference` and labeled out-edges. The tested value
+  is a `"quoted"` reference: a bare name is text in CQL. A legacy bare name (`weight` with the
+  label `weight > 38?`) is read as the reference `"weight"` with a warning; any other constant
+  tested by a rhombus stops the build.
 - `factor`: sequence scoring node (non-display calculate). Created from numeric edge
   labels; stores the factor in `reference`, uses `path` for the branch condition.
   Expression semantics: **if path then factor else 0** (feeds `count` / `add` nodes).
@@ -208,19 +211,22 @@ instance-band suffix).
 
 ### Values calculated at the call
 
-An argument can be an expression, evaluated where the block is used, with the names
-available there:
+Every argument is read as CQL. An operation or a `"quoted"` reference is evaluated where the
+block is used, with the names available there; anything else is a fixed value:
 
 ```yaml
 args:
-  site: axillary                                  # a fixed value
-  age: {expression: AgeInDays(), intent: {en: Age of the child in days}}
+  site: axillary            # a fixed value: a bare word is text
+  label: "'left arm'"       # a fixed value: a CQL text
+  age: AgeInDays()          # calculated at the use
+  weight_kg: '"weight" / 1000'
 ```
 
-draw.io: `param.age = {"expression":"AgeInDays()"}`. The calling page gets a hidden calculate
-(`arg_age_<digest>`, labelled by the `intent`) evaluated once at the use. Inside the block,
-`{{age}}` reads it: a reference in an expression, `${…}` in a text. Passed on to an inner block
-as `{{age}}`, the same calculate is used. It is never inherited by name.
+draw.io: the same text, `param.age = AgeInDays()`. The calling page gets a hidden calculate
+(`arg_age_<digest>`, labelled with the parameter name) evaluated once at the use. Inside the
+block, `{{age}}` reads it: a reference in an expression, `${…}` in a text. Passed on to an inner
+block as `{{age}}`, the same calculate is used. It is never inherited by name. A `concept`
+parameter reads `"body_temperature"` as that concept; `name` parameters are never parsed.
 
 Only a fixed value fits a parameter that shapes the drawing: one used in a node or option
 `name`, a `save`, a `{{p|raw}}`, a static decision, a literal argument of an inner call, or of

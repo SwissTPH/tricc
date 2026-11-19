@@ -39,7 +39,6 @@ from tricc_oo.models.params import (
     E_BLOCK_PRIVATE,
     E_BLOCK_SCOPE,
     E_PARAM_UNKNOWN,
-    EXPRESSION,
     PRIMITIVE_TYPES,
     TEXT,
     W_PARAM_UNREFERENCED,
@@ -511,19 +510,16 @@ class ParamBuild:
     def _dynamic_adder(self, rendered, call: CallSite, caller_id: str, where: str):
         """The ``add_dynamic`` callback of ``bind`` for one call of a rendered page.
 
-        It renders the argument's expression in the caller's environment, names its
+        ``bind`` gives the expression rendered in the caller's environment; this names its
         calculate ``arg_<parameter>_<digest of the use>`` and has the strategy add it to the
         calling page, where it is evaluated once, at the use.
         """
 
-        def add(name: str, arg: Dict[str, Any], caller_env: Env) -> str:
+        def add(name: str, expression: str, caller_env: Env) -> str:
             if self.add_calculate is None:
                 raise TriccParamError(E_ARG_DYNAMIC_STATIC, f"{where}: this input has no expression arguments")
-            expression = substitute(str(arg["expression"]), caller_env, EXPRESSION, f"{where}: parameter {name!r}")
             calc_name = f"arg_{name}_{_digest(f'{caller_id}/{call.node_id}/{name}')}"
-            lang = getattr(self.project, "lang_code", None) or "en"
-            label = _text(arg.get("intent"), lang) or name
-            self.add_calculate(rendered, call, calc_name, expression, label)
+            self.add_calculate(rendered, call, calc_name, expression, name)
             return calc_name
 
         return add

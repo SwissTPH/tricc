@@ -765,8 +765,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
     def get_tricc_operation_operand(self, r, coalesce_fallback="''"):
         # function transform an object to XLSFORM value
         # @param r reference to be translated
-        # TriccReference subclasses TriccStatic — check it first so field
-        # refs become ${name} and $this becomes '.' (not a quoted/static name).
+        # Field refs become ${name} and $this becomes '.' (not a quoted/static name).
         if isinstance(r, TriccOperation):
             return self.get_tricc_operation_expression(r)
         elif isinstance(r, TriccReference):

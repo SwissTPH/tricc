@@ -47,7 +47,7 @@ def test_cht_follow_up_js_and_parent_calculate(tmp_path):
             {
                 "on": "follow_up",
                 "intervention": "pediatrics",
-                "condition": "classification = 'pneumonia'",
+                "condition": "\"classification\" = 'pneumonia'",
                 "due": "3 d",
                 "window": {"before": "0 d", "after": "4 d"},
             }
@@ -132,7 +132,7 @@ def test_cht_follow_up_unknown_parent_name_fails(tmp_path):
         {
             "on": "follow_up",
             "intervention": "pediatrics",
-            "condition": "classification = 'pneumonia'",
+            "condition": "\"classification\" = 'pneumonia'",
             "due": "3 d",
         },
         parent_names=("other",),

@@ -15,6 +15,7 @@ from tricc_oo.converters.xml_to_tricc import parse_expression
 from tricc_oo.models.params import (
     DYNAMIC,
     E_ARG_DYNAMIC_STATIC,
+    E_PARAM_TYPE,
     E_BLOCK_PRIVATE,
     E_BLOCK_SCOPE,
     E_OUTPUT_UNKNOWN,
@@ -44,7 +45,7 @@ def add_age(block):
     block["edges"] += [{"source": "mt-f", "target": "mt-old"}, {"source": "mt-old", "target": "mt-e"}]
 
 
-AGE_ARG = {"expression": "AgeInDays()", "intent": {"en": "Age of the child in days"}}
+AGE_ARG = "AgeInDays()"
 
 
 # ---------------------------------------------------------------------------
@@ -85,10 +86,36 @@ class TestStoredDataFunctions:
 class TestExpressionArguments:
     def test_bind_calls_add_dynamic(self):
         seen = []
-        env = bind({"age": spec("age", "number")}, {"age": {"expression": "AgeInDays()"}}, {}, "use",
-                   add_dynamic=lambda name, arg, caller_env: seen.append(arg) or "arg_age_x")
+        env = bind({"age": spec("age", "number")}, {"age": "AgeInDays()"}, {}, "use",
+                   add_dynamic=lambda name, expression, caller_env: seen.append(expression) or "arg_age_x")
         assert env["age"][1] == {DYNAMIC: "arg_age_x"}
-        assert seen == [{"expression": "AgeInDays()"}]
+        assert seen == ["AgeInDays()"]
+
+    def test_placeholders_rendered_as_expression(self):
+        seen = []
+        caller = {"t": (spec("t", "number"), 38)}
+        bind({"age": spec("age", "number")}, {"age": '"weight" > {{t}}'}, caller, "use",
+             add_dynamic=lambda name, expression, caller_env: seen.append(expression) or "c")
+        assert seen == ['"weight" > 38']
+
+    @pytest.mark.parametrize("arg,expected", [
+        ("axillary", "axillary"),        # a bare word is text
+        ("'axillary'", "axillary"),      # a CQL text literal
+        ("left arm", "left arm"),        # not CQL: text
+        ("007", "007"),                  # a number written for a string stays as written
+    ])
+    def test_literals_are_not_expressions(self, arg, expected):
+        env = bind({"s": spec("s", "string")}, {"s": arg}, {}, "use", add_dynamic=lambda *a: pytest.fail("dynamic"))
+        assert env["s"][1] == expected
+
+    def test_number_and_boolean_literals(self):
+        params = {"n": spec("n", "number"), "b": spec("b", "boolean")}
+        env = bind(params, {"n": "38", "b": "true"}, {}, "use", add_dynamic=lambda *a: pytest.fail("dynamic"))
+        assert env["n"][1] == 38 and env["b"][1] is True
+
+    def test_concept_reference_is_its_code(self):
+        env = bind({"c": spec("c", "concept")}, {"c": '"body_temperature"'}, {}, "use")
+        assert env["c"][1] == {"system": None, "code": "body_temperature"}
 
     def test_rendering(self):
         env = {"age": (spec("age", "number"), {DYNAMIC: "arg_age_x"})}
@@ -106,15 +133,16 @@ class TestExpressionArguments:
         # not inherited by name
         assert bind(params, {}, caller, "use")["age"][1] is None
 
-    @pytest.mark.parametrize("ptype", ["name", "concept"])
-    def test_static_only_types(self, ptype):
+    @pytest.mark.parametrize("ptype,code", [("name", E_PARAM_TYPE), ("concept", E_ARG_DYNAMIC_STATIC)])
+    def test_static_only_types(self, ptype, code):
+        # a name is fixed text, never parsed: an expression is not a name fragment
         with pytest.raises(TriccParamError) as err:
-            bind({"p": spec("p", ptype)}, {"p": {"expression": "1"}}, {}, "use", add_dynamic=lambda *a: "c")
-        assert err.value.code == E_ARG_DYNAMIC_STATIC
+            bind({"p": spec("p", ptype)}, {"p": "AgeInDays()"}, {}, "use", add_dynamic=lambda *a: "c")
+        assert err.value.code == code
 
     def test_intervention_arguments_are_fixed(self):
         with pytest.raises(TriccParamError) as err:
-            bind({"p": spec("p", "number")}, {"p": {"expression": "1"}}, {}, "intervention")
+            bind({"p": spec("p", "number")}, {"p": "AgeInDays() + 1"}, {}, "intervention")
         assert err.value.code == E_ARG_DYNAMIC_STATIC
 
     def test_static_only_through_the_chain(self):
@@ -147,7 +175,7 @@ class TestExpressionArguments:
     def test_dynamic_for_a_name_parameter_fails(self, tmp_path):
         root = copy_fixture(tmp_path)
         edit_yaml(root / "activities" / "triage.activity.yaml",
-                  lambda d: node(d, "t-ax")["args"].update(site={"expression": "'axillary'"}))
+                  lambda d: node(d, "t-ax")["args"].update(site='"site_text"'))
         with pytest.raises(TriccParamError) as err:
             load(root)
         assert err.value.code == E_ARG_DYNAMIC_STATIC
@@ -156,7 +184,7 @@ class TestExpressionArguments:
     def test_intervention_expression_fails(self, tmp_path):
         root = copy_fixture(tmp_path)
         edit_yaml(root / "tricc.yaml",
-                  lambda d: d["interventions"][0]["args"].update(lab_available={"expression": "true"}))
+                  lambda d: d["interventions"][0]["args"].update(lab_available="AgeInDays() > 1"))
         with pytest.raises(TriccParamError) as err:
             load(root)
         assert err.value.code == E_ARG_DYNAMIC_STATIC
@@ -340,11 +368,11 @@ class TestDrawio:
         text = text.replace('param.site="choice(axillary|rectal)!"',
                             'param.site="choice(axillary|rectal)!" param.age="number!"')
         text = text.replace('param.site="axillary"',
-                            'param.site="axillary" param.age="{&quot;expression&quot;:&quot;Round(40.2)&quot;}"')
+                            'param.site="axillary" param.age="Round(40.2)"')
         text = text.replace('param.site="rectal"', 'param.site="rectal" param.age="{{lab_available}}"')
         with pytest.raises(TriccParamError):  # a boolean passed to a number
             drawio_survey(tmp_path, text)
-        text = text.replace('param.age="{{lab_available}}"', 'param.age="{&quot;expression&quot;:&quot;1&quot;}"')
+        text = text.replace('param.age="{{lab_available}}"', 'param.age="Round(1.4)"')
         rows = drawio_survey(tmp_path / "ok", text)
         assert len([n for n in rows if n.startswith("arg_age_")]) == 2
 

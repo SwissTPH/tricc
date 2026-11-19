@@ -249,12 +249,50 @@ def coerce_value(spec: ParamSpec, value: Any, where: str) -> Any:
     return text
 
 
-def is_expression_arg(arg: Any) -> bool:
-    """Whether a call argument, as written, is a dynamic one: ``{expression, intent?}``.
+def _parse_arg(text: str):
+    """``text`` parsed as CQL, quietly; None when it does not parse."""
+    from tricc_oo.converters.cql_to_operation import transform_cql_to_operation
 
-    A bare string is always a literal; a concept is ``{system, code}``, never this form.
+    try:
+        return transform_cql_to_operation(text, quiet=True)
+    except Exception:
+        return None
+
+
+def _is_constant(parsed: Any) -> bool:
+    """Whether a parsed argument is a plain value (``TriccStatic``, not a reference)."""
+    from tricc_oo.models.base import TriccStatic
+
+    return isinstance(parsed, TriccStatic)
+
+
+def is_expression_arg(arg: Any) -> bool:
+    """Whether a call argument, as written, is an expression (dynamic, §18.8 point 1).
+
+    A string argument is read as CQL, each placeholder standing for a value: it is an
+    expression when it parses to an operation or a ``"quoted"`` reference (``bind`` does
+    not ask for ``name`` and ``expression`` parameters: their values are fixed text). A text that
+    does not parse, a bare word (``axillary``), a ``'quoted'`` text, a number or a boolean
+    is a literal; so is ``{{x}}`` alone (the caller's value, bound as it is), a concept
+    ``{system, code}`` or any value that is not a string.
     """
-    return isinstance(arg, dict) and "expression" in arg and "code" not in arg
+    if not isinstance(arg, str) or REFERENCE.match(arg):
+        return False
+    from tricc_oo.models.base import TriccOperation, TriccReference
+
+    probe = PLACEHOLDER.sub(lambda m: "__p__" if m.group(2) else '"__p__"', arg)
+    # words side by side parse as a list of texts: prose, not an expression
+    return isinstance(_parse_arg(probe), (TriccOperation, TriccReference))
+
+
+def literal_value(text: str) -> Any:
+    """The value of a literal argument: a CQL text ``'axillary'`` gives ``axillary``; any
+    other literal (a bare word, a number, a text that is not CQL) stays as written, for
+    ``coerce_value``."""
+    if not text.strip().startswith("'"):
+        return text
+    parsed = _parse_arg(text)
+    return parsed.value if _is_constant(parsed) and isinstance(parsed.value, str) else text
 
 
 def is_dynamic(value: Any) -> bool:
@@ -393,7 +431,7 @@ def literal_arg_names(args: Dict[str, Any]) -> Set[str]:
     """
     names: Set[str] = set()
     for arg in args.values():
-        if isinstance(arg, str) and not REFERENCE.match(arg):
+        if isinstance(arg, str) and not REFERENCE.match(arg) and not is_expression_arg(arg):
             names.update(placeholder_names(arg))
     return names
 
@@ -643,15 +681,15 @@ def bind(
     caller_env: Env,
     chain: str,
     static_only: Iterable[str] = (),
-    add_dynamic: Optional[Callable[[str, Dict[str, Any], Env], str]] = None,
+    add_dynamic: Optional[Callable[[str, str, Env], str]] = None,
 ) -> Env:
     """Bind the parameters of a called page (§3.2).
 
     Each parameter takes the first value found among:
 
-    1. the call's argument: a literal (a placeholder inside it is rendered as text from
-       the caller's environment), ``{{x}}``, the caller's value of ``x``, or an expression
-       ``{expression, intent?}`` (dynamic, §18.8 point 1);
+    1. the call's argument: ``{{x}}``, the caller's value of ``x``; an expression
+       (``is_expression_arg``: dynamic, §18.8 point 1); else a literal (a placeholder inside
+       it is rendered as text from the caller's environment, then ``literal_value``);
     2. the caller's value of the same name (inheritance), unless that value is dynamic: a
        dynamic value is only ever passed on explicitly, by ``{{x}}``;
     3. the parameter's default.
@@ -659,8 +697,9 @@ def bind(
     A value set at the call replaces the inherited one for the callee only: the caller's
     environment is not changed.
 
-    An expression argument is evaluated once, at the use, in the caller's scope:
-    ``add_dynamic`` creates that calculate and names it, and the bound value is
+    An expression argument is evaluated once, at the use, in the caller's scope: its
+    placeholders are rendered as in an expression, ``add_dynamic`` creates the calculate
+    and names it, and the bound value is
     ``{"dynamic": <its name>}``. Passed on to a page below by ``{{x}}``, the same calculate
     is used: it is not evaluated again.
 
@@ -673,8 +712,8 @@ def bind(
             (``intervention > triage > block t-ax in triage``).
         static_only: The callee's parameters that need a fixed value
             (``compute_static_only``).
-        add_dynamic: ``(parameter name, argument, caller_env) -> calculate name``: adds the
-            calculate of an expression argument to the calling page. None where no
+        add_dynamic: ``(parameter name, rendered expression, caller_env) -> calculate name``:
+            adds the calculate of an expression argument to the calling page. None where no
             expression argument is allowed (the intervention's ``args``).
 
     Returns:
@@ -703,18 +742,21 @@ def bind(
                 value = caller_env[ref.group(1)][1]
                 if value is not None and not is_dynamic(value):
                     value = coerce_value(spec, value, where)
-            elif is_expression_arg(arg):
+            elif spec.type == "concept" and isinstance(arg, str) and _concept_code(arg):
+                value = coerce_value(spec, _concept_code(arg), where)
+            elif spec.type not in ("expression", "name") and is_expression_arg(arg):
                 if add_dynamic is None:
                     raise TriccParamError(
                         E_ARG_DYNAMIC_STATIC, f"{where}: an intervention argument is a fixed value, not an expression"
                     )
-                if not str(arg.get("expression") or "").strip():
-                    raise TriccParamError(E_PARAM_TYPE, f"{where}: expression argument with no expression")
                 _check_dynamic_allowed(spec, static_only, where)
-                value = {DYNAMIC: add_dynamic(name, arg, caller_env)}
+                expression = substitute(arg, caller_env, EXPRESSION, where)
+                value = {DYNAMIC: add_dynamic(name, expression, caller_env)}
             else:
                 if isinstance(arg, str) and has_placeholder(arg):
                     arg = substitute(arg, caller_env, TEXT, where)
+                if isinstance(arg, str) and spec.type not in ("expression", "name"):
+                    arg = literal_value(arg)
                 value = coerce_value(spec, arg, where)
         elif name in caller_env and caller_env[name][1] is not None and not is_dynamic(caller_env[name][1]):
             value = coerce_value(spec, caller_env[name][1], where)
@@ -730,6 +772,16 @@ def bind(
             )
         env[name] = (spec, value)
     return env
+
+
+def _concept_code(arg: str) -> Optional[str]:
+    """The code of a concept argument written as a reference, ``"body_temperature"``."""
+    from tricc_oo.models.base import TriccReference
+
+    if has_placeholder(arg):
+        return None
+    parsed = _parse_arg(arg)
+    return parsed.value if type(parsed) is TriccReference else None
 
 
 def _check_dynamic_allowed(spec: ParamSpec, static_only: Set[str], where: str) -> None:
@@ -780,8 +832,6 @@ def unreferenced(template: Template, effective: Dict[str, ParamSpec]) -> Iterabl
     fed = set()
     for call in template.calls:
         for arg in call.args.values():
-            if is_expression_arg(arg):
-                arg = arg.get("expression")
             if isinstance(arg, str):
                 fed.update(placeholder_names(arg))
     for name in template.declared:

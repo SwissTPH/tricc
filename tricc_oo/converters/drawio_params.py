@@ -11,8 +11,9 @@ feature/20261111-block-params-and-start-node.md §2 to §4. In a drawing:
   carry ``param.<name>`` attributes: the values for that use;
 - ``{{param}}`` / ``{{param|raw}}`` placeholders may appear in node attributes (rendered as
   text or as an expression, see ``_context``), in edge labels and in the page name;
-- a call argument may be an expression, ``param.age = {"expression": "AgeInDays()"}``: a
-  calculate of the calling page, added by ``drawio_add_calculate`` (§18.8 point 1);
+- a call argument may be an expression, ``param.age = AgeInDays()`` (an operation or a
+  ``"quoted"`` reference, ``is_expression_arg``): a calculate of the calling page, added by
+  ``drawio_add_calculate`` (§18.8 point 1);
 - an input or calculate of a block marked ``output = true`` is an output; when no field of
   the block is marked, every input and calculate is an output.
 

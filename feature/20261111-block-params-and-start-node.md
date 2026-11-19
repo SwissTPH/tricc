@@ -706,18 +706,27 @@ Source: frontend RFC [SwissTPH/tricc-frontend#12](https://github.com/SwissTPH/tr
 2026-11-05 / 2026-11-06. It refines §18.1 to §18.5. Implemented on the interim (blocks still
 inlined at linking, §18.7); see §18.8.1 for what that changes.
 
-**1. Expression arguments (refines §18.1).** A dynamic argument is explicit, an object with the
-expression shape used elsewhere; a bare string stays a literal:
+**1. Expression arguments (refines §18.1; revised 2026-11-19).** Every argument is read as
+CQL. It is dynamic when it is an operation or a `"quoted"` reference; anything else is a
+literal:
 
 ```yaml
 args:
-  site: axillary                                # static: a literal
+  site: axillary                                # static: a bare word is text
+  label: "'left arm'"                           # static: a CQL text literal
   threshold: "{{fever_threshold}}"              # static: bound to a caller parameter
-  age: { expression: AgeInDays(), intent: { en: Age of the child in days } }  # dynamic
+  age: AgeInDays()                              # dynamic: an operation
+  weight_kg: '"weight" / 1000'                  # dynamic: reads a node of the caller
 ```
 
-- draw.io: the JSON form, `param.age = {"expression":"AgeInDays()"}`. It cannot be mistaken for
-  a concept (`{system, code}`).
+- A bare identifier is text everywhere in CQL, not only in arguments; a reference is a
+  `"quoted"` identifier. A text that does not parse (`child's arm`) or words side by side
+  (`left arm`) are literals too. Numbers and booleans stay literals (`38`, `true`).
+- draw.io: the same text, `param.age = AgeInDays()`. The `{expression, intent}` object of the
+  first version is gone; the calculate is labelled with the parameter name.
+- A `concept` parameter takes `{system, code}`, a bare code, or a `"quoted"` reference, read as
+  that concept (fixed). A `name` or `expression` parameter is never parsed: its value is
+  fixed text.
 - The expression is evaluated at the use, in the caller's scope (§18.4: it is what makes the use
   wait, like a calculate's references). Inside the block it is read through `{{age}}`, rendered
   as a reference to that per-use value.
@@ -779,6 +788,13 @@ advisory check (its validator has a tokenizer, not an operation tree):
 
 **Decisions (§18.8, Patrick 2026-11-06).**
 
+- 2026-11-19: no `{expression}` object: every argument is parsed, an operation or a `"quoted"`
+  reference is dynamic, the rest is a literal. A bare identifier is text in all CQL
+  (`resolve_scv`). A rhombus whose tested value is a bare name (the legacy `weight` with the
+  label `weight > 38?`) has it quoted, with a warning; any other constant is `TriccRhombusError`.
+  `TriccReference` no longer subclasses `TriccStatic` (`TriccValueMixin`). Safe: no project uses the YAML input
+  yet (@delcroip, in conversation)
+
 1. `Today()` / `Now()` are **allowed** inside a block. They read no stored data, so they are not
    on the list; they are still non-static (§7.1), so a static decision or a static argument
    cannot use them.
@@ -791,9 +807,11 @@ advisory check (its validator has a tokenizer, not an operation tree):
 Built on the interim of §18.7: a block is still a page instance inlined at linking, so "at
 linking" below means when the instance is built (`strategies/input/param_build.py`).
 
-- **Expression arguments.** `bind` (`models/params.py`) takes `add_dynamic`; an expression
-  argument becomes a calculate `arg_<param>_<digest of the use>` on the *calling* page (a free
-  calculate, label from `intent`), added by the input strategy (`_yaml_add_calculate`,
+- **Expression arguments.** `bind` (`models/params.py`) takes `add_dynamic`; an argument is an
+  expression when `is_expression_arg` parses it (placeholders standing for `"__p__"`) to a
+  `TriccOperation` or a `TriccReference`. It is rendered as an expression in the caller's
+  environment and becomes a calculate `arg_<param>_<digest of the use>` on the *calling* page (a
+  free calculate, labelled with the parameter name), added by the input strategy (`_yaml_add_calculate`,
   `drawio_add_calculate`). The bound value is `{"dynamic": <calculate name>}`; `{{p}}` renders
   as `"<name>"` in an expression and `${<name>}` in a text, and never `|raw`. A `{{p}}` argument
   passes the same value on; inheritance by name skips it. `compute_static_only` gives each

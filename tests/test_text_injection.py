@@ -227,7 +227,7 @@ class TestDisplayModelOnly:
             id="r1",
             name="rh1",
             label="has_symptom = true",
-            reference="has_symptom",
+            reference="\"has_symptom\"",
             activity=None,
             group=None,
         )

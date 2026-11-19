@@ -75,7 +75,7 @@ class OpenMRSStrategy(BaseOutPutStrategy):
             return self.get_option_value(r.name)
         elif isinstance(r, str):
             return self.get_option_value(r)
-        elif isinstance(r, TriccStatic):
+        elif isinstance(r, (TriccStatic, TriccReference)):
             if isinstance(r.value, str):
                 return self.get_option_value(r.value)
             elif isinstance(r.value, bool):

@@ -30,7 +30,7 @@ nodes:
   - id: rhombus_choice
     type: rhombus
     label: "Path?"
-    reference: "choice = true"
+    reference: "\"choice\" = true"
 
   - id: goto_b1
     type: goto

@@ -49,6 +49,7 @@ from tricc_oo.converters.xml_to_tricc import (
     assign_rhombus_path,
     parse_expression,
     load_expressions,
+    TriccRhombusError,
     process_edge_label,
     propagate_activity_repeat,
     shield_required,
@@ -957,6 +958,8 @@ class YamlStrategy(BaseInputStrategy):
         """Run the project's expression loader on the newly created node."""
         try:
             load_expressions(node)
+        except TriccRhombusError:
+            raise
         except Exception:
             # load_expressions is defensive; ignore non-fatal issues in test data
             pass
