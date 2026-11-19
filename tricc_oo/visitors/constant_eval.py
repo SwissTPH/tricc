@@ -5,10 +5,15 @@ operators over them, and calculates that are constant in turn. It answers in thr
 
 - a value (a ``TriccStatic``, or None for a CQL null);
 - ``TriccNotConstant``: the expression reads collected data (an input, a select, an unknown
-  name, stored data, ``Today()`` / ``Now()``, a ``native`` function). The caller keeps it
-  dynamic; this is never shown to the author;
-- ``TriccEvalUnsupported``: the expression is constant but uses an operator the table below
-  cannot evaluate. The caller stops the build, naming the operator.
+  name, stored data, ``Today()`` / ``Now()``, a function declared ``@retrieve: true``). The
+  caller keeps it dynamic, silently;
+- ``TriccEvalUnsupported``: the expression reads no collected data but uses an operator the
+  table below cannot evaluate, or a function the build has no implementation of (declared
+  ``@retrieve: false``, or not declared at all). The caller keeps it dynamic, with a warning.
+
+A function called as written (a ``native`` operation) is looked up with ``functions(name)``:
+its declaration in the project's CQL libraries (``converters/cql_library.FunctionSignature``),
+whose ``@retrieve`` tag says whether it reads recorded data.
 
 The whole expression is checked for collected data before any operator is evaluated, so an
 unsupported operator only fails an expression that would otherwise be constant.
@@ -29,6 +34,9 @@ from tricc_oo.models.base import TriccOperation, TriccOperator, TriccReference, 
 #: ``resolve(name)``: the expression of the calculate called ``name`` (CQL text or parsed), or
 #: None when ``name`` is not a calculate whose value can be known at build time
 Resolver = Callable[[str], Any]
+#: ``functions(name)``: the project's declaration of a function (a ``FunctionSignature``, with
+#: its ``retrieve`` flag), or None when it declares none
+Functions = Callable[[str], Any]
 
 
 class TriccNotConstant(Exception):
@@ -47,13 +55,15 @@ class TriccEvalUnsupported(Exception):
         super().__init__(f"{self.operator}{': ' + detail if detail else ''}")
 
 
-#: operators whose value depends on the moment or on data the build does not have
-_NEVER_CONSTANT = {TriccOperator.TODAY, TriccOperator.NOW, TriccOperator.NATIVE}
+#: operators whose value depends on the moment
+_NEVER_CONSTANT = {TriccOperator.TODAY, TriccOperator.NOW}
 
 _UNSET = object()
 
 
-def evaluate_constant(expression: Any, resolve: Optional[Resolver] = None) -> Optional[TriccStatic]:
+def evaluate_constant(
+    expression: Any, resolve: Optional[Resolver] = None, functions: Optional[Functions] = None
+) -> Optional[TriccStatic]:
     """The value of a constant expression.
 
     Args:
@@ -61,22 +71,26 @@ def evaluate_constant(expression: Any, resolve: Optional[Resolver] = None) -> Op
             ``TriccOperation``).
         resolve: Gives the expression of a calculate by name (see ``Resolver``). None: every
             reference is collected data.
+        functions: Gives a function's declaration by name (see ``Functions``). None: no
+            function is declared.
 
     Returns:
         The value as a ``TriccStatic``, or None when the expression is a CQL null.
 
     Raises:
         TriccNotConstant: The expression reads collected data, or is not CQL.
-        TriccEvalUnsupported: The expression is constant but uses an operator outside the
-            table, or applies one to values of the wrong types.
+        TriccEvalUnsupported: The expression reads no collected data but uses an operator
+            outside the table or a function the build cannot run, or applies an operator to
+            values of the wrong types.
     """
-    value = _Evaluator(resolve).run(expression)
+    value = _Evaluator(resolve, functions).run(expression)
     return None if value is None else TriccStatic(value=_out(value))
 
 
 class _Evaluator:
-    def __init__(self, resolve: Optional[Resolver]):
+    def __init__(self, resolve: Optional[Resolver], functions: Optional[Functions]):
         self.resolve = resolve
+        self.functions = functions
         self.parsed: Dict[str, Any] = {}  # calculate name -> parsed expression
         self.checked: Set[str] = set()  # calculates known to read no collected data
         self.values: Dict[str, Any] = {}  # calculate name -> value
@@ -114,7 +128,13 @@ class _Evaluator:
         if isinstance(item, TriccOperation):
             if item.retrieves_stored_data or item.operator in _NEVER_CONSTANT:
                 raise TriccNotConstant(f"{item.operator} is not constant")
-            for sub in item.reference or []:
+            refs = list(item.reference or [])
+            if item.operator == TriccOperator.NATIVE:
+                name = refs.pop(0) if refs else None
+                signature = self.functions(name) if self.functions and isinstance(name, str) else None
+                if signature is not None and signature.retrieve:
+                    raise TriccNotConstant(f"{name} reads recorded data (@retrieve: true)")
+            for sub in refs:
                 self.check(sub, stack)
             return
         # a node used as a value, an Expression, anything else: data
@@ -133,6 +153,12 @@ class _Evaluator:
             return self.values[name]
         operator = item.operator
         refs = list(item.reference or [])
+        if operator == TriccOperator.NATIVE:
+            name = refs[0] if refs else "?"
+            declared = self.functions(name) if self.functions and isinstance(name, str) else None
+            why = ("declared @retrieve: false, but the build has no implementation of it" if declared
+                   else "not declared in the project's CQL libraries")
+            raise TriccEvalUnsupported(name, why)
         lazy = _LAZY.get(operator)
         if lazy is not None:
             return lazy(self, refs)

@@ -243,15 +243,17 @@ args:
   limit: '"base_limit" * 2'                            # base_limit: a calculate of this page
 ```
 
-"No collected data" means no input, select, stored data, `Today()` / `Now()` or other function
-call, and only calculates of the calling page that read none either (a name given to two
-calculates is not one of them). The build evaluates `and`, `or`, `not`, comparisons,
+"No collected data" means no input, select, stored data, `Today()` / `Now()` or function
+declared `@retrieve: true` in the project's CQL `libraries`, and only calculates of the calling
+page that read none either (a name given to two calculates is not one of them). The build evaluates `and`, `or`, `not`, comparisons,
 `+ - * /`, `mod`, `if`, `Coalesce`, `Concatenate`, `Abs`, `Min`, `Max`, `Round` and the
 `is true` / `is false` / `exists` / `is null` tests, with CQL rules: null in, null out (`and` /
 `or` are three-valued), division by zero is null, numbers are decimals (`7 / 2` is `3.5`). An
-expression that is constant but uses any other operator (`case`, for example) stops the build
-with `E_ARG_EVAL`, naming the call, the parameter and the operator. One that evaluates to null
-keeps its hidden calculate. The same applies to an intervention's `args`: `37 + 1` is `38`.
+expression that reads no collected data but uses any other operator (`case`, for example) or a
+project function (the build has no implementation of it, whatever its `@retrieve`) keeps its
+hidden calculate, with a warning `W_ARG_EVAL` naming the call, the parameter and the operator;
+where only a fixed value fits, `E_ARG_DYNAMIC_STATIC` gives that reason. One that evaluates to
+null keeps its hidden calculate too. The same applies to an intervention's `args`: `37 + 1` is `38`.
 
 A block reads no stored data: an expression calling a function of
 `tricc_oo/converters/cql/stored_data_functions.json` (`AgeInDays()`, the encounter, history

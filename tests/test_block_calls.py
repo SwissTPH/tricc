@@ -15,7 +15,6 @@ from tricc_oo.converters.xml_to_tricc import parse_expression
 from tricc_oo.models.params import (
     DYNAMIC,
     E_ARG_DYNAMIC_STATIC,
-    E_ARG_EVAL,
     E_PARAM_TYPE,
     E_BLOCK_PRIVATE,
     E_BLOCK_SCOPE,
@@ -455,12 +454,28 @@ class TestConstantArguments:
         env = bind({"n": spec("n", "number", default=1)}, {"n": "1 / 0"}, {}, "use", add_dynamic=lambda *a: "c")
         assert env["n"][1] == {DYNAMIC: "c"}
 
-    def test_unsupported_operator(self):
+    def test_unsupported_operator_warns_and_stays_dynamic(self, caplog):
+        env = bind({"n": spec("n", "number")}, {"n": "case when 1 > 0 then 38 else 37 end"}, {}, "a > b",
+                   add_dynamic=lambda *a: "c")
+        assert env["n"][1] == {DYNAMIC: "c"}
+        assert "W_ARG_EVAL" in caplog.text and "a > b" in caplog.text and "case" in caplog.text
+
+    def test_unsupported_where_a_fixed_value_is_needed(self):
         with pytest.raises(TriccParamError) as err:
-            bind({"n": spec("n", "number")}, {"n": "case when 1 > 0 then 38 else 37 end"}, {}, "a > b",
-                 add_dynamic=self.no_dynamic)
-        assert err.value.code == E_ARG_EVAL
-        assert "a > b" in str(err.value) and "'n'" in str(err.value) and "case" in str(err.value)
+            bind({"s": spec("s", "string")}, {"s": "case when 1 > 0 then 'a' else 'b' end"}, {}, "use",
+                 static_only={"s"}, add_dynamic=lambda *a: "c")
+        assert err.value.code == E_ARG_DYNAMIC_STATIC and "cannot evaluate case" in str(err.value)
+
+    @pytest.mark.parametrize("retrieve,warned", [("true", False), ("false", True), (None, True)])
+    def test_function_retrieve_tag(self, caplog, retrieve, warned):
+        from tricc_oo.converters.cql_library import FunctionSignature
+
+        declared = {} if retrieve is None else {
+            "bmi": FunctionSignature("Bmi", "decimal", tags={"retrieve": retrieve})}
+        env = bind({"n": spec("n", "number")}, {"n": "Bmi(70, 1.7)"}, {}, "use",
+                   add_dynamic=lambda *a: "c", functions=lambda name: declared.get(name.lower()))
+        assert env["n"][1] == {DYNAMIC: "c"}  # never folded: the build cannot run Bmi
+        assert ("W_ARG_EVAL" in caplog.text) is warned
 
     def test_intervention_argument(self):
         env = bind({"p": spec("p", "number")}, {"p": "37 + 1"}, {}, "intervention")
@@ -481,10 +496,22 @@ class TestConstantArguments:
         assert "temp_axillary" in rows and "temp_rectal" in rows  # a folded value names a node
         assert "38.5" in rows["fever_rectal"]["label"]
 
-    def test_project_unsupported(self, tmp_path):
+    def test_project_functions(self, tmp_path, caplog):
         root = copy_fixture(tmp_path)
-        edit_yaml(root / "activities" / "triage.activity.yaml",
-                  lambda d: node(d, "t-re")["args"].update(threshold="case when 1 > 0 then 38 else 37 end"))
-        with pytest.raises(TriccParamError) as err:
-            load(root)
-        assert err.value.code == E_ARG_EVAL and "t-re" in str(err.value)
+        (root / "cql").mkdir()
+        (root / "cql" / "functions.cql").write_text(
+            "/*\n@retrieve: false\n*/\n"
+            "define function Bmi(weight Decimal, height Decimal) returns FHIR.decimal: external\n"
+            "/*\n@retrieve: true\n*/\n"
+            "define function LastWeight() returns FHIR.decimal: external\n",
+            encoding="utf-8",
+        )
+        edit_yaml(root / "tricc.yaml", lambda d: d.update(libraries=["cql/*"]))
+        edit_yaml(root / "activities" / "triage.activity.yaml", lambda d: (
+            node(d, "t-ax")["args"].update(threshold="LastWeight() / 2"),
+            node(d, "t-re")["args"].update(threshold="Bmi(70, 1.7)"),
+        ))
+        rows = survey(root)
+        assert len([n for n in rows if n.startswith("arg_threshold_")]) == 2
+        warnings = [r.getMessage() for r in caplog.records if "W_ARG_EVAL" in r.getMessage()]
+        assert len(warnings) == 1 and "t-re" in warnings[0] and "Bmi" in warnings[0]

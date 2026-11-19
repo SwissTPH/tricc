@@ -127,10 +127,38 @@ class TestReferences:
 
 
 class TestNotConstant:
-    @pytest.mark.parametrize("expression", ["Today()", "Now() > Today()", "AgeInDays() + 1", "Foo(1)"])
+    @pytest.mark.parametrize("expression", ["Today()", "Now() > Today()", "AgeInDays() + 1"])
     def test_data_and_time(self, expression):
         with pytest.raises(TriccNotConstant):
             value(expression)
+
+
+class TestFunctions:
+    """A function called as written, looked up in the project's CQL libraries (``@retrieve``)."""
+
+    def declared(self, retrieve):
+        from tricc_oo.converters.cql_library import FunctionSignature
+
+        sig = FunctionSignature("Bmi", "decimal", tags={} if retrieve is None else {"retrieve": retrieve})
+        return lambda name: {"bmi": sig}.get(name.lower())
+
+    def test_retrieve_true_is_data(self):
+        with pytest.raises(TriccNotConstant, match="retrieve"):
+            evaluate_constant("Bmi(70, 1.7)", functions=self.declared("true"))
+
+    @pytest.mark.parametrize("retrieve", ["false", None])  # the default is false
+    def test_retrieve_false_has_no_implementation(self, retrieve):
+        with pytest.raises(TriccEvalUnsupported, match="no implementation") as err:
+            evaluate_constant("Bmi(70, 1.7)", functions=self.declared(retrieve))
+        assert err.value.operator == "Bmi"
+
+    def test_undeclared(self):
+        with pytest.raises(TriccEvalUnsupported, match="not declared"):
+            evaluate_constant("Foo(1)")
+
+    def test_data_argument_wins(self):
+        with pytest.raises(TriccNotConstant):
+            evaluate_constant('Bmi("weight", 1.7)', functions=self.declared("false"))
 
     def test_not_cql(self):
         with pytest.raises(TriccNotConstant):

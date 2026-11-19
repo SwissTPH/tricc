@@ -42,7 +42,6 @@ from tricc_oo.models.params import (
     E_BLOCK_PRIVATE,
     E_BLOCK_SCOPE,
     E_PARAM_UNKNOWN,
-    NOT_CONSTANT,
     PRIMITIVE_TYPES,
     TEXT,
     W_PARAM_UNREFERENCED,
@@ -51,6 +50,7 @@ from tricc_oo.models.params import (
     ParamSpec,
     Template,
     TriccParamError,
+    Unfolded,
     bind,
     compute_effective,
     compute_static_only,
@@ -459,7 +459,7 @@ class ParamBuild:
                     f"intervention {getattr(config, 'id', '?')}: argument {name!r} reaches no activity parameter",
                 )
             where = f"intervention {getattr(config, 'id', '?')}: argument {name!r}"
-            if is_expression_arg(value) and fold_argument(value, None, where) is NOT_CONSTANT:
+            if is_expression_arg(value) and isinstance(fold_argument(value, None, where, self._function), Unfolded):
                 raise TriccParamError(
                     E_ARG_DYNAMIC_STATIC,
                     f"{where} is an expression; an intervention's arguments are fixed values "
@@ -470,7 +470,9 @@ class ParamBuild:
             params = self.effective[tid]
             try:
                 root_args = {k: v for k, v in args.items() if k in params}
-                self.base_env[tid] = bind(params, root_args, {}, f"intervention > {tid}", self.static_only[tid])
+                self.base_env[tid] = bind(
+                    params, root_args, {}, f"intervention > {tid}", self.static_only[tid], functions=self._function
+                )
             except TriccParamError:
                 if tid not in called:
                     raise
@@ -491,6 +493,7 @@ class ParamBuild:
                 callee_env = bind(
                     self.effective[callee], call.args, env, where, self.static_only[callee],
                     self._dynamic_adder(rendered, call, new_id, where), self._resolver(rendered),
+                    self._function,
                 )
                 use = f"{new_id}/{call.node_id}" if self.templates[callee].private_fields() else None
                 callee_id = self.instantiate(callee, callee_env, chain + [call.describe()], use)
@@ -556,6 +559,12 @@ class ParamBuild:
             return calc_name
 
         return add
+
+    def _function(self, name: str):
+        """The project's declaration of function ``name`` (its ``@retrieve`` tag), or None."""
+        from tricc_oo.converters.cql_library import function_signature
+
+        return function_signature(self.project, name)
 
     def _resolver(self, rendered) -> Optional[Callable[[str], Optional[str]]]:
         """``bind``'s ``resolve`` for the calls of a rendered page: its calculates, by name
