@@ -143,14 +143,14 @@ class TestFunctions:
         sig = FunctionSignature("Bmi", "decimal", tags={} if retrieve is None else {"retrieve": retrieve})
         return lambda name: {"bmi": sig}.get(name.lower())
 
-    def test_retrieve_true_is_data(self):
+    @pytest.mark.parametrize("retrieve", ["true", None])  # no tag: assume it reads data
+    def test_retrieve_true_or_no_tag_is_data(self, retrieve):
         with pytest.raises(TriccNotConstant, match="retrieve"):
-            evaluate_constant("Bmi(70, 1.7)", functions=self.declared("true"))
-
-    @pytest.mark.parametrize("retrieve", ["false", None])  # the default is false
-    def test_retrieve_false_is_static_computed_by_the_form(self, retrieve):
-        with pytest.raises(TriccEvalDeferred, match="only the form") as err:
             evaluate_constant("Bmi(70, 1.7)", functions=self.declared(retrieve))
+
+    def test_retrieve_false_is_static_computed_by_the_form(self):
+        with pytest.raises(TriccEvalDeferred, match="only the form") as err:
+            evaluate_constant("Bmi(70, 1.7)", functions=self.declared("false"))
         assert err.value.operator == "Bmi"
 
     def test_undeclared(self):

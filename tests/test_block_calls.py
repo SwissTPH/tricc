@@ -474,7 +474,7 @@ class TestConstantArguments:
             "bmi": FunctionSignature("Bmi", "decimal", tags={} if retrieve is None else {"retrieve": retrieve})}
         return lambda name: found.get(name.lower())
 
-    # @retrieve: false (the default) is static, computed by the form: no warning
+    # @retrieve: false is static, computed by the form; true or no tag is data: no warning either way
     @pytest.mark.parametrize("retrieve,warned", [("true", False), ("false", False), (None, False),
                                                  ("undeclared", True)])
     def test_function_retrieve_tag(self, caplog, retrieve, warned):

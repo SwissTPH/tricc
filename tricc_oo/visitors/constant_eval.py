@@ -5,10 +5,10 @@ operators over them, and calculates that are constant in turn. It answers in thr
 
 - a value (a ``TriccStatic``, or None for a CQL null);
 - ``TriccNotConstant``: the expression reads collected data (an input, a select, an unknown
-  name, stored data, ``Today()`` / ``Now()``, a function declared ``@retrieve: true``). The
-  caller keeps it dynamic, silently;
+  name, stored data, ``Today()`` / ``Now()``, a declared function without ``@retrieve: false``:
+  ``true``, or no tag, assumed to read data). The caller keeps it dynamic, silently;
 - ``TriccEvalDeferred``: the expression reads no collected data but calls a project function
-  declared ``@retrieve: false``. It is static, but the build has no implementation of it: the
+  declared with an explicit ``@retrieve: false``. It is static, but the build has no implementation of it: the
   form computes it (the output must support the function). The caller keeps it computed in
   the form, silently;
 - ``TriccEvalUnsupported``: the expression reads no collected data but uses an operator the
@@ -148,8 +148,8 @@ class _Evaluator:
             if item.operator == TriccOperator.NATIVE:
                 name = refs.pop(0) if refs else None
                 signature = self.functions(name) if self.functions and isinstance(name, str) else None
-                if signature is not None and signature.retrieve:
-                    raise TriccNotConstant(f"{name} reads recorded data (@retrieve: true)")
+                if signature is not None and not _static(signature):
+                    raise TriccNotConstant(f"{name} may read recorded data (@retrieve is not false)")
                 if signature is None:
                     self.unsupported.append(TriccEvalUnsupported(name, "not declared in the project's CQL libraries"))
             elif item.operator not in _TABLE and item.operator not in _LAZY:
@@ -190,6 +190,12 @@ class _Evaluator:
             raise
         except (TypeError, ValueError, InvalidOperation) as error:
             raise TriccEvalUnsupported(operator, f"{args!r}: {error}") from None
+
+
+def _static(signature: Any) -> bool:
+    """Whether a declared function is static: only with an explicit ``@retrieve: false``
+    (``FunctionSignature.retrieve`` is True without the tag: assume the worst)."""
+    return not signature.retrieve
 
 
 def _parse(expression: Any) -> Any:

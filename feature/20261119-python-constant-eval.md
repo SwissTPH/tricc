@@ -27,8 +27,8 @@ name, a static decision). The author has to work out the value by hand.
 - "No collected data" means no inputs and no stored data. A calculate is allowed when it reads
   no collected data either, recursively.
 - A project function says whether it reads recorded data with the `@retrieve` tag of its
-  declaration in the project's CQL libraries. `@retrieve: true`: it does, like an input.
-  `@retrieve: false` (the default): it is static, but the build cannot run it, so the form
+  declaration in the project's CQL libraries. `@retrieve: true`, or no tag: it does (or may),
+  like an input. `@retrieve: false`: it is static, but the build cannot run it, so the form
   computes it; the output must support the function, or the export fails.
 - An expression that reads no collected data but uses an operator the build can't evaluate,
   or a function no library declares, is computed in the form, as before, with a warning
@@ -64,8 +64,8 @@ name, a static decision). The author has to work out the value by hand.
   - Stored-data functions (`get_stored_data()`), `today`, `now`: `TriccNotConstant`.
   - A function called as written (`native`): looked up with `functions(name)`, the project's
     declaration (`cql_library.function_signature`, PR #84). `@retrieve: true`:
-    `TriccNotConstant`. Not declared: `TriccEvalUnsupported(name)`. `@retrieve: false` (the
-    default): its arguments are checked like any operand; evaluating it raises
+    `TriccNotConstant`, and so is a declaration without the tag (assume the worst). Not
+    declared: `TriccEvalUnsupported(name)`. An explicit `@retrieve: false`: its arguments are checked like any operand; evaluating it raises
     `TriccEvalDeferred(name)` (a `TriccEvalUnsupported`): static, computed by the form.
   - Any other operator: `TriccEvalUnsupported(operator)`.
   - The check pass collects unsupported operators and undeclared functions over the whole
@@ -108,8 +108,8 @@ name, a static decision). The author has to work out the value by hand.
   - a folded value is accepted for a parameter used in a node name;
   - an unsupported operator warns `W_ARG_EVAL` and stays dynamic, or gives
     `E_ARG_DYNAMIC_STATIC` with the reason where a fixed value is needed;
-  - `@retrieve: true` / `false` (no warning) / undeclared (warning), in a project with a
-    `libraries` file.
+  - `@retrieve: true` / no tag (dynamic) / `false` (computed by the form), no warning;
+    undeclared: warning; in a project with a `libraries` file.
 
 ### 4. Phases
 
@@ -136,6 +136,9 @@ None.
   implementation, so the form computes it, and an output that doesn't support it fails the
   export. A label or name needs the value at build time, so it fails there with the reason
   (@delcroip).
+- 2026-11-19: a declaration without `@retrieve` is dynamic (assume the worst); only an explicit
+  `@retrieve: false` makes a function static. This reverses the "default false" of PR #84 for
+  this use (@delcroip).
 - 2026-11-19: partial folding of an argument's constant parts is wanted, as a later RFC (it
   needs a TRICC expression → CQL writer) (@delcroip).
 - 2026-11-19: folding calculates and conditions in the exported forms is deferred to a later
