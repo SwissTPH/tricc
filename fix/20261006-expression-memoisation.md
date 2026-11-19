@@ -69,6 +69,11 @@ between them), and any change to the guard's budgets or diagnostics.
 
 # Part II — Fix approach
 
+> **Superseded on merge with `develop`:** `develop` (2cc5f15) memoises the same requests in
+> `_GNE_CACHE`, kept for a whole conversion walk and cleared by `clear_expression_walk_caches()`.
+> The per-call `_EXPRESSION_CACHE` below was removed in favour of it; the ladder regression test
+> is kept and passes against `_GNE_CACHE`. Sections 1–3 describe the original approach.
+
 ## 1. Memoise `get_node_expression` within one top-level call
 
 `get_node_expression` (the guarded entry point) keeps a cache, `_EXPRESSION_CACHE`, that exists only while a
@@ -102,17 +107,18 @@ semantics above stay the same.
 
 ## 4. Code checklist
 
-- [x] `tricc_oo/visitors/tricc.py` — `_EXPRESSION_CACHE`, `_expression_cache_key`,
-      `_cached_expression_copy`; `get_node_expression` consults and fills the cache around the guarded call.
+- [x] ~~`tricc_oo/visitors/tricc.py` — `_EXPRESSION_CACHE`, `_expression_cache_key`,
+      `_cached_expression_copy`~~ — removed; `develop`'s `_GNE_CACHE` covers it.
 
 ## 5. Tests — `tests/test_expression_memoisation.py`
 
 - [x] A 30-step ladder (2^30 paths) builds within a budget of 20 calls per step.
-- [x] The cache is `None` after the top-level call returns.
-- [x] Two requests for the same node return equal but distinct operations, with distinct operand lists.
+- [x] ~~The cache is `None` after the top-level call returns.~~ — removed with `_EXPRESSION_CACHE`.
+- [x] ~~Two requests for the same node return equal but distinct operations.~~ — removed: `develop`'s
+      `test_rhombus_prefix_is_reused` requires the cached object itself to be returned.
 
 ## 6. Acceptance criteria
 
-- [x] `python -m pytest tests/` passes (588 tests).
+- [x] `python -m pytest tests/` passes (891 passed, 138 skipped after the merge with `develop`).
 - [x] `flake8` reports nothing new in the changed files.
 - [x] `demo.drawio` converts to identical XLSForm content and identical FHIR output with and without the fix.

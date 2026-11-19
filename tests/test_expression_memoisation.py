@@ -68,22 +68,6 @@ class TestExpressionMemoisation(unittest.TestCase):
             tricc.get_node_expression(last, processed_nodes=OrderedSet())
         self.assertEqual(guard.path, [])
 
-    def test_cache_does_not_outlive_the_top_level_call(self):
-        last = _ladder(3)
-        tricc.get_node_expression(last, processed_nodes=OrderedSet())
-        self.assertIsNone(tricc._EXPRESSION_CACHE)
-
-    def test_cached_results_are_not_shared_between_callers(self):
-        last = _ladder(3)
-        processed = OrderedSet()
-        with mock.patch.object(tricc, "_EXPRESSION_CACHE", {}):
-            first = tricc.get_node_expression(last, processed_nodes=processed, is_prev=True)
-            second = tricc.get_node_expression(last, processed_nodes=processed, is_prev=True)
-        self.assertIsInstance(first, TriccOperation)
-        self.assertEqual(first, second)
-        self.assertIsNot(first, second)
-        self.assertIsNot(first.reference, second.reference)
-
 
 if __name__ == "__main__":
     unittest.main()
