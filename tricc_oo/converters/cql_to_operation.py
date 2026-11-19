@@ -1,3 +1,8 @@
+import functools
+import json
+import os
+from typing import Dict
+
 from antlr4.error.ErrorListener import ErrorListener
 from antlr4 import CommonTokenStream, InputStream
 from tricc_oo.converters.cql.cqlLexer import cqlLexer
@@ -57,6 +62,26 @@ FUNCTION_MAP = {
     "GetRepeatedValue": TriccOperator.GET_REPEATED_VALUE,
 }
 
+#: the shared list of CQL functions that retrieve stored data (tricc_oo is its authority; the
+#: frontend's closed-block check tests against a copy of it)
+STORED_DATA_FUNCTIONS_FILE = os.path.join(os.path.dirname(__file__), "cql", "stored_data_functions.json")
+
+
+@functools.lru_cache(maxsize=1)
+def stored_data_functions() -> Dict[str, str]:
+    """The CQL functions that retrieve stored data, from ``stored_data_functions.json``.
+
+    feature/20261111-block-params-and-start-node.md §18.5, §18.8 point 4.
+
+    Returns:
+        ``{function name: reads}``, ``reads`` being ``patient``, ``encounter``, ``history`` or
+        ``context``.
+    """
+    with open(STORED_DATA_FUNCTIONS_FILE, encoding="utf-8") as file:
+        data = json.load(file)
+    return {entry["name"]: entry["reads"] for entry in data["functions"]}
+
+
 # Operators whose first argument is a concept code rather than a value expression.
 CONCEPT_REF_FIRST_ARG = {
     TriccOperator.GET_REPEATED_VALUE,
@@ -113,8 +138,9 @@ class cqlToXlsFormVisitor(cqlVisitor):
         elif arg.lower() in ["true", "false"]:
             return TriccStatic(arg.lower() == "true")
         elif arg != "runner":
-            self.errors.append(f"'{arg}' will be poccessed as reference ")
-            return TriccReference(arg)
+            # A bare identifier is text: a reference is a "quoted" CQL identifier, a text
+            # literal 'quoted'; the legacy bare rhombus name is refused by its caller.
+            return TriccStatic(arg)
 
         else:
             return "runner"
@@ -182,6 +208,8 @@ class cqlToXlsFormVisitor(cqlVisitor):
             op.reference += [self.visit(arg) for arg in args.expression() if arg]
         if operator in CONCEPT_REF_FIRST_ARG and op.reference:
             op.reference[0] = as_concept_reference(op.reference[0], function_name)
+        if function_name in stored_data_functions():
+            op.retrieves_stored_data = True
         op.update_origin()
 
         return op
@@ -223,7 +251,7 @@ class cqlToXlsFormVisitor(cqlVisitor):
 
     def visitInvocationExpressionTerm(self, ctx):
         result = super().visitInvocationExpressionTerm(ctx)
-        if isinstance(result, list) and all(isinstance(x, TriccStatic) for x in result):
+        if isinstance(result, list) and all(isinstance(x, (TriccStatic, TriccReference)) for x in result):
             value = ".".join([x.value for x in result])
             logger.warning(f"guessed reference for '{value}'")
             return TriccReference(value)
@@ -437,7 +465,19 @@ class CQLErrorListener(ErrorListener):
         self.errors.append(error)
 
 
-def transform_cql_to_operation(cql_input, context=None):
+def transform_cql_to_operation(cql_input, context=None, quiet=False):
+    """Parse a CQL expression into a TriccOperation / TriccReference / TriccStatic.
+
+    A bare identifier is text (``TriccStatic``); a reference is a ``"quoted"`` identifier.
+
+    Args:
+        cql_input: The expression.
+        context: Shown in error messages.
+        quiet: Do not report grammar errors (the caller treats unparsable input as text).
+
+    Returns:
+        The parsed expression, or None when it does not parse.
+    """
     lib_input = f"""
     library runner
 
@@ -459,7 +499,7 @@ def transform_cql_to_operation(cql_input, context=None):
 
     # Check for errors
     if error_listener.errors:
-        for error in error_listener.errors:
+        for error in [] if quiet else error_listener.errors:
             print(f"CQL Grammar Error: {error} \n in:\n {cql_input}")
         return None  # Or handle errors as appropriate for your use case
 

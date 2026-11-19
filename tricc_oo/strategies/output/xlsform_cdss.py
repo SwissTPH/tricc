@@ -227,15 +227,15 @@ class XLSFormCDSSStrategy(XLSFormStrategy):
     def tricc_operation_has_qualifier(self, ref_expressions):
         raise NotImplementedError("This type of opreration  is not supported in this strategy")
 
-    def tricc_operation_age_day(self, ref_expressions):
+    def tricc_operation_age_day(self, ref_expressions, original_references=None):
         dob_node_name = ref_expressions[0].value if ref_expressions else "birthday"
         return f"int((today()-date(${{{dob_node_name}}})))"
 
-    def tricc_operation_age_month(self, ref_expressions):
+    def tricc_operation_age_month(self, ref_expressions, original_references=None):
         dob_node_name = ref_expressions[0].value if ref_expressions else "birthday"
         return f"int((today()-date(${{{dob_node_name}}})) div 30.25)"
 
-    def tricc_operation_age_year(self, ref_expressions):
+    def tricc_operation_age_year(self, ref_expressions, original_references=None):
         dob_node_name = ref_expressions[0].value if ref_expressions else "birthday"
         return f"int((today()-date(${{{dob_node_name}}})) div 365.25)"
 

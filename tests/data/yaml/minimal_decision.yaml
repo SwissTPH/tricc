@@ -27,7 +27,7 @@ nodes:
   - id: rhombus_symptom
     type: rhombus
     label: "Symptom present?"
-    reference: "has_symptom = true"   # will be parsed
+    reference: "\"has_symptom\" = true"   # will be parsed
 
   - id: note_positive
     type: note

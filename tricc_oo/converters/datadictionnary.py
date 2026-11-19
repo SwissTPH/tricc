@@ -133,6 +133,42 @@ def role_meta(role: str) -> dict:
     return {"tag": [{"system": CODESYSTEM_ROLE_SYSTEM, "code": role}]}
 
 
+def _property_value(prop):
+    """The value of a CodeSystem concept property, whatever its ``value[x]``."""
+    for attr in ("valueCode", "valueString", "valueBoolean", "valueInteger", "valueDecimal"):
+        value = getattr(prop, attr, None)
+        if value is not None:
+            return value
+    return None
+
+
+def is_template_concept(concept) -> bool:
+    """Whether ``concept`` is abstract: the concept of a templated node name (``fever_{{site}}``).
+
+    feature/20261111-block-params-and-start-node.md §18.8 point 2: property ``kind`` =
+    ``template`` (with ``notSelectable`` = true and ``owner`` = the block). It is never
+    emitted: each use of the block gets a concrete concept built from it.
+    """
+    return any(
+        getattr(p, "code", None) == "kind" and _property_value(p) == "template"
+        for p in (getattr(concept, "property", None) or [])
+    )
+
+
+def exportable_code_system(code_system):
+    """``code_system`` without its abstract concepts (``is_template_concept``), for export.
+
+    The CodeSystem itself is returned when it has none; otherwise a copy.
+    """
+    concepts = getattr(code_system, "concept", None) or []
+    kept = [c for c in concepts if not is_template_concept(c)]
+    if len(kept) == len(concepts):
+        return code_system
+    exported = code_system.copy(deep=True)
+    exported.concept = kept or None
+    return exported
+
+
 def init_codesystem(code, name):
     """A new, empty CodeSystem; the one named ``calculate`` is tagged as the calculate dictionary."""
     extra = {"meta": role_meta(CALCULATE_ROLE)} if code == CALCULATE_ROLE else {}

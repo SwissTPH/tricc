@@ -29,7 +29,7 @@ nodes:
   - id: rhombus_a
     type: rhombus
     label: "Check at triage?"
-    reference: "trigger_a = true"
+    reference: '"trigger_a" = true'
 
   - id: goto_c1
     type: goto
@@ -94,7 +94,7 @@ nodes:
   - id: rhombus_d
     type: rhombus
     label: "Check at assessment?"
-    reference: "trigger_d = true"
+    reference: '"trigger_d" = true'
 
   - id: goto_c2
     type: goto

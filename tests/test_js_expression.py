@@ -17,7 +17,7 @@ def test_age_in_months_less_than():
 
 
 def test_and_contact_field():
-    op = transform_cql_to_operation("AgeInMonths() < 60 and sex = 'F'")
+    op = transform_cql_to_operation("AgeInMonths() < 60 and \"sex\" = 'F'")
     assert op is not None
     js = render_cht_js_expression(op)
     assert "ageInMonths(contact)" in js

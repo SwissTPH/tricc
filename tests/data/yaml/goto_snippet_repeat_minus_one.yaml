@@ -49,7 +49,7 @@ nodes:
     type: note
     name: node_gate_b
     label: "Caller B"
-    relevance: "trigger_b = true"
+    relevance: "\"trigger_b\" = true"
 
   - id: goto_a1
     type: goto
@@ -62,7 +62,7 @@ nodes:
     type: note
     name: node_gate_c
     label: "Caller C"
-    relevance: "trigger_c = true"
+    relevance: "\"trigger_c\" = true"
 
   - id: goto_a2
     type: goto

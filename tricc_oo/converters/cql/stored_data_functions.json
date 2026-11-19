@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "description": "CQL functions that retrieve stored data (feature/20261111-block-params-and-start-node.md §18.5, §18.8). A block may not call them: the value comes in as an argument calculated at the use. reads: patient | encounter | history | context.",
+  "functions": [
+    {"name": "AgeInDays", "reads": "patient"},
+    {"name": "AgeInMonths", "reads": "patient"},
+    {"name": "AgeInYears", "reads": "patient"},
+    {"name": "GetPatientValue", "reads": "patient"},
+    {"name": "GetEncounterValue", "reads": "encounter"},
+    {"name": "GetEncounterObservationValue", "reads": "encounter"},
+    {"name": "GetEncounterConditionValue", "reads": "encounter"},
+    {"name": "GetObservationValue", "reads": "encounter"},
+    {"name": "GetConditionValue", "reads": "encounter"},
+    {"name": "GetRepeatedValue", "reads": "encounter"},
+    {"name": "GetHistoryObservation", "reads": "history"},
+    {"name": "GetHistoryObservationValue", "reads": "history"},
+    {"name": "GetHistoryObservationSince", "reads": "history"},
+    {"name": "GetHistoryObservationValueSince", "reads": "history"},
+    {"name": "GetHistoryObservationCodesSince", "reads": "history"},
+    {"name": "GetHistoryCondition", "reads": "history"},
+    {"name": "GetHistoryConditionValue", "reads": "history"},
+    {"name": "GetPractitionerValue", "reads": "context"},
+    {"name": "GetLocationValue", "reads": "context"},
+    {"name": "GetFacilityValue", "reads": "context"}
+  ]
+}

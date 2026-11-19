@@ -1000,6 +1000,8 @@ def add_tricc_base_node(
 
 
 def load_expressions(node):
+    # Keep the attributes parsed here aligned with param_build.EXPRESSION_ATTRS, which renames
+    # and checks the references in them after a page is built.
     if getattr(node, "constraint", None):
         node.constraint = parse_expression("", node.constraint)
     if getattr(node, "expression", None):
@@ -1019,6 +1021,19 @@ def load_expressions(node):
                 remove_html(str(node.label)) if node.label is not None else node.label
             )
             node.expression_reference = parse_expression(node.label, node.reference)
+            try:
+                check_rhombus_left(node, node.expression_reference)
+            except TriccRhombusError:
+                quoted = quote_rhombus_left(node.reference, node.expression_reference)
+                if quoted is None:
+                    raise
+                logger.warning(
+                    f"rhombus {node.id} ({node.label!r}): bare name in {node.reference!r} read as the "
+                    f"reference {quoted!r}; write it quoted, a bare name is text in CQL"
+                )
+                node.reference = quoted
+                node.expression_reference = parse_expression(node.label, quoted)
+                check_rhombus_left(node, node.expression_reference)
         else:
             node.expression_reference = parse_expression("", node.reference)
 
@@ -1076,7 +1091,7 @@ def shield_required(value):
     """
     if value is None or value == "":
         return None
-    # TriccReference subclasses TriccStatic. A name is not a 1/yes/true literal.
+    # A name is not a 1/yes/true literal.
     if isinstance(value, (TriccReference, TriccOperation)):
         return _as_boolean_required(value)
     if isinstance(value, TriccStatic):
@@ -1097,6 +1112,53 @@ def shield_required(value):
             return parsed
         return shield_required(parsed)
     return value
+
+
+class TriccRhombusError(ValueError):
+    """A rhombus that tests a constant instead of a collected value."""
+
+
+def quote_rhombus_left(reference, operation):
+    """The legacy rhombus reference, a bare name, quoted; None when it is not one.
+
+    The legacy rhombus names the tested value bare (``weight`` with the label
+    ``weight > 38?``), which CQL reads as text. When the whole reference is that name, the
+    reference meant is ``"weight"``.
+
+    Args:
+        reference: The rhombus reference as written.
+        operation: Its parse (``parse_expression``).
+
+    Returns:
+        ``'"name"'``, or None.
+    """
+    if not isinstance(reference, str) or not isinstance(operation, TriccStatic):
+        return None
+    name = operation.value
+    if not isinstance(name, str) or reference.strip() != name:
+        return None
+    if not re.match(r"^[A-Za-z_][A-Za-z0-9_.]*$", name):
+        return None
+    return f'"{name}"'
+
+
+def check_rhombus_left(node, operation):
+    """Refuse a rhombus whose whole reference is a constant.
+
+    A rhombus tests a value collected earlier: ``"weight"``, or CQL such as
+    ``"weight" > 38``. A reference that parses to a constant alone (``weight``, ``38``)
+    tests nothing. CQL that only starts with a literal (``38 < "weight"``) is an operation
+    and is accepted.
+
+    Raises:
+        TriccRhombusError: when the parsed reference is a ``TriccStatic``.
+    """
+    if isinstance(operation, TriccStatic):
+        raise TriccRhombusError(
+            f"rhombus {getattr(node, 'id', '?')} ({node.label!r}, reference {getattr(node, 'reference', None)!r}): "
+            f"the tested value {operation.value!r} is a "
+            f'constant; write the reference as a quoted identifier ("{operation.value}")'
+        )
 
 
 def parse_expression(label=None, expression=None):

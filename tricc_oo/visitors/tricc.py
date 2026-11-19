@@ -3717,7 +3717,7 @@ def _get_node_expression_uncached(
     elif (
         (not is_prev or not ONE_QUESTION_AT_A_TIME)
         and hasattr(node, "relevance")
-        and isinstance(node.relevance, (TriccOperation, TriccStatic))
+        and isinstance(node.relevance, (TriccOperation, TriccReference, TriccStatic))
         and getattr(node, 'is_sequence_defined', False)
         and not get_overall_exp
     ):
@@ -4300,7 +4300,7 @@ def get_rhombus_terms(node, processed_nodes, get_overall_exp=False, negate=False
         exit(1)
 
     if expression is not None:
-        if isinstance(expression, (TriccOperation, TriccStatic)):
+        if isinstance(expression, (TriccOperation, TriccReference, TriccStatic)):
             return expression
         elif issubclass(expression.__class__, TriccNodeCalculateBase):
             return TriccOperation(
@@ -4369,7 +4369,7 @@ def get_factor_terms(node, processed_nodes, get_overall_exp=False, negate=False,
     factor_value = node.reference
     if isinstance(factor_value, list) and factor_value:
         factor_value = factor_value[0]
-    if not isinstance(factor_value, TriccStatic):
+    if not isinstance(factor_value, (TriccStatic, TriccReference)):
         factor_value = TriccStatic(float(factor_value))
 
     path_condition = _get_factor_path_condition(
@@ -4459,9 +4459,9 @@ def get_calculation_terms(node, processed_nodes, get_overall_exp=False, negate=F
         else:
             logger.critical("exclusive node {} has no ou too much parent".format(node.get_name()))
 
-    if isinstance(node.expression_reference, (TriccOperation, TriccStatic)):
+    if isinstance(node.expression_reference, (TriccOperation, TriccReference, TriccStatic)):
         expression = node.expression_reference
-    if isinstance(node.expression, (TriccOperation, TriccStatic)):
+    if isinstance(node.expression, (TriccOperation, TriccReference, TriccStatic)):
         expression = node.expression
     elif expression is None:
         expression = get_prev_node_expression(
@@ -4485,7 +4485,7 @@ def get_calculation_terms(node, processed_nodes, get_overall_exp=False, negate=F
 
 
 def add_sub_expression(array, sub):
-    if isinstance(sub, (TriccOperation, TriccStatic)):
+    if isinstance(sub, (TriccOperation, TriccReference, TriccStatic)):
         not_sub = negate_term(sub)
         if not_sub in array:
             # avoid having 2 conditions that are complete opposites

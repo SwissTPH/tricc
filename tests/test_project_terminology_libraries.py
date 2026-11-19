@@ -23,7 +23,7 @@ process: main
 nodes:
   - {id: start, type: start, label: Lib demo, name: start_lib}
   - {id: age, type: integer, name: age, label: Age in years, required: true}
-  - {id: old_note, type: note, name: old_note, label: Older child, relevance: is_older}
+  - {id: old_note, type: note, name: old_note, label: Older child, relevance: '"is_older"'}
   - {id: end, type: end, name: end_lib, label: End}
 edges:
   - {source: start, target: age}
@@ -36,9 +36,9 @@ using FHIR version '4.0.1'
 context Patient
 
 // shared logic
-define is_older: age > 5
+define is_older: "age" > 5
 define private very_old:
-  is_older and age > 10 /* nested reference */
+  "is_older" and "age" > 10 /* nested reference */
 """
 
 CODESYSTEM = {
@@ -103,8 +103,8 @@ def _build(tmp_path):
 
 def test_parse_library_reads_defines_and_ignores_declarations_and_comments():
     assert parse_cql_library(LIBRARY) == [
-        ("is_older", "age > 5"),
-        ("very_old", "is_older and age > 10"),
+        ("is_older", '"age" > 5'),
+        ("very_old", '"is_older" and "age" > 10'),
     ]
 
 

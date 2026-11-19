@@ -76,7 +76,10 @@ This page documents TRICC modeling elements and their meaning based on:
   filtered by `sex` + `y_min`/`y_max`. Phase 1 table: `wfa` (weight-for-age).
   Only tables referenced by the form are injected into the choices sheet.
   See `feature/cdss-zscore.md`.
-- `rhombus`: decision/condition gate using `reference` and labeled out-edges.
+- `rhombus`: decision/condition gate using `reference` and labeled out-edges. The tested value
+  is a `"quoted"` reference: a bare name is text in CQL. A legacy reference that is a bare name
+  alone (`weight` with the label `weight > 38?`) is read as `"weight"` with a warning; a reference
+  that is any other constant alone (`38`) stops the build. CQL starting with a literal is accepted.
 - `factor`: sequence scoring node (non-display calculate). Created from numeric edge
   labels; stores the factor in `reference`, uses `path` for the branch condition.
   Expression semantics: **if path then factor else 0** (feeds `count` / `add` nodes).
@@ -110,7 +113,7 @@ This page documents TRICC modeling elements and their meaning based on:
 ## Blocks and parameters
 
 A **block** is a reusable piece of flow, written once and used in many places with
-different settings. Spec: `feature/20261102-block-params-and-start-node.md`.
+different settings. Spec: `feature/20261111-block-params-and-start-node.md`.
 
 - A block file (`blocks/<id>.block.yaml`, listed in tricc.yaml `blocks: [{id, path}]`)
   has the shape of an activity. Its root is **`block_start`** and it ends at an
@@ -205,6 +208,61 @@ say whether the uses are the same concept or not ([Instance vs repeat](#instance
 
 Names without a placeholder keep the earlier behaviour (each copy gets its own
 instance-band suffix).
+
+### Values calculated at the call
+
+Every argument is read as CQL. An operation or a `"quoted"` reference is evaluated where the
+block is used, with the names available there; anything else is a fixed value:
+
+```yaml
+args:
+  site: axillary            # a fixed value: a bare word is text
+  label: "'left arm'"       # a fixed value: a CQL text
+  age: AgeInDays()          # calculated at the use
+  weight_kg: '"weight" / 1000'
+```
+
+draw.io: the same text, `param.age = AgeInDays()`. The calling page gets a hidden calculate
+(`arg_age_<digest>`, labelled with the parameter name) evaluated once at the use. Inside the
+block, `{{age}}` reads it: a reference in an expression, `${…}` in a text. Passed on to an inner
+block as `{{age}}`, the same calculate is used. It is never inherited by name. A `concept`
+parameter reads `"body_temperature"` as that concept; `name` parameters are never parsed.
+
+Only a fixed value fits a parameter that shapes the drawing: one used in a node or option
+`name`, a `save`, a `{{p|raw}}`, a static decision, a literal argument of an inner call, or of
+type `name` or `concept`, here or in a block below. An expression there is
+`E_ARG_DYNAMIC_STATIC`. An intervention's `args` are always fixed values.
+
+A block reads no stored data: an expression calling a function of
+`tricc_oo/converters/cql/stored_data_functions.json` (`AgeInDays()`, the encounter, history
+and practitioner / location / facility readers), or a `populate` node, inside a block is
+`E_BLOCK_SCOPE`. Pass the value in as an expression argument. `Today()` and `Now()` are allowed.
+
+### Outputs
+
+Every input and calculate of a block is an output: visible after the use, by its rendered
+name. A block can narrow that with `outputs` (template names) beside `params`:
+
+```yaml
+outputs: ["fever_{{site}}"]     # only these; outputs: [] for none
+```
+
+draw.io: set `output = true` on each input or calculate that is an output; when no field of
+the block has it, all are outputs (draw.io has no "none"). A field not listed or marked is **private**: each use gets its own copy, named with
+a per-use suffix (`temp_axillary_3fa2c1`), without a dictionary concept. A reference to it from
+outside the block is `E_BLOCK_PRIVATE`. A listed name the block does not have is
+`E_OUTPUT_UNKNOWN`.
+
+### Abstract concepts
+
+A node named with a placeholder (`temp_{{site}}`) can have an **abstract concept**: code the
+template name verbatim, properties `kind = template`, `notSelectable = true` and `owner` = the
+block. Its texts may use placeholders too (`Temperature ({{site}})`). Each use gets a concrete
+concept (`temp_axillary`) in the same CodeSystem, with the texts rendered for that use: a
+`choice` value shows its option concept's label in each language, else the code. A concrete
+concept already in the project dictionary wins. Abstract concepts are never written to the
+terminology outputs (CodeSystem JSON, OCL), and selecting one outside its block is
+`E_ABSTRACT_SELECTED`.
 
 ## Diagnosis/classification elements
 

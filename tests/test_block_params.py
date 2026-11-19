@@ -1,4 +1,4 @@
-"""Block and activity parameters (feature/20261102-block-params-and-start-node.md, phases 1-5)."""
+"""Block and activity parameters (feature/20261111-block-params-and-start-node.md, phases 1-5)."""
 
 import glob
 import os

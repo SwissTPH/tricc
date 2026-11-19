@@ -161,7 +161,7 @@ def start_group(
 
     if not relevance:
         relevance_expression_str = ""
-    elif isinstance(relevance_expression, (TriccOperation, TriccStatic)):
+    elif isinstance(relevance_expression, (TriccOperation, TriccReference, TriccStatic)):
         relevance_expression = process_operation_reference(
             relevance_expression,
             cur_group,

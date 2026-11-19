@@ -29,6 +29,7 @@ from tricc_oo.models import (
 from tricc_oo.strategies.input.base_input_strategy import BaseInputStrategy
 from tricc_oo.strategies.input.param_build import ParamBuild
 from tricc_oo.converters.drawio_params import (
+    drawio_add_calculate,
     drawio_render,
     drawio_resolver,
     drawio_template,
@@ -109,7 +110,7 @@ class DrawioStrategy(BaseInputStrategy):
 
     def _load_pages(self, diagrams, media_path, project):
         """Build the pages: one copy of each diagram per distinct set of parameter values
-        (feature/20261102-block-params-and-start-node.md)."""
+        (feature/20261111-block-params-and-start-node.md)."""
         templates = {}
         for diagram in diagrams:
             template = drawio_template(diagram)
@@ -121,7 +122,7 @@ class DrawioStrategy(BaseInputStrategy):
         def build(template, rendered):
             self._create_page(rendered, media_path, project)
 
-        ParamBuild(templates, drawio_resolver(templates), project, drawio_render, build).run()
+        ParamBuild(templates, drawio_resolver(templates), project, drawio_render, build, drawio_add_calculate).run()
 
     def finalize(self, project, media_path):
         logger.info("# Create the graph from the start node")

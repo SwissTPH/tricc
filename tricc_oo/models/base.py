@@ -310,7 +310,8 @@ class TriccNodeBaseModel(TriccBaseModel):
     label: Optional[DisplayText] = None
     next_nodes: OrderedSet[TriccNodeBaseModel] = OrderedSet()
     prev_nodes: OrderedSet[TriccNodeBaseModel] = OrderedSet()
-    expression: Optional[Union[Expression, TriccOperation, TriccStatic]] = None  # will be generated based on the input
+    # will be generated based on the input
+    expression: Optional[Union[Expression, TriccOperation, TriccReference, TriccStatic]] = None
     expression_inputs: List[Expression] = []
     activity: Optional[FwTriccNodeBaseModel] = None
     ref_def: Optional[Union[int, str]] = None  # for medal creator
@@ -372,8 +373,12 @@ class TriccNodeBaseModel(TriccBaseModel):
         return OrderedSet()
 
 
-class TriccStatic(BaseModel):
-    value: Union[str, float, int, bool, TriccNodeBaseModel]
+class TriccValueMixin:
+    """What a literal (``TriccStatic``) and a reference (``TriccReference``) share.
+
+    The two are siblings, not parent and child: ``isinstance(x, TriccStatic)`` is true only
+    for a literal. Test ``(TriccStatic, TriccReference)`` where either fits.
+    """
 
     def __init__(self, value):
         super().__init__(value=value)
@@ -405,8 +410,8 @@ class TriccStatic(BaseModel):
     def __str__(self):
         return str(self.value)
 
-    def __copy__(self, **argv):
-        return super().__copy__()
+    def __copy__(self):
+        return type(self)(self.value)
 
     def copy(self, **argv):
         return self.__copy__()
@@ -414,18 +419,20 @@ class TriccStatic(BaseModel):
     def __repr__(self):
         return self.__class__.__name__ + "|" + str(type(self.value)) + "|" + str(self.value)
 
+
+class TriccStatic(TriccValueMixin, BaseModel):
+    """A literal: text, number, boolean (or a node used as a value)."""
+
+    value: Union[str, float, int, bool, TriccNodeBaseModel]
+
     def get_references(self):
         return OrderedSet()
 
 
-class TriccReference(TriccStatic):
+class TriccReference(TriccValueMixin, BaseModel):
+    """A reference to a node or concept by name (a ``"quoted"`` CQL identifier)."""
+
     value: str
-
-    def __copy__(self):
-        return type(self)(self.value)
-
-    def copy(self):
-        return self.__copy__()
 
     def get_references(self):
         return OrderedSet([self])
@@ -597,6 +604,8 @@ class TriccOperation(BaseModel):
             ],
         ]
     ] = []
+    # set by the CQL parser on a call to a function that retrieves stored data (§18.5)
+    retrieves_stored_data: bool = False
     _struct_hash: Optional[int] = PrivateAttr(default=None)
     _origin_sig: Optional[int] = PrivateAttr(default=None)
 
@@ -729,6 +738,27 @@ class TriccOperation(BaseModel):
                 predecessor.add(s)
         elif issubclass(reference.__class__, (TriccNodeBaseModel, TriccReference)):
             predecessor.add(reference)
+
+    def get_stored_data(self) -> bool:
+        """Whether this operation, or any operation inside it, retrieves stored data.
+
+        ``retrieves_stored_data`` is set by the CQL parser on a call to a function of
+        ``converters/cql/stored_data_functions.json`` (patient, encounter, history or
+        context readers; feature/20261111-block-params-and-start-node.md §18.5).
+
+        Returns:
+            True when this operation's own flag is set or a child operation's is.
+        """
+        if self.retrieves_stored_data:
+            return True
+        pending = list(self.reference or [])
+        while pending:
+            item = pending.pop()
+            if isinstance(item, list):
+                pending.extend(item)
+            elif isinstance(item, TriccOperation) and item.get_stored_data():
+                return True
+        return False
 
     def append(self, value):
         self.reference.append(value)

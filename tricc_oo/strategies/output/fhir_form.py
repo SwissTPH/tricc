@@ -1103,7 +1103,6 @@ class FHIRStrategy(BaseOutPutStrategy):
     @staticmethod
     def _operand_link_id(operand) -> Optional[str]:
         """Questionnaire ``linkId`` for a reference operand, or ``None`` for literals."""
-        # TriccReference subclasses TriccStatic, so it must be tested first.
         if isinstance(operand, TriccReference):
             target = operand.value
         elif isinstance(operand, (TriccStatic, TriccNodeSelectOption)):
@@ -2860,8 +2859,6 @@ class FHIRStrategy(BaseOutPutStrategy):
         that needs .first() in FHIRPath."""
         if original_ref is None:
             return False
-        # TriccReference subclasses TriccStatic, so it must be checked first —
-        # otherwise it would be caught (and excluded) by the TriccStatic branch below.
         if isinstance(original_ref, TriccReference):
             node = self._resolve_reference_node(original_ref)
             return node is None or self._is_answerable_item(node)
@@ -3148,8 +3145,7 @@ class FHIRStrategy(BaseOutPutStrategy):
             return original_ref
         for ref in original_ref.reference or []:
             # Skip literal arguments (the repeat slot of GetRepeatedValue, …).
-            # TriccReference subclasses TriccStatic, so it must be tested first.
-            if isinstance(ref, TriccStatic) and not isinstance(ref, TriccReference):
+            if isinstance(ref, TriccStatic):
                 continue
             resolved = self._value_source_reference(ref, depth + 1)
             if resolved is not None and not isinstance(resolved, TriccOperation):
@@ -3158,7 +3154,7 @@ class FHIRStrategy(BaseOutPutStrategy):
 
     def _code_literal_operand(self, expr, original_ref) -> Optional[str]:
         """The quoted option code ``expr`` stands for, or None when it is not one."""
-        # TriccReference subclasses TriccStatic: a reference is never a literal.
+        # A reference is never a literal.
         if isinstance(original_ref, TriccReference):
             return None
         if not isinstance(original_ref, (TriccStatic, str, TriccNodeSelectOption)):
@@ -3851,7 +3847,6 @@ class FHIRStrategy(BaseOutPutStrategy):
 
     def _inherited_operand_link_id(self, original_ref) -> Optional[str]:
         """linkId an inherited-value operand reads, or None (nested operation / literal)."""
-        # TriccReference subclasses TriccStatic, so it must be tested first.
         if isinstance(original_ref, TriccReference):
             try:
                 return get_export_name(original_ref.value)

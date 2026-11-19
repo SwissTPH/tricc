@@ -72,7 +72,7 @@ class DHIS2Strategy(BaseOutPutStrategy):
             ret = self.get_option_value(r.name)
         elif isinstance(r, str):
             ret = self.get_option_value(r)
-        elif isinstance(r, TriccStatic):
+        elif isinstance(r, (TriccStatic, TriccReference)):
             if isinstance(r.value, str):
                 ret = self.get_option_value(r.value)
             elif isinstance(r.value, bool):
@@ -313,7 +313,7 @@ class DHIS2Strategy(BaseOutPutStrategy):
                             option_name = self.get_export_name(option)
                             if isinstance(option_name, str):
                                 option_name = option_name.replace('\u00a0', ' ').strip()
-                            elif isinstance(option_name, TriccStatic):
+                            elif isinstance(option_name, (TriccStatic, TriccReference)):
                                 option_name = str(option_name.value)
                             # Create separate option entityif
                             option_def = {
@@ -481,7 +481,7 @@ class DHIS2Strategy(BaseOutPutStrategy):
 
         if not relevance:
             relevance_expression = ""
-        elif isinstance(relevance_expression, (TriccOperation, TriccStatic)):
+        elif isinstance(relevance_expression, (TriccOperation, TriccReference, TriccStatic)):
             relevance_expression = self.get_tricc_operation_expression(relevance_expression)
 
         # Create section

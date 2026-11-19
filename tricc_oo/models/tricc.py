@@ -22,7 +22,9 @@ TRICC_FALSE_VALUE = "false"
 
 class TriccNodeCalculateBase(TriccNodeBaseModel):
     # input: Dict[TriccOperation, TriccNodeBaseModel] = {}
-    reference: Union[List[Union[TriccNodeBaseModel, TriccStatic]], Expression, TriccStatic] = None
+    reference: Union[
+        List[Union[TriccNodeBaseModel, TriccReference, TriccStatic]], Expression, TriccReference, TriccStatic
+    ] = None
     expression_reference: Union[str, TriccOperation] = None
     last: bool = None
     datatype: str = "boolean"
@@ -320,7 +322,7 @@ class TriccNodeNote(TriccNodeDisplayModel):
 
 
 class TriccNodeInputModel(TriccNodeDisplayModel):
-    required: Optional[Union[Expression, TriccOperation, TriccStatic]] = "1"
+    required: Optional[Union[Expression, TriccOperation, TriccReference, TriccStatic]] = "1"
     constraint_message: Optional[DisplayText] = None
     required_message: Optional[DisplayText] = None
     constraint: Optional[Expression] = None

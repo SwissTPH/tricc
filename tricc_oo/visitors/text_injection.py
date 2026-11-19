@@ -353,9 +353,8 @@ def _merge_concat_statics(parts: List[Any]) -> List[Any]:
         last_static = (
             merged
             and isinstance(merged[-1], TriccStatic)
-            and not isinstance(merged[-1], TriccReference)
         )
-        this_static = isinstance(part, TriccStatic) and not isinstance(part, TriccReference)
+        this_static = isinstance(part, TriccStatic)
         if last_static and this_static:
             merged[-1] = TriccStatic(str(merged[-1].value) + str(part.value))
         else:
@@ -367,8 +366,8 @@ def _wrap_concat_parts(parts: List[Any], open_: str, close: str) -> List[Any]:
     if not parts:
         return []
     wrapped = list(parts)
-    first_static = isinstance(wrapped[0], TriccStatic) and not isinstance(wrapped[0], TriccReference)
-    last_static = isinstance(wrapped[-1], TriccStatic) and not isinstance(wrapped[-1], TriccReference)
+    first_static = isinstance(wrapped[0], TriccStatic)
+    last_static = isinstance(wrapped[-1], TriccStatic)
     if first_static:
         wrapped[0] = TriccStatic(open_ + str(wrapped[0].value))
     else:
@@ -432,7 +431,7 @@ def message_to_concatenate_operation(value: Any) -> Optional[TriccOperation]:
     parts = _concat_parts_from_nodes(value.children)
     if not parts:
         return None
-    if len(parts) == 1 and isinstance(parts[0], TriccStatic) and not isinstance(parts[0], TriccReference):
+    if len(parts) == 1 and isinstance(parts[0], TriccStatic):
         return None
 
     def _is_interp(part: Any) -> bool:

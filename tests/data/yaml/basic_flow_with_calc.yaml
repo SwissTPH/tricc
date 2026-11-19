@@ -22,7 +22,7 @@ nodes:
     type: calculate
     name: is_adult
     label: "Is adult?"
-    calculate: "age >= 18"
+    calculate: "\"age\" >= 18"
 
   - id: end
     type: end

@@ -49,7 +49,7 @@ nodes:
   - id: rhombus_high_risk
     type: rhombus
     label: High risk?
-    reference: "risk_score > 30"  # Should be able to see the merged version
+    reference: "\"risk_score\" > 30"  # Should be able to see the merged version
 
   - id: note_high
     type: note
