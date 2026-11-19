@@ -7,16 +7,22 @@ operators over them, and calculates that are constant in turn. It answers in thr
 - ``TriccNotConstant``: the expression reads collected data (an input, a select, an unknown
   name, stored data, ``Today()`` / ``Now()``, a function declared ``@retrieve: true``). The
   caller keeps it dynamic, silently;
+- ``TriccEvalDeferred``: the expression reads no collected data but calls a project function
+  declared ``@retrieve: false``. It is static, but the build has no implementation of it: the
+  form computes it (the output must support the function). The caller keeps it computed in
+  the form, silently;
 - ``TriccEvalUnsupported``: the expression reads no collected data but uses an operator the
-  table below cannot evaluate, or a function the build has no implementation of (declared
-  ``@retrieve: false``, or not declared at all). The caller keeps it dynamic, with a warning.
+  table below cannot evaluate, or a function no library declares. The caller keeps it
+  dynamic, with a warning.
 
 A function called as written (a ``native`` operation) is looked up with ``functions(name)``:
 its declaration in the project's CQL libraries (``converters/cql_library.FunctionSignature``),
 whose ``@retrieve`` tag says whether it reads recorded data.
 
-The whole expression is checked for collected data before any operator is evaluated, so an
-unsupported operator only fails an expression that would otherwise be constant.
+The whole expression is checked first: collected data anywhere gives ``TriccNotConstant``;
+otherwise an operator outside the table or an undeclared function anywhere (even in a branch
+that would not be taken) gives ``TriccEvalUnsupported``. Only then is it evaluated, where a
+declared ``@retrieve: false`` function gives ``TriccEvalDeferred``.
 
 Semantics follow CQL: ``and`` / ``or`` / ``not`` are three-valued (None is null), any other
 operator gives null for a null operand, division by zero is null, and numbers are ``Decimal``
@@ -47,12 +53,17 @@ class TriccEvalUnsupported(Exception):
     """A constant expression uses an operator the build cannot evaluate.
 
     Attributes:
-        operator: The operator (a ``TriccOperator`` value), for the error message.
+        operator: The operator (a ``TriccOperator`` value) or function name, for the message.
     """
 
     def __init__(self, operator: Any, detail: str = ""):
         self.operator = str(operator)
         super().__init__(f"{self.operator}{': ' + detail if detail else ''}")
+
+
+class TriccEvalDeferred(TriccEvalUnsupported):
+    """A static expression calls a function declared ``@retrieve: false`` that the build cannot
+    run: the form computes it."""
 
 
 #: operators whose value depends on the moment
@@ -79,9 +90,11 @@ def evaluate_constant(
 
     Raises:
         TriccNotConstant: The expression reads collected data, or is not CQL.
+        TriccEvalDeferred: The expression is static but calls a declared ``@retrieve: false``
+            function the build cannot run.
         TriccEvalUnsupported: The expression reads no collected data but uses an operator
-            outside the table or a function the build cannot run, or applies an operator to
-            values of the wrong types.
+            outside the table or an undeclared function, or applies an operator to values of
+            the wrong types.
     """
     value = _Evaluator(resolve, functions).run(expression)
     return None if value is None else TriccStatic(value=_out(value))
@@ -94,10 +107,13 @@ class _Evaluator:
         self.parsed: Dict[str, Any] = {}  # calculate name -> parsed expression
         self.checked: Set[str] = set()  # calculates known to read no collected data
         self.values: Dict[str, Any] = {}  # calculate name -> value
+        self.unsupported: List[TriccEvalUnsupported] = []  # found by the check, raised after it
 
     def run(self, expression: Any) -> Any:
         parsed = _parse(expression)
         self.check(parsed, [])
+        if self.unsupported:
+            raise self.unsupported[0]
         return self.eval(parsed)
 
     # -- pass 1: does it read collected data? --------------------------------
@@ -134,6 +150,10 @@ class _Evaluator:
                 signature = self.functions(name) if self.functions and isinstance(name, str) else None
                 if signature is not None and signature.retrieve:
                     raise TriccNotConstant(f"{name} reads recorded data (@retrieve: true)")
+                if signature is None:
+                    self.unsupported.append(TriccEvalUnsupported(name, "not declared in the project's CQL libraries"))
+            elif item.operator not in _TABLE and item.operator not in _LAZY:
+                self.unsupported.append(TriccEvalUnsupported(item.operator))
             for sub in refs:
                 self.check(sub, stack)
             return
@@ -155,10 +175,8 @@ class _Evaluator:
         refs = list(item.reference or [])
         if operator == TriccOperator.NATIVE:
             name = refs[0] if refs else "?"
-            declared = self.functions(name) if self.functions and isinstance(name, str) else None
-            why = ("declared @retrieve: false, but the build has no implementation of it" if declared
-                   else "not declared in the project's CQL libraries")
-            raise TriccEvalUnsupported(name, why)
+            # declared (the check raised for an undeclared one)
+            raise TriccEvalDeferred(name, "static (@retrieve: false), but only the form can compute it")
         lazy = _LAZY.get(operator)
         if lazy is not None:
             return lazy(self, refs)

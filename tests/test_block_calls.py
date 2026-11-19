@@ -466,16 +466,28 @@ class TestConstantArguments:
                  static_only={"s"}, add_dynamic=lambda *a: "c")
         assert err.value.code == E_ARG_DYNAMIC_STATIC and "cannot evaluate case" in str(err.value)
 
-    @pytest.mark.parametrize("retrieve,warned", [("true", False), ("false", True), (None, True)])
-    def test_function_retrieve_tag(self, caplog, retrieve, warned):
+    @staticmethod
+    def declared(retrieve):
         from tricc_oo.converters.cql_library import FunctionSignature
 
-        declared = {} if retrieve is None else {
-            "bmi": FunctionSignature("Bmi", "decimal", tags={"retrieve": retrieve})}
+        found = {} if retrieve == "undeclared" else {
+            "bmi": FunctionSignature("Bmi", "decimal", tags={} if retrieve is None else {"retrieve": retrieve})}
+        return lambda name: found.get(name.lower())
+
+    # @retrieve: false (the default) is static, computed by the form: no warning
+    @pytest.mark.parametrize("retrieve,warned", [("true", False), ("false", False), (None, False),
+                                                 ("undeclared", True)])
+    def test_function_retrieve_tag(self, caplog, retrieve, warned):
         env = bind({"n": spec("n", "number")}, {"n": "Bmi(70, 1.7)"}, {}, "use",
-                   add_dynamic=lambda *a: "c", functions=lambda name: declared.get(name.lower()))
-        assert env["n"][1] == {DYNAMIC: "c"}  # never folded: the build cannot run Bmi
+                   add_dynamic=lambda *a: "c", functions=self.declared(retrieve))
+        assert env["n"][1] == {DYNAMIC: "c"}  # the build cannot run Bmi: the form computes it
         assert ("W_ARG_EVAL" in caplog.text) is warned
+
+    def test_static_function_where_a_fixed_value_is_needed(self):
+        with pytest.raises(TriccParamError) as err:
+            bind({"s": spec("s", "string")}, {"s": "Bmi(70, 1.7)"}, {}, "use", static_only={"s"},
+                 add_dynamic=lambda *a: "c", functions=self.declared("false"))
+        assert err.value.code == E_ARG_DYNAMIC_STATIC and "only the form can compute it" in str(err.value)
 
     def test_intervention_argument(self):
         env = bind({"p": spec("p", "number")}, {"p": "37 + 1"}, {}, "intervention")
@@ -509,9 +521,11 @@ class TestConstantArguments:
         edit_yaml(root / "tricc.yaml", lambda d: d.update(libraries=["cql/*"]))
         edit_yaml(root / "activities" / "triage.activity.yaml", lambda d: (
             node(d, "t-ax")["args"].update(threshold="LastWeight() / 2"),
-            node(d, "t-re")["args"].update(threshold="Bmi(70, 1.7)"),
+            node(d, "t-re")["args"].update(threshold="Bmi(70, 1.7) + Undeclared()"),
         ))
         rows = survey(root)
-        assert len([n for n in rows if n.startswith("arg_threshold_")]) == 2
+        args = [n for n in rows if n.startswith("arg_threshold_")]
+        assert len(args) == 2 and any("Bmi(70" in rows[n]["calculation"] for n in args)
         warnings = [r.getMessage() for r in caplog.records if "W_ARG_EVAL" in r.getMessage()]
-        assert len(warnings) == 1 and "t-re" in warnings[0] and "Bmi" in warnings[0]
+        # Bmi (@retrieve: false) and LastWeight (true) are declared; only Undeclared warns
+        assert len(warnings) == 1 and "t-re" in warnings[0] and "Undeclared" in warnings[0]

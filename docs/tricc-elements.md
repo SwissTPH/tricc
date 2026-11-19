@@ -248,11 +248,13 @@ declared `@retrieve: true` in the project's CQL `libraries`, and only calculates
 page that read none either (a name given to two calculates is not one of them). The build evaluates `and`, `or`, `not`, comparisons,
 `+ - * /`, `mod`, `if`, `Coalesce`, `Concatenate`, `Abs`, `Min`, `Max`, `Round` and the
 `is true` / `is false` / `exists` / `is null` tests, with CQL rules: null in, null out (`and` /
-`or` are three-valued), division by zero is null, numbers are decimals (`7 / 2` is `3.5`). An
-expression that reads no collected data but uses any other operator (`case`, for example) or a
-project function (the build has no implementation of it, whatever its `@retrieve`) keeps its
-hidden calculate, with a warning `W_ARG_EVAL` naming the call, the parameter and the operator;
-where only a fixed value fits, `E_ARG_DYNAMIC_STATIC` gives that reason. One that evaluates to
+`or` are three-valued), division by zero is null, numbers are decimals (`7 / 2` is `3.5`). A
+project function declared `@retrieve: false` (the default) is static, but the build has no
+implementation of it: the argument keeps its hidden calculate and the form computes it (the
+output must support the function). An expression that reads no collected data but uses any
+other operator (`case`, for example) or a function no library declares keeps its hidden
+calculate too, with a warning `W_ARG_EVAL` naming the call, the parameter and the operator.
+Where only a fixed value fits, either is `E_ARG_DYNAMIC_STATIC`, with the reason. One that evaluates to
 null keeps its hidden calculate too. The same applies to an intervention's `args`: `37 + 1` is `38`.
 
 A block reads no stored data: an expression calling a function of

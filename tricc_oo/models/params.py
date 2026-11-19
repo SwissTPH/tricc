@@ -68,7 +68,7 @@ E_BLOCK_PRIVATE = "E_BLOCK_PRIVATE"  # a reference from outside a block to one o
 E_OUTPUT_UNKNOWN = "E_OUTPUT_UNKNOWN"  # ``outputs`` lists a name no inner input or calculate has
 E_ABSTRACT_SELECTED = "E_ABSTRACT_SELECTED"  # an abstract (template) concept used outside its block
 E_BLOCK_SCOPE = "E_BLOCK_SCOPE"  # a block reads stored data (it must come in as an argument)
-W_ARG_EVAL = "W_ARG_EVAL"  # an argument reading no data uses a function the build cannot run (RFC #86)
+W_ARG_EVAL = "W_ARG_EVAL"  # an argument reading no data uses an operator or undeclared function (RFC #86)
 
 #: parameter types whose value is only ever static (§18.8 point 1)
 STATIC_ONLY_TYPES = ("name", "concept")
@@ -330,16 +330,24 @@ def fold_argument(
 
     Returns:
         The value (``str``, ``int``, ``float`` or ``bool``, for ``coerce_value``), or an
-        ``Unfolded`` when the argument reads collected data, evaluates to null, or uses an
-        operator or function the build cannot run (``W_ARG_EVAL`` is then logged): it is
-        then dynamic, as if it read collected data.
+        ``Unfolded`` when the argument reads collected data, evaluates to null, calls a
+        function declared ``@retrieve: false`` (static, but only the form can compute it), or
+        uses an operator or undeclared function the build cannot run (``W_ARG_EVAL`` is then
+        logged): its calculate then computes it in the form.
     """
-    from tricc_oo.visitors.constant_eval import TriccEvalUnsupported, TriccNotConstant, evaluate_constant
+    from tricc_oo.visitors.constant_eval import (
+        TriccEvalDeferred,
+        TriccEvalUnsupported,
+        TriccNotConstant,
+        evaluate_constant,
+    )
 
     try:
         value = evaluate_constant(expression, resolve, functions)
     except TriccNotConstant:
         return Unfolded()
+    except TriccEvalDeferred as error:
+        return Unfolded(f"{error}")
     except TriccEvalUnsupported as error:
         reason = f"the build cannot evaluate {error}"
         logger.warning(f"{W_ARG_EVAL}: {where}: {expression!r} reads no collected data, but {reason}; kept dynamic")

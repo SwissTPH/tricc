@@ -5,6 +5,7 @@ import pytest
 from tricc_oo.models.base import TriccOperation, TriccOperator, TriccReference, TriccStatic
 from tricc_oo.visitors.constant_eval import (
     SUPPORTED_OPERATORS,
+    TriccEvalDeferred,
     TriccEvalUnsupported,
     TriccNotConstant,
     evaluate_constant,
@@ -147,14 +148,15 @@ class TestFunctions:
             evaluate_constant("Bmi(70, 1.7)", functions=self.declared("true"))
 
     @pytest.mark.parametrize("retrieve", ["false", None])  # the default is false
-    def test_retrieve_false_has_no_implementation(self, retrieve):
-        with pytest.raises(TriccEvalUnsupported, match="no implementation") as err:
+    def test_retrieve_false_is_static_computed_by_the_form(self, retrieve):
+        with pytest.raises(TriccEvalDeferred, match="only the form") as err:
             evaluate_constant("Bmi(70, 1.7)", functions=self.declared(retrieve))
         assert err.value.operator == "Bmi"
 
     def test_undeclared(self):
-        with pytest.raises(TriccEvalUnsupported, match="not declared"):
+        with pytest.raises(TriccEvalUnsupported, match="not declared") as err:
             evaluate_constant("Foo(1)")
+        assert not isinstance(err.value, TriccEvalDeferred)
 
     def test_data_argument_wins(self):
         with pytest.raises(TriccNotConstant):

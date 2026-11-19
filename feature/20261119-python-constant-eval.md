@@ -26,16 +26,23 @@ name, a static decision). The author has to work out the value by hand.
   value: no hidden calculate, and accepted where only fixed values fit.
 - "No collected data" means no inputs and no stored data. A calculate is allowed when it reads
   no collected data either, recursively.
-- An expression that reads no collected data but uses a function the build can't evaluate
-  stays calculated in the form, as before, with a warning naming the function. Where only a
-  fixed value fits, the error says why the value could not be worked out.
 - A project function says whether it reads recorded data with the `@retrieve` tag of its
-  declaration in the project's CQL libraries (`@retrieve: true`); without it, it doesn't.
+  declaration in the project's CQL libraries. `@retrieve: true`: it does, like an input.
+  `@retrieve: false` (the default): it is static, but the build cannot run it, so the form
+  computes it; the output must support the function, or the export fails.
+- An expression that reads no collected data but uses an operator the build can't evaluate,
+  or a function no library declares, is computed in the form, as before, with a warning
+  naming it.
+- Where only a fixed value fits (a node name, a label once the block is built, a static
+  decision), an argument the build can't evaluate is an error saying why.
 
 ### Out of scope
 
 - Folding calculates, relevances or rhombus conditions in the exported forms (a possible later
   phase, see Open questions).
+- Partial folding: replacing the constant parts of an argument that can't be folded whole
+  (`Bmi({{w}} * 2, 1.7)` → `Bmi(140, 1.7)`). It needs a writer from parsed expressions back to
+  CQL text; a later RFC.
 - `Today()` and `Now()`: never constant (§7.1 of the block spec).
 
 ---
@@ -57,10 +64,12 @@ name, a static decision). The author has to work out the value by hand.
   - Stored-data functions (`get_stored_data()`), `today`, `now`: `TriccNotConstant`.
   - A function called as written (`native`): looked up with `functions(name)`, the project's
     declaration (`cql_library.function_signature`, PR #84). `@retrieve: true`:
-    `TriccNotConstant`. Otherwise (`@retrieve: false`, the default, or not declared) its
-    arguments are checked like any operand, then `TriccEvalUnsupported(name)`: the build has
-    no implementation of a project function.
+    `TriccNotConstant`. Not declared: `TriccEvalUnsupported(name)`. `@retrieve: false` (the
+    default): its arguments are checked like any operand; evaluating it raises
+    `TriccEvalDeferred(name)` (a `TriccEvalUnsupported`): static, computed by the form.
   - Any other operator: `TriccEvalUnsupported(operator)`.
+  - The check pass collects unsupported operators and undeclared functions over the whole
+    tree and raises the first after it, so the outcome does not depend on operand order.
   - The whole expression is checked for collected data first: an unsupported operator only
     fails an expression that would otherwise be constant (`case when "weight" > 0 …` stays
     dynamic).
@@ -69,8 +78,9 @@ name, a static decision). The author has to work out the value by hand.
 - `bind` (`models/params.py`): after rendering an expression argument, try `evaluate_constant`.
   - A value: bind it as a literal (`coerce_value`), with no calculate.
   - `TriccNotConstant`: dynamic, as today.
+  - `TriccEvalDeferred`: computed by the form (its `arg_` calculate), no warning.
   - `TriccEvalUnsupported`: warning `W_ARG_EVAL`, then dynamic, as if it read collected data.
-    Where a fixed value is needed, `E_ARG_DYNAMIC_STATIC` gives the reason.
+  - Either way, where a fixed value is needed, `E_ARG_DYNAMIC_STATIC` gives the reason.
   - `fold_argument` returns the value or an `Unfolded(reason)`.
 - `resolve` for arguments: the calculates of the rendered calling page. The input strategy
   gives them through a new optional `ParamBuild` hook, `calculates(rendered) -> {name:
@@ -82,8 +92,8 @@ name, a static decision). The author has to work out the value by hand.
 
 ### 2. Validation and errors
 
-- `W_ARG_EVAL` (warning): an argument reading no collected data uses an operator or function
-  the build can't evaluate; kept dynamic. The message names the call chain, the parameter and
+- `W_ARG_EVAL` (warning): an argument reading no collected data uses an operator the build
+  can't evaluate or an undeclared function; kept dynamic. The message names the call chain, the parameter and
   the operator or function.
 - `TriccNotConstant` is never shown to the author: it only means "keep it dynamic".
 
@@ -98,7 +108,8 @@ name, a static decision). The author has to work out the value by hand.
   - a folded value is accepted for a parameter used in a node name;
   - an unsupported operator warns `W_ARG_EVAL` and stays dynamic, or gives
     `E_ARG_DYNAMIC_STATIC` with the reason where a fixed value is needed;
-  - `@retrieve: true` / `false` / undeclared, in a project with a `libraries` file.
+  - `@retrieve: true` / `false` (no warning) / undeclared (warning), in a project with a
+    `libraries` file.
 
 ### 4. Phases
 
@@ -121,6 +132,12 @@ None.
 - 2026-11-19: a function's static/dynamic marker is the `@retrieve` tag of its CQL `external`
   declaration (PR #84); `false` is the default. An undeclared function is treated like
   `@retrieve: false`: not data, but not evaluable, so warned and kept dynamic.
+- 2026-11-19: a function declared `@retrieve: false` is static: no warning; the build has no
+  implementation, so the form computes it, and an output that doesn't support it fails the
+  export. A label or name needs the value at build time, so it fails there with the reason
+  (@delcroip).
+- 2026-11-19: partial folding of an argument's constant parts is wanted, as a later RFC (it
+  needs a TRICC expression → CQL writer) (@delcroip).
 - 2026-11-19: folding calculates and conditions in the exported forms is deferred to a later
   RFC, behind the same visitor.
 - 2026-11-19: numbers are Python `Decimal`; a whole result is given back as `int`, else `float`.
