@@ -1,0 +1,109 @@
+# Evaluate constant expressions at build time
+
+| Field             | Value                                                                                   |
+| ----------------- | --------------------------------------------------------------------------------------- |
+| **Status**        | Approved (2026-11-19, in conversation)                                                  |
+| **Branch target** | `feature/python-constant-eval` → `develop`                                              |
+| **Scope**         | `models`, `converters/cql_to_operation`, `strategies/input/param_build` (new visitor)   |
+| **Related**       | `20261111-block-params-and-start-node.md` §18.8 point 1 (expression arguments, which this makes foldable) |
+| **RFC**           | SwissTPH/tricc#86                                                                       |
+
+---
+
+## Part I — Business description
+
+### The problem
+
+A block argument is fixed only when it is written as a plain value (`38`, `'axillary'`). An
+expression that always gives the same result, such as `{{threshold}} + 0.5` or `37 + 1`, is
+treated like one that reads the patient's data. The build then adds a hidden calculate that the
+form computes every time, and refuses the argument wherever a fixed value is needed (a node
+name, a static decision). The author has to work out the value by hand.
+
+### What changes for an author
+
+- An argument that uses no collected data gets its value at build time. It's then a fixed
+  value: no hidden calculate, and accepted where only fixed values fit.
+- "No collected data" means no inputs and no stored data. A calculate is allowed when it reads
+  no collected data either, recursively.
+- An expression that uses a function the build can't evaluate stops the build, naming the
+  function, so it never silently becomes something else.
+
+### Out of scope
+
+- Folding calculates, relevances or rhombus conditions in the exported forms (a possible later
+  phase, see Open questions).
+- `Today()` and `Now()`: never constant (§7.1 of the block spec).
+
+---
+
+## Part II — Technical specification
+
+### 1. Design
+
+- New visitor `tricc_oo/visitors/constant_eval.py`:
+  `evaluate_constant(expression, resolve) -> TriccStatic`.
+  - A `TriccStatic` (not a `TriccReference`) is its value.
+  - A `TriccReference` goes through `resolve(name)`. A calculate that reads no collected data
+    is evaluated recursively, with a cycle guard. Anything else (an input, a select, an unknown
+    name) raises `TriccNotConstant`.
+  - A `TriccOperation` is evaluated from its operands through a table
+    `TriccOperator -> Python function`, starting with: `and`, `or`, `not` (CQL three-valued,
+    None is null), comparisons, `+ - * /` (division by zero is null), `if`, `concatenate`, `abs`,
+    `min`, `max`, `round`, `istrue`, `isfalse`, `exists`.
+  - Stored-data functions (`get_stored_data()`), `today`, `now` and `native`: `TriccNotConstant`.
+  - Any other operator: `TriccEvalUnsupported(operator)`.
+  - The whole expression is checked for collected data first: an unsupported operator only
+    fails an expression that would otherwise be constant (`case when "weight" > 0 …` stays
+    dynamic).
+  - A null result returns None; the argument then keeps its calculate (bound as None, the
+    parameter would take its default).
+- `bind` (`models/params.py`): after rendering an expression argument, try `evaluate_constant`.
+  - A value: bind it as a literal (`coerce_value`), with no calculate.
+  - `TriccNotConstant`: dynamic, as today.
+  - `TriccEvalUnsupported`: re-raised as `TriccParamError` with a new code `E_ARG_EVAL`.
+- `resolve` for arguments: the calculates of the rendered calling page. The input strategy
+  gives them through a new optional `ParamBuild` hook, `calculates(rendered) -> {name:
+  expression}` (`_yaml_calculates`, `drawio_calculates`); a name given twice maps to None.
+  `ParamBuild._resolver` passes it to `bind(..., resolve=)`.
+- Intervention `args` are folded too (no resolver): `37 + 1` is accepted there.
+
+### 2. Validation and errors
+
+- `E_ARG_EVAL`: an argument uses a function the build can't evaluate. The message names the
+  call chain, the parameter and the operator.
+- `TriccNotConstant` is never shown to the author: it only means "keep it dynamic".
+
+### 3. Tests
+
+- `tests/test_constant_eval.py`, operator table:
+  - each supported operator, null propagation, division by zero;
+  - a reference to an input fails; a reference to a constant calculate, nested, is evaluated;
+  - a cycle is detected.
+- `tests/test_block_calls.py`:
+  - `{{t}} + 1` binds the number, with no `arg_` calculate;
+  - a folded value is accepted for a parameter used in a node name;
+  - an unsupported operator gives `E_ARG_EVAL`.
+
+### 4. Phases
+
+1. Visitor and operator table, unit tests.
+2. Use in `bind`, with the resolver over the calling page's calculates.
+3. Docs: `docs/tricc-elements.md` (block arguments).
+
+---
+
+## Open questions
+
+None.
+
+## Decisions
+
+- 2026-11-19: approved in conversation (@delcroip).
+- 2026-11-19: an unsupported function in a constant argument stops the build (`E_ARG_EVAL`).
+- 2026-11-19: folding calculates and conditions in the exported forms is deferred to a later
+  RFC, behind the same visitor.
+- 2026-11-19: numbers are Python `Decimal`; a whole result is given back as `int`, else `float`.
+- 2026-11-19 (implementation): `native` calls stay dynamic, as Part II says, rather than
+  stopping the build; data is checked before operators; a null result keeps its calculate.
+

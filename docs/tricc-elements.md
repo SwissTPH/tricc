@@ -233,6 +233,26 @@ Only a fixed value fits a parameter that shapes the drawing: one used in a node 
 type `name` or `concept`, here or in a block below. An expression there is
 `E_ARG_DYNAMIC_STATIC`. An intervention's `args` are always fixed values.
 
+An expression that reads no collected data is calculated when the project is built and becomes
+a fixed value: no hidden calculate, and it fits where only a fixed value does.
+
+```yaml
+args:
+  threshold: '{{t}} + 0.5'                             # {{t}} is a fixed value of the caller
+  site: "if {{lab_available}} then 'axillary' else 'rectal'"
+  limit: '"base_limit" * 2'                            # base_limit: a calculate of this page
+```
+
+"No collected data" means no input, select, stored data, `Today()` / `Now()` or other function
+call, and only calculates of the calling page that read none either (a name given to two
+calculates is not one of them). The build evaluates `and`, `or`, `not`, comparisons,
+`+ - * /`, `mod`, `if`, `Coalesce`, `Concatenate`, `Abs`, `Min`, `Max`, `Round` and the
+`is true` / `is false` / `exists` / `is null` tests, with CQL rules: null in, null out (`and` /
+`or` are three-valued), division by zero is null, numbers are decimals (`7 / 2` is `3.5`). An
+expression that is constant but uses any other operator (`case`, for example) stops the build
+with `E_ARG_EVAL`, naming the call, the parameter and the operator. One that evaluates to null
+keeps its hidden calculate. The same applies to an intervention's `args`: `37 + 1` is `38`.
+
 A block reads no stored data: an expression calling a function of
 `tricc_oo/converters/cql/stored_data_functions.json` (`AgeInDays()`, the encounter, history
 and practitioner / location / facility readers), or a `populate` node, inside a block is
