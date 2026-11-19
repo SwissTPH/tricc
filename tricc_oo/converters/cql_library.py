@@ -1,5 +1,8 @@
 """Project CQL libraries (tricc.yaml ``libraries``) -> calculate nodes.
 
+Libraries are parsed with the CQL grammar (``cqlParser.library``); a syntax error names
+the file and line.
+
 A library is a list of named expressions; in TRICC terms each ``define`` is a
 calculate. Only expression definitions are supported: ``library`` / ``using`` /
 ``include`` / ``context`` / ``parameter`` / terminology declarations are ignored, and
@@ -33,20 +36,18 @@ import re
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
+from antlr4 import CommonTokenStream, InputStream
+from antlr4.error.ErrorListener import ErrorListener
+
+from tricc_oo.converters.cql.cqlLexer import cqlLexer
+from tricc_oo.converters.cql.cqlParser import cqlParser
 from tricc_oo.converters.utils import generate_id
 from tricc_oo.models.base import TriccNodeType
 from tricc_oo.models.calculate import TriccNodeCalculate
 
 logger = logging.getLogger("default")
 
-_COMMENTS = re.compile(r"/\*.*?\*/|//[^\n]*", re.S)
-_DEFINE = re.compile(
-    r"^\s*(?P<define>define)\s+(?:(?:public|private)\s+)?(?P<function>(?:fluent\s+)?function\s+)?"
-    r"(?P<name>\"(?:[^\"\\]|\\.)+\"|[A-Za-z_][A-Za-z0-9_]*)\s*(?P<params>\([^)]*\))?(?P<tail>[^:]*?):",
-    re.M,
-)
 _NAME_OK = re.compile(r"^[A-Za-z_][A-Za-z0-9_.]*$")
-_RETURNS = re.compile(r"\breturns\s+(?P<type>[A-Za-z_][A-Za-z0-9_.]*)\s*$")
 _TAG = re.compile(r"^@(?P<name>[A-Za-z_][A-Za-z0-9_.-]*)\s*:?\s*(?P<value>.*)$")
 _BOOLEAN_TAGS = ("retrieve",)
 
@@ -102,31 +103,69 @@ class FunctionSignature:
         return self.tags.get("retrieve", "true").lower() != "false"
 
 
-def _blank_comments(text: str) -> str:
-    """``text`` with comments replaced by spaces (positions and newlines kept)."""
-    out, i = [], 0
-    for m in _COMMENTS.finditer(text):
-        # Keep string literals intact: only drop comments outside quotes.
-        if text[: m.start()].count("'") % 2:
-            continue
-        out.append(text[i : m.start()])
-        out.append(re.sub(r"[^\n]", " ", m.group(0)))
-        i = m.end()
-    out.append(text[i:])
-    return "".join(out)
+class _RaiseOnSyntaxError(ErrorListener):
+    def __init__(self, source: str):
+        super().__init__()
+        self.source = source
+
+    def syntaxError(self, recognizer, offendingSymbol, line, column, msg, e):
+        raise ValueError(f"{self.source}: not valid CQL at line {line}:{column}: {msg}")
 
 
-def _leading_tags(raw: str, position: int, name: str, source: str) -> Dict[str, str]:
-    """Documentation tags of the ``/* */`` comment right before ``position``."""
-    before = raw[:position].rstrip()
-    if not before.endswith("*/"):
-        return {}
-    opening = before.rfind("/*")
-    if opening < 0:
-        return {}
+class _ParsedLibrary:
+    """One library parsed with the CQL grammar: its defines and functions, in file order."""
+
+    def __init__(self, text: str, source: str):
+        self.text = text
+        self.source = source
+        self.input = InputStream(text)
+        lexer = cqlLexer(self.input)
+        lexer.removeErrorListeners()
+        lexer.addErrorListener(_RaiseOnSyntaxError(source))
+        self.tokens = CommonTokenStream(lexer)
+        parser = cqlParser(self.tokens)
+        parser.removeErrorListeners()
+        parser.addErrorListener(_RaiseOnSyntaxError(source))
+        self.tree = parser.library()
+
+    def statements(self):
+        for statement in self.tree.statement():
+            definition = statement.expressionDefinition() or statement.functionDefinition()
+            if definition is not None:
+                yield definition
+
+    def source_text(self, ctx) -> str:
+        """The text of ``ctx`` exactly as written."""
+        return self.input.getText(ctx.start.start, ctx.stop.stop)
+
+    def leading_tags(self, ctx, name: str) -> Dict[str, str]:
+        """Documentation tags of the ``/* */`` comment right before ``ctx``."""
+        hidden = self.tokens.getHiddenTokensToLeft(ctx.start.tokenIndex) or []
+        comment = None
+        for token in reversed(hidden):
+            if token.type == cqlLexer.WS:
+                continue
+            if token.type == cqlLexer.COMMENT:
+                comment = token.text
+            break
+        if comment is None:
+            return {}
+        return _parse_tags(comment[2:-2], name, self.source)
+
+
+def _identifier(ctx) -> str:
+    """An identifier as a name: ``"quoted"`` and `` `delimited` `` without their quotes."""
+    text = ctx.getText()
+    if len(text) >= 2 and text[0] == text[-1] and text[0] in "\"`":
+        return text[1:-1]
+    return text
+
+
+def _parse_tags(comment: str, name: str, source: str) -> Dict[str, str]:
+    """``{tag: value}`` from a comment body; a line without ``@`` continues the last value."""
     tags: Dict[str, str] = {}
     current = None
-    for line in before[opening + 2 : -2].splitlines():
+    for line in comment.splitlines():
         line = line.strip().lstrip("*").strip()
         tag = _TAG.match(line)
         if tag:
@@ -140,32 +179,6 @@ def _leading_tags(raw: str, position: int, name: str, source: str) -> Dict[str, 
         if flag in tags and tags[flag].lower() not in ("true", "false"):
             raise ValueError(f"{source}: @{flag} on {name!r} must be true or false, not {tags[flag]!r}")
     return tags
-
-
-def _arguments(params: Optional[str], name: str, source: str) -> Tuple[Tuple[str, str], ...]:
-    """``(name, type)`` per operand of ``(a String, b List<Decimal>)``."""
-    inner = (params or "()").strip()[1:-1]
-    parts, depth, current = [], 0, ""
-    for char in inner:
-        if char in "<{":
-            depth += 1
-        elif char in ">}":
-            depth -= 1
-        if char == "," and depth == 0:
-            parts.append(current)
-            current = ""
-        else:
-            current += char
-    parts.append(current)
-    arguments = []
-    for part in (p.strip() for p in parts):
-        if not part:
-            continue
-        operand = part.split(None, 1)
-        if len(operand) != 2:
-            raise ValueError(f"{source}: argument {part!r} of function {name!r} needs a name and a type")
-        arguments.append((operand[0].strip('"'), operand[1].strip()))
-    return tuple(arguments)
 
 
 def native_function_type(project, name) -> Optional[str]:
@@ -191,72 +204,61 @@ def function_signature(project, name) -> Optional[FunctionSignature]:
     return None
 
 
-def _library_entries(text: str, source: str):
-    """``(name, header match, body)`` for every define, in file order (positions as in ``text``)."""
-    blanked = _blank_comments(text)
-    matches = list(_DEFINE.finditer(blanked))
-    for i, m in enumerate(matches):
-        end = matches[i + 1].start() if i + 1 < len(matches) else len(blanked)
-        name = m.group("name").strip('"')
-        yield name, m, blanked[m.end() : end].strip()
-
-
-def _return_type(name: str, tail: str, source: str) -> str:
-    """FHIR type a function declares (its ``returns`` clause)."""
-    returns = _RETURNS.search(tail)
-    if not returns:
-        raise ValueError(f"{source}: function {name!r} must declare its type with 'returns'")
-    fhir_type = fhir_type_of_cql_type(returns.group("type"))
-    if fhir_type is None:
-        raise ValueError(
-            f"{source}: function {name!r} returns {returns.group('type')!r}; "
-            f"use one of {', '.join(sorted(set(CQL_TO_FHIR_TYPE.values())))}"
-        )
-    return fhir_type
-
-
-def _is_function(m) -> bool:
-    return bool(m.group("function") or m.group("params"))
-
-
-def _check_external(name: str, body: str, source: str) -> None:
-    """Only ``external`` functions for now; a body (real CQL to write out) is planned."""
-    if body != "external":
+def _function_signature(library: _ParsedLibrary, ctx) -> FunctionSignature:
+    name = _identifier(ctx.identifierOrFunctionIdentifier())
+    source = library.source
+    if ctx.functionBody() is not None:
         raise ValueError(
             f"{source}: CQL functions with a body are not supported yet (define {name!r}); "
             "declare it 'external'"
         )
+    if ctx.typeSpecifier() is None:
+        raise ValueError(f"{source}: function {name!r} must declare its type with 'returns'")
+    returns = library.source_text(ctx.typeSpecifier())
+    return_type = fhir_type_of_cql_type(returns)
+    if return_type is None:
+        raise ValueError(
+            f"{source}: function {name!r} returns {returns!r}; "
+            f"use one of {', '.join(sorted(set(CQL_TO_FHIR_TYPE.values())))}"
+        )
+    return FunctionSignature(
+        name=name,
+        return_type=return_type,
+        arguments=tuple(
+            (_identifier(operand.referentialIdentifier()), library.source_text(operand.typeSpecifier()))
+            for operand in ctx.operandDefinition()
+        ),
+        tags=library.leading_tags(ctx, name),
+        external=True,
+        source=source,
+    )
 
 
 def parse_cql_library_functions(text: str, source: str = "<library>") -> Dict[str, FunctionSignature]:
     """Every function of a library, by name, in file order."""
+    library = _ParsedLibrary(text, source)
     functions: Dict[str, FunctionSignature] = {}
-    for name, m, body in _library_entries(text, source):
-        if not _is_function(m):
+    for ctx in library.statements():
+        if not isinstance(ctx, cqlParser.FunctionDefinitionContext):
             continue
-        _check_external(name, body, source)
-        if name in functions:
-            raise ValueError(f"{source}: function {name!r} appears twice")
-        functions[name] = FunctionSignature(
-            name=name,
-            return_type=_return_type(name, m.group("tail"), source),
-            arguments=_arguments(m.group("params"), name, source),
-            tags=_leading_tags(text, m.start("define"), name, source),
-            external=True,
-            source=source,
-        )
+        signature = _function_signature(library, ctx)
+        if signature.name in functions:
+            raise ValueError(f"{source}: function {signature.name!r} appears twice")
+        functions[signature.name] = signature
     return functions
 
 
 def parse_cql_library(text: str, source: str = "<library>") -> List[Tuple[str, str]]:
     """Return ``[(define name, expression text)]`` in file order (functions: see
     :func:`parse_cql_library_functions`)."""
+    library = _ParsedLibrary(text, source)
     defines: List[Tuple[str, str]] = []
     seen = set()
-    for name, m, body in _library_entries(text, source):
-        if _is_function(m):
-            _check_external(name, body, source)
+    for ctx in library.statements():
+        if isinstance(ctx, cqlParser.FunctionDefinitionContext):
+            _function_signature(library, ctx)  # rejects a body
             continue
+        name = _identifier(ctx.identifier())
         if not _NAME_OK.match(name):
             raise ValueError(
                 f"{source}: define {name!r} must be a plain identifier (letters, digits, _ or .) "
@@ -265,9 +267,7 @@ def parse_cql_library(text: str, source: str = "<library>") -> List[Tuple[str, s
         if name in seen:
             raise ValueError(f"{source}: define {name!r} appears twice")
         seen.add(name)
-        if not body:
-            raise ValueError(f"{source}: define {name!r} has no expression")
-        defines.append((name, body))
+        defines.append((name, library.source_text(ctx.expression())))
     return defines
 
 

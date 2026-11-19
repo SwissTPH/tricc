@@ -124,7 +124,8 @@ def test_parse_library_accepts_quoted_identifiers():
         ("define function Double(x Integer): x * 2", "functions with a body are not supported"),
         ('define "Has fever": temperature > 37.5', "plain identifier"),
         ("define a: 1\ndefine a: 2", "appears twice"),
-        ("define a:\n", "no expression"),
+        ("define a:\n", "not valid CQL at line 2"),
+        ("define a: age >\n", "not valid CQL"),
     ],
 )
 def test_parse_library_rejects_unsupported_defines(text, message):
@@ -139,7 +140,7 @@ library Ext version '1.0'
   of gestation
 @retrieve: false
 */
-define function IsPreterm(weeks Integer) returns FHIR.boolean: external
+define function IsPreterm(gestationWeeks Integer) returns FHIR.boolean: external
 
 // a line comment is not a tag block
 define function Score(a Decimal, b List<Decimal>) returns System.Integer : external
@@ -156,7 +157,7 @@ def test_functions_are_signatures_not_calculates():
     assert list(functions) == ["IsPreterm", "Score", "LastWeight"]
     preterm = functions["IsPreterm"]
     assert preterm.return_type == "boolean"
-    assert preterm.arguments == (("weeks", "Integer"),)
+    assert preterm.arguments == (("gestationWeeks", "Integer"),)
     assert preterm.tags == {"description": "Is the child born before 37 weeks of gestation", "retrieve": "false"}
     assert preterm.external and not preterm.retrieve
     assert functions["Score"].return_type == "integer"
@@ -171,7 +172,7 @@ def test_functions_are_signatures_not_calculates():
     "text, message",
     [
         ("define function F(x Integer): external", "must declare its type"),
-        ("define function F(x Integer) returns Tuple: external", "returns 'Tuple'"),
+        ("define function F(x Integer) returns List<Integer>: external", "returns 'List<Integer>'"),
         (
             "define function F() returns Boolean: external\ndefine function F() returns Boolean: external",
             "appears twice",
@@ -179,7 +180,7 @@ def test_functions_are_signatures_not_calculates():
         ("define function F(x Integer) returns Integer: x * 2", "body are not supported yet"),
         ("/* @retrieve: maybe */\ndefine function F() returns Boolean: external", "must be true or false"),
         ("/* @retrieve: true\n@retrieve: false */\ndefine function F() returns Boolean: external", "twice"),
-        ("define function F(x) returns Boolean: external", "needs a name and a type"),
+        ("define function F(x) returns Boolean: external", "not valid CQL"),
     ],
 )
 def test_function_errors(text, message):

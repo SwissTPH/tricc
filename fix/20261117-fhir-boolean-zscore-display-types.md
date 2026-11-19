@@ -64,6 +64,8 @@ Valid status values: `Draft` → `Approved` → `Implemented` → `Superseded`.
   define function Zscore(chart String, sex String, value Decimal) returns FHIR.decimal: external
   ```
 
+  Libraries are parsed with the CQL ANTLR grammar (`cqlParser.library`, comments read from
+  the HIDDEN token channel), not with regular expressions.
   `cql_library.parse_cql_library_functions` reads each into a `FunctionSignature`
   (`return_type` as a FHIR data type, from a FHIR type or its CQL System name; `arguments`
   as `(name, type as written)`; `tags` as written; `external`) in

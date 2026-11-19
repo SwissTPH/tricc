@@ -93,7 +93,8 @@ interventions:
   - A row's concept is its node's explicit YAML `concept`, else the concept whose code
     is the node name. Designation text is used as is (`${name}` tokens are not remapped
     to export names).
-- **`libraries`** lists CQL files. Each `define name: <expression>` becomes a
+- **`libraries`** lists CQL files, parsed with the CQL grammar (a syntax error stops the
+  build with the file and line). Each `define name: <expression>` becomes a
   calculate that any activity can reference by name, processed like a free-floating
   calculate on the main page (computed once its references are available). Only
   expression defines are supported: declarations (`library`, `using`, `include`,
