@@ -64,11 +64,14 @@ E_BLOCK_PRIVATE = "E_BLOCK_PRIVATE"  # a reference from outside a block to one o
 E_OUTPUT_UNKNOWN = "E_OUTPUT_UNKNOWN"  # ``outputs`` lists a name no inner input or calculate has
 E_ABSTRACT_SELECTED = "E_ABSTRACT_SELECTED"  # an abstract (template) concept used outside its block
 E_BLOCK_SCOPE = "E_BLOCK_SCOPE"  # a block reads stored data (it must come in as an argument)
+E_ARG_EVAL = "E_ARG_EVAL"  # a constant argument uses a function the build cannot evaluate (RFC #86)
 
 #: parameter types whose value is only ever static (§18.8 point 1)
 STATIC_ONLY_TYPES = ("name", "concept")
 #: key of a bound dynamic value: ``{"dynamic": <name of the calculate holding it>}``
 DYNAMIC = "dynamic"
+#: ``fold_argument``'s answer for an argument that reads collected data
+NOT_CONSTANT = object()
 
 
 class TriccParamError(ValueError):
@@ -293,6 +296,38 @@ def literal_value(text: str) -> Any:
         return text
     parsed = _parse_arg(text)
     return parsed.value if _is_constant(parsed) and isinstance(parsed.value, str) else text
+
+
+def fold_argument(expression: str, resolve: Optional[Callable[[str], Any]], where: str) -> Any:
+    """The value of an expression argument that uses no collected data (RFC #86).
+
+    Args:
+        expression: The argument, its placeholders rendered as in an expression.
+        resolve: The expression of a calculate of the calling page, by name; None when the
+            caller has no page (the intervention's ``args``).
+        where: Context for the error message (the call chain and the parameter).
+
+    Returns:
+        The value (``str``, ``int``, ``float`` or ``bool``, for ``coerce_value``), or
+        ``NOT_CONSTANT`` when the argument reads collected data or evaluates to null: it is
+        then dynamic.
+
+    Raises:
+        TriccParamError: ``E_ARG_EVAL`` when the argument is constant but uses an operator
+            the build cannot evaluate.
+    """
+    from tricc_oo.visitors.constant_eval import TriccEvalUnsupported, TriccNotConstant, evaluate_constant
+
+    try:
+        value = evaluate_constant(expression, resolve)
+    except TriccNotConstant:
+        return NOT_CONSTANT
+    except TriccEvalUnsupported as error:
+        raise TriccParamError(
+            E_ARG_EVAL, f"{where}: {expression!r} uses no collected data, but the build cannot evaluate {error}"
+        ) from None
+    # a null keeps its calculate: an unbound parameter would take its default instead
+    return NOT_CONSTANT if value is None else value.value
 
 
 def is_dynamic(value: Any) -> bool:
@@ -682,6 +717,7 @@ def bind(
     chain: str,
     static_only: Iterable[str] = (),
     add_dynamic: Optional[Callable[[str, str, Env], str]] = None,
+    resolve: Optional[Callable[[str], Any]] = None,
 ) -> Env:
     """Bind the parameters of a called page (§3.2).
 
@@ -701,7 +737,9 @@ def bind(
     placeholders are rendered as in an expression, ``add_dynamic`` creates the calculate
     and names it, and the bound value is
     ``{"dynamic": <its name>}``. Passed on to a page below by ``{{x}}``, the same calculate
-    is used: it is not evaluated again.
+    is used: it is not evaluated again. An expression argument that uses no collected data
+    (``fold_argument``) is evaluated at build time instead and bound as a literal: no
+    calculate, and accepted where only a fixed value fits.
 
     Args:
         callee_params: The callee's effective parameters (``compute_effective``).
@@ -715,6 +753,8 @@ def bind(
         add_dynamic: ``(parameter name, rendered expression, caller_env) -> calculate name``:
             adds the calculate of an expression argument to the calling page. None where no
             expression argument is allowed (the intervention's ``args``).
+        resolve: The expression of a calculate of the calling page, by name, or None when
+            the name is not one: lets an argument that reads such a calculate be folded.
 
     Returns:
         The callee's environment, one entry per parameter of ``callee_params``. An
@@ -726,7 +766,7 @@ def bind(
             needs it); ``E_PARAM_UNKNOWN`` for ``{{x}}`` naming no caller parameter;
             ``E_PARAM_TYPE`` from ``coerce_value``; ``E_ARG_DYNAMIC_STATIC`` for an
             expression argument where none is allowed, or for a parameter that needs a
-            fixed value.
+            fixed value; ``E_ARG_EVAL`` from ``fold_argument``.
     """
     static_only = set(static_only)
     env: Env = {}
@@ -745,13 +785,18 @@ def bind(
             elif spec.type == "concept" and isinstance(arg, str) and _concept_code(arg):
                 value = coerce_value(spec, _concept_code(arg), where)
             elif spec.type not in ("expression", "name") and is_expression_arg(arg):
-                if add_dynamic is None:
-                    raise TriccParamError(
-                        E_ARG_DYNAMIC_STATIC, f"{where}: an intervention argument is a fixed value, not an expression"
-                    )
-                _check_dynamic_allowed(spec, static_only, where)
                 expression = substitute(arg, caller_env, EXPRESSION, where)
-                value = {DYNAMIC: add_dynamic(name, expression, caller_env)}
+                folded = fold_argument(expression, resolve, where)
+                if folded is not NOT_CONSTANT:
+                    value = coerce_value(spec, folded, where)
+                else:
+                    if add_dynamic is None:
+                        raise TriccParamError(
+                            E_ARG_DYNAMIC_STATIC,
+                            f"{where}: an intervention argument is a fixed value, not an expression",
+                        )
+                    _check_dynamic_allowed(spec, static_only, where)
+                    value = {DYNAMIC: add_dynamic(name, expression, caller_env)}
             else:
                 if isinstance(arg, str) and has_placeholder(arg):
                     arg = substitute(arg, caller_env, TEXT, where)

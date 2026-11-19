@@ -16,6 +16,9 @@ An input strategy gives:
   strategy's normal page build);
 - ``add_calculate(rendered, call, name, expression, label)`` (optional): add to a rendered
   page the calculate holding an expression argument of one of its calls (§18.8 point 1).
+- ``calculates(rendered)`` (optional): the calculates of a rendered page, ``{name: expression
+  text}``, a name given twice mapped to None. An expression argument that reads only those
+  that are constant is evaluated at build time (RFC #86).
 
 ``ParamBuild.run`` then computes the effective parameters, binds the intervention ``args`` at
 the root pages and each call's ``args`` below, builds every instance once, and registers the
@@ -39,6 +42,7 @@ from tricc_oo.models.params import (
     E_BLOCK_PRIVATE,
     E_BLOCK_SCOPE,
     E_PARAM_UNKNOWN,
+    NOT_CONSTANT,
     PRIMITIVE_TYPES,
     TEXT,
     W_PARAM_UNREFERENCED,
@@ -52,6 +56,7 @@ from tricc_oo.models.params import (
     compute_static_only,
     env_key,
     env_suffix,
+    fold_argument,
     is_dynamic,
     is_expression_arg,
     param_concept_code,
@@ -375,6 +380,8 @@ class ParamBuild:
         build: See the module docstring.
         add_calculate: See the module docstring; None when the input has no expression
             arguments.
+        calculates: See the module docstring; None when the input gives no calculates, so
+            only an argument without references is evaluated at build time.
         effective: Each page's effective parameters, set by ``run``.
         static_only: Each page's parameters that need a fixed value, set by ``run``.
         base_env: Each activity's values from its intervention, or None when only its
@@ -391,6 +398,7 @@ class ParamBuild:
         render: Callable[[Template, Env, str], Tuple[Any, List[RenderedCall]]],
         build: Callable[[Template, Any], None],
         add_calculate: Optional[Callable[[Any, CallSite, str, str, str], None]] = None,
+        calculates: Optional[Callable[[Any], Dict[str, Optional[str]]]] = None,
     ):
         self.templates = templates
         self.resolve = resolve
@@ -398,6 +406,7 @@ class ParamBuild:
         self.render = render
         self.build = build
         self.add_calculate = add_calculate
+        self.calculates = calculates
         self.effective: Dict[str, Dict[str, ParamSpec]] = {}
         self.static_only: Dict[str, Set[str]] = {}
         self.base_env: Dict[str, Optional[Env]] = {}
@@ -449,11 +458,12 @@ class ParamBuild:
                     E_PARAM_UNKNOWN,
                     f"intervention {getattr(config, 'id', '?')}: argument {name!r} reaches no activity parameter",
                 )
-            if is_expression_arg(value):
+            where = f"intervention {getattr(config, 'id', '?')}: argument {name!r}"
+            if is_expression_arg(value) and fold_argument(value, None, where) is NOT_CONSTANT:
                 raise TriccParamError(
                     E_ARG_DYNAMIC_STATIC,
-                    f"intervention {getattr(config, 'id', '?')}: argument {name!r} is an expression; an "
-                    "intervention's arguments are fixed values (nothing is collected yet)",
+                    f"{where} is an expression; an intervention's arguments are fixed values "
+                    "(nothing is collected yet)",
                 )
         called = {self.resolve(c) for t in self.templates.values() for c in t.calls}
         for tid in roots:
@@ -480,7 +490,7 @@ class ParamBuild:
                 where = " > ".join(chain + [call.describe()])
                 callee_env = bind(
                     self.effective[callee], call.args, env, where, self.static_only[callee],
-                    self._dynamic_adder(rendered, call, new_id, where),
+                    self._dynamic_adder(rendered, call, new_id, where), self._resolver(rendered),
                 )
                 use = f"{new_id}/{call.node_id}" if self.templates[callee].private_fields() else None
                 callee_id = self.instantiate(callee, callee_env, chain + [call.describe()], use)
@@ -546,6 +556,21 @@ class ParamBuild:
             return calc_name
 
         return add
+
+    def _resolver(self, rendered) -> Optional[Callable[[str], Optional[str]]]:
+        """``bind``'s ``resolve`` for the calls of a rendered page: its calculates, by name
+        (RFC #86). Read when the first argument needs it, after the expression arguments of
+        earlier calls were added (those are dynamic, so never constant)."""
+        if self.calculates is None:
+            return None
+        cache: Dict[str, Dict[str, Optional[str]]] = {}
+
+        def resolve(name: str) -> Optional[str]:
+            if "c" not in cache:
+                cache["c"] = self.calculates(rendered)
+            return cache["c"].get(name)
+
+        return resolve
 
     # ------------------------------------------------------------------
     # Private fields (§18.8 point 3)

@@ -30,6 +30,7 @@ from tricc_oo.strategies.input.base_input_strategy import BaseInputStrategy
 from tricc_oo.strategies.input.param_build import ParamBuild
 from tricc_oo.converters.drawio_params import (
     drawio_add_calculate,
+    drawio_calculates,
     drawio_render,
     drawio_resolver,
     drawio_template,
@@ -122,7 +123,8 @@ class DrawioStrategy(BaseInputStrategy):
         def build(template, rendered):
             self._create_page(rendered, media_path, project)
 
-        ParamBuild(templates, drawio_resolver(templates), project, drawio_render, build, drawio_add_calculate).run()
+        ParamBuild(templates, drawio_resolver(templates), project, drawio_render, build, drawio_add_calculate,
+                   drawio_calculates).run()
 
     def finalize(self, project, media_path):
         logger.info("# Create the graph from the start node")
