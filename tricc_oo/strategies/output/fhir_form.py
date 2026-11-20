@@ -285,6 +285,11 @@ define function HasCondition(code String):
         and exists(C.clinicalStatus.coding CS where CS.code = 'active')
   )
 
+// ── Content version ───────────────────────────────────────────────────────────
+// Build version of this export. See fix/20261116-content-version-reference.md.
+define function GetContentVersion():
+  '{content_version}'
+
 // ── Age helpers ───────────────────────────────────────────────────────────────
 // From PatientBirthDate (First([Patient])), not the implicit Patient singleton.
 
@@ -348,6 +353,8 @@ class FHIRStrategy(BaseOutPutStrategy):
         self.base_url = (base_url or "https://fhir.tricc").rstrip("/")
         self.use_value_sets = use_value_sets
         self.questionnaires: Dict[str, dict] = {}
+        # Build version, also returned by GetContentVersion() (fix/20261116-content-version-reference.md)
+        self.content_version = datetime.datetime.now().strftime("%Y%m%d%H%M")
         self.cql_defines: Dict[str, List[str]] = {}
         # populate concept read -> linkIds reading it (unpersisted-concept warning)
         self._populate_reads: Dict[str, set] = {}
@@ -453,7 +460,7 @@ class FHIRStrategy(BaseOutPutStrategy):
 
     def execute(self):
         """Run the full FHIR export pipeline."""
-        version = datetime.datetime.now().strftime("%Y%m%d%H%M")
+        version = self.content_version
         logger.info(f"FHIRStrategy: build version {version}")
         # Resolve form id before library assembly so Library ids match PlanDefinitions
         self.resolve_form_id()
@@ -2526,6 +2533,7 @@ class FHIRStrategy(BaseOutPutStrategy):
             repeat_helpers=cql_helper_repeat_block(FHIR_VERSION),
             populate_helpers=cql_helper_populate_block(),
             value_helpers=cql_helper_value_block(),
+            content_version=self.content_version,
         )
         retrievals = retrieval_cql_defines(iter_retrievals(self.project), type(self).__name__)
         if retrievals:
@@ -3596,6 +3604,9 @@ class FHIRStrategy(BaseOutPutStrategy):
     def tricc_operation_now(self, ref_expressions, original_references=None):
         return "Now()"
 
+    def tricc_operation_content_version(self, ref_expressions, original_references=None):
+        return "Helper.GetContentVersion()"
+
     def tricc_operation_age_day(self, ref_expressions, original_references=None):
         return f"AgeInDays({ref_expressions[0]})"
 
@@ -4235,6 +4246,10 @@ class FHIRStrategy(BaseOutPutStrategy):
 
     def tricc_operation_fhirpath_now(self, ref_expressions, original_references=None):
         return "now()"
+
+    def tricc_operation_fhirpath_content_version(self, ref_expressions, original_references=None):
+        # FHIRPath has no content-version accessor: the build version as a literal.
+        return f"'{self.content_version}'"
 
     # ============================================================
     # No clean FHIRPath equivalent — fail loudly rather than emit

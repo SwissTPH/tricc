@@ -889,6 +889,10 @@ class XLSFormStrategy(BaseOutPutStrategy):
     def tricc_operation_now(self, ref_expressions, original_references=None):
         return f"now()"
 
+    def tricc_operation_content_version(self, ref_expressions, original_references=None):
+        # Same value as the injected ``version`` row (fix/20261116-content-version-reference.md).
+        return "version()"
+
     def tricc_operation_abs(self, ref_expressions, original_references=None):
         return f"abs({ref_expressions[0]})"
 

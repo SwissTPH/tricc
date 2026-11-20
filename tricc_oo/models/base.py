@@ -505,6 +505,7 @@ class TriccOperator(StrEnum):
     MAX = "max"
     SUM = "sum"
     FORMAT_DATE = "format_date"
+    CONTENT_VERSION = "content_version"  # no operand, build version of the content
         # repeat TODO
     GET_REPEATED_VALUE = "get_repeated_value"
     GET_NUMBER_OF_REPEAT = "get_number_of_repeat"
@@ -564,6 +565,7 @@ RETURNS_LIST = [TriccOperator.DIAGNOSIS_LIST]
 RETURNS_STRING = [
     TriccOperator.CONCATENATE,
     TriccOperator.NORMALIZE_SPACE,
+    TriccOperator.CONTENT_VERSION,
 ]
 
 RETURNS_CONCEPT = [

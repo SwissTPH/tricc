@@ -50,6 +50,7 @@ FUNCTION_MAP = {
     "DiagnosisList": TriccOperator.DIAGNOSIS_LIST,
     "Today": TriccOperator.TODAY,
     "Now": TriccOperator.NOW,
+    "GetContentVersion": TriccOperator.CONTENT_VERSION,
     "Abs": TriccOperator.ABS,
     "Min": TriccOperator.MIN,
     "Max": TriccOperator.MAX,

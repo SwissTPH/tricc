@@ -1,0 +1,35 @@
+# A calculate calling GetContentVersion(), shown in a note.
+# See fix/20261116-content-version-reference.md.
+
+id: content_version
+title: Content version
+process: main
+
+nodes:
+  - id: start
+    type: start
+    form_id: content_version
+    label: "Start"
+
+  - id: content_version
+    type: calculate
+    name: content_version
+    label: "Content version"
+    calculate: "GetContentVersion()"
+
+  - id: note_version
+    type: note
+    name: note_version
+    label: "Content version ${content_version}"
+
+  - id: end
+    type: end
+    label: "End"
+
+edges:
+  - source: start
+    target: content_version
+  - source: content_version
+    target: note_version
+  - source: note_version
+    target: end

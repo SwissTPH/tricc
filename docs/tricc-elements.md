@@ -422,6 +422,12 @@ the correction.
 Full specification: `feature/20260821-get-repeated-value-operation.md` (explicit slot) and
 `feature/20260825-get-repeated-value-latest.md` (optional slot).
 
+**Content version — `GetContentVersion()`:** returns the build version of the exported
+content as a string. Declare a calculate (e.g. `content_version`, expression
+`GetContentVersion()`) and show it with `${content_version}`. XLSForm renders `version()`;
+FHIR renders `Helper.GetContentVersion()` in CQL and the version literal in FHIRPath. There is
+no implicit `version` reference outside XLSForm. See `fix/20261116-content-version-reference.md`.
+
 **Not yet usable in expressions:** `GetRepeated` (returns a resource, not a value),
 `GetNumberOfRepeat`, and the history accessors `GetHistoryValue` /
 `GetHistoryObservationValue` / `GetHistoryConditionValue`. These exist as **generated Helper CQL**
