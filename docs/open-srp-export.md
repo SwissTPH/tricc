@@ -184,6 +184,29 @@ children are display-only and are not extracted. See
 
 ---
 
+## Text and formatting
+
+Labels are authored as formatted text and reach the export as Markdown. FHIR `text`,
+`prefix` and `Coding.display` are plain strings, so the export writes:
+
+- **plain text** in `text` / `display`: the data dictionary wording (CodeSystem concept
+  display, or its `help` / `hint` designation) when there is one, else the label, with the
+  Markdown removed, blank-line runs collapsed and each `${…}` token shown as `…`;
+- **the formatted label** next to it on `_text` / `_display`, chosen by the strategy
+  parameter `text_format`:
+
+  | `text_format` | Extension | Value |
+  |---------------|-----------|-------|
+  | `"markdown"` (default) | `http://hl7.org/fhir/StructureDefinition/rendering-markdown` | `valueMarkdown` |
+  | `"html"` | `http://hl7.org/fhir/StructureDefinition/rendering-xhtml` | `valueString`, an XHTML `div` |
+
+This covers question and note text, the help / hint display children and answer options.
+No extension is written when the label is already plain and equals the text. Translations
+carry plain text. LHC-Forms renders both extensions; kotlin-fhir-data-capture shows `text`
+only. See `fix/20261120-fhir-text-format.md`.
+
+---
+
 ## cpg-common-process Mapping
 
 Each draw.io **activity** is mapped to a
@@ -439,7 +462,8 @@ alone is an XLSForm-only row and does not resolve here
 
 Text authored with `${field}` tokens — note labels, question labels, `hint` and `help`
 (`feature/display-text-injection.md`, `feature/20260909-display-message-ast.md`) — is stored as a
-message tree, exported as Markdown in `item.text`, and as a **`cqf-expression` on the item's
+message tree, exported as plain text in `item.text` (see *Text and formatting*), and as a
+**`cqf-expression` on the item's
 `text` element**, which openSRP FHIR Data Capture evaluates against the in-progress
 QuestionnaireResponse and shows instead of the static text:
 
@@ -447,7 +471,7 @@ QuestionnaireResponse and shows instead of the static text:
 {
   "linkId": "note_age",
   "type": "display",
-  "text": "Patient is ${age} years old",
+  "text": "Patient is … years old",
   "_text": {
     "extension": [
       {
@@ -462,8 +486,8 @@ QuestionnaireResponse and shows instead of the static text:
 }
 ```
 
-- `item.text` keeps the author's `${…}` tokens as a fallback for renderers without dynamic-text
-  support — it is never the serialized expression.
+- `item.text` shows `…` where a `${…}` token stands, as a fallback for renderers without
+  dynamic-text support — it is never the serialized expression.
 - The expression **must be FHIRPath**: the renderer rejects any other language for item text, then
   takes a single primitive value from the result.
 - Concatenation uses `&`, not `+` (`+` is arithmetic-only, and `&` renders an unanswered question

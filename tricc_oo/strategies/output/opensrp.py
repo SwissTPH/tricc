@@ -58,6 +58,7 @@ from tricc_oo.converters.fhir.questionnaire_item_mapper import (
     build_choice_orientation_extension,
 )
 from tricc_oo.converters.fhir.structuremap import target_structuremap_extension
+from tricc_oo.converters.fhir.text_format import TEXT_FORMAT_MARKDOWN
 from tricc_oo.strategies.output.fhir_form import (
     DEFAULT_BASE_URL,
     FHIRStrategy,
@@ -130,15 +131,18 @@ class OpenSRPStrategy(FHIRStrategy):
 
     processes = ["main"]
 
-    def __init__(self, project, output_path: str, base_url: str = DEFAULT_BASE_URL):
+    def __init__(
+        self, project, output_path: str, base_url: str = DEFAULT_BASE_URL, text_format: str = TEXT_FORMAT_MARKDOWN
+    ):
         """Initialise the OpenSRPStrategy.
 
         Args:
             project: The TRICC project object.
             output_path: Directory path for output files.
             base_url: Canonical base URL for FHIR resources.
+            text_format: ``"markdown"`` (default) or ``"html"``; see FHIRStrategy.
         """
-        super().__init__(project, output_path, base_url)
+        super().__init__(project, output_path, base_url, text_format=text_format)
         self.plan_definitions: Dict[str, dict] = {}
         self.activity_definitions: Dict[str, dict] = {}
         self.composition: Optional[dict] = None

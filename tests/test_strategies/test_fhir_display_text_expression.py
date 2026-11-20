@@ -65,7 +65,7 @@ def _child_by_control(parent, code):
 
 
 class TestDisplayTextExpression(unittest.TestCase):
-    def test_note_keeps_tokens_in_text_and_gets_fhirpath_expression(self):
+    def test_note_text_neutralises_tokens_and_gets_fhirpath_expression(self):
         strategy = _make_strategy()
         age = TriccNodeInteger(id="a", name="age", label="Age")
         note = TriccNodeNote(id="n", name="note_age", label="")
@@ -76,7 +76,7 @@ class TestDisplayTextExpression(unittest.TestCase):
         strategy.process_display_text()
 
         item = _find(strategy.questionnaires["main"]["item"], "note_age")
-        self.assertEqual(item["text"], "Patient is ${age} years old")
+        self.assertEqual(item["text"], "Patient is … years old")
 
         expression = _text_expression(item)
         self.assertIsNotNone(expression, item)
@@ -137,9 +137,9 @@ class TestDisplayTextExpression(unittest.TestCase):
         help_item = _child_by_control(parent, "help")
         hint_item = _child_by_control(parent, "flyover")
 
-        self.assertEqual(help_item["text"], "Recorded age is ${age}")
+        self.assertEqual(help_item["text"], "Recorded age is …")
         self.assertIn("linkId='age'", _text_expression(help_item)["expression"])
-        self.assertEqual(hint_item["text"], "e.g. ${age}")
+        self.assertEqual(hint_item["text"], "e.g. …")
         self.assertIn("linkId='age'", _text_expression(hint_item)["expression"])
 
     def test_plain_label_gets_no_text_element(self):
@@ -180,7 +180,7 @@ class TestDisplayTextYamlWalk(unittest.TestCase):
 
         note = _find(q.get("item"), "note_patient")
         self.assertIsNotNone(note, q.get("item"))
-        self.assertEqual(note["text"], "Patient is ${age} years old and ${sex}")
+        self.assertEqual(note["text"], "Patient is … years old and …")
 
         expression = _text_expression(note)["expression"]
         self.assertTrue(expression.startswith("'Patient is ' & "), expression)
