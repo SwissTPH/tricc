@@ -278,7 +278,7 @@ order stays the group-aware CHT order (`fix/20261118-fhir-group-aware-sections.m
 5. DrawTRICC mirror: the `page` / `asGroup` settings (activity, GoTo, block, group), migration of
    `instance = -1`.
 
-### 5. Implementation notes (phases 1–4)
+### 5. Implementation notes (phases 1–4, rev. 2026-11-20)
 
 Where the code made a rule above impossible or unclear:
 
@@ -304,6 +304,26 @@ Where the code made a rule above impossible or unclear:
   copy, so groups of called activities never reached an output; the XLSForm group of a
   `TriccGroup` now carries its activity's relevance (it crashed, or showed the questions
   outside the activity).
+
+**`asGroup` on blocks and groups (rev. 2026-11-20)**
+
+- A block is always inlined. With `as_group` or `page` resolved true its nodes are wrapped in a
+  generated `TriccGroup` (`wrap_snippet_in_group`), which carries `call = True`: that flag is
+  what makes it a section unit when the form is not paged, where a `container_page` group with
+  `as_group = True` stays a sub-heading. Its section linkId is `<block>_Ii_<n>_Ss_1`.
+- A group with `as_group = False` is dissolved when the activity's groups are built
+  (`dissolve_inline_groups`, draw.io and YAML), before any instance is made: its nodes and
+  nested groups move to the nearest enclosing section group, else the activity. Every output
+  therefore sees no group, not only FHIR and XLSForm. **No hidden item for its relevance:**
+  neither input authors a relevance on a group (`container_page` and YAML `groups` carry none),
+  so there is nothing to hold; a relevance set by code is dropped with a warning.
+- Rule 8 is checked on each node or group as it is read: `asGroup: false` on a goto or block call
+  that also says `page: true` is overridden there. The wrapping of rule 7 for an inlined activity
+  call therefore needs the `asGroup: false` on the `activity_start` (or `page` there and
+  `asGroup: false` on the goto): `pages_block.yaml` was changed accordingly.
+- `TriccNodeActivity.as_group` is not stored: a built instance exists only when it resolves true.
+- Fixed on the way: a nested draw.io `container_page` crashed (`add_group` was called without
+  its activity).
 
 ---
 

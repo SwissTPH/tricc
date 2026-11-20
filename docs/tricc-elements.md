@@ -101,6 +101,9 @@ This page documents TRICC modeling elements and their meaning based on:
     target activity as a snippet** into the caller (inline nodes; no nested activity / wait, no
     group in the form; `instance` is then ignored). The goto's value wins over the start
     node's. A [block](#blocks-and-parameters) is the declared form of this reuse.
+    `asGroup` also applies to a `block` / `block_start` (default `false`: inline; `true`: its
+    own section) and to a `container_page` group (default `true`: a sub-heading; `false`: only
+    a frame on the canvas). See [Form pages](#form-pages-and-sections).
   - `page` (on the `goto`, `activity_start`, `block`, `block_start` or a `container_page`
     group; default `false`): show it on its own form page. The goto's value wins over the
     start node's; two gotos opening one shared instance with different values stop the
@@ -130,8 +133,22 @@ Spec: `feature/20261120-questionnaire-pages.md`.
   (each item gated on its activity's hidden item). A group without `page` is a sub-heading
   inside its section. A block or `asGroup: false` call with `page: true` is wrapped in a
   generated page group.
+- **`asGroup`** says whether a container is a section of the form:
+
+  | Container | Default | `asGroup: true` | `asGroup: false` |
+  | --------- | ------- | --------------- | ---------------- |
+  | Activity (`activity_start`, `goto`) | `true` | its own section | inline in the caller |
+  | Block (`block_start`, `block`) | `false` | its own section | inline in the caller |
+  | Group of questions (`container_page`) | `true` | a sub-heading | only a frame on the canvas |
+
+  The call's value wins over the start node's. A block with `asGroup: true` is still inlined;
+  its nodes are wrapped in a generated group, a section like an activity (a sub-heading in a
+  paginated form unless it has `page`). A group with `asGroup: false` exports nothing: its
+  questions join the enclosing section. `page: true` implies a section: with `asGroup: false`
+  on the same node it logs a warning and the page wins.
 - **XLSForm** groups are already one level deep and `field-list`: a page is one screen, a
-  page called inside a page closes and reopens the outer group.
+  page called inside a page closes and reopens the outer group. A block with `asGroup: true`
+  gets its own `begin group`; a group with `asGroup: false` none.
 
 ## Blocks and parameters
 
