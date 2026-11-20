@@ -34,10 +34,20 @@ Two yes/no settings:
 
 - **`page`**, on an activity, a block, a GoTo, a block call or a group of questions (the frame
   drawn around questions): show it on its own page. The default is `false`.
-- **`asGroup`**, on an activity or a GoTo that calls one: `true` (the default, as today) makes it a
-  section; `false` puts its questions inline in the caller. **This replaces `instance = -1`.**
+- **`asGroup`**, on an activity, a block, a GoTo, a block call or a group of questions: whether it
+  is a section of the form (`true`) or only puts its questions in the enclosing one (`false`).
+  The default keeps today's behaviour:
 
-A setting on the GoTo wins over the one on the activity, for that call only. When two GoTos
+  | Container | Default | `asGroup: true` | `asGroup: false` |
+  | --------- | ------- | --------------- | ---------------- |
+  | Activity  | `true`  | its own section | inline in the caller (**replaces `instance = -1`**) |
+  | Block     | `false` | its own section | inline in the caller |
+  | Group of questions | `true` | a sub-heading in the form | only a frame on the canvas |
+
+  `page: true` implies a section, since a page is one.
+
+A setting on the GoTo (or block call) wins over the one on the activity (or block), for that
+call only. When two GoTos
 open the same copy of an activity:
 
 - if only one of them sets a value, that value applies to the copy;
@@ -85,22 +95,24 @@ DrawTRICC rewrites it when the project is opened. One release later it becomes a
 
 - `TriccNodeActivityStart`, `TriccNodeBlockStart`, `TriccNodeGoTo`, `TriccNodeBlock`:
   `page: Optional[bool] = None`.
-- `TriccNodeActivityStart`, `TriccNodeGoTo`: `as_group: Optional[bool] = None`. `None` means
-  "not set"; it is what lets a GoTo override or defer to the start node.
-- `TriccNodeActivity` (the built instance): resolved `page: bool = False`.
-- `TriccGroup` (`container_page`, YAML `groups`): `page: bool = False`, authored directly.
+- `TriccNodeActivityStart`, `TriccNodeBlockStart`, `TriccNodeGoTo`, `TriccNodeBlock`:
+  `as_group: Optional[bool] = None`. `None` means "not set"; it is what lets a call override or
+  defer to the start node.
+- `TriccNodeActivity` (the built instance): resolved `page: bool = False`, `as_group: bool`.
+- `TriccGroup` (`container_page`, YAML `groups`): `page: bool = False`, `as_group: bool = True`,
+  authored directly.
 - `TriccNodeGoTo.instance`: update the comment (`models/tricc.py`) to
   `# -1: DEPRECATED, use as_group=False (feature/<date>-questionnaire-pages.md)`.
 
 **Input**
 
 - draw.io (`converters/drawio_type_map.py`): add `page` and `asGroup` to `activity_start`,
-  `goto`; `page` to `block_start` and `block`. Parse `true`/`false`/`1`/`0` as bool in
+  `goto`, `block_start` and `block`. Parse `true`/`false`/`1`/`0` as bool in
   `xml_to_tricc` next to `priority` / `instance` / `repeat`. `asGroup` maps to `as_group`.
 - YAML (`strategies/input/yaml.py` `NODE_TYPE_MAP`): the same attributes, `as_group` spelled
   `asGroup` in the file, as in draw.io.
-- Groups: `page` on draw.io `container_page` (read in `xml_to_tricc` `get_groups` / `add_group`)
-  and on YAML `groups[]` (`YamlGroup.page`).
+- Groups: `page` and `asGroup` on draw.io `container_page` (read in `xml_to_tricc` `get_groups` /
+  `add_group`) and on YAML `groups[]` (`YamlGroup.page`, `YamlGroup.as_group`).
 
 **Deprecation of `instance = -1`**
 
@@ -128,8 +140,13 @@ DrawTRICC rewrites it when the project is opened. One release later it becomes a
    GoTos that leave it unset follow. Two GoTos setting different values: **error**, naming both
    GoTos and the instance, and the export stops. `as_group` cannot differ for one shared
    instance: an inlined call has no instance to share.
-7. `page = True` on an inlined call or a block: the injected nodes are wrapped in a generated
-   `TriccGroup` (`page = True`, name from the block or activity), because a page needs a group.
+7. Blocks: `as_group = block.as_group if set, else block_start.as_group if set, else False`, and
+   `page` the same way. A block is always inlined (today's path); with `as_group` or `page`
+   resolved true, its injected nodes are wrapped in a generated `TriccGroup` (`as_group = True`,
+   `page` as resolved, name from the block). The same wrapping applies to an inlined activity
+   call (`as_group = False`) with `page = True`.
+8. `page = True` implies a section: with `as_group` explicitly `False` on the same container or
+   call, log a warning and keep the page (`as_group` becomes `True`).
 
 **FHIR export: flat sections** (`strategies/output/fhir_form.py`)
 
@@ -139,9 +156,9 @@ order stays the group-aware CHT order (`fix/20261118-fhir-group-aware-sections.m
 
 1. **Paged** = at least one activity instance or `TriccGroup` of the segment has `page = True`.
 2. **Section unit**: when paged, an activity or a `TriccGroup` with `page = True`; when not
-   paged, every activity with `as_group = True`. Inlined calls and blocks are not units (their
-   nodes belong to the caller), except a block or inlined call with `page = True` when paged
-   (§ Resolution 7). A page `TriccGroup` is gated by its own relevance, ANDed with its
+   paged, every activity with `as_group = True` and every block wrapped in a generated group
+   (§ Resolution 7). Inlined calls and blocks without a group are not units (their nodes belong
+   to the caller). A page `TriccGroup` is gated by its own relevance, ANDed with its
    activity's hidden item (rule 4).
 3. Walk the items in order and keep a stack of open units:
    - entering unit C while section S is open: close S, open a section for C;
@@ -179,7 +196,12 @@ order stays the group-aware CHT order (`fix/20261118-fhir-group-aware-sections.m
 8. Activities with `repeat: x` need nothing special: the repeat slot is already in the export
    names and in the relevance. They are sections like any other; the suffixes of rule 5 keep
    their linkIds distinct.
-9. A `TriccGroup` without `page` stays a nested group (a sub-heading) inside its section.
+9. A `TriccGroup` without `page` and with `as_group = True` stays a nested group (a sub-heading)
+   inside its section; a block wrapped in a group (§ Resolution 7) is a unit when not paged, a
+   sub-heading when paged without `page`.
+10. A `TriccGroup` with `as_group = False` exports no item of its own: its items join the
+    enclosing section in their order. When the group has a relevance, it is held once in a
+    hidden calculated item (as for an activity, rule 4) and gates each of its items.
 
 **XLSForm export** (`XLSFormStrategy`, inherited by `XLSFormCDSSStrategy` → `XLSFormCHTStrategy`
 → `XLSFormCHTHFStrategy`)
@@ -191,11 +213,14 @@ order stays the group-aware CHT order (`fix/20261118-fhir-group-aware-sections.m
   after, as in the FHIR export (rule 3), because ODK flattens a `field-list` inside another one.
   The reopened group keeps the outer relevance and gets a distinct name (`_Ss_<n>`, rule 5).
 - No `page` anywhere: the XLSForm output is unchanged.
+- `asGroup` follows the same rules: a block wrapped in a group (§ Resolution 7) gets its own
+  `begin_group` / `end_group`; a `TriccGroup` with `as_group = False` gets none, and its relevance
+  goes on its items (as an activity's relevance already does for inlined nodes).
 
 ### 2. Validation and errors
 
 - `page` / `asGroup` not a boolean: warning, attribute ignored.
-- `asGroup` on a `block_start` or `block`: warning, ignored (a block is always inline).
+- `page: true` with `asGroup: false` on the same container or call: warning, the page wins.
 - Conflicting values on GoTos sharing an instance: **error**, the export stops.
 - `instance = -1`: deprecation warning (`logger.warning` + `DeprecationWarning`) pointing to
   `asGroup: false`; an error one release after DrawTRICC migrates projects on open.
@@ -230,6 +255,14 @@ order stays the group-aware CHT order (`fix/20261118-fhir-group-aware-sections.m
   - a `container_page` with `page: true` → its own page; without → a nested group in its page;
   - no `page` anywhere → same as the flat-sections output, without `itemControl`.
 - `tests/test_goto_snippet.py`: same cases with `asGroup: false`.
+- `tests/test_questionnaire_pages.py`, `asGroup` on blocks and groups (rev. 2026-11-20):
+  - a block call with `asGroup: true` → its own section (no `itemControl`), not inlined;
+  - `block_start` `asGroup: true`, call `asGroup: false` → inlined;
+  - a `container_page` with `asGroup: false` → no group item, its items in the enclosing
+    section, gated by a hidden item when the group has a relevance;
+  - `page: true` with `asGroup: false` → warning, the page is kept;
+  - XLSForm: a block with `asGroup: true` gets a `begin group`, a group with `asGroup: false`
+    none.
 - `tests/test_xlsform_pages.py`: page activity → `appearance = field-list`; page inside page →
   outer group closed and reopened with a distinct name; no `page` → XLSForm unchanged.
 - `tests/uat/` e2e: an Android-renderer check that the paginated form navigates (optional).
@@ -299,3 +332,6 @@ None.
   an error one release after DrawTRICC migrates projects (@delcroip)
 - 2026-11-20: LHC-Forms support of `itemControl = page` is checked during phase 2 (@delcroip)
 - 2026-11-20: approved for implementation (@delcroip)
+- 2026-11-20: `asGroup` applies to every container (activity, block, group of questions) and to
+  every call (GoTo, block call), with defaults that keep today's behaviour: activity `true`,
+  block `false`, group `true`; `page: true` implies a section (@delcroip)
