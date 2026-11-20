@@ -12,9 +12,10 @@ from __future__ import annotations
 import html
 import logging
 import re
-from typing import Any, Callable, List, Optional, Union
+from typing import Any, Callable, List, Optional, Tuple, Union
 
 from bs4 import BeautifulSoup, NavigableString, Tag
+from markdown_it import MarkdownIt
 
 from tricc_oo.models.base import (
     TriccNodeBaseModel,
@@ -58,6 +59,16 @@ EM_TAGS = frozenset({"i", "em"})
 # More consecutive line breaks than this collapse (one blank line at most).
 MAX_CONSECUTIVE_BREAKS = 2
 XHTML_NS = "http://www.w3.org/1999/xhtml"
+
+# Markdown typed by the author into a label: only lists, emphasis and line breaks are read;
+# headings, links, code, escapes, entities, … stay text.
+TYPED_MARKDOWN_RULES = ["list", "emphasis", "newline"]
+_FORMAT_TOKENS = frozenset({"strong_open", "em_open", "bullet_list_open", "ordered_list_open"})
+_MARK_TOKENS = {"strong_open": TriccMessageMarkKind.STRONG, "em_open": TriccMessageMarkKind.EM}
+# Private-use characters stand for the nodes that are not text while Markdown is parsed.
+_ATOM_BASE = 0xE000
+_ATOM_LIMIT = 0xF8FF - _ATOM_BASE
+_typed_markdown_parser: Optional[MarkdownIt] = None
 XHTML_MARK_TAGS = {
     TriccMessageMarkKind.STRONG: "strong",
     TriccMessageMarkKind.EM: "em",
@@ -196,7 +207,13 @@ def _split_trailing_blank(children: List[Any]) -> List[Any]:
 
 def _normalize_mark(mark: TriccMessageMark) -> List[Any]:
     """A mark without spaces or line breaks at its edges, or its content if it is empty."""
-    children = _normalize_nodes(mark.children)
+    children = []
+    for child in _normalize_nodes(mark.children):
+        if isinstance(child, TriccMessageMark) and child.kind == mark.kind:
+            children.extend(child.children)  # **<b>x</b>**: one mark
+        else:
+            children.append(child)
+    children = _merge_adjacent_text(children)
     before = _split_leading_blank(children)
     after = _split_trailing_blank(children)
     if not children:
@@ -247,7 +264,20 @@ def _normalize_nodes(nodes: List[Any]) -> List[Any]:
             continue
         else:
             out.append(node)
-    return _cap_breaks(_merge_adjacent_marks(_merge_adjacent_text(out)))
+    return _cap_breaks(_break_around_lists(_merge_adjacent_marks(_merge_adjacent_text(out))))
+
+
+def _break_around_lists(nodes: List[Any]) -> List[Any]:
+    """A list is a block: a line break separates it from text before or after it."""
+    out: List[Any] = []
+    for i, node in enumerate(nodes):
+        after_list = i > 0 and isinstance(nodes[i - 1], TriccMessageList)
+        if out and not isinstance(node, TriccMessageBreak) and not isinstance(out[-1], TriccMessageBreak) and (
+            isinstance(node, TriccMessageList) or after_list
+        ):
+            out.append(TriccMessageBreak())
+        out.append(node)
+    return out
 
 
 def _strip_breaks(children: List[Any]) -> List[Any]:
@@ -344,14 +374,149 @@ def _parse_html_node(node, allow_leading_block_break: bool = False) -> List[Any]
     return _parse_html_children(node.children)
 
 
+def _markdown_parser() -> MarkdownIt:
+    global _typed_markdown_parser
+    if _typed_markdown_parser is None:
+        _typed_markdown_parser = MarkdownIt("zero").enable(TYPED_MARKDOWN_RULES)
+    return _typed_markdown_parser
+
+
+def _expand_atoms(content: str, atoms: List[Any]) -> List[Any]:
+    """Text of a Markdown token, with the placeholder characters put back as their nodes."""
+    out: List[Any] = []
+    text: List[str] = []
+    for char in content:
+        index = ord(char) - _ATOM_BASE
+        if 0 <= index < len(atoms):
+            if text:
+                out.append(TriccMessageText(value="".join(text)))
+                text = []
+            out.append(atoms[index])
+        else:
+            text.append(char)
+    if text:
+        out.append(TriccMessageText(value="".join(text)))
+    return out
+
+
+def _inline_from_tokens(tokens, atoms: List[Any]) -> List[Any]:
+    root: List[Any] = []
+    stack = [(None, root)]
+    for token in tokens or []:
+        if token.type in _MARK_TOKENS:
+            stack.append((_MARK_TOKENS[token.type], []))
+        elif token.type in ("strong_close", "em_close") and len(stack) > 1:
+            kind, children = stack.pop()
+            stack[-1][1].append(TriccMessageMark(kind=kind, children=children))
+        elif token.type in ("softbreak", "hardbreak"):
+            stack[-1][1].append(TriccMessageBreak())
+        else:
+            stack[-1][1].extend(_expand_atoms(token.content, atoms))
+    while len(stack) > 1:  # unclosed (cannot happen with markdown-it): keep the content
+        _, children = stack.pop()
+        stack[-1][1].extend(children)
+    return root
+
+
+def _join_blocks(blocks: List[Tuple[Tuple[int, int], List[Any]]]) -> List[Any]:
+    """Blocks of one container joined by a line break, or a blank line where the source had
+    one (``(first line, end line)`` of each block, from markdown-it's ``map``)."""
+    out: List[Any] = []
+    previous_end = None
+    for (start, end), nodes in blocks:
+        if previous_end is not None:
+            out.extend([TriccMessageBreak()] * (2 if start > previous_end else 1))
+        out.extend(nodes)
+        previous_end = end
+    return out
+
+
+def _nodes_from_tokens(tokens, atoms: List[Any]) -> List[Any]:
+    """Rebuild message nodes from markdown-it block tokens."""
+    frames: List[dict] = [{"blocks": []}]
+    for token in tokens:
+        frame = frames[-1]
+        lines = tuple(token.map) if token.map else (0, 0)
+        if token.type == "paragraph_open":
+            frame["blocks"].append((lines, []))
+            for outer in frames:  # a list's map counts the blank line after it; its text ends here
+                outer["end"] = lines[1]
+        elif token.type == "inline":
+            if not frame["blocks"]:
+                frame["blocks"].append((lines, []))
+            frame["blocks"][-1][1].extend(_inline_from_tokens(token.children, atoms))
+        elif token.type in ("bullet_list_open", "ordered_list_open"):
+            frames.append({"ordered": token.type == "ordered_list_open", "items": [], "start": lines[0]})
+        elif token.type == "list_item_open":
+            frames.append({"blocks": []})
+        elif token.type == "list_item_close":
+            item = frames.pop()
+            frames[-1]["items"].append(TriccMessageListItem(children=_join_blocks(item["blocks"])))
+        elif token.type in ("bullet_list_close", "ordered_list_close"):
+            lst = frames.pop()
+            node = TriccMessageList(ordered=lst["ordered"], items=lst["items"])
+            frames[-1]["blocks"].append(((lst["start"], lst.get("end", lst["start"])), [node]))
+    return _join_blocks(frames[0]["blocks"])
+
+
+def _parse_typed_markdown(nodes: List[Any]) -> List[Any]:
+    """Read the Markdown an author typed into a label (``**bold**``, ``* item``) as marks
+    and lists, also when the markers sit in different HTML elements than the text they
+    wrap. Nodes that are not text (references, marks, lists) stand in the Markdown as
+    placeholder characters and are put back as they are. Nodes come back unchanged when
+    the text holds no emphasis or list. See fix/20261120-fhir-text-format.md."""
+    nodes = [_parse_typed_markdown_in(node) for node in nodes]
+    if not any(isinstance(n, TriccMessageText) and n.value.strip() for n in nodes):
+        return nodes
+    atoms: List[Any] = []
+    source: List[str] = []
+    for i, node in enumerate(nodes):
+        if isinstance(node, TriccMessageText):
+            source.append(node.value)
+        elif isinstance(node, TriccMessageBreak):
+            source.append("\n")
+        elif len(atoms) < _ATOM_LIMIT:
+            placeholder = chr(_ATOM_BASE + len(atoms))
+            atoms.append(node)
+            if isinstance(node, TriccMessageList):
+                # a list is a block: on its own line, it does not touch the text's emphasis
+                if source and not source[-1].endswith("\n"):
+                    placeholder = "\n" + placeholder
+                if i + 1 < len(nodes) and not isinstance(nodes[i + 1], TriccMessageBreak):
+                    placeholder += "\n"
+            source.append(placeholder)
+        else:
+            return nodes
+    tokens = _markdown_parser().parse("".join(source))
+    formatted = any(
+        token.type in _FORMAT_TOKENS or any(child.type in _FORMAT_TOKENS for child in token.children or [])
+        for token in tokens
+    )
+    return _nodes_from_tokens(tokens, atoms) if formatted else nodes
+
+
+def _parse_typed_markdown_in(node: Any) -> Any:
+    if isinstance(node, TriccMessageMark):
+        return TriccMessageMark(kind=node.kind, children=_parse_typed_markdown(list(node.children or [])))
+    if isinstance(node, TriccMessageList):
+        items = [
+            TriccMessageListItem(children=_parse_typed_markdown(list(item.children or [])))
+            for item in node.items or []
+        ]
+        return TriccMessageList(ordered=node.ordered, items=items)
+    return node
+
+
 def parse_html_to_message(raw: str) -> Union[str, TriccMessage]:
     """Parse an HTML (or plain) fragment into a message tree, then simplify."""
     if raw is None:
         return raw
     soup = BeautifulSoup(raw, "html.parser")
     root = soup.body if soup.body is not None else soup
-    children = _parse_html_children(root.children)
-    return _simplify_message(normalize_message(TriccMessage(children=children)))
+    # normalised first so typed markers split over neighbouring marks meet (<b>**</b><b>x</b><b>**</b>)
+    message = normalize_message(TriccMessage(children=_parse_html_children(root.children)))
+    message = TriccMessage(children=_parse_typed_markdown(list(message.children)))
+    return _simplify_message(normalize_message(message))
 
 
 def load_display_text(

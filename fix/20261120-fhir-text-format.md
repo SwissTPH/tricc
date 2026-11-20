@@ -41,8 +41,6 @@ Everyone using a FHIR / openSRP package in a client that does not guess Markdown
   plain text, or a formatted live text, is tracked separately.
 - `prefix`: the export writes none today. The helper applies to it when it does.
 - Translations carry the data dictionary text as it is; there is no translated formatted label.
-- Markdown typed by the author into a label (`**bold**`, `* item`) is text, not formatting:
-  it is kept as typed in every output (see Open questions 2).
 
 ---
 
@@ -74,6 +72,20 @@ the issue came from wrapping marks as they were authored: `<b>VITAMIN </b>A`,
   - `serialize_injection_xhtml(value, reference_text)`: `<div xmlns="http://www.w3.org/1999/xhtml">`;
     two or more line breaks separate `p` blocks, one is `br`; lists `ul` / `ol` / `li`;
     marks `strong` / `em` / `u`; text escaped by construction.
+- `_parse_typed_markdown`: Markdown the author typed into a label (`**bold**`, `_em_`,
+  `* item`, `1. item`) is read with `markdown-it-py` (preset `zero`, rules `list`,
+  `emphasis`, `newline` only: headings, links, code, escapes and entities stay text). The
+  container's nodes are written as Markdown, every non-text node (reference, mark, list)
+  as one private-use placeholder character (a list on its own line), parsed, and the marks
+  and lists rebuilt with the placeholders put back; blank lines follow the source lines
+  (markdown-it `map`). Nodes come back unchanged when the parse finds no emphasis or list.
+  It runs in mark and list item children too.
+- `parse_html_to_message`: HTML → tree, `normalize_message` (so typed markers split over
+  neighbouring marks meet: `<b>**</b><b>x</b><b>**</b>`), `_parse_typed_markdown`,
+  `normalize_message` again (a mark of the same kind inside a mark is flattened; a line
+  break separates a list from text next to it), `_simplify_message`.
+- CommonMark rules apply to typed text: an intraword `*` is emphasis (`3*4*5` reads `3`,
+  italic `4`, `5`); an intraword `_` is not (`weight_for_age`).
 - A label without formatting stays a plain string: plain = Markdown = the string.
 
 ### FHIR text (`tricc_oo/converters/fhir/text_format.py`)
@@ -117,26 +129,18 @@ plain value already in `element[field]`. No Markdown parsing.
 
 ### Acceptance
 
-Global Almanach child package (`L2/child` + `L2/common`, `OpenSRPStrategy`): no `${`
-placeholder in any `text`, title or option `display`; formatting authored with the editor
-(bold, italic, lists, line breaks) is gone from `text` and is in a `rendering-markdown`
-extension; no run of more than one blank line; the 77 `cqf-expression`s are kept and 7
-more come from tokens split over inline elements (84).
-
-Not met while Open question 2 is open: 137 texts of that package keep `**` (and `* `
-bullets) that the authors typed as Markdown into the labels, e.g. the convulsion note
-(`<div>**IF THE CHILD IS CONVULSING NOW - TREAT IMMEDIATELY**</div><div>* Turn …</div>`).
+Global Almanach child package (`L2/child` + `L2/common`, `OpenSRPStrategy`), 1289 texts,
+titles and option displays: no `**`, no `* ` bullet, no `${`, no run of more than one
+blank line; formatting, authored with the editor or typed as Markdown, is in 227
+`rendering-markdown` extensions; the 77 `cqf-expression`s are kept and 7 more come from
+tokens split over inline elements (84). Met (2026-11-20).
 
 ## Open questions
 
 1. Placeholder in static text: `…` (chosen) vs empty. Recommendation: keep `…`, it shows
    where the value goes until clients evaluate the expression.
-2. Markdown typed into labels. The Global Almanach draw.io files hold it in most formatted
-   labels, also split across HTML elements (`**<span>${</span><span>ors_planb_drops} ml
-   </span>ORS**`). Without a parser it stays text. Recommendation: parse it at load with
-   `markdown-it-py` (new dependency): render the tree's text to Markdown with references as
-   placeholders, parse, and rebuild marks and lists in the tree, so every output gets it.
-   Needs @delcroip's OK for the dependency.
+2. ~~Markdown typed into labels~~ Resolved 2026-11-20: parsed at load with
+   `markdown-it-py` (see Decisions).
 
 ## Decisions
 
@@ -147,3 +151,5 @@ bullets) that the authors typed as Markdown into the labels, e.g. the convulsion
 - 2026-11-20: render the display-text tree (plain, Markdown, XHTML), normalised once at
   load; no Markdown regexes. A Markdown parser only with an OK for the dependency.
   (@delcroip, relayed)
+- 2026-11-20: `markdown-it-py` approved as a dependency; Markdown typed into labels is
+  parsed into the tree at load, for every output (open question 2). (@delcroip, relayed)

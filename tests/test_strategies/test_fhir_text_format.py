@@ -13,7 +13,7 @@ from tricc_oo.converters.datadictionnary import add_concept
 from tricc_oo.converters.fhir.questionnaire_item_mapper import CQF_EXT_TEXT_EXPRESSION
 from tricc_oo.converters.fhir.text_format import RENDERING_MARKDOWN_EXT, RENDERING_XHTML_EXT
 from tricc_oo.models.base import TriccReference
-from tricc_oo.models.message import TriccMessage, TriccMessageMark
+from tricc_oo.models.message import TriccMessage, TriccMessageList, TriccMessageMark
 from tricc_oo.models.tricc import (
     TriccNodeInteger,
     TriccNodeNote,
@@ -98,6 +98,56 @@ class TestMessageNormalisation(unittest.TestCase):
 
     def test_a_label_without_formatting_stays_a_string(self):
         self.assertEqual(parse_html_to_message("<b></b>Age in months"), "Age in months")
+
+
+class TestTypedMarkdown(unittest.TestCase):
+    """Markdown the author typed into the label HTML is read as marks and lists at load."""
+
+    def _markdown(self, html):
+        return serialize_injection_for_js_text(parse_html_to_message(html))
+
+    def test_typed_bold_and_bullets(self):
+        html = (
+            "<div>**IF CONVULSING NOW**</div><div><br></div><div>* Turn the child</div>"
+            "<div>* Avoid things</div><div><br></div><div>Give **Diazepam rectally**</div>"
+        )
+        message = parse_html_to_message(html)
+        self.assertEqual(
+            serialize_injection_plain(message, "…"),
+            "IF CONVULSING NOW\n\n• Turn the child\n• Avoid things\n\nGive Diazepam rectally",
+        )
+        self.assertEqual(
+            self._markdown(html),
+            "**IF CONVULSING NOW**\n\n- Turn the child\n- Avoid things\n\nGive **Diazepam rectally**",
+        )
+
+    def test_markers_around_a_reference_split_over_spans(self):
+        message = parse_html_to_message('give **<span>${</span><span style="x">ors_dose} ml&nbsp;</span>ORS** now')
+        mark = next(c for c in message.children if isinstance(c, TriccMessageMark))
+        self.assertEqual(str(mark.kind), "strong")
+        self.assertIsInstance(mark.children[0], TriccReference)
+        self.assertEqual(serialize_injection_plain(message, "…"), "give … ml ORS now")
+
+    def test_markers_in_their_own_bold_elements(self):
+        html = 'Give oral <b>**</b><b style="x">Ciprofloxacin</b><b>**</b>:<ul><li>**2** times per day</li></ul>'
+        self.assertEqual(self._markdown(html), "Give oral **Ciprofloxacin**:\n- **2** times per day")
+
+    def test_bold_closed_before_an_html_list(self):
+        html = "<p>Give first dose of&nbsp;**CEFTRIAXONE (IM)**</p><ul><li>80-100mg/kg/dose</li></ul><p>Dissolving</p>"
+        self.assertEqual(
+            serialize_injection_plain(parse_html_to_message(html), "…"),
+            "Give first dose of CEFTRIAXONE (IM)\n• 80-100mg/kg/dose\nDissolving",
+        )
+
+    def test_typed_ordered_list(self):
+        message = parse_html_to_message("1. Give **extra fluid**<br>2. Continue feeding")
+        self.assertIsInstance(message.children[0], TriccMessageList)
+        self.assertTrue(message.children[0].ordered)
+
+    def test_text_without_markdown_is_unchanged(self):
+        for text in ("weight_for_age in kg", "Age (months) - 2 * 3", "Headache # 2 [left]"):
+            with self.subTest(text=text):
+                self.assertEqual(parse_html_to_message(text), text)
 
 
 class TestRenderers(unittest.TestCase):

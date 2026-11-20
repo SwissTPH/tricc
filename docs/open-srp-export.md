@@ -186,8 +186,8 @@ children are display-only and are not extracted. See
 
 ## Text and formatting
 
-Labels are authored as formatted text (bold, italic, lists, line breaks) and loaded as a
-display-text tree. FHIR `text`, `prefix` and `Coding.display` are plain strings, so the
+Labels are authored as formatted text (bold, italic, lists, line breaks, or Markdown typed
+into the label: `**bold**`, `* item`) and loaded as a display-text tree. FHIR `text`, `prefix` and `Coding.display` are plain strings, so the
 export renders the tree twice:
 
 - **plain text** in `text` / `display`: the data dictionary's own wording (a CodeSystem
@@ -203,8 +203,7 @@ export renders the tree twice:
 
 This covers question and note text, the help / hint display children and answer options.
 No extension is written when the label is already plain and equals the text. Translations
-carry the data dictionary text as it is. Markdown typed into a label (`**bold**`) is text,
-not formatting, and is kept as typed. LHC-Forms renders both extensions; kotlin-fhir-data-capture shows `text`
+carry the data dictionary text as it is. LHC-Forms renders both extensions; kotlin-fhir-data-capture shows `text`
 only. See `fix/20261120-fhir-text-format.md`.
 
 ---
