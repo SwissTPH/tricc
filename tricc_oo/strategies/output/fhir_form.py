@@ -111,7 +111,7 @@ from tricc_oo.converters.datadictionnary import concept_text, lookup_codesystems
 from tricc_oo.converters.fhir.text_format import (
     TEXT_FORMAT_MARKDOWN,
     TEXT_FORMATS,
-    markdown_to_plain,
+    plain_text,
     set_text_rendering,
 )
 from tricc_oo.serializers.xls_form_translations import node_concept, translations_active
@@ -696,8 +696,7 @@ class FHIRStrategy(BaseOutPutStrategy):
                 main_page = self.project.start_pages.get("main")
                 root_label = getattr(getattr(main_page, "root", None), "label", None)
                 if root_label:
-                    title_text, _ = self._display_text_and_operation(root_label)
-                    q_title = markdown_to_plain(title_text) or q_name
+                    q_title = plain_text(self._display_value(root_label)) or q_name
             self.questionnaires[segment] = {
                 "resourceType": "Questionnaire",
                 "id": q_id,
@@ -759,13 +758,13 @@ class FHIRStrategy(BaseOutPutStrategy):
             text_operation = None
         item = {
             "linkId": link_id,
-            "text": label if hidden else self._plain_text(node, "display", label),
+            "text": label if hidden else self._plain_text(node, "display", raw_label),
             "type": fhir_type,
         }
         self._apply_item_required(item, node, hidden=hidden, fhir_type=fhir_type)
 
         if not hidden:
-            set_text_rendering(item, "text", label, self.text_format)
+            set_text_rendering(item, "text", self._display_value(raw_label), self.text_format)
             add_translations(item, "text", self._concept_translations(node, "display"))
 
         if is_repeating(tricc_type):
@@ -817,7 +816,7 @@ class FHIRStrategy(BaseOutPutStrategy):
             for opt in node.options.values():
                 option_entry = {"valueCoding": self._answer_option_coding(opt)}
                 set_text_rendering(
-                    option_entry["valueCoding"], "display", self._option_label(opt), self.text_format
+                    option_entry["valueCoding"], "display", self._display_value(opt), self.text_format
                 )
                 add_translations(
                     option_entry["valueCoding"], "display", self._concept_translations(opt, "display")
@@ -954,31 +953,44 @@ class FHIRStrategy(BaseOutPutStrategy):
         translations = []
         for language in project.languages:
             if language != project.lang_code:
-                text = markdown_to_plain(concept_text(concept, use, language, project.lang_code))
+                text = concept_text(concept, use, language, project.lang_code)
                 if text:
                     translations.append((language, text))
         return translations
 
-    def _plain_text(self, node, use: str, formatted: Optional[str]) -> str:
-        """Plain ``text`` of a node: its concept's ``use`` text in the default language
-        (data dictionary), else the authored label, without Markdown or ``${...}``
-        (fix/20261120-fhir-text-format.md)."""
-        project = self.project
-        concept = node_concept(project, node)
-        text = None
-        if concept is not None:
-            text = concept_text(concept, use, project.lang_code, project.lang_code)
-        if not isinstance(text, str) or not text.strip():
-            text = formatted
-        return markdown_to_plain(text)
+    def _display_value(self, value):
+        """The display-text value to render: a node's label, the first non-empty locale
+        of a dict, the tree or string itself. A non-``${REF}`` operation gives its
+        static text."""
+        if issubclass(value.__class__, TriccNodeBaseModel) and not isinstance(value, TriccMessage):
+            return self._display_value(getattr(value, "label", None))
+        if isinstance(value, dict):
+            return next((v for v in value.values() if v), None)
+        if isinstance(value, TriccOperation) and value.operator != TriccOperator.CONCATENATE:
+            return self._display_text_and_operation(value)[0]
+        return value
 
     @staticmethod
-    def _option_label(opt) -> Optional[str]:
-        """The authored (Markdown) label of a select option, as static text."""
-        label = getattr(opt, "label", None)
-        if isinstance(label, dict):
-            label = next((v for v in label.values() if v), None)
-        return label if isinstance(label, str) else None
+    def _data_dictionary_text(text: Optional[str], value) -> Optional[str]:
+        """``text`` from the data dictionary when it is its own wording, not the label's
+        Markdown it was filled with at load (``check_and_add_concept``)."""
+        if not isinstance(text, str) or not text.strip():
+            return None
+        return None if text == serialize_injection_for_js_text(value) else text
+
+    def _plain_text(self, node, use: str, value) -> str:
+        """Plain ``text`` of a node: its concept's ``use`` text in the default language
+        (data dictionary) when it has its own wording, else the plain rendering of the
+        display-text tree, ``${...}`` shown as ``…`` (fix/20261120-fhir-text-format.md)."""
+        project = self.project
+        value = self._display_value(value)
+        concept = node_concept(project, node)
+        if concept is not None:
+            text = concept_text(concept, use, project.lang_code, project.lang_code)
+            curated = self._data_dictionary_text(text, value)
+            if curated:
+                return curated
+        return plain_text(value)
 
     @staticmethod
     def _injection_export_name(value) -> str:
@@ -996,22 +1008,24 @@ class FHIRStrategy(BaseOutPutStrategy):
             return
         path_len = int(getattr(node, "path_len", 0) or 0)
         children = []
-        help_text, help_operation = self._display_text_and_operation(getattr(node, "help", None))
+        help_value = getattr(node, "help", None)
+        help_text, help_operation = self._display_text_and_operation(help_value)
         if help_text:
             child = build_item_control_display_item(
-                f"{parent_id}-help", self._plain_text(node, "help", help_text), "help"
+                f"{parent_id}-help", self._plain_text(node, "help", help_value), "help"
             )
-            set_text_rendering(child, "text", help_text, self.text_format)
+            set_text_rendering(child, "text", self._display_value(help_value), self.text_format)
             add_translations(child, "text", self._concept_translations(node, "help"))
             children.append(child)
             if help_operation is not None:
                 self._pending_text_expressions.append((node, child, help_operation))
-        hint_text, hint_operation = self._display_text_and_operation(getattr(node, "hint", None))
+        hint_value = getattr(node, "hint", None)
+        hint_text, hint_operation = self._display_text_and_operation(hint_value)
         if hint_text:
             child = build_item_control_display_item(
-                f"{parent_id}-hint", self._plain_text(node, "hint", hint_text), "flyover"
+                f"{parent_id}-hint", self._plain_text(node, "hint", hint_value), "flyover"
             )
-            set_text_rendering(child, "text", hint_text, self.text_format)
+            set_text_rendering(child, "text", self._display_value(hint_value), self.text_format)
             add_translations(child, "text", self._concept_translations(node, "hint"))
             children.append(child)
             if hint_operation is not None:
@@ -1629,14 +1643,16 @@ class FHIRStrategy(BaseOutPutStrategy):
 
     def _answer_option_coding(self, opt) -> dict:
         """Return the valueCoding dict used on both answerOption and toggle slices."""
+        label = self._display_value(opt)
         concept = lookup_codesystems_code(self.project.code_systems, opt.name)
         if concept:
-            coding = {"code": concept.code, "display": markdown_to_plain(concept.display) or concept.code}
+            display = self._data_dictionary_text(concept.display, label) or plain_text(label)
+            coding = {"code": concept.code, "display": display or concept.code}
             system = getattr(concept, "system", None)
             if system:
                 coding["system"] = system
             return coding
-        return {"code": opt.name, "display": markdown_to_plain(self._option_label(opt)) or opt.name}
+        return {"code": opt.name, "display": plain_text(label) or opt.name}
 
     def _option_relevance_is_always_on(self, relevance) -> bool:
         if relevance is None or relevance is True:
