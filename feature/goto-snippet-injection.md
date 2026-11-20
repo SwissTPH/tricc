@@ -2,9 +2,9 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Implemented |
+| **Status** | Superseded |
 | **Branch target** | `feature/adv_merge_calc` / `develop` |
-| **Related** | Activity `goto`, multi-instance activities, bridge/wait scaffolding; same-name versioning after multi-inject (`feature/advanced-merge-calc.md`, `feature/concept-repeat.md`) |
+| **Related** | Superseded by `feature/20261120-questionnaire-pages.md` (`asGroup: false` replaces `instance = -1`, RFC #90); activity `goto`, multi-instance activities, bridge/wait scaffolding; same-name versioning after multi-inject (`feature/advanced-merge-calc.md`, `feature/concept-repeat.md`) |
 | **Authoring surface** | draw.io `instance` attribute on `goto`; YAML `instance: -1` |
 
 Valid status values: `Draft` → `Approved` → `Implemented` → `Superseded`.
