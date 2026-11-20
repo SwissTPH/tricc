@@ -17,6 +17,7 @@ This is the reusable FHIR base layer. openSRP/fhircore-specific resources
 from __future__ import annotations
 
 import base64
+import copy
 import datetime
 import json
 import logging
@@ -400,6 +401,11 @@ class FHIRStrategy(BaseOutPutStrategy):
         self._activity_group_relevance: Dict[int, object] = {}
         # activity instances exported as a Questionnaire group, in relevance-walk order
         self._activity_groups: List[object] = []
+        # One-level sections (feature/20261120-questionnaire-pages.md): id(item) -> node;
+        # segment -> linkIds of the hidden activity items; (segment, linkId) -> its sections
+        self._item_nodes: Dict[int, object] = {}
+        self._unit_links: Dict[str, set] = {}
+        self._unit_sections: Dict[Tuple[str, str], List[dict]] = {}
 
     def get_tricc_operation_expression(self, operation):
         # For CQL
@@ -631,7 +637,8 @@ class FHIRStrategy(BaseOutPutStrategy):
 
         Supports basic nesting: group-like nodes (activity_start, start, etc.)
         become "group" items and subsequent siblings are attached under them
-        until a corresponding end node is seen.
+        until a corresponding end node is seen. ``_flatten_sections`` then turns
+        that nesting into one level of sections.
         """
         tricc_type = getattr(node, 'tricc_type', None)
         if tricc_type is None:
@@ -824,6 +831,7 @@ class FHIRStrategy(BaseOutPutStrategy):
             int(getattr(node, "path_len", 0) or 0),
             self._item_seq,
         )
+        self._item_nodes[id(item)] = node
         target_list.append(item)
         if text_operation is not None:
             self._pending_text_expressions.append((node, item, text_operation))
@@ -979,8 +987,13 @@ class FHIRStrategy(BaseOutPutStrategy):
         self._item_sort_keys = {}
         self._item_seq = 0
         self._item_path_index = None
+        self._item_nodes = {}
+        self._unit_links = {}
+        self._unit_sections = {}
         super().process_base(start_pages, **kwargs)
         self._sort_questionnaire_items()
+        # expressions are written after this, so every item path resolves on the flat tree
+        self._flatten_sections()
         self._item_path_index = None
 
     def _sort_questionnaire_items(self) -> None:
@@ -1000,6 +1013,135 @@ class FHIRStrategy(BaseOutPutStrategy):
 
         for q in (self.questionnaires or {}).values():
             sort_list(q.get("item"))
+
+    # ── One-level sections (feature/20261120-questionnaire-pages.md) ──
+
+    SECTION_SEPARATOR = "_Ss_"
+
+    def _is_section_unit(self, item: dict, node) -> bool:
+        """An item that opens sections: an activity group, or a segment start with a relevance."""
+        if item.get("type") != FHIR_TYPE_GROUP:
+            return False
+        tricc_type = getattr(node, "tricc_type", None)
+        if tricc_type == TriccNodeType.activity_start:
+            return True
+        if tricc_type == TriccNodeType.start:
+            return self._is_effective_relevance(self._effective_relevance(node))
+        return False
+
+    @staticmethod
+    def _is_transparent_group(item: dict, node) -> bool:
+        """A segment start without relevance: its group is dropped, its items kept."""
+        return item.get("type") == FHIR_TYPE_GROUP and getattr(node, "tricc_type", None) == TriccNodeType.start
+
+    def _flatten_sections(self) -> None:
+        """Replace the nested activity groups of each Questionnaire by top-level sections.
+
+        An activity no longer nests in its caller: the caller's section stops, the called
+        activity gets its own, and the caller continues in a new one (``P_Ss_1``, ``C_Ss_1``,
+        ``P_Ss_2``). Items outside every activity go to default sections. The activity group
+        itself becomes a hidden boolean item (same linkId) that holds the activity relevance
+        (``generate_relevance``); its sections are gated on it.
+        """
+        for segment, q in (self.questionnaires or {}).items():
+            q["item"] = self._flatten_items(segment, q.get("item") or [])
+
+    def _flatten_items(self, segment: str, items: List[dict]) -> List[dict]:
+        top: List[dict] = []
+        stack: List[dict] = []
+        state = {"section": None, "default": 0}
+        counters: Dict[str, int] = {}
+        # an authored name may end like a section linkId: never reuse one
+        used = self._collect_all_link_ids(items)
+
+        def section_link_id(base: str) -> str:
+            link_id, k = base, 0
+            while link_id in used:
+                k += 1
+                link_id = f"{base}_{k}"
+            used.add(link_id)
+            return link_id
+
+        def open_section() -> dict:
+            if stack:
+                unit = stack[-1]
+                counters[unit["linkId"]] = counters.get(unit["linkId"], 0) + 1
+                section = {
+                    "linkId": section_link_id(f"{unit['linkId']}{self.SECTION_SEPARATOR}{counters[unit['linkId']]}"),
+                    "text": unit.get("text") or "",
+                    "type": FHIR_TYPE_GROUP,
+                    "item": [],
+                }
+                if unit.get("_text"):
+                    section["_text"] = copy.deepcopy(unit["_text"])
+                self._unit_sections.setdefault((segment, unit["linkId"]), []).append(section)
+            else:
+                state["default"] += 1
+                section = {
+                    "linkId": section_link_id(f"{segment}{self.SECTION_SEPARATOR}d{state['default']}"),
+                    "text": "",
+                    "type": FHIR_TYPE_GROUP,
+                    "item": [],
+                }
+            top.append(section)
+            return section
+
+        def visit(children: List[dict]) -> None:
+            for item in children:
+                node = self._item_nodes.get(id(item))
+                if self._is_section_unit(item, node):
+                    nested = item.pop("item", None) or []
+                    unit = {"linkId": item["linkId"], "text": item.get("text"), "_text": item.get("_text")}
+                    self._to_hidden_activity_item(item, node)
+                    self._unit_links.setdefault(segment, set()).add(item["linkId"])
+                    top.append(item)
+                    stack.append(unit)
+                    state["section"] = None
+                    visit(nested)
+                    stack.pop()
+                    # the caller continues in a new section, opened by its next item
+                    state["section"] = None
+                elif self._is_transparent_group(item, node):
+                    visit(item.pop("item", None) or [])
+                else:
+                    if state["section"] is None:
+                        state["section"] = open_section()
+                    state["section"]["item"].append(item)
+
+        visit(items)
+        return top
+
+    def _to_hidden_activity_item(self, item: dict, node) -> None:
+        """Turn an activity group into the hidden boolean item holding its relevance."""
+        item["type"] = "boolean"
+        item["text"] = self._sanitize_hidden_item_text(node, item.get("text") or "")
+        for key in ("_text", "repeats", "required"):
+            item.pop(key, None)
+        item["extension"] = [build_hidden_extension(), build_calculated_expression_fhirpath("true")]
+
+    def _is_hidden_activity_item(self, segment: Optional[str], link_id: Optional[str]) -> bool:
+        if not link_id:
+            return False
+        if segment is not None:
+            return link_id in self._unit_links.get(segment, ())
+        return any(link_id in links for links in self._unit_links.values())
+
+    def _activity_item_true(self, link_id: str) -> str:
+        """FHIRPath: the hidden activity item ``link_id`` is true."""
+        return f"{self._fhirpath_answer(link_id)}.where(value = true).exists()"
+
+    def _gate_unit_sections(self, segment: str, link_id: str) -> None:
+        """Gate every section of an activity on its hidden item."""
+        sections = self._unit_sections.get((segment, link_id)) or []
+        if not sections:
+            return
+        self._current_segment = segment
+        try:
+            gate = self._activity_item_true(link_id)
+        finally:
+            self._current_segment = None
+        for section in sections:
+            set_item_extension(section, build_enable_when_expression(gate))
 
     def _enter_serialisation_context(self, node) -> None:
         """Record the Questionnaire / item an expression is being serialised for.
@@ -1168,7 +1310,12 @@ class FHIRStrategy(BaseOutPutStrategy):
             self._leave_serialisation_context()
 
         item = self._find_item_by_link_id(q.get("item", []), link_id)
-        if item is not None:
+        if item is not None and self._is_hidden_activity_item(segment, link_id):
+            # the activity relevance, computed once; its sections are gated on it
+            set_item_extension(item, build_calculated_expression_fhirpath(fhirpath_expr))
+            if fhirpath_expr != 'true':
+                self._gate_unit_sections(segment, link_id)
+        elif item is not None:
             if fhirpath_expr == 'false':
                 set_item_extension(item, build_hidden_extension())
             elif fhirpath_expr != 'true':
@@ -1358,10 +1505,22 @@ class FHIRStrategy(BaseOutPutStrategy):
 
     def _and_group_enable_when(self, segment: str, root, term: str) -> None:
         """AND ``term`` into the enableWhenExpression of ``root``'s group in ``segment``."""
-        group = self._find_item_by_link_id(
-            self.questionnaires[segment].get("item", []), get_export_name(root)
-        )
+        link_id = get_export_name(root)
+        group = self._find_item_by_link_id(self.questionnaires[segment].get("item", []), link_id)
         if group is None:
+            return
+        if self._is_hidden_activity_item(segment, link_id):
+            current = next(
+                (
+                    (ext.get("valueExpression") or {}).get("expression")
+                    for ext in group.get("extension") or []
+                    if ext.get("url") == SDC_EXT_CALCULATED_EXPR
+                ),
+                None,
+            )
+            expression = term if current in (None, "true") else f"{current} and {term}"
+            set_item_extension(group, build_calculated_expression_fhirpath(expression))
+            self._gate_unit_sections(segment, link_id)
             return
         current = next(
             (
@@ -1476,6 +1635,14 @@ class FHIRStrategy(BaseOutPutStrategy):
             return True
         if should_skip(tricc_type):
             return False
+        if tricc_type in (TriccNodeType.activity_start, TriccNodeType.start):
+            # an activity is a hidden boolean item holding its relevance (one-level sections)
+            try:
+                link_id = get_export_name(node)
+            except Exception:
+                link_id = None
+            if self._is_hidden_activity_item(None, link_id):
+                return True
         mapping = NODE_TYPE_TO_FHIR.get(tricc_type)
         if mapping is None:
             # Unmapped type: keep the historical answer idiom rather than guessing.

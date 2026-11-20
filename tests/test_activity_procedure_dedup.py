@@ -88,6 +88,19 @@ def _enable_when(item):
     return _expression(item, ENABLE_WHEN)
 
 
+def _activity_items(items, prefix="module_c"):
+    """The hidden items holding the relevance of each call of an activity, in form order
+    (one-level sections, feature/20261120-questionnaire-pages.md)."""
+    return [
+        i for i in items.values()
+        if i["type"] == "boolean" and i["linkId"].startswith(prefix) and not i["linkId"].endswith(("_done", "_prev"))
+    ]
+
+
+def _activity_relevance(item):
+    return _expression(item, CALCULATED)
+
+
 def _trigger(name):
     return f"item.where(linkId='{name}').answer.where($this.exists()).value = true"
 
@@ -98,18 +111,27 @@ class TestSameQuestionnaire(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         (cls.items,) = _questionnaires("activity_called_twice.yaml").values()
-        groups = [i for i in cls.items.values() if i["type"] == "group" and i["linkId"].startswith("module_c")]
-        cls.first, cls.second = groups
+        cls.first, cls.second = _activity_items(cls.items)
 
     def test_first_call_keeps_its_own_condition(self):
-        expr = _enable_when(self.first)
+        expr = _activity_relevance(self.first)
         self.assertIn(_trigger("trigger_a"), expr)
         self.assertNotIn("trigger_d", expr)
 
     def test_second_call_is_skipped_when_the_first_was_shown(self):
-        expr = _enable_when(self.second)
+        expr = _activity_relevance(self.second)
         self.assertIn(_trigger("trigger_d"), expr)
-        self.assertIn(f"({'%resource'}.item.where(linkId='start_parent').{_trigger('trigger_a')}).not()", expr)
+        self.assertIn(f"({'%resource'}.item.where(linkId='main_Ss_d1').{_trigger('trigger_a')}).not()", expr)
+
+    def test_sections_are_gated_on_the_activity_item(self):
+        for activity in (self.first, self.second):
+            sections = [i for i in self.items.values() if i["linkId"].startswith(activity["linkId"] + "_Ss_")]
+            self.assertTrue(sections)
+            for section in sections:
+                self.assertEqual(
+                    _enable_when(section),
+                    f"%resource.item.where(linkId='{activity['linkId']}').answer.where(value = true).exists()",
+                )
 
     def test_matches_xlsform(self):
         with tempfile.TemporaryDirectory() as out:
@@ -135,12 +157,12 @@ class TestRecordedAsProcedure(unittest.TestCase):
     def test_done_item_is_true_when_the_group_is_shown(self):
         for process in PROCESSES:
             items = _by_process(self.questionnaires, process)
-            group = next(i for i in items.values() if i["type"] == "group" and i["linkId"].startswith("module_c"))
+            (activity,) = _activity_items(items)
             done = items["module_c_done"]
             self.assertEqual(done["type"], "boolean")
             self.assertIn({"url": HIDDEN, "valueBoolean": True}, done["extension"])
-            # the group's whole enableWhen: a call skipped because it was done before records nothing
-            own = _enable_when(group).split(f" and {NOT_DONE_BEFORE}")[0]
+            # the activity's whole relevance: a call skipped because it was done before records nothing
+            own = _activity_relevance(activity).split(f" and {NOT_DONE_BEFORE}")[0]
             self.assertEqual(_expression(done, CALCULATED), f"({own}) and {NOT_DONE_BEFORE}", process)
 
     def test_procedure_written_only_when_shown(self):
@@ -193,8 +215,8 @@ class TestReadBack(unittest.TestCase):
     def test_group_is_skipped_when_done_before(self):
         for process, trigger in zip(PROCESSES, ("trigger_a", "trigger_d")):
             items = {i["linkId"]: i for i in _items(_by_process(self.questionnaires, process)["item"])}
-            group = next(i for i in items.values() if i["type"] == "group" and i["linkId"].startswith("module_c"))
-            expr = _enable_when(group)
+            (activity,) = _activity_items(items)
+            expr = _activity_relevance(activity)
             self.assertIn(_trigger(trigger), expr)
             self.assertTrue(expr.endswith(f" and {NOT_DONE_BEFORE}"), expr)
 
