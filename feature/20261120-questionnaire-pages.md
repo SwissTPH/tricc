@@ -245,6 +245,33 @@ order stays the group-aware CHT order (`fix/20261118-fhir-group-aware-sections.m
 5. DrawTRICC mirror: the `page` / `asGroup` settings (activity, GoTo, block, group), migration of
    `instance = -1`.
 
+### 5. Implementation notes (phases 1–4)
+
+Where the code made a rule above impossible or unclear:
+
+- **Hidden activity items** are top-level items, placed before the activity's first section.
+  One whose activity relevance is `true` and that nothing references is pruned with the other
+  unused hidden calculates. A segment start gets one (and sections) only when it has a
+  relevance; otherwise its items go to default sections.
+- **Split** happens when an item of the caller follows the called activity's items: a called
+  activity with no item leaves the caller's section whole.
+- **Groups in FHIR**: `container_page` was not exported at all before. A group without `page`
+  is now a sub-heading (its own relevance on it) in paginated and plain forms alike.
+- A **section left with hidden items only** is marked `questionnaire-hidden`, so a paginated form
+  shows no empty page. A section linkId already taken by an authored name gets `_<k>`.
+- **XLSForm** groups were already one level deep, closed and reopened around other groups
+  (`<name>_<n>`), and every `begin group` was already `field-list`. `page` therefore changes
+  nothing in XLSForm; the reopened group keeps its existing `<name>_<n>` name (not `_Ss_<n>`)
+  so a form without `page` is unchanged.
+- **draw.io**: the bridge / wait skip of a goto runs before the called page is built; the
+  `asGroup` of every `activity_start` is read up front (`TriccIntervention.start_as_group`).
+- **YAML `groups`** (`id`, `name`, `label`, `parent`, `page`, node `group`) are read in the
+  format of `feature/20261009-yaml-page-groups.md`, which this RFC needs for `YamlGroup.page`.
+- Fixed on the way: `TriccNodeActivity.make_instance` dropped the `TriccGroup` of every node
+  copy, so groups of called activities never reached an output; the XLSForm group of a
+  `TriccGroup` now carries its activity's relevance (it crashed, or showed the questions
+  outside the activity).
+
 ---
 
 ## Open questions

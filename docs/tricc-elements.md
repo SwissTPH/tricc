@@ -95,10 +95,16 @@ This page documents TRICC modeling elements and their meaning based on:
 ## Navigation/linking elements
 
 - `goto`: jump to another page/activity.
-  - `instance` (default `1`): nested activity instance number; `0` auto-unique nested instance;
-    **`-1` injects the target activity as a snippet** into the caller (inline nodes; no nested
-    activity / wait). See `feature/goto-snippet-injection.md`. A [block](#blocks-and-parameters)
-    is the declared form of this reuse.
+  - `instance` (default `1`): nested activity instance number; `0` auto-unique nested instance.
+    `-1` is **deprecated**: it is read as `asGroup: false`, with a warning.
+  - `asGroup` (on the `goto` or the `activity_start`; default `true`): `false` **injects the
+    target activity as a snippet** into the caller (inline nodes; no nested activity / wait, no
+    group in the form; `instance` is then ignored). The goto's value wins over the start
+    node's. A [block](#blocks-and-parameters) is the declared form of this reuse.
+  - `page` (on the `goto`, `activity_start`, `block`, `block_start` or a `container_page`
+    group; default `false`): show it on its own form page. The goto's value wins over the
+    start node's; two gotos opening one shared instance with different values stop the
+    export. See [Form pages](#form-pages-and-sections).
   - When two different `goto`s target the **same** `instance` number of the same activity
     (e.g. two callers both call `link: shared_module, instance: 1`), they resolve to the
     **identical shared `TriccNodeActivity` object** — see `TriccNodeActivity.make_instance`'s
@@ -109,6 +115,23 @@ This page documents TRICC modeling elements and their meaning based on:
 - `bridge`: bridge/helper connector.
 - `block`: use a [block](#blocks-and-parameters), with `link` and `args`.
 - `goto` may also carry `args` for a parameterized activity (see below).
+
+## Form pages and sections
+
+Spec: `feature/20261120-questionnaire-pages.md`.
+
+- **FHIR sections are one level deep.** Each activity is a section; an activity called inside
+  another one splits the caller: `P_Ss_1`, `C_Ss_1`, `P_Ss_2`. Items outside every activity go
+  to default sections `<process>_Ss_d<n>`. The activity itself is a hidden boolean item (linkId
+  = its export name) holding its relevance once; its sections are shown when it is true.
+- **Pages.** As soon as one activity or `container_page` group of a Questionnaire has
+  `page: true`, the Questionnaire is paginated: each page is a section with
+  `itemControl = page`, and loose items and activities without `page` join default pages
+  (each item gated on its activity's hidden item). A group without `page` is a sub-heading
+  inside its section. A block or `asGroup: false` call with `page: true` is wrapped in a
+  generated page group.
+- **XLSForm** groups are already one level deep and `field-list`: a page is one screen, a
+  page called inside a page closes and reopens the outer group.
 
 ## Blocks and parameters
 
@@ -324,6 +347,7 @@ Examples used across element families:
 - `relevance`, `priority`
 - `save`, `expression`, `trigger`
 - `reference`, `instance`, `process`
+- `page`, `asGroup` — see [Form pages](#form-pages-and-sections)
 - `form_id` — deprecated: names the form only for a project without `tricc.yaml`
   `interventions` (otherwise ignored with a warning; use `interventions[].name`)
 - `repeat` — concept capture slot (see [Concept repeat](#concept-repeat) below)
