@@ -1,0 +1,205 @@
+# Paginated FHIR Questionnaire (feature/20261120-questionnaire-pages.md).
+# main: loose1, page act_a (which calls page act_c in the middle), loose2, non-page act_n,
+# page act_b. act_b frames b_temp in a group without page (a sub-heading) and b_extra in a
+# group with page: true (its own page).
+
+id: main_page
+title: "Main"
+process: main
+
+nodes:
+  - id: start
+    type: start
+    form_id: pages_form
+    label: "Start"
+    name: start_main
+
+  - id: loose1
+    type: integer
+    name: loose1
+    label: "Loose question 1"
+
+  - id: goto_a
+    type: goto
+    name: goto_a
+    label: "Activity A"
+    link: act_a
+
+  - id: loose2
+    type: integer
+    name: loose2
+    label: "Loose question 2"
+
+  - id: goto_n
+    type: goto
+    name: goto_n
+    label: "Activity N"
+    link: act_n
+
+  - id: goto_b
+    type: goto
+    name: goto_b
+    label: "Activity B"
+    link: act_b
+
+  - id: end
+    type: end
+    label: "End"
+    name: end_main
+
+edges:
+  - source: start
+    target: loose1
+  - source: loose1
+    target: goto_a
+  - source: goto_a
+    target: loose2
+  - source: loose2
+    target: goto_n
+  - source: goto_n
+    target: goto_b
+  - source: goto_b
+    target: end
+
+---
+id: act_a
+title: "Activity A"
+process: main
+
+nodes:
+  - id: a_start
+    type: activity_start
+    label: "Activity A"
+    name: act_a
+    page: true
+
+  - id: a_q
+    type: integer
+    name: a_q
+    label: "A question"
+
+  - id: goto_c
+    type: goto
+    name: goto_c
+    label: "Activity C"
+    link: act_c
+
+  - id: a_after
+    type: integer
+    name: a_after
+    label: "A after C"
+
+  - id: a_end
+    type: activity_end
+
+edges:
+  - source: a_start
+    target: a_q
+  - source: a_q
+    target: goto_c
+  - source: goto_c
+    target: a_after
+  - source: a_after
+    target: a_end
+
+---
+id: act_c
+title: "Activity C"
+process: main
+
+nodes:
+  - id: c_start
+    type: activity_start
+    label: "Activity C"
+    name: act_c
+    page: true
+
+  - id: c_q
+    type: integer
+    name: c_q
+    label: "C question"
+
+  - id: c_end
+    type: activity_end
+
+edges:
+  - source: c_start
+    target: c_q
+  - source: c_q
+    target: c_end
+
+---
+id: act_n
+title: "Activity N"
+process: main
+
+nodes:
+  - id: n_start
+    type: activity_start
+    label: "Activity N"
+    name: act_n
+    relevance: "\"loose2\" > 1"
+
+  - id: n_q
+    type: integer
+    name: n_q
+    label: "N question"
+
+  - id: n_end
+    type: activity_end
+
+edges:
+  - source: n_start
+    target: n_q
+  - source: n_q
+    target: n_end
+
+---
+id: act_b
+title: "Activity B"
+process: main
+groups:
+  - id: g_vitals
+    name: vitals
+    label: "Vitals"
+  - id: g_extra
+    name: extra
+    label: "Extra"
+    page: true
+
+nodes:
+  - id: b_start
+    type: activity_start
+    label: "Activity B"
+    name: act_b
+    page: true
+
+  - id: b_q
+    type: integer
+    name: b_q
+    label: "B question"
+
+  - id: b_temp
+    type: decimal
+    name: b_temp
+    label: "Temperature"
+    group: g_vitals
+
+  - id: b_extra
+    type: integer
+    name: b_extra
+    label: "Extra question"
+    group: g_extra
+
+  - id: b_end
+    type: activity_end
+
+edges:
+  - source: b_start
+    target: b_q
+  - source: b_q
+    target: b_temp
+  - source: b_temp
+    target: b_extra
+  - source: b_extra
+    target: b_end

@@ -191,18 +191,24 @@ class TriccNodeActivity(TriccNodeBaseModel):
             return instance
 
     def update_groups_group(self, group):
+        # point the copies nested in ``group`` (template) at the copy of ``group``
+        group_instance = next((g for g in self.groups.values() if g.base_instance is group), None)
         for instance_group in self.groups.values():
-            if instance_group.group == group:
-                instance_group.group = instance_group
-            elif instance_group.group == self.base_instance:
+            parent = getattr(instance_group.base_instance, "group", None)
+            if parent is group and group_instance is not None:
+                instance_group.group = group_instance
+            elif not isinstance(parent, TriccGroup):
                 instance_group.group = self
 
     def update_groups(self, group):
         # create new group
         instance_group = group.make_instance(self.instance, activity=self)
-        # update the group in all activity
+        instance_group.activity = self
+        # update the group in all activity: a node copy has the activity as its group, its
+        # template (base_instance) still has the template group
         for node in list(self.nodes.values()):
-            if node.group == group:
+            origin = getattr(node, "base_instance", None)
+            if node.group == group or getattr(origin, "group", None) is group:
                 node.group = instance_group
         self.groups[instance_group.id] = instance_group
 

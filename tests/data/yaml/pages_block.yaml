@@ -1,0 +1,103 @@
+# A block call and an inlined activity call with page: true: their nodes are wrapped in a
+# generated page group (feature/20261120-questionnaire-pages.md).
+
+id: main_page
+title: "Main"
+process: main
+
+nodes:
+  - id: start
+    type: start
+    form_id: pages_block
+    label: "Start"
+    name: start_main
+
+  - id: q0
+    type: integer
+    name: q0
+    label: "Before"
+
+  - id: use_measure
+    type: block
+    name: use_measure
+    label: "Measure"
+    link: measure
+    page: true
+
+  - id: goto_inline
+    type: goto
+    name: goto_inline
+    label: "Inline module"
+    link: inline_mod
+    asGroup: false
+    page: true
+
+  - id: q1
+    type: integer
+    name: q1
+    label: "After"
+
+  - id: end
+    type: end
+    label: "End"
+    name: end_main
+
+edges:
+  - source: start
+    target: q0
+  - source: q0
+    target: use_measure
+  - source: use_measure
+    target: goto_inline
+  - source: goto_inline
+    target: q1
+  - source: q1
+    target: end
+
+---
+id: measure
+name: measure
+title: "Measure"
+nodes:
+  - id: m_start
+    type: block_start
+    name: measure
+
+  - id: m_temp
+    type: decimal
+    name: m_temp
+    label: "Temperature"
+
+  - id: m_end
+    type: activity_end
+
+edges:
+  - source: m_start
+    target: m_temp
+  - source: m_temp
+    target: m_end
+
+---
+id: inline_mod
+title: "Inline module"
+process: main
+
+nodes:
+  - id: im_start
+    type: activity_start
+    label: "Inline module"
+    name: inline_mod
+
+  - id: im_age
+    type: integer
+    name: im_age
+    label: "Age"
+
+  - id: im_end
+    type: activity_end
+
+edges:
+  - source: im_start
+    target: im_age
+  - source: im_age
+    target: im_end
