@@ -1,7 +1,15 @@
 import logging
 import os
 
-from tricc_oo.converters.xml_to_tricc import apply_goto_repeat_to_activity, create_activity
+from tricc_oo.converters.xml_to_tricc import (
+    apply_goto_page_to_activity,
+    apply_goto_repeat_to_activity,
+    create_activity,
+    read_start_as_group,
+    resolve_as_group,
+    resolve_goto_page,
+    wrap_snippet_in_page_group,
+)
 from tricc_oo.visitors.tricc import (
     load_calculate,
     set_prev_next_node,
@@ -119,6 +127,10 @@ class DrawioStrategy(BaseInputStrategy):
                 logger.critical(f"{template.id} diagram (drawio tab) already loaded (Duplicate diagram ID ?)")
                 exit(1)
             templates[template.id] = template
+            # a goto's bridge skip needs the asGroup of the page it calls, built later
+            as_group = read_start_as_group(diagram)
+            if as_group is not None:
+                project.start_as_group[template.id] = as_group
 
         def build(template, rendered):
             self._create_page(rendered, media_path, project)
@@ -254,8 +266,13 @@ class DrawioStrategy(BaseInputStrategy):
         if node.link in pages:
             next_page = pages[node.link]
 
-            # instance == -1: inline target activity as a snippet (no nested activity / wait)
-            if getattr(node, "instance", 1) == -1:
+            # asGroup false (deprecated: instance == -1): inline the target activity as a
+            # snippet (no nested activity / wait); the instance number is then ignored
+            if not resolve_as_group(node, next_page.root):
+                if getattr(node, "instance", 1) not in (1, -1):
+                    logger.warning(
+                        f"goto {node.get_name()}: instance {node.instance} ignored, the activity is inlined"
+                    )
                 # Clone then link the snippet graph (make_instance clears prev/next;
                 # nested gotos / edges inside the module need the same walk as a normal page).
                 #
@@ -280,6 +297,9 @@ class DrawioStrategy(BaseInputStrategy):
                             snippet_processed,
                             list(current_path),
                         )
+                if resolve_goto_page(node, next_page.root):
+                    # a page needs a group: wrap the inlined nodes in one
+                    wrap_snippet_in_page_group(clone, node)
                 entry = inject_activity_as_snippet(node, page, clone)
                 logger.debug(
                     "injected page {0} as snippet into {1} from {2}".format(
@@ -298,6 +318,7 @@ class DrawioStrategy(BaseInputStrategy):
                 # return existing instance if any
                 next_page = next_page.make_instance(node.instance)
             apply_goto_repeat_to_activity(node, next_page)
+            apply_goto_page_to_activity(node, next_page)
             if next_page.id not in pages:
                 pages[next_page.id] = next_page
             logger.debug(

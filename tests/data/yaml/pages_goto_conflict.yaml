@@ -1,0 +1,122 @@
+# Two gotos open instance 2 of page_mod with page: true and page: false: an export error
+# (feature/20261120-questionnaire-pages.md).
+
+id: parent_main
+title: "Parent Main"
+process: main
+
+nodes:
+  - id: start
+    type: start
+    form_id: parent_main
+    label: "Start"
+    name: start_parent
+
+  - id: choice
+    type: select_yesno
+    name: choice
+    label: "Path A?"
+    required: true
+
+  - id: rhombus_choice
+    type: rhombus
+    label: "Path?"
+    reference: "\"choice\" = true"
+
+  - id: goto_a
+    type: goto
+    name: goto_a
+    label: "Module, path A"
+    link: page_mod
+    instance: 2
+    page: true
+
+  - id: goto_b
+    type: goto
+    name: goto_b
+    label: "Module, path B"
+    link: page_mod
+    instance: 2
+    page: false
+
+  - id: goto_c
+    type: goto
+    name: goto_c
+    label: "Paged activity, not a page here"
+    link: paged_act
+    page: false
+
+  - id: end
+    type: end
+    label: "End"
+    name: end_parent
+
+edges:
+  - source: start
+    target: choice
+  - source: choice
+    target: rhombus_choice
+    value: follow
+  - source: rhombus_choice
+    target: goto_a
+    value: "yes"
+  - source: rhombus_choice
+    target: goto_b
+    value: "no"
+  - source: goto_a
+    target: goto_c
+  - source: goto_b
+    target: goto_c
+  - source: goto_c
+    target: end
+
+---
+id: page_mod
+title: "Page module"
+process: main
+
+nodes:
+  - id: pm_start
+    type: activity_start
+    label: "Page module"
+    name: page_mod
+
+  - id: pm_age
+    type: integer
+    name: pm_age
+    label: "Age"
+
+  - id: pm_end
+    type: activity_end
+
+edges:
+  - source: pm_start
+    target: pm_age
+  - source: pm_age
+    target: pm_end
+
+---
+id: paged_act
+title: "Paged activity"
+process: main
+
+nodes:
+  - id: pa_start
+    type: activity_start
+    label: "Paged activity"
+    name: paged_act
+    page: true
+
+  - id: pa_weight
+    type: integer
+    name: pa_weight
+    label: "Weight"
+
+  - id: pa_end
+    type: activity_end
+
+edges:
+  - source: pa_start
+    target: pa_weight
+  - source: pa_weight
+    target: pa_end

@@ -108,6 +108,11 @@ class TriccNodeActivity(TriccNodeBaseModel):
     # plain-language twin of ``applicability`` (text or {lang: text}); informational
     intent: Optional[Union[str, Dict[str, str]]] = None
     is_sequence_defined: bool = False
+    # resolved from the calls and the start node: shown on its own form page; the goto
+    # that set it, for the conflict check of a shared instance
+    # (feature/20261120-questionnaire-pages.md)
+    page: bool = False
+    page_set_by: Optional[str] = None
 
     # redefine
     def make_instance(self, instance_nb=None, **kwargs):
@@ -380,8 +385,13 @@ class TriccNodeGoTo(TriccNodeBaseModel):
     tricc_type: TriccNodeType = TriccNodeType.goto
     link: Union[TriccNodeActivity, triccId]
     datatype: str = "n/a"
-    #  n > 0: named nested activity instance; 0: auto-unique instance; -1: snippet inject into caller
+    #  n > 0: named nested activity instance; 0: auto-unique instance
+    # -1: DEPRECATED, use as_group=False (feature/20261120-questionnaire-pages.md)
     instance: int = 1
+    # None: not set, the called activity_start decides (feature/20261120-questionnaire-pages.md)
+    page: Optional[bool] = None
+    # False: inline the activity in the caller (no group, no instance)
+    as_group: Optional[bool] = None
 
     # no need ot copy
     def make_instance(self, instance_nb, activity, **kwargs):
@@ -395,7 +405,7 @@ class TriccNodeGoTo(TriccNodeBaseModel):
 class TriccNodeBlock(TriccNodeGoTo):
     """Uses a block: ``link`` names the block instance built for ``args``.
 
-    Linked like a ``goto`` with ``instance == -1``: the block is cloned and inlined.
+    Linked like a ``goto`` with ``as_group=False``: the block is cloned and inlined.
     """
 
     tricc_type: TriccNodeType = TriccNodeType.block
@@ -544,6 +554,9 @@ class TriccIntervention(BaseModel):
     # graph_process_start: Dict = {}
     # list of context:
     pages: Dict[str, TriccNodeActivity] = {}
+    # draw.io: ``asGroup`` of each page's start node by page id, read before the pages are
+    # built, for the goto bridge skip (feature/20261120-questionnaire-pages.md)
+    start_as_group: Dict[str, bool] = {}
     start_pages: Dict[str, TriccNodeActivity] = {}
     # process name -> authored segments (main-start pages)
     segments: Dict[str, List[TriccSegment]] = {}

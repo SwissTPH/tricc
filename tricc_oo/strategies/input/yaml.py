@@ -50,6 +50,7 @@ from tricc_oo.converters.xml_to_tricc import (
     parse_expression,
     load_expressions,
     TriccRhombusError,
+    parse_bool_attribute,
     process_edge_label,
     propagate_activity_repeat,
     shield_required,
@@ -79,7 +80,7 @@ from tricc_oo.models.tricc import (
     TriccNodeGoTo,
     TriccNodeBlock,
 )
-from tricc_oo.models.base import TriccNodeType
+from tricc_oo.models.base import TriccGroup, TriccNodeType
 
 # Nodes defined in calculate.py
 from tricc_oo.models.calculate import (
@@ -169,6 +170,13 @@ class YamlNode(YamlModel):
     static: Optional[bool] = None
     instance: Optional[int] = 1
     repeat: Optional[int] = None
+    # activity_start / goto / block_start / block: own form page; activity_start / goto:
+    # False inlines the activity (feature/20261120-questionnaire-pages.md). Read as booleans
+    # by parse_bool_attribute; anything else is warned about and ignored.
+    page: Optional[Any] = None
+    as_group: Optional[Any] = Field(default=None, validation_alias=AliasChoices("asGroup", "as_group"))
+    # id of the activity group framing the node
+    group: Optional[str] = None
     context: Optional[str] = None
     period: Optional[str] = None
     # populate: the concept read, a code or {system, code} (default: the node name; #34)
@@ -208,6 +216,18 @@ NO_CONCEPT_TEXT_TYPES = {"calculate", "rhombus"}
 TEXT_FIELD_USES = {"label": "display", "hint": "hint", "help": "help"}
 
 
+class YamlGroup(YamlModel):
+    """A frame around nodes, as a draw.io ``container_page`` (feature/20261009-yaml-page-groups.md).
+
+    ``page``: shown on its own form page (feature/20261120-questionnaire-pages.md).
+    """
+    id: str
+    name: Optional[str] = None
+    label: Optional[Union[str, Dict[str, str]]] = None
+    parent: Optional[str] = None
+    page: Optional[Any] = None
+
+
 class YamlEdge(YamlModel):
     """Edge between two nodes. 'value' is used for conditional (rhombus) edges."""
     source: str
@@ -225,6 +245,7 @@ class YamlActivity(YamlModel):
     process: str = "main"
     nodes: List[YamlNode]
     edges: List[YamlEdge] = Field(default_factory=list)
+    groups: List[YamlGroup] = Field(default_factory=list)
     applicability: Optional[str] = None
     # names the activity in outputs (else the title slug)
     name: Optional[str] = None
@@ -266,12 +287,12 @@ NODE_TYPE_MAP: Dict[str, Dict[str, Any]] = {
     },
     "activity_start": {
         "model": TriccNodeActivityStart,
-        "attrs": ["label", "name", "relevance", "instance", "repeat"],
+        "attrs": ["label", "name", "relevance", "instance", "repeat", "page", "as_group"],
         "tricc_type": TriccNodeType.activity_start,
     },
     "block_start": {
         "model": TriccNodeBlockStart,
-        "attrs": ["label", "name", "relevance"],
+        "attrs": ["label", "name", "relevance", "page"],
         "tricc_type": TriccNodeType.block_start,
     },
     "activity_end": {
@@ -358,13 +379,13 @@ NODE_TYPE_MAP: Dict[str, Dict[str, Any]] = {
     },
     "goto": {
         "model": TriccNodeGoTo,
-        "attrs": ["label", "name", "link", "instance", "repeat"],
+        "attrs": ["label", "name", "link", "instance", "repeat", "page", "as_group"],
         "tricc_type": TriccNodeType.goto,
     },
-    # inlines one copy of the block built for its args (a goto with instance -1)
+    # inlines one copy of the block built for its args (a goto with asGroup false)
     "block": {
         "model": TriccNodeBlock,
-        "attrs": ["label", "name", "link", "repeat", "args"],
+        "attrs": ["label", "name", "link", "repeat", "args", "page"],
         "tricc_type": TriccNodeType.block,
     },
     # Same attributes the model and the draw.io map actually carry. A missing entry
@@ -380,6 +401,9 @@ NODE_TYPE_MAP: Dict[str, Dict[str, Any]] = {
         "tricc_type": TriccNodeType.diagnosis,
     },
 }
+
+# yes/no attributes (feature/20261120-questionnaire-pages.md): field -> name in the file
+BOOL_ATTRS = {"page": "page", "as_group": "asGroup"}
 
 # Map YAML type strings to TriccNodeType (for nodes where the map above does not list it)
 YAML_TYPE_TO_TRICC_TYPE = {
@@ -411,7 +435,7 @@ YAML_TYPE_TO_TRICC_TYPE = {
 EXPRESSION_FIELDS = {"relevance", "calculate", "expression", "constraint", "min", "max", "reference", "trigger"}
 TEXT_FIELDS = {"name", "label", "hint", "help", "constraint_message", "save"}
 # never rendered: ids, structure, and call arguments (bound by the call instead)
-RAW_FIELDS = {"id", "type", "process", "instance", "link", "args", "options", "ui"}
+RAW_FIELDS = {"id", "type", "process", "instance", "link", "args", "options", "ui", "group"}
 
 
 def _normalize_types(act_dict: Dict[str, Any]) -> None:
@@ -783,6 +807,7 @@ class YamlStrategy(BaseInputStrategy):
         for node in nodes.values():
             node.activity = activity
             node.group = activity
+        self._build_groups(yaml_act, activity, project)
 
         # 3b. Edge labels, as for draw.io: rhombus paths, then yes / no / factor /
         # condition / follow / Answer('…'). Injected nodes and edges land in the activity.
@@ -815,6 +840,57 @@ class YamlStrategy(BaseInputStrategy):
 
         logger.info(f"Loaded YAML activity: {yaml_act.id} ({yaml_act.title})")
         return activity
+
+    def _build_groups(self, yaml_act: YamlActivity, activity: TriccNodeActivity, project: TriccIntervention) -> None:
+        """Build the activity's groups as ``get_groups`` does for draw.io ``container_page``.
+
+        An unknown ``group`` / ``parent`` id is warned about and the activity kept as the
+        group; a parent cycle is broken at the first repeated id.
+        """
+        if not yaml_act.groups:
+            return
+        groups: Dict[str, TriccGroup] = {}
+        for ygroup in yaml_act.groups:
+            label = ygroup.label
+            if label is None and ygroup.name:
+                concept = self._resolve_concept(None, ygroup.name, project, f"group {ygroup.id}")
+                label = self._concept_texts(concept, project).get("label")
+            groups[ygroup.id] = TriccGroup(
+                id=generate_id(f"{activity.id}{ygroup.id}"),
+                name=ygroup.name,
+                label=label,
+                activity=activity,
+                group=activity,
+                page=bool(parse_bool_attribute(ygroup.page, "page", f"group {ygroup.id}")),
+            )
+        for ygroup in yaml_act.groups:
+            if not ygroup.parent:
+                continue
+            if ygroup.parent not in groups:
+                logger.warning(f"group {ygroup.id}: unknown parent {ygroup.parent!r}, ignored")
+                continue
+            # walk up from the parent: reaching this group again is a cycle
+            seen, cursor = {ygroup.id}, ygroup.parent
+            parents = {g.id: g.parent for g in yaml_act.groups}
+            while cursor and cursor not in seen:
+                seen.add(cursor)
+                cursor = parents.get(cursor)
+            if cursor == ygroup.id:
+                logger.warning(f"group {ygroup.id}: parent cycle, broken at {ygroup.parent!r}")
+                continue
+            groups[ygroup.id].group = groups[ygroup.parent]
+        by_id = {ynode.id: ynode for ynode in yaml_act.nodes}
+        for node_id, node in activity.nodes.items():
+            ynode = by_id.get(node_id)
+            if ynode is None or not ynode.group:
+                continue
+            if ynode.group not in groups:
+                logger.warning(f"node {node_id}: unknown group {ynode.group!r}, ignored")
+                continue
+            node.group = groups[ynode.group]
+            for option in (getattr(node, "options", None) or {}).values():
+                option.group = node.group
+        activity.groups = {g.id: g for g in groups.values()}
 
     def _create_node(
         self, ynode: YamlNode, yaml_act: YamlActivity, project: TriccIntervention, activity=None
@@ -849,11 +925,17 @@ class YamlStrategy(BaseInputStrategy):
             if attr == "source" and val is not None:
                 # the concept code; its system only narrows the dictionary, the model keeps the code
                 val = self._concept_ref(val)[0]
+            if attr in BOOL_ATTRS:
+                val = parse_bool_attribute(val, BOOL_ATTRS[attr], f"node {ynode.id}")
             if val is not None:
                 if attr == "required":
                     data[attr] = shield_required(val)
                 else:
                     data[attr] = val
+        if ynode.as_group is not None and "as_group" not in allowed_attrs:
+            logger.warning(
+                f"node {ynode.id}: asGroup is ignored on a {ynode.type} (only read on activity_start and goto)"
+            )
 
         if ynode.type not in NO_CONCEPT_TEXT_TYPES and any(
             f in allowed_attrs and f not in data for f in TEXT_FIELD_USES

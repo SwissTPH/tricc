@@ -1,4 +1,4 @@
-"""Tests for goto instance=-1 snippet injection."""
+"""Tests for goto snippet injection: asGroup: false, and the deprecated instance: -1."""
 
 import unittest
 from pathlib import Path
@@ -59,8 +59,12 @@ def _project_after_linking(name: str) -> TriccIntervention:
 
 
 class TestGotoSnippetInjection(unittest.TestCase):
+    # deprecated spelling (feature/20261120-questionnaire-pages.md); see the subclass below
+    SNIPPET = "goto_snippet_injection.yaml"
+    DOUBLE = "goto_snippet_double_inject.yaml"
+
     def test_instance_minus_one_inlines_module(self):
-        project = _load_yaml("goto_snippet_injection.yaml")
+        project = _load_yaml(self.SNIPPET)
         self.assertIsNotNone(project)
         parent = project.start_pages.get("main")
         self.assertIsNotNone(parent)
@@ -164,7 +168,7 @@ class TestGotoSnippetInjection(unittest.TestCase):
         from collections import Counter
         from tricc_oo.converters.tricc_to_xls_form import get_export_name
 
-        project = _load_yaml("goto_snippet_double_inject.yaml")
+        project = _load_yaml(self.DOUBLE)
         parent = project.start_pages.get("main")
         self.assertIsNotNone(parent)
 
@@ -200,6 +204,13 @@ class TestGotoSnippetInjection(unittest.TestCase):
                 all_exports.append(get_export_name(n))
         dupes = {k: v for k, v in Counter(all_exports).items() if v > 1}
         self.assertEqual(dupes, {}, f"duplicate export names after double snippet inject: {dupes}")
+
+
+class TestGotoAsGroupFalse(TestGotoSnippetInjection):
+    """Same cases with ``asGroup: false``, which replaces ``instance: -1``."""
+
+    SNIPPET = "goto_as_group_false.yaml"
+    DOUBLE = "goto_as_group_false_double.yaml"
 
 
 if __name__ == "__main__":

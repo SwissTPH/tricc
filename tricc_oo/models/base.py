@@ -193,6 +193,8 @@ class TriccGroup(TriccBaseModel):
     relevance: Optional[Union[Expression, TriccOperation]] = None
     path_len: int = 0
     prev_nodes: OrderedSet[TriccBaseModel] = OrderedSet()
+    # shown on its own form page (feature/20261120-questionnaire-pages.md)
+    page: bool = False
 
     def __init__(self, **data):
         super().__init__(**data)
