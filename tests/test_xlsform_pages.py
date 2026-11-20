@@ -83,3 +83,18 @@ def test_no_page_gives_the_same_xlsform(output_strategy):
     without = survey("xlsform_no_pages.yaml", output_strategy)
     keep = [c for c in with_pages.columns if c in without.columns]
     assert with_pages[keep].equals(without[keep])
+
+
+@pytest.mark.parametrize("output_strategy", ["XLSFormStrategy", "XLSFormCHTStrategy"])
+def test_as_group_on_blocks_and_groups(output_strategy):
+    """asGroup on blocks and groups of questions (rev. 2026-11-20)."""
+    df = survey("as_group_blocks.yaml", output_strategy)
+    names = list(group_rows(df)["name"])
+    # a block called with asGroup: true (or whose block_start says so) gets its own group
+    assert [n for n in names if n.startswith("blk_a_Ii_")]
+    assert [n for n in names if n.startswith("blk_c_Ii_")]
+    # inlined block: no group of its own
+    assert not [n for n in names if n.startswith("blk_b_")]
+    # a group of questions with asGroup: false gets none, the default one does
+    assert "frame" not in names and not [n for n in names if n.startswith("frame_")]
+    assert "head" in names

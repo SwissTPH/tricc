@@ -212,3 +212,144 @@ def test_as_group_false_gives_the_same_questionnaire_as_instance_minus_one():
     (with_alias,) = build_questionnaires("goto_snippet_injection.yaml").values()
     (with_flag,) = build_questionnaires("goto_as_group_false.yaml").values()
     assert with_flag["item"] == with_alias["item"]
+
+
+# ── asGroup on blocks and groups of questions (rev. 2026-11-20) ──
+
+
+class TestAsGroupBlocksAndGroups:
+    """as_group_blocks.yaml: three block calls and two groups of questions, no page."""
+
+    @pytest.fixture(scope="class")
+    def q(self):
+        (q,) = build_questionnaires("as_group_blocks.yaml").values()
+        return q
+
+    @staticmethod
+    def _sections(q):
+        return {i["linkId"]: [c["linkId"] for c in i.get("item", [])] for i in q["item"] if i["type"] == "group"}
+
+    def test_block_call_as_group_true_is_its_own_section(self, q):
+        sections = self._sections(q)
+        (a_section,) = [s for s, items in sections.items() if items == ["a_q"]]
+        assert a_section.startswith("blk_a_Ii_") and a_section.endswith("_Ss_1")
+        # a section, not a page
+        assert all(item_control(i) is None for i in q["item"])
+        # the caller is split around it
+        order = list(sections)
+        assert order.index("main_Ss_d1") < order.index(a_section) < order.index("main_Ss_d2")
+
+    def test_block_start_as_group_true_call_false_is_inlined(self, q):
+        sections = self._sections(q)
+        assert sections["main_Ss_d2"] == ["b_q"]
+        assert not [s for s in sections if s.startswith("blk_b_")]
+
+    def test_block_start_as_group_true_applies_when_the_call_leaves_it_unset(self, q):
+        sections = self._sections(q)
+        (c_section,) = [s for s, items in sections.items() if items == ["c_q"]]
+        assert c_section.startswith("blk_c_Ii_")
+
+    def test_group_as_group_false_has_no_group_item(self, q):
+        items = {i["linkId"]: i for i, _ in walk(q["item"])}
+        assert "frame" not in items
+        # q1 sits in the enclosing section, next to the sub-heading of the default group
+        assert self._sections(q)["main_Ss_d3"] == ["q1", "head"]
+        assert items["head"]["type"] == "group" and items["head"]["text"] == "Head"
+
+    def test_paths_resolve(self, q):
+        assert unresolved_paths(q) == []
+
+
+def test_block_calls_resolve_as_group_on_the_model():
+    project = _load_yaml("as_group_blocks.yaml")
+    main = project.start_pages["main"]
+    by_name = {getattr(n, "name", None): n for n in main.nodes.values()}
+    assert by_name["a_q"].group.call and by_name["a_q"].group.as_group
+    assert not by_name["a_q"].group.page
+    assert by_name["b_q"].group is main
+    assert by_name["c_q"].group.call
+    # the frame is gone, its question belongs to the activity
+    assert by_name["q1"].group is main
+    assert [g.name for g in main.groups.values() if not g.call] == ["head"]
+
+
+def test_dissolve_inline_groups_moves_members_to_the_enclosing_section():
+    from tricc_oo.converters.xml_to_tricc import dissolve_inline_groups
+    from tricc_oo.models.base import TriccGroup
+    from tricc_oo.models.tricc import TriccNodeInteger
+
+    activity = TriccNodeActivity(id="a1", name="a1", root=TriccNodeGoTo(id="r", link="x"))
+    head = TriccGroup(id="g_head", name="head", activity=activity, group=activity)
+    frame = TriccGroup(id="g_frame", name="frame", activity=activity, group=head, as_group=False)
+    inner = TriccGroup(id="g_inner", name="inner", activity=activity, group=frame)
+    q1 = TriccNodeInteger(id="q1", name="q1", label="Q1", activity=activity, group=frame)
+    q2 = TriccNodeInteger(id="q2", name="q2", label="Q2", activity=activity, group=inner)
+    activity.nodes = {"q1": q1, "q2": q2}
+    activity.groups = {g.id: g for g in (head, frame, inner)}
+    dissolve_inline_groups(activity)
+    assert q1.group is head
+    assert q2.group is inner and inner.group is head
+    assert set(activity.groups) == {"g_head", "g_inner"}
+
+
+def test_drawio_container_page_reads_as_group():
+    from lxml import etree
+
+    from tricc_oo.converters.xml_to_tricc import add_group
+
+    diagram = etree.fromstring(
+        '<diagram id="d1" name="d1"><mxGraphModel><root>'
+        '<object id="g1" tricc_type="container_page" name="frame" asGroup="false"/>'
+        '<object id="g2" tricc_type="container_page" name="head"/>'
+        "</root></mxGraphModel></diagram>"
+    )
+    activity = TriccNodeActivity(id="a1", name="a1", root=TriccNodeGoTo(id="r", link="x"))
+    frame, head = (add_group(elm, diagram, {}, {}, activity, activity) for elm in diagram.iter("object"))
+    assert frame.as_group is False
+    assert head.as_group is True
+
+
+def test_drawio_block_reads_as_group():
+    from lxml import etree
+
+    from tricc_oo.converters.xml_to_tricc import resolve_as_group, set_additional_attributes
+    from tricc_oo.models.calculate import TriccNodeBlockStart
+    from tricc_oo.models.tricc import TriccNodeBlock
+
+    block = TriccNodeBlock(id="b1", name="b1", link="blk")
+    set_additional_attributes(["page", "asGroup"], etree.fromstring('<object asGroup="1"/>'), block)
+    assert block.as_group is True
+    start = TriccNodeBlockStart(id="s1", name="blk", label="Block", as_group=True)
+    # call value, else block_start value, else False
+    assert resolve_as_group(TriccNodeBlock(id="b2", link="blk"), start) is True
+    assert resolve_as_group(TriccNodeBlock(id="b3", link="blk", as_group=False), start) is False
+    assert resolve_as_group(TriccNodeBlock(id="b4", link="blk"), None) is False
+
+
+def test_page_true_with_as_group_false_keeps_the_page(caplog):
+    _load_yaml("as_group_page_wins.yaml")
+    wins = [r for r in caplog.records if "the page wins" in r.getMessage()]
+    assert {r.getMessage().split(":")[0] for r in wins} == {"node call_m", "group g_page"}
+    (q,) = build_questionnaires("as_group_page_wins.yaml").values()
+    sections = {i["linkId"]: [c["linkId"] for c in i.get("item", [])] for i in q["item"] if i["type"] == "group"}
+    assert all(item_control(i) == "page" for i in q["item"] if i["type"] == "group")
+    assert any(s.startswith("measure_Ii_") and items == ["m_temp"] for s, items in sections.items())
+    assert sections.get("page_frame_Ss_1") == ["q1"]
+
+
+def test_drawio_nested_container_page():
+    from lxml import etree
+
+    from tricc_oo.converters.xml_to_tricc import get_groups
+
+    diagram = etree.fromstring(
+        '<diagram id="d1" name="d1"><mxGraphModel><root>'
+        '<object id="grpouter001" odk_type="container_page" tricc_type="container_page" name="outer"/>'
+        '<object id="grpinner002" parent="grpouter001" odk_type="container_page" tricc_type="container_page"'
+        ' name="inner"/>'
+        "</root></mxGraphModel></diagram>"
+    )
+    activity = TriccNodeActivity(id="a1", name="a1", root=TriccNodeGoTo(id="r", link="x"))
+    groups = get_groups(diagram, {}, activity)
+    assert groups["grpinner002"].group is groups["grpouter001"]
+    assert groups["grpinner002"].activity is activity

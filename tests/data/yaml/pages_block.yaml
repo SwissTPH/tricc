@@ -1,5 +1,6 @@
 # A block call and an inlined activity call with page: true: their nodes are wrapped in a
-# generated page group (feature/20261120-questionnaire-pages.md).
+# generated page group (feature/20261120-questionnaire-pages.md). The activity is inlined by
+# its activity_start: asGroup: false on the goto itself would lose to page: true.
 
 id: main_page
 title: "Main"
@@ -29,7 +30,6 @@ nodes:
     name: goto_inline
     label: "Inline module"
     link: inline_mod
-    asGroup: false
     page: true
 
   - id: q1
@@ -87,6 +87,7 @@ nodes:
     type: activity_start
     label: "Inline module"
     name: inline_mod
+    asGroup: false
 
   - id: im_age
     type: integer

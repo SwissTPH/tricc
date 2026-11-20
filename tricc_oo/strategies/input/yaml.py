@@ -51,6 +51,8 @@ from tricc_oo.converters.xml_to_tricc import (
     load_expressions,
     TriccRhombusError,
     parse_bool_attribute,
+    check_page_as_group,
+    dissolve_inline_groups,
     process_edge_label,
     propagate_activity_repeat,
     shield_required,
@@ -170,9 +172,9 @@ class YamlNode(YamlModel):
     static: Optional[bool] = None
     instance: Optional[int] = 1
     repeat: Optional[int] = None
-    # activity_start / goto / block_start / block: own form page; activity_start / goto:
-    # False inlines the activity (feature/20261120-questionnaire-pages.md). Read as booleans
-    # by parse_bool_attribute; anything else is warned about and ignored.
+    # activity_start / goto / block_start / block: own form page; as_group: a section (True)
+    # or inline in the caller (False) (feature/20261120-questionnaire-pages.md). Read as
+    # booleans by parse_bool_attribute; anything else is warned about and ignored.
     page: Optional[Any] = None
     as_group: Optional[Any] = Field(default=None, validation_alias=AliasChoices("asGroup", "as_group"))
     # id of the activity group framing the node
@@ -219,13 +221,15 @@ TEXT_FIELD_USES = {"label": "display", "hint": "hint", "help": "help"}
 class YamlGroup(YamlModel):
     """A frame around nodes, as a draw.io ``container_page`` (feature/20261009-yaml-page-groups.md).
 
-    ``page``: shown on its own form page (feature/20261120-questionnaire-pages.md).
+    ``page``: shown on its own form page; ``asGroup: false``: only a frame, its nodes join the
+    enclosing section (feature/20261120-questionnaire-pages.md).
     """
     id: str
     name: Optional[str] = None
     label: Optional[Union[str, Dict[str, str]]] = None
     parent: Optional[str] = None
     page: Optional[Any] = None
+    as_group: Optional[Any] = Field(default=None, validation_alias=AliasChoices("asGroup", "as_group"))
 
 
 class YamlEdge(YamlModel):
@@ -292,7 +296,7 @@ NODE_TYPE_MAP: Dict[str, Dict[str, Any]] = {
     },
     "block_start": {
         "model": TriccNodeBlockStart,
-        "attrs": ["label", "name", "relevance", "page"],
+        "attrs": ["label", "name", "relevance", "page", "as_group"],
         "tricc_type": TriccNodeType.block_start,
     },
     "activity_end": {
@@ -385,7 +389,7 @@ NODE_TYPE_MAP: Dict[str, Dict[str, Any]] = {
     # inlines one copy of the block built for its args (a goto with asGroup false)
     "block": {
         "model": TriccNodeBlock,
-        "attrs": ["label", "name", "link", "repeat", "args", "page"],
+        "attrs": ["label", "name", "link", "repeat", "args", "page", "as_group"],
         "tricc_type": TriccNodeType.block,
     },
     # Same attributes the model and the draw.io map actually carry. A missing entry
@@ -863,6 +867,9 @@ class YamlStrategy(BaseInputStrategy):
                 group=activity,
                 page=bool(parse_bool_attribute(ygroup.page, "page", f"group {ygroup.id}")),
             )
+            as_group = parse_bool_attribute(ygroup.as_group, "asGroup", f"group {ygroup.id}")
+            groups[ygroup.id].as_group = True if as_group is None else as_group
+            check_page_as_group(groups[ygroup.id], f"group {ygroup.id}")
         for ygroup in yaml_act.groups:
             if not ygroup.parent:
                 continue
@@ -891,6 +898,8 @@ class YamlStrategy(BaseInputStrategy):
             for option in (getattr(node, "options", None) or {}).values():
                 option.group = node.group
         activity.groups = {g.id: g for g in groups.values()}
+        # groups with asGroup false are only frames (feature/20261120-questionnaire-pages.md)
+        dissolve_inline_groups(activity)
 
     def _create_node(
         self, ynode: YamlNode, yaml_act: YamlActivity, project: TriccIntervention, activity=None
@@ -934,7 +943,8 @@ class YamlStrategy(BaseInputStrategy):
                     data[attr] = val
         if ynode.as_group is not None and "as_group" not in allowed_attrs:
             logger.warning(
-                f"node {ynode.id}: asGroup is ignored on a {ynode.type} (only read on activity_start and goto)"
+                f"node {ynode.id}: asGroup is ignored on a {ynode.type} "
+                "(only read on activity_start, goto, block_start and block)"
             )
 
         if ynode.type not in NO_CONCEPT_TEXT_TYPES and any(
@@ -973,6 +983,7 @@ class YamlStrategy(BaseInputStrategy):
         except Exception as exc:
             logger.error(f"Failed to instantiate {ynode.type} node '{ynode.id}': {exc}")
             return None
+        check_page_as_group(node, f"node {ynode.id}")
 
         # Post-creation wiring for select options (now that the parent exists)
         if ynode.type == "select_yesno" and not ynode.options:

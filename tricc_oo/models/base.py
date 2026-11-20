@@ -193,8 +193,12 @@ class TriccGroup(TriccBaseModel):
     relevance: Optional[Union[Expression, TriccOperation]] = None
     path_len: int = 0
     prev_nodes: OrderedSet[TriccBaseModel] = OrderedSet()
-    # shown on its own form page (feature/20261120-questionnaire-pages.md)
+    # shown on its own form page; False as_group: only a frame on the canvas, its items join
+    # the enclosing section; call: generated for a block (or inlined activity) call, a section
+    # like an activity (feature/20261120-questionnaire-pages.md)
     page: bool = False
+    as_group: bool = True
+    call: bool = False
 
     def __init__(self, **data):
         super().__init__(**data)

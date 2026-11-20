@@ -272,7 +272,8 @@ class TriccNodeActivityStart(TriccNodeFakeCalculateBase):
     relevance: Optional[Union[Expression, TriccOperation]] = None
     status: Optional[str] = None
     process: Optional[str] = None
-    # None: not set, a goto calling the activity may set it (feature/20261120-questionnaire-pages.md)
+    # None: not set, a goto (block call) may set it; unset as_group: True for an activity,
+    # False for a block (feature/20261120-questionnaire-pages.md)
     page: Optional[bool] = None
     as_group: Optional[bool] = None
 

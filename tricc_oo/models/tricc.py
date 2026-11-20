@@ -411,7 +411,8 @@ class TriccNodeGoTo(TriccNodeBaseModel):
 class TriccNodeBlock(TriccNodeGoTo):
     """Uses a block: ``link`` names the block instance built for ``args``.
 
-    Linked like a ``goto`` with ``as_group=False``: the block is cloned and inlined.
+    Linked like a ``goto`` with ``as_group=False``: the block is cloned and inlined; with
+    ``as_group`` or ``page`` resolved true its nodes are wrapped in a generated group.
     """
 
     tricc_type: TriccNodeType = TriccNodeType.block

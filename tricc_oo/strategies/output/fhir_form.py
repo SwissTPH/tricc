@@ -1084,6 +1084,8 @@ class FHIRStrategy(BaseOutPutStrategy):
         A Questionnaire with a page (an activity or a ``TriccGroup`` with ``page``) is
         paginated: only pages open sections, every section is a page, and the items of an
         activity that is not a page join the enclosing section, gated on its hidden item.
+        Without pages, a block called with ``asGroup`` (its generated group) is a section like
+        an activity; with pages, it is a sub-heading unless it is a page.
         """
         for segment, q in (self.questionnaires or {}).items():
             q["item"] = self._flatten_items(segment, q.get("item") or [])
@@ -1139,12 +1141,13 @@ class FHIRStrategy(BaseOutPutStrategy):
             return section
 
         def place(item: dict, node) -> None:
-            groups = self._node_groups(node)
-            # innermost unit: a page group of the innermost activity, else an activity unit
+            groups = [g for g in self._node_groups(node) if g.as_group]
+            # innermost unit: a page group (paged) or a block call group (not paged) of the
+            # innermost activity, else an activity unit
             unit, inner = None, groups
-            page_groups = [g for g in groups if g.page] if paged else []
-            if page_groups:
-                group = page_groups[0]
+            unit_groups = [g for g in groups if (g.page if paged else g.call)]
+            if unit_groups:
+                group = unit_groups[0]
                 inner = groups[:groups.index(group)]
                 link_id = get_export_name(group)
                 owner = activities[-1]["linkId"] if activities else None
@@ -1166,8 +1169,8 @@ class FHIRStrategy(BaseOutPutStrategy):
             own = activities[-1] if activities else None
             if own is not None and own is not unit and not (unit and unit.get("activity") == own["linkId"]):
                 self._absorbed.setdefault(segment, []).append((item, own["linkId"]))
-            # a group of questions that is not a page: a sub-heading inside the section
-            sub = next((g for g in inner if not g.page or not paged), None) if inner else None
+            # a group of questions that is not a unit: a sub-heading inside the section
+            sub = next((g for g in inner if not (g.page if paged else g.call)), None) if inner else None
             if sub is None:
                 state["subgroup"] = None
                 state["section"]["item"].append(item)

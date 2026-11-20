@@ -8,7 +8,7 @@ from tricc_oo.converters.xml_to_tricc import (
     read_start_as_group,
     resolve_as_group,
     resolve_goto_page,
-    wrap_snippet_in_page_group,
+    wrap_snippet_in_group,
 )
 from tricc_oo.visitors.tricc import (
     load_calculate,
@@ -24,6 +24,7 @@ from tricc_oo.models import (
     TriccIntervention,
     OrderedSet,
     TriccNodeActivity,
+    TriccNodeBlock,
     TriccNodeGoTo,
     TriccNodeLinkOut,
     TriccNodeMoreInfo,
@@ -266,10 +267,12 @@ class DrawioStrategy(BaseInputStrategy):
         if node.link in pages:
             next_page = pages[node.link]
 
-            # asGroup false (deprecated: instance == -1): inline the target activity as a
+            # asGroup false (deprecated: instance == -1), or a block: inline the target as a
             # snippet (no nested activity / wait); the instance number is then ignored
-            if not resolve_as_group(node, next_page.root):
-                if getattr(node, "instance", 1) not in (1, -1):
+            as_group = resolve_as_group(node, next_page.root)
+            is_block = isinstance(node, TriccNodeBlock)
+            if is_block or not as_group:
+                if not is_block and getattr(node, "instance", 1) not in (1, -1):
                     logger.warning(
                         f"goto {node.get_name()}: instance {node.instance} ignored, the activity is inlined"
                     )
@@ -297,9 +300,10 @@ class DrawioStrategy(BaseInputStrategy):
                             snippet_processed,
                             list(current_path),
                         )
-                if resolve_goto_page(node, next_page.root):
-                    # a page needs a group: wrap the inlined nodes in one
-                    wrap_snippet_in_page_group(clone, node)
+                page_flag = resolve_goto_page(node, next_page.root)
+                if page_flag or (is_block and as_group):
+                    # a section (a page is one) needs a group: wrap the inlined nodes in one
+                    wrap_snippet_in_group(clone, node, page_flag)
                 entry = inject_activity_as_snippet(node, page, clone)
                 logger.debug(
                     "injected page {0} as snippet into {1} from {2}".format(
