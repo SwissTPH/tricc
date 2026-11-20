@@ -1,0 +1,126 @@
+# xlsform_pages.yaml without any page setting: the XLSForm must be the same.
+
+id: main_page
+title: "Main"
+process: main
+
+nodes:
+  - id: start
+    type: start
+    form_id: xlsform_pages
+    label: "Start"
+    name: start_main
+
+  - id: go_p
+    type: select_yesno
+    name: go_p
+    label: "Path P?"
+    required: true
+
+  - id: r_go
+    type: rhombus
+    label: "P?"
+    reference: "\"go_p\" = true"
+
+  - id: goto_p
+    type: goto
+    name: goto_p
+    label: "Activity P"
+    link: act_p
+
+  - id: end
+    type: end
+    label: "End"
+    name: end_main
+
+edges:
+  - source: start
+    target: go_p
+  - source: go_p
+    target: r_go
+    value: follow
+  - source: r_go
+    target: goto_p
+    value: "yes"
+  - source: r_go
+    target: end
+    value: "no"
+  - source: goto_p
+    target: end
+
+---
+id: act_p
+title: "Activity P"
+process: main
+groups:
+  - id: g_extra
+    name: p_extra_group
+    label: "Extra"
+
+nodes:
+  - id: p_start
+    type: activity_start
+    label: "Activity P"
+    name: act_p
+
+  - id: p_q
+    type: integer
+    name: p_q
+    label: "P question"
+
+  - id: goto_c
+    type: goto
+    name: goto_c
+    label: "Activity C"
+    link: act_c
+
+  - id: p_after
+    type: integer
+    name: p_after
+    label: "P after C"
+
+  - id: p_extra
+    type: integer
+    name: p_extra
+    label: "Extra"
+    group: g_extra
+
+  - id: p_end
+    type: activity_end
+
+edges:
+  - source: p_start
+    target: p_q
+  - source: p_q
+    target: goto_c
+  - source: goto_c
+    target: p_after
+  - source: p_after
+    target: p_extra
+  - source: p_extra
+    target: p_end
+
+---
+id: act_c
+title: "Activity C"
+process: main
+
+nodes:
+  - id: c_start
+    type: activity_start
+    label: "Activity C"
+    name: act_c
+
+  - id: c_q
+    type: integer
+    name: c_q
+    label: "C question"
+
+  - id: c_end
+    type: activity_end
+
+edges:
+  - source: c_start
+    target: c_q
+  - source: c_q
+    target: c_end
