@@ -71,13 +71,16 @@ def test_doc_is_canonical(path):
 def test_markdown_reads_back_to_the_same_text(path):
     """``value`` (Markdown) is the fallback of ``designation-doc``: read back, it renders the
     same Markdown. Not for colours and foreign pictures (no Markdown), nor for a line right
-    after a list: CommonMark reads it into the last item (lazy continuation)."""
+    after a list (CommonMark reads it into the last item) or two lists apart by a blank line
+    (CommonMark reads one loose list)."""
     case = _load(path)
     if "textStyle" in json.dumps(case["doc"]) or "![x](http" in case["markdown"]:
         pytest.skip("colour / foreign picture: not in Markdown")
     blocks = case["doc"]["content"]
     if any(a["type"].endswith("List") and b.get("content") for a, b in zip(blocks, blocks[1:])):
         pytest.skip("a line right after a list continues its last item in CommonMark")
+    if any(a["type"] == c["type"] and a["type"].endswith("List") for a, c in zip(blocks, blocks[2:])):
+        pytest.skip("two lists apart by a blank line are one loose list in CommonMark")
     again = from_markdown(case["markdown"])
     assert to_markdown(again, lambda name: "${" + name + "}") == case["markdown"]
 

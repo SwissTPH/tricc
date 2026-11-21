@@ -75,7 +75,9 @@ Python ≥ 3.10: `requires-python` moves from `>=3.8` to `>=3.10` (CI already te
   - `from_html(raw) -> dict`: draw.io label HTML → lxml → whitespace pre-pass (§1.1) →
     `DOMParser.from_schema(TEXT_SCHEMA).parse(...)` → `${name}` split → typed Markdown (§1.2).
     `from_text(raw)` picks `from_html` for a string holding a tag or an entity, else
-    `from_markdown`.
+    `from_markdown`. A paragraph the import leaves without any content is dropped: it is a
+    `div` / `p` wrapping only blocks (`<div><ul>…</ul></div>`) or an empty one, and shows no
+    line (a blank line, `<div><br></div>`, still holds its `hardBreak` at that point).
   - `from_markdown(text) -> dict`: `markdown-it-py` (preset `zero` + `list`, `emphasis`,
     `newline`, `image`) with an `interp` inline rule for `${name}`; tokens mapped to nodes and
     marks by a table, the way `prosemirror-markdown`'s `MarkdownParser` does it. Used for YAML
@@ -146,8 +148,11 @@ Every reader ends with `normalize(doc)`, and the shared fixtures hold documents 
 
 - `hardBreak` and `image` carry no marks; neighbouring text nodes with the same marks are one;
   marks are in schema order.
-- A run of two or more `hardBreak` in a paragraph ends it and leaves one empty paragraph (a
-  blank line); `hardBreak`s and spaces at a paragraph's edges are dropped.
+- Line breaks are read as a browser shows them: a run of `hardBreak`s opening a paragraph, or
+  a run of two or more inside or closing it, is a blank line (it ends the paragraph and leaves
+  one empty paragraph); a single `hardBreak` closing a paragraph shows nothing and is dropped.
+  So `</ul><br>Then` and `<div><br>- item</div>` keep the blank line the author sees, and
+  `<div>For x<br></div><div>Give</div>` has none. Spaces at a paragraph's edges are dropped.
 - Consecutive empty paragraphs are one; none opens or closes the document or sits in a list
   item; an empty document is one empty paragraph.
 - Neighbouring lists of the same kind are one list (an ordered one only when its `start`

@@ -1,0 +1,81 @@
+{
+  "name": "typed-list-with-blank-line",
+  "input": {
+    "html": "Zinc:<br><br>- tablet of 20 mg<br>- once a day<br><br>- for children under 2"
+  },
+  "doc": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Zinc:"
+          }
+        ]
+      },
+      {
+        "type": "paragraph"
+      },
+      {
+        "type": "bulletList",
+        "content": [
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "tablet of 20 mg"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "once a day"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "paragraph"
+      },
+      {
+        "type": "bulletList",
+        "content": [
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "for children under 2"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "plain": "Zinc:\n\n• tablet of 20 mg\n• once a day\n\n• for children under 2",
+  "markdown": "Zinc:\n\n- tablet of 20 mg\n- once a day\n\n- for children under 2",
+  "xhtml": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Zinc:</p><ul><li>tablet of 20 mg</li><li>once a day</li></ul><ul><li>for children under 2</li></ul></div>"
+}

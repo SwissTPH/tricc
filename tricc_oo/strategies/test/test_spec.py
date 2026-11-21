@@ -126,10 +126,10 @@ def label_text(label: Any, lang_code: str = "en") -> Optional[str]:
             # Fall back to any language rather than losing the label entirely.
             chosen = next(iter(label.values()))
         return label_text(chosen, lang_code)
-    from tricc_oo.models.message import TriccMessage
+    from tricc_oo.text.model import TriccText
     from tricc_oo.visitors.text_injection import serialize_injection_for_js_text
 
-    if isinstance(label, TriccMessage):
+    if isinstance(label, TriccText):
         text = serialize_injection_for_js_text(label).strip()
         return text or None
     return str(label).strip() or None

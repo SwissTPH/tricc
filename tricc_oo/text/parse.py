@@ -126,8 +126,9 @@ def _trim_edges(content: List[JSONDict]) -> List[JSONDict]:
 
 
 def _split_paragraph(node: JSONDict) -> List[JSONDict]:
-    """A run of two or more line breaks is a blank line: it ends the paragraph, and an empty
-    paragraph stands for the blank line."""
+    """Line breaks as a browser shows them. A run of ``hardBreak``s opening the paragraph, or
+    a run of two or more inside or closing it, is a blank line: it ends the paragraph and
+    leaves one empty paragraph. A single one closing the paragraph shows nothing."""
     content = _clean_inline(node.get("content") or [])
     chunks: List[Optional[List[JSONDict]]] = [[]]
     i = 0
@@ -136,9 +137,11 @@ def _split_paragraph(node: JSONDict) -> List[JSONDict]:
             run = 1
             while i + run < len(content) and content[i + run]["type"] == "hardBreak":
                 run += 1
-            if run >= 2:
+            opening = i == 0
+            closing = i + run == len(content)
+            if opening or run >= 2:
                 chunks.extend([None, []])
-            else:
+            elif not closing:
                 chunks[-1].append(content[i])
             i += run
             continue
@@ -187,11 +190,11 @@ def _normalize_blocks(blocks: List[JSONDict], top: bool) -> List[JSONDict]:
 def normalize(doc: JSONDict) -> JSONDict:
     """The canonical form of a document.
 
-    Line breaks and pictures carry no marks; text nodes with the same marks are merged; a run
-    of two or more line breaks splits the paragraph and leaves one empty paragraph (a blank
-    line); line breaks and spaces at a paragraph's edges are dropped; consecutive empty
-    paragraphs collapse into one, none opens or closes the document or sits in a list item;
-    neighbouring lists of the same kind are one list.
+    Line breaks and pictures carry no marks; text nodes with the same marks are merged; line
+    breaks are read as a browser shows them (:func:`_split_paragraph`): a blank line is an
+    empty paragraph; spaces at a paragraph's edges are dropped; consecutive empty paragraphs
+    collapse into one, none opens or closes the document or sits in a list item; neighbouring
+    lists of the same kind are one list.
     """
     blocks = _normalize_blocks(doc.get("content") or [], top=True)
     return {"type": "doc", "content": blocks or [paragraph()]}
@@ -316,6 +319,25 @@ def _prepare_html(root: Any) -> None:
                 parent.insert(parent.index(element) + 1, holder)
 
 
+def _drop_containers(doc: JSONDict) -> JSONDict:
+    """A paragraph the HTML import leaves without any content shows no line: it is a
+    ``div`` / ``p`` that only wraps blocks (``<div><ul>…</ul></div>``) or an empty one. A
+    blank line (``<div><br></div>``) still holds its ``hardBreak`` here."""
+    def blocks(nodes: List[JSONDict]) -> List[JSONDict]:
+        out = []
+        for node in nodes or []:
+            if node.get("type") == "paragraph" and "content" not in node:
+                continue
+            if node.get("type") in LIST_TYPES:
+                node = dict(node, content=[
+                    dict(item, content=blocks(item.get("content") or [])) for item in node.get("content") or []
+                ])
+            out.append(node)
+        return out
+
+    return dict(doc, content=blocks(doc.get("content") or []))
+
+
 def from_html(raw: str, where: Optional[str] = None) -> JSONDict:
     """A draw.io label (HTML) as a document.
 
@@ -333,7 +355,7 @@ def from_html(raw: str, where: Optional[str] = None) -> JSONDict:
     except (lxml.etree.ParserError, ValueError):
         return from_plain(raw)
     _prepare_html(root)
-    doc = DOMParser.from_schema(TEXT_SCHEMA).parse(root).to_json()
+    doc = _drop_containers(DOMParser.from_schema(TEXT_SCHEMA).parse(root).to_json())
     doc = normalize(split_interps(doc))
     return normalize(read_typed_markdown(doc, where))
 
@@ -453,10 +475,11 @@ def _blocks_from_tokens(tokens: List[Any]) -> List[JSONDict]:
 
 
 def from_markdown(text: str) -> JSONDict:
-    """Markdown (YAML labels, ``value`` of a designation, typed Markdown) as a document."""
+    """Markdown (YAML labels, ``value`` of a designation, typed Markdown) as a document. A
+    non-breaking space is a space, as in HTML labels."""
     if text is None or not text.strip():
         return empty_doc()
-    tokens = markdown_parser().parse(text)
+    tokens = markdown_parser().parse(text.replace("\xa0", " "))
     return normalize({"type": "doc", "content": _blocks_from_tokens(tokens)})
 
 
