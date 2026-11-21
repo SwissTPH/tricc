@@ -2,7 +2,7 @@
 
 | Field             | Value |
 | ----------------- | ----- |
-| **Status**        | Approved (2026-11-20, in conversation) |
+| **Status**        | Implemented (2026-11-21) |
 | **Branch target** | `feature/prosemirror-display-text` → `develop` (stacked on `fix/89-fhir-text-format`, PR #94) |
 | **Scope**         | `models`, `converters/xml_to_tricc`, `DrawioStrategy`, `YamlStrategy`, `XLSFormStrategy` → `XLSFormCHTStrategy`, `FHIRStrategy` → `OpenSRPStrategy` |
 | **Related**       | `feature/20260909-display-message-ast.md` (the tree this replaces; §2.9 already named ProseMirror as the interchange to pick). `feature/20261008-concept-texts-q-display-and-message-tree.md` (the `designation-message` extension, superseded here). `fix/20261120-fhir-text-format.md` (#89 / PR #94: the renderers move onto this model). Frontend mirror: `tricc-frontend/feature/20261120-prosemirror-display-text.md`. |
@@ -192,8 +192,28 @@ Every reader ends with `normalize(doc)`, and the shared fixtures hold documents 
   `<b>`s, the convulsion note), lists, colour, images, `${name}` inside bold.
 - `designation-doc` round trip; `designation-message` read compatibility; `value` fallback.
 - The existing display-text, XLSForm, CHT and FHIR tests stay green with unchanged expectations,
-  except the documented spacing fixes.
+  except the documented spacing fixes (§3.1).
 - Global child export check from #94: 0 `**`, `* ` bullets, `${`, triple newlines.
+
+#### 3.1 Spacing fixes (Global child, against #94)
+
+Global child (`L2/child` + `L2/common`, `OpenSRPStrategy`, 1289 texts, titles and option
+displays): 0 `**`, 0 `* ` bullets, 0 `${`, 0 triple newlines; 228 `rendering-markdown`
+extensions and 84 `cqf-expression`s, as with #94. 86 texts differ from #94, spacing only
+(a text can show several kinds):
+
+- spaces collapse as in HTML (`apply for<b>  4 weeks</b>`, `&nbsp; &nbsp;` runs, a space before
+  a line break): 56 texts lose a space;
+- a space between two elements is kept (`(tinea)<b> </b>with`, `(ORS)</b> <span>on`): 2 texts;
+- a `<br>` opening a line is the blank line the author sees (`</ul><br>Advise …`,
+  `<div><br>- apply</div>`), and blank lines typed between list items stay (`- a<br><br>- b`,
+  `1. …</div><div><br></div><div>2. …`): 24 texts gain a blank line;
+- a `<br>` closing a line adds none (`For ${x}<br></div><div>Give`, `…:</b><br><div>In case`):
+  5 texts lose one;
+- a line inside a list item stays in the item, indented under its marker: 3 texts.
+
+The convulsion note (`tests/test_strategies/test_fhir_text_format.py`) now has the blank
+line its `</ul><br>For this child` shows.
 
 ### 4. Phases
 
@@ -203,6 +223,8 @@ Every reader ends with `normalize(doc)`, and the shared fixtures hold documents 
    `TriccText`; all outputs render from it.
 3. `YamlStrategy` reads `designation-doc` / `designation-message` / `value`.
 4. Delete `models/message.py` and the old helpers; docs (`docs/pipeline.md`, `docs/open-srp-export.md`).
+
+All four phases are implemented on `feature/prosemirror-display-text`.
 
 ---
 
@@ -216,3 +238,8 @@ None open; see Decisions.
 - 2026-11-20: Python uses prosemirror-py; HTML import goes through its `DOMParser`, typed Markdown and YAML through `markdown-it-py`. (Patrick, in conversation)
 - 2026-11-20: Python floor raised to 3.10 (prosemirror-py requires it; CI already starts at 3.10).
 - 2026-11-20: new extension URL `designation-doc`; `designation-message` read, never written.
+- 2026-11-21 (implementation): blocks are lines, an empty paragraph is a blank line, and line
+  breaks are read as the browser shows them (§1.4), so the outputs keep today's line layout
+  (draw.io writes one `div` per line). The whitespace pre-pass wraps blank text for the parser
+  instead of moving it into the previous element (§1.1). A paragraph with underline, like one
+  with a colour, is not re-read as typed Markdown (§1.2).

@@ -187,8 +187,9 @@ children are display-only and are not extracted. See
 ## Text and formatting
 
 Labels are authored as formatted text (bold, italic, lists, line breaks, or Markdown typed
-into the label: `**bold**`, `* item`) and loaded as a display-text tree. FHIR `text`, `prefix` and `Coding.display` are plain strings, so the
-export renders the tree twice:
+into the label: `**bold**`, `* item`) and loaded as a ProseMirror document
+(`feature/20261120-prosemirror-display-text.md`). FHIR `text`, `prefix` and `Coding.display`
+are plain strings, so the export renders the document twice:
 
 - **plain text** in `text` / `display`: the data dictionary's own wording (a CodeSystem
   concept display or `help` / `hint` designation that is not just the label) when there is
@@ -205,6 +206,11 @@ This covers question and note text, the help / hint display children and answer 
 No extension is written when the label is already plain and equals the text. Translations
 carry the data dictionary text as it is. LHC-Forms renders both extensions; kotlin-fhir-data-capture shows `text`
 only. See `fix/20261120-fhir-text-format.md`.
+
+Lines follow what draw.io shows: each `div` line is a line, a blank line (`<div><br></div>`,
+`<br><br>`, a `<br>` opening a line) stays one blank line, a `<br>` closing a line adds
+nothing. In XHTML, lines one after the other are one `p` with `<br/>`; a blank line starts a
+new `p`.
 
 ---
 
@@ -462,8 +468,8 @@ alone is an XLSForm-only row and does not resolve here
 ### Dynamic display text (`${REF}` injection)
 
 Text authored with `${field}` tokens — note labels, question labels, `hint` and `help`
-(`feature/display-text-injection.md`, `feature/20260909-display-message-ast.md`) — is stored as a
-message tree, exported as plain text in `item.text` (see *Text and formatting*), and as a
+(`feature/display-text-injection.md`, `feature/20261120-prosemirror-display-text.md`) — is stored as a
+ProseMirror document, exported as plain text in `item.text` (see *Text and formatting*), and as a
 **`cqf-expression` on the item's
 `text` element**, which openSRP FHIR Data Capture evaluates against the in-progress
 QuestionnaireResponse and shows instead of the static text:
