@@ -1,6 +1,6 @@
 """Plain ``text`` + rendering extension on ``_text`` (fix/20261120-fhir-text-format.md).
 
-Labels are built from draw.io-style HTML through ``parse_html_to_message``, the load path.
+Labels are built from draw.io-style HTML through ``load_display_text``, the load path.
 
 Run with:
     python -m pytest tests/test_strategies/test_fhir_text_format.py -v
@@ -12,8 +12,6 @@ from unittest.mock import MagicMock
 from tricc_oo.converters.datadictionnary import add_concept
 from tricc_oo.converters.fhir.questionnaire_item_mapper import CQF_EXT_TEXT_EXPRESSION
 from tricc_oo.converters.fhir.text_format import RENDERING_MARKDOWN_EXT, RENDERING_XHTML_EXT
-from tricc_oo.models.base import TriccReference
-from tricc_oo.models.message import TriccMessage, TriccMessageList, TriccMessageMark
 from tricc_oo.models.tricc import (
     TriccNodeInteger,
     TriccNodeNote,
@@ -22,8 +20,9 @@ from tricc_oo.models.tricc import (
 )
 from tricc_oo.strategies.output.fhir_form import FHIRStrategy
 from tricc_oo.strategies.output.opensrp import OpenSRPStrategy
+from tricc_oo.text.model import TriccText
 from tricc_oo.visitors.text_injection import (
-    parse_html_to_message,
+    load_display_text as parse_html_to_message,
     serialize_injection_for_js_text,
     serialize_injection_plain,
     serialize_injection_xhtml,
@@ -38,7 +37,7 @@ CONVULSION_HTML = (
 CONVULSION_PLAIN = (
     "IF THE CHILD IS CONVULSING NOW - TREAT IMMEDIATELY\n\n"
     "• Turn the child to his/her side\n"
-    "• Do not put anything in the mouth\n"
+    "• Do not put anything in the mouth\n\n"  # the <br> opening the line after the list
     "For this child give …ml Diazepam per rectum"
 )
 
@@ -77,7 +76,8 @@ class TestMessageNormalisation(unittest.TestCase):
             "Give one dose of <b>VITAMIN </b>A now": "Give one dose of **VITAMIN** A now",
             "For <b>HIV exposed:<br></b><br>Refer": "For **HIV exposed:**\n\nRefer",
             "For <b>H</b><b>erpes Zoster </b>Keep": "For **Herpes Zoster** Keep",
-            "apply for<b>  4 weeks</b>": "apply for  **4 weeks**",
+            # spaces collapse as in HTML (before: "apply for  **4 weeks**")
+            "apply for<b>  4 weeks</b>": "apply for **4 weeks**",
             "Give oral <b></b><b> </b>Ciprofloxacin": "Give oral Ciprofloxacin",
             "a<br><br><br><br>b": "a\n\nb",
             "<ul><li>a<br><br></li><li>b</li></ul>": "- a\n- b",
@@ -88,13 +88,13 @@ class TestMessageNormalisation(unittest.TestCase):
 
     def test_marks_keep_their_kind(self):
         message = parse_html_to_message("<b>a</b><i>b</i><b>c</b>")
-        kinds = [child.kind for child in message.children if isinstance(child, TriccMessageMark)]
-        self.assertEqual([str(k) for k in kinds], ["strong", "em", "strong"])
+        kinds = [n["marks"][0]["type"] for n in message.doc["content"][0]["content"]]
+        self.assertEqual(kinds, ["bold", "italic", "bold"])
 
     def test_token_split_over_inline_elements_is_a_reference(self):
         message = parse_html_to_message('give <span>${</span><span style="x">ors_dose} ml</span> of ORS')
-        self.assertIsInstance(message, TriccMessage)
-        self.assertEqual([c.value for c in message.children if isinstance(c, TriccReference)], ["ors_dose"])
+        self.assertIsInstance(message, TriccText)
+        self.assertEqual(message.names(), ["ors_dose"])
 
     def test_a_label_without_formatting_stays_a_string(self):
         self.assertEqual(parse_html_to_message("<b></b>Age in months"), "Age in months")
@@ -123,9 +123,8 @@ class TestTypedMarkdown(unittest.TestCase):
 
     def test_markers_around_a_reference_split_over_spans(self):
         message = parse_html_to_message('give **<span>${</span><span style="x">ors_dose} ml&nbsp;</span>ORS** now')
-        mark = next(c for c in message.children if isinstance(c, TriccMessageMark))
-        self.assertEqual(str(mark.kind), "strong")
-        self.assertIsInstance(mark.children[0], TriccReference)
+        interp = next(n for n in message.doc["content"][0]["content"] if n["type"] == "interp")
+        self.assertEqual(interp["marks"], [{"type": "bold"}])
         self.assertEqual(serialize_injection_plain(message, "…"), "give … ml ORS now")
 
     def test_markers_in_their_own_bold_elements(self):
@@ -141,8 +140,7 @@ class TestTypedMarkdown(unittest.TestCase):
 
     def test_typed_ordered_list(self):
         message = parse_html_to_message("1. Give **extra fluid**<br>2. Continue feeding")
-        self.assertIsInstance(message.children[0], TriccMessageList)
-        self.assertTrue(message.children[0].ordered)
+        self.assertEqual(message.doc["content"][0]["type"], "orderedList")
 
     def test_text_without_markdown_is_unchanged(self):
         for text in ("weight_for_age in kg", "Age (months) - 2 * 3", "Headache # 2 [left]"):
@@ -281,7 +279,7 @@ class TestItemText(unittest.TestCase):
         age = TriccNodeInteger(id="a", name="age", label="Age")
         note = TriccNodeNote(id="n", name="note_age", label="")
         note.label = parse_html_to_message("Patient is <b>${age}</b> years old")
-        self.assertIsInstance(note.label, TriccMessage)
+        self.assertIsInstance(note.label, TriccText)
         strategy.generate_base(age)
         strategy.generate_base(note)
         strategy.process_display_text()

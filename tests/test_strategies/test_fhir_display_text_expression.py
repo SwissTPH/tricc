@@ -13,8 +13,7 @@ from tricc_oo.converters.fhir.questionnaire_item_mapper import (
     CQF_EXT_TEXT_EXPRESSION,
     SDC_EXT_ITEM_CONTROL,
 )
-from tricc_oo.models.base import TriccReference
-from tricc_oo.models.message import TriccMessage, TriccMessageText
+from tricc_oo.visitors.text_injection import parse_injection_text
 from tricc_oo.models.calculate import TriccNodeCalculate
 from tricc_oo.models.tricc import TriccNodeInteger, TriccNodeNote
 from tricc_oo.strategies.output.fhir_form import FHIRStrategy
@@ -29,11 +28,8 @@ def _make_strategy():
 
 
 def _injection(*parts):
-    """Build the TriccMessage a ``${REF}`` label is loaded as."""
-    children = [
-        TriccReference(p[1]) if isinstance(p, tuple) else TriccMessageText(value=p) for p in parts
-    ]
-    return TriccMessage(children=children)
+    """Build the TriccText a ``${REF}`` label is loaded as."""
+    return parse_injection_text("".join("${" + p[1] + "}" if isinstance(p, tuple) else p for p in parts))
 
 
 def _find(items, link_id):

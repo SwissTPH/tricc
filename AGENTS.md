@@ -18,7 +18,7 @@ installed as the `tricc` console script (`tricc_oo/cli.py`, entry point in `pypr
 
 ## Key Technologies
 
-- **Language**: Python 3.8+
+- **Language**: Python 3.10+
 - **Core Dependencies**: lxml, pydantic, pandas, xlsxwriter, antlr4
 - **Code Style**: PEP 8, max line length 120 (see .flake8)
 - **Architecture**: Strategy pattern for input/output processing

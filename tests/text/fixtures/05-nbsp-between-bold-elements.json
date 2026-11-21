@@ -1,0 +1,41 @@
+{
+  "name": "nbsp-between-bold-elements",
+  "input": {
+    "html": "<b>a</b>&nbsp;<b>b</b>"
+  },
+  "doc": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ],
+            "text": "a"
+          },
+          {
+            "type": "text",
+            "text": " "
+          },
+          {
+            "type": "text",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ],
+            "text": "b"
+          }
+        ]
+      }
+    ]
+  },
+  "plain": "a b",
+  "markdown": "**a** **b**",
+  "xhtml": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><strong>a</strong> <strong>b</strong></p></div>"
+}

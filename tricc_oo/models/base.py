@@ -120,7 +120,7 @@ class TriccBaseModel(BaseModel):
             if not attr.startswith("_") and value is not None:
                 try:
                     if isinstance(value, dict) and any(
-                        type(v).__name__ == "TriccMessage" for v in value.values()
+                        type(v).__name__ == "TriccText" for v in value.values()
                     ):
                         setattr(
                             instance,
@@ -244,8 +244,8 @@ def get_repeat_authored(node) -> int:
     return int(value)
 
 
-# Display text after input load: plain str, multi-lang dict, or TriccMessage AST.
-# ``Any`` avoids a forward-ref to ``TriccMessage`` (defined in models.message).
+# Display text after input load: plain str, multi-lang dict, or TriccText (ProseMirror document).
+# ``Any`` avoids a forward-ref to ``TriccText`` (defined in tricc_oo.text.model).
 DisplayText = Union[str, Dict[str, Any], Any]
 
 
@@ -254,7 +254,7 @@ def label_text_for_name(label) -> Optional[str]:
 
     - plain str: as-is
     - multi-lang dict: first locale value (recursively)
-    - TriccMessage: first text leaf (skip interpolations)
+    - TriccText: first text (skip interpolations)
     - TriccReference / concat without a static segment: skip (None)
     """
     if label is None:
@@ -267,13 +267,11 @@ def label_text_for_name(label) -> Optional[str]:
         return label_text_for_name(next(iter(label.values())))
 
     cls_name = type(label).__name__
-    if cls_name == "TriccMessage":
+    if cls_name == "TriccText":
         first = getattr(label, "first_text", None)
         if callable(first):
             return first()
         return None
-    if cls_name == "TriccMessageText":
-        return label_text_for_name(getattr(label, "value", None))
     # Bare reference / node is not useful in super()/log ids
     if cls_name == "TriccReference":
         return None

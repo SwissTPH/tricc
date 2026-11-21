@@ -1,21 +1,17 @@
-"""Display-text AST: parse HTML + ``${REF}`` at input load, Markdown at export.
+"""Display text at load and at export: thin wrappers over :mod:`tricc_oo.text`.
 
-Scope: TriccNodeDisplayModel fields only (label, hint, help, constraint_message,
+Scope: ``TriccNodeDisplayModel`` fields only (label, hint, help, constraint_message,
 required_message). Not for calculates / rhombus.
 
-HTML is parsed to ``TriccMessage`` *before* Markdown conversion. See
-``feature/20260909-display-message-ast.md``.
+At load a label string becomes a ProseMirror document (``TriccText``) or stays a plain
+``str`` when it has no structure; every output renders from it. See
+``feature/20261120-prosemirror-display-text.md``.
 """
 
 from __future__ import annotations
 
-import html
 import logging
-import re
-from typing import Any, Callable, List, Optional, Tuple, Union
-
-from bs4 import BeautifulSoup, NavigableString, Tag
-from markdown_it import MarkdownIt
+from typing import Any, Callable, List, Optional
 
 from tricc_oo.models.base import (
     TriccNodeBaseModel,
@@ -24,19 +20,14 @@ from tricc_oo.models.base import (
     TriccReference,
     TriccStatic,
 )
-from tricc_oo.models.message import (
-    TriccMessage,
-    TriccMessageBreak,
-    TriccMessageList,
-    TriccMessageListItem,
-    TriccMessageMark,
-    TriccMessageMarkKind,
-    TriccMessageText,
-)
+from tricc_oo.text import from_plain, from_text, simplify
+from tricc_oo.text.parse import INTERP_RE, empty_doc, paragraph, text_node, interp_node, normalize
+from tricc_oo.text.model import TriccText
+from tricc_oo.text.render import markdown_parts, to_markdown, to_plain, to_xhtml
 
 logger = logging.getLogger("default")
 
-INJECTION_TOKEN_RE = re.compile(r"\$\{([^}]+)\}")
+INJECTION_TOKEN_RE = INTERP_RE
 
 TEXT_INJECTION_FIELDS = (
     "label",
@@ -46,531 +37,76 @@ TEXT_INJECTION_FIELDS = (
     "required_message",
 )
 
-# Markdown: distinct wrappers so nested strong+em stay unambiguous.
-STRONG_WRAP = ("**", "**")
-EM_WRAP = ("_", "_")
-
-DROP_TAGS = frozenset({"img", "table", "thead", "tbody", "tr", "td", "th"})
-UNWRAP_TAGS = frozenset({"span", "font", "a", "html", "body", "[document]"})
-BLOCK_TAGS = frozenset({"div", "p"})
-STRONG_TAGS = frozenset({"b", "strong"})
-EM_TAGS = frozenset({"i", "em"})
-
-# More consecutive line breaks than this collapse (one blank line at most).
-MAX_CONSECUTIVE_BREAKS = 2
-XHTML_NS = "http://www.w3.org/1999/xhtml"
-
-# Markdown typed by the author into a label: only lists, emphasis and line breaks are read;
-# headings, links, code, escapes, entities, … stay text.
-TYPED_MARKDOWN_RULES = ["list", "emphasis", "newline"]
-_FORMAT_TOKENS = frozenset({"strong_open", "em_open", "bullet_list_open", "ordered_list_open"})
-_MARK_TOKENS = {"strong_open": TriccMessageMarkKind.STRONG, "em_open": TriccMessageMarkKind.EM}
-# Private-use characters stand for the nodes that are not text while Markdown is parsed.
-_ATOM_BASE = 0xE000
-_ATOM_LIMIT = 0xF8FF - _ATOM_BASE
-_typed_markdown_parser: Optional[MarkdownIt] = None
-XHTML_MARK_TAGS = {
-    TriccMessageMarkKind.STRONG: "strong",
-    TriccMessageMarkKind.EM: "em",
-    TriccMessageMarkKind.U: "u",
-}
+_LOADED_TYPES = (TriccText, TriccOperation, TriccReference, TriccStatic)
 
 
-def parse_injection_text(text: str) -> Union[str, TriccMessage, TriccReference, TriccMessageText]:
-    """Split plain (non-HTML) text on ``${name}`` tokens.
+def text_from_doc(doc: dict) -> Any:
+    """A document as a display value: a plain ``str`` without structure, else ``TriccText``."""
+    simple = simplify(doc)
+    return simple if isinstance(simple, str) else TriccText.from_doc(simple)
 
-    No tokens → original string. Otherwise a ``TriccMessage`` of text leaves and
-    ``TriccReference`` names (or a single reference / text when only one part).
+
+def parse_injection_text(text: Any) -> Any:
+    """Split plain (non-HTML, non-Markdown) text on ``${name}`` tokens.
+
+    No tokens → the string itself; otherwise a ``TriccText`` of text and ``interp`` nodes.
     """
-    if text is None:
+    if not isinstance(text, str) or not INTERP_RE.search(text):
         return text
-    if not isinstance(text, str):
-        return text
-    if not INJECTION_TOKEN_RE.search(text):
-        return text
-    return _simplify_message(TriccMessage(children=_split_text_tokens(text)))
-
-
-def _split_text_tokens(text: str) -> List[Any]:
-    parts: list = []
-    last_end = 0
-    for match in INJECTION_TOKEN_RE.finditer(text):
-        if match.start() > last_end:
-            parts.append(TriccMessageText(value=text[last_end : match.start()]))
+    content: List[dict] = []
+    last = 0
+    for match in INTERP_RE.finditer(text):
         name = match.group(1).strip()
-        if name:
-            parts.append(TriccReference(name))
-        last_end = match.end()
-    if last_end < len(text):
-        parts.append(TriccMessageText(value=text[last_end:]))
-    return parts
-
-
-def _normalize_text(value: str) -> str:
-    return value.replace("\xa0", " ").replace("&nbsp;", " ")
-
-
-def _is_message_tree(value: Any) -> bool:
-    return isinstance(
-        value,
-        (
-            TriccMessage,
-            TriccMessageText,
-            TriccMessageBreak,
-            TriccMessageMark,
-            TriccMessageList,
-            TriccMessageListItem,
-        ),
-    )
-
-
-def _has_structure(nodes: List[Any]) -> bool:
-    for node in nodes:
-        if isinstance(node, (TriccReference, TriccMessageBreak, TriccMessageMark, TriccMessageList)):
-            return True
-        if issubclass(node.__class__, TriccNodeBaseModel) and not isinstance(node, TriccMessageText):
-            return True
-        if isinstance(node, TriccMessage) and _has_structure(node.children or []):
-            return True
-    return False
-
-
-def _merge_adjacent_text(nodes: List[Any]) -> List[Any]:
-    merged: List[Any] = []
-    for node in nodes:
-        if (
-            merged
-            and isinstance(merged[-1], TriccMessageText)
-            and isinstance(node, TriccMessageText)
-        ):
-            merged[-1] = TriccMessageText(value=merged[-1].value + node.value)
-        else:
-            merged.append(node)
-    return merged
-
-
-def _simplify_message(message: TriccMessage) -> Union[str, TriccMessage]:
-    children = _merge_adjacent_text(list(message.children or []))
-    message = TriccMessage(children=children)
-    if not children:
-        return ""
-    if len(children) == 1 and isinstance(children[0], TriccMessageText):
-        return children[0].value
-    if not _has_structure(children) and all(isinstance(c, TriccMessageText) for c in children):
-        return "".join(c.value for c in children)
-    return message
-
-
-def _is_blank(node: Any) -> bool:
-    return isinstance(node, TriccMessageBreak) or (isinstance(node, TriccMessageText) and not node.value.strip())
-
-
-def _split_leading_blank(children: List[Any]) -> List[Any]:
-    """Pop the line breaks and spaces that open ``children``; return them in order."""
-    moved: List[Any] = []
-    while children and _is_blank(children[0]):
-        first = children[0]
-        if isinstance(first, TriccMessageText):
-            stripped = first.value.lstrip()
-            if stripped:
-                moved.append(TriccMessageText(value=first.value[: len(first.value) - len(stripped)]))
-                children[0] = TriccMessageText(value=stripped)
-                break
-        moved.append(children.pop(0))
-    if children and isinstance(children[0], TriccMessageText) and children[0].value[:1].isspace():
-        value = children[0].value
-        stripped = value.lstrip()
-        moved.append(TriccMessageText(value=value[: len(value) - len(stripped)]))
-        children[0] = TriccMessageText(value=stripped)
-    return moved
-
-
-def _split_trailing_blank(children: List[Any]) -> List[Any]:
-    """Pop the line breaks and spaces that close ``children``; return them in order."""
-    moved: List[Any] = []
-    while children:
-        last = children[-1]
-        if isinstance(last, TriccMessageBreak):
-            moved.insert(0, children.pop())
+        if not name:
             continue
-        if isinstance(last, TriccMessageText) and last.value[-1:].isspace():
-            stripped = last.value.rstrip()
-            moved.insert(0, TriccMessageText(value=last.value[len(stripped):]))
-            if stripped:
-                children[-1] = TriccMessageText(value=stripped)
-                break
-            children.pop()
-            continue
-        break
-    return moved
+        if match.start() > last:
+            content.append(text_node(text[last:match.start()]))
+        content.append(interp_node(name))
+        last = match.end()
+    if last < len(text):
+        content.append(text_node(text[last:]))
+    return text_from_doc(normalize({"type": "doc", "content": [paragraph(content)]}))
 
 
-def _normalize_mark(mark: TriccMessageMark) -> List[Any]:
-    """A mark without spaces or line breaks at its edges, or its content if it is empty."""
-    children = []
-    for child in _normalize_nodes(mark.children):
-        if isinstance(child, TriccMessageMark) and child.kind == mark.kind:
-            children.extend(child.children)  # **<b>x</b>**: one mark
-        else:
-            children.append(child)
-    children = _merge_adjacent_text(children)
-    before = _split_leading_blank(children)
-    after = _split_trailing_blank(children)
-    if not children:
-        return before + after
-    return before + [TriccMessageMark(kind=mark.kind, children=children)] + after
+def load_display_text(raw: Any, clean_fn: Optional[Callable[[str], str]] = None, where: Optional[str] = None) -> Any:
+    """Input-load entry point: a label string as a document (HTML when it holds a tag or an
+    entity, else Markdown), ``${name}`` split.
 
-
-def _merge_adjacent_marks(nodes: List[Any]) -> List[Any]:
-    merged: List[Any] = []
-    for node in nodes:
-        if (
-            merged
-            and isinstance(node, TriccMessageMark)
-            and isinstance(merged[-1], TriccMessageMark)
-            and merged[-1].kind == node.kind
-        ):
-            children = _merge_adjacent_text(list(merged[-1].children) + list(node.children))
-            merged[-1] = TriccMessageMark(kind=node.kind, children=children)
-        else:
-            merged.append(node)
-    return merged
-
-
-def _cap_breaks(nodes: List[Any]) -> List[Any]:
-    capped: List[Any] = []
-    run = 0
-    for node in nodes:
-        run = run + 1 if isinstance(node, TriccMessageBreak) else 0
-        if run <= MAX_CONSECUTIVE_BREAKS:
-            capped.append(node)
-    return capped
-
-
-def _normalize_nodes(nodes: List[Any]) -> List[Any]:
-    out: List[Any] = []
-    for node in nodes or []:
-        if isinstance(node, TriccMessageMark):
-            out.extend(_normalize_mark(node))
-        elif isinstance(node, TriccMessageList):
-            items = [
-                TriccMessageListItem(children=_strip_breaks(_normalize_nodes(item.children)))
-                for item in node.items or []
-            ]
-            out.append(TriccMessageList(ordered=node.ordered, items=items))
-        elif isinstance(node, TriccMessage):
-            out.extend(_normalize_nodes(node.children))
-        elif isinstance(node, TriccMessageText) and not node.value:
-            continue
-        else:
-            out.append(node)
-    return _cap_breaks(_break_around_lists(_merge_adjacent_marks(_merge_adjacent_text(out))))
-
-
-def _break_around_lists(nodes: List[Any]) -> List[Any]:
-    """A list is a block: a line break separates it from text before or after it."""
-    out: List[Any] = []
-    for i, node in enumerate(nodes):
-        after_list = i > 0 and isinstance(nodes[i - 1], TriccMessageList)
-        if out and not isinstance(node, TriccMessageBreak) and not isinstance(out[-1], TriccMessageBreak) and (
-            isinstance(node, TriccMessageList) or after_list
-        ):
-            out.append(TriccMessageBreak())
-        out.append(node)
-    return out
-
-
-def _strip_breaks(children: List[Any]) -> List[Any]:
-    """Drop the line breaks opening or closing a message or a list item."""
-    while children and isinstance(children[0], TriccMessageBreak):
-        children.pop(0)
-    while children and isinstance(children[-1], TriccMessageBreak):
-        children.pop()
-    return children
-
-
-def normalize_message(message: TriccMessage) -> TriccMessage:
-    """Clean a message tree once, after it is parsed.
-
-    Empty marks are dropped, neighbouring marks of the same kind merged, spaces and line
-    breaks at a mark's edges moved outside it (``<b>VITAMIN </b>A``, ``<b>HIV:<br></b>``),
-    runs of line breaks capped at :data:`MAX_CONSECUTIVE_BREAKS`, and line breaks opening
-    or closing the message or a list item dropped. See fix/20261120-fhir-text-format.md.
-    """
-    return TriccMessage(children=_strip_breaks(_normalize_nodes(message.children)))
-
-
-NON_INLINE_TAGS = BLOCK_TAGS | DROP_TAGS | frozenset({"br", "ul", "ol", "li"})
-
-
-def _is_inline(node) -> bool:
-    if isinstance(node, NavigableString):
-        return True
-    return isinstance(node, Tag) and (node.name or "").lower() not in NON_INLINE_TAGS
-
-
-def _parse_html_children(children) -> List[Any]:
-    nodes: List[Any] = []
-    for child in children:
-        nodes.extend(_parse_html_node(child, allow_leading_block_break=bool(nodes)))
-    # A token split over inline elements (``<span>${</span><span>dose}</span>``) is whole
-    # once the neighbouring text is merged.
-    split: List[Any] = []
-    for node in _merge_adjacent_text(nodes):
-        if isinstance(node, TriccMessageText) and INJECTION_TOKEN_RE.search(node.value):
-            split.extend(_split_text_tokens(node.value))
-        else:
-            split.append(node)
-    return split
-
-
-def _parse_html_node(node, allow_leading_block_break: bool = False) -> List[Any]:
-    if isinstance(node, NavigableString):
-        text = _normalize_text(str(node))
-        if not text:
-            return []
-        if text.isspace():
-            # A space between two inline elements is a word separator (``<b>a</b> <b>b</b>``);
-            # around blocks, list items and line breaks it is only source layout.
-            inline = _is_inline(node.previous_sibling) and _is_inline(node.next_sibling)
-            return [TriccMessageText(value=" ")] if inline else []
-        return _split_text_tokens(text)
-
-    if not isinstance(node, Tag):
-        return []
-
-    name = (node.name or "").lower()
-    if name in DROP_TAGS:
-        return []
-    if name in UNWRAP_TAGS:
-        return _parse_html_children(node.children)
-    if name == "br":
-        return [TriccMessageBreak()]
-    if name in STRONG_TAGS:
-        inner = _parse_html_children(node.children)
-        return [TriccMessageMark(kind=TriccMessageMarkKind.STRONG, children=inner)] if inner else []
-    if name in EM_TAGS:
-        inner = _parse_html_children(node.children)
-        return [TriccMessageMark(kind=TriccMessageMarkKind.EM, children=inner)] if inner else []
-    if name == "u":
-        inner = _parse_html_children(node.children)
-        return [TriccMessageMark(kind=TriccMessageMarkKind.U, children=inner)] if inner else []
-    if name in BLOCK_TAGS:
-        inner = _parse_html_children(node.children)
-        if not inner:
-            return []
-        if allow_leading_block_break:
-            return [TriccMessageBreak(), *inner]
-        return inner
-    if name in ("ul", "ol"):
-        items = []
-        for li in node.find_all("li", recursive=False):
-            items.append(TriccMessageListItem(children=_parse_html_children(li.children)))
-        if not items:
-            return []
-        return [TriccMessageList(ordered=(name == "ol"), items=items)]
-    if name == "li":
-        return _parse_html_children(node.children)
-    return _parse_html_children(node.children)
-
-
-def _markdown_parser() -> MarkdownIt:
-    global _typed_markdown_parser
-    if _typed_markdown_parser is None:
-        _typed_markdown_parser = MarkdownIt("zero").enable(TYPED_MARKDOWN_RULES)
-    return _typed_markdown_parser
-
-
-def _expand_atoms(content: str, atoms: List[Any]) -> List[Any]:
-    """Text of a Markdown token, with the placeholder characters put back as their nodes."""
-    out: List[Any] = []
-    text: List[str] = []
-    for char in content:
-        index = ord(char) - _ATOM_BASE
-        if 0 <= index < len(atoms):
-            if text:
-                out.append(TriccMessageText(value="".join(text)))
-                text = []
-            out.append(atoms[index])
-        else:
-            text.append(char)
-    if text:
-        out.append(TriccMessageText(value="".join(text)))
-    return out
-
-
-def _inline_from_tokens(tokens, atoms: List[Any]) -> List[Any]:
-    root: List[Any] = []
-    stack = [(None, root)]
-    for token in tokens or []:
-        if token.type in _MARK_TOKENS:
-            stack.append((_MARK_TOKENS[token.type], []))
-        elif token.type in ("strong_close", "em_close") and len(stack) > 1:
-            kind, children = stack.pop()
-            stack[-1][1].append(TriccMessageMark(kind=kind, children=children))
-        elif token.type in ("softbreak", "hardbreak"):
-            stack[-1][1].append(TriccMessageBreak())
-        else:
-            stack[-1][1].extend(_expand_atoms(token.content, atoms))
-    while len(stack) > 1:  # unclosed (cannot happen with markdown-it): keep the content
-        _, children = stack.pop()
-        stack[-1][1].extend(children)
-    return root
-
-
-def _join_blocks(blocks: List[Tuple[Tuple[int, int], List[Any]]]) -> List[Any]:
-    """Blocks of one container joined by a line break, or a blank line where the source had
-    one (``(first line, end line)`` of each block, from markdown-it's ``map``)."""
-    out: List[Any] = []
-    previous_end = None
-    for (start, end), nodes in blocks:
-        if previous_end is not None:
-            out.extend([TriccMessageBreak()] * (2 if start > previous_end else 1))
-        out.extend(nodes)
-        previous_end = end
-    return out
-
-
-def _nodes_from_tokens(tokens, atoms: List[Any]) -> List[Any]:
-    """Rebuild message nodes from markdown-it block tokens."""
-    frames: List[dict] = [{"blocks": []}]
-    for token in tokens:
-        frame = frames[-1]
-        lines = tuple(token.map) if token.map else (0, 0)
-        if token.type == "paragraph_open":
-            frame["blocks"].append((lines, []))
-            for outer in frames:  # a list's map counts the blank line after it; its text ends here
-                outer["end"] = lines[1]
-        elif token.type == "inline":
-            if not frame["blocks"]:
-                frame["blocks"].append((lines, []))
-            frame["blocks"][-1][1].extend(_inline_from_tokens(token.children, atoms))
-        elif token.type in ("bullet_list_open", "ordered_list_open"):
-            frames.append({"ordered": token.type == "ordered_list_open", "items": [], "start": lines[0]})
-        elif token.type == "list_item_open":
-            frames.append({"blocks": []})
-        elif token.type == "list_item_close":
-            item = frames.pop()
-            frames[-1]["items"].append(TriccMessageListItem(children=_join_blocks(item["blocks"])))
-        elif token.type in ("bullet_list_close", "ordered_list_close"):
-            lst = frames.pop()
-            node = TriccMessageList(ordered=lst["ordered"], items=lst["items"])
-            frames[-1]["blocks"].append(((lst["start"], lst.get("end", lst["start"])), [node]))
-    return _join_blocks(frames[0]["blocks"])
-
-
-def _parse_typed_markdown(nodes: List[Any]) -> List[Any]:
-    """Read the Markdown an author typed into a label (``**bold**``, ``* item``) as marks
-    and lists, also when the markers sit in different HTML elements than the text they
-    wrap. Nodes that are not text (references, marks, lists) stand in the Markdown as
-    placeholder characters and are put back as they are. Nodes come back unchanged when
-    the text holds no emphasis or list. See fix/20261120-fhir-text-format.md."""
-    nodes = [_parse_typed_markdown_in(node) for node in nodes]
-    if not any(isinstance(n, TriccMessageText) and n.value.strip() for n in nodes):
-        return nodes
-    atoms: List[Any] = []
-    source: List[str] = []
-    for i, node in enumerate(nodes):
-        if isinstance(node, TriccMessageText):
-            source.append(node.value)
-        elif isinstance(node, TriccMessageBreak):
-            source.append("\n")
-        elif len(atoms) < _ATOM_LIMIT:
-            placeholder = chr(_ATOM_BASE + len(atoms))
-            atoms.append(node)
-            if isinstance(node, TriccMessageList):
-                # a list is a block: on its own line, it does not touch the text's emphasis
-                if source and not source[-1].endswith("\n"):
-                    placeholder = "\n" + placeholder
-                if i + 1 < len(nodes) and not isinstance(nodes[i + 1], TriccMessageBreak):
-                    placeholder += "\n"
-            source.append(placeholder)
-        else:
-            return nodes
-    tokens = _markdown_parser().parse("".join(source))
-    formatted = any(
-        token.type in _FORMAT_TOKENS or any(child.type in _FORMAT_TOKENS for child in token.children or [])
-        for token in tokens
-    )
-    return _nodes_from_tokens(tokens, atoms) if formatted else nodes
-
-
-def _parse_typed_markdown_in(node: Any) -> Any:
-    if isinstance(node, TriccMessageMark):
-        return TriccMessageMark(kind=node.kind, children=_parse_typed_markdown(list(node.children or [])))
-    if isinstance(node, TriccMessageList):
-        items = [
-            TriccMessageListItem(children=_parse_typed_markdown(list(item.children or [])))
-            for item in node.items or []
-        ]
-        return TriccMessageList(ordered=node.ordered, items=items)
-    return node
-
-
-def parse_html_to_message(raw: str) -> Union[str, TriccMessage]:
-    """Parse an HTML (or plain) fragment into a message tree, then simplify."""
-    if raw is None:
-        return raw
-    soup = BeautifulSoup(raw, "html.parser")
-    root = soup.body if soup.body is not None else soup
-    # normalised first so typed markers split over neighbouring marks meet (<b>**</b><b>x</b><b>**</b>)
-    message = normalize_message(TriccMessage(children=_parse_html_children(root.children)))
-    message = TriccMessage(children=_parse_typed_markdown(list(message.children)))
-    return _simplify_message(normalize_message(message))
-
-
-def load_display_text(
-    raw: Any,
-    clean_fn: Optional[Callable[[str], str]] = None,
-) -> Any:
-    """Input-load entrypoint: parse HTML to a message tree, split ``${REF}``.
-
-    ``clean_fn`` is ignored (kept for call-site compatibility). HTML must not be
-    markdownified before the tree exists.
+    ``clean_fn`` is ignored (kept for call-site compatibility): HTML must not be
+    markdownified before the document exists.
     """
     if raw is None:
         return raw
-
     if isinstance(raw, dict):
-        return {locale: load_display_text(value, clean_fn=clean_fn) for locale, value in raw.items()}
-
-    if _is_message_tree(raw) or isinstance(raw, (TriccOperation, TriccReference, TriccStatic)):
+        return {locale: load_display_text(value, clean_fn=clean_fn, where=where) for locale, value in raw.items()}
+    if isinstance(raw, _LOADED_TYPES) or not isinstance(raw, str):
         return raw
-
-    if not isinstance(raw, str):
-        return raw
-
-    stripped = raw.strip() if raw else raw
+    stripped = raw.strip()
     if not stripped:
         return stripped
-    return parse_html_to_message(stripped)
+    return text_from_doc(from_text(stripped, where))
 
 
 def apply_display_text_injections(node: TriccNodeBaseModel, clean_fn=None) -> None:
-    """Load injection fields on a display node in place. Caller must ensure scope."""
+    """Load the display-text fields of a display node in place. Caller must ensure scope."""
+    where = getattr(node, "id", None)
     for field in TEXT_INJECTION_FIELDS:
         if not hasattr(node, field):
             continue
         raw = getattr(node, field, None)
-        if raw is None:
+        if raw is None or isinstance(raw, _LOADED_TYPES):
             continue
-        if _is_message_tree(raw) or isinstance(raw, (TriccOperation, TriccReference, TriccStatic)):
+        if isinstance(raw, dict) and any(isinstance(v, _LOADED_TYPES) for v in raw.values()):
             continue
-        if isinstance(raw, dict) and any(
-            _is_message_tree(v) or isinstance(v, (TriccOperation, TriccReference, TriccStatic))
-            for v in raw.values()
-        ):
-            continue
-        setattr(node, field, load_display_text(raw, clean_fn=clean_fn))
+        setattr(node, field, load_display_text(raw, clean_fn=clean_fn, where=where))
+
+
+# ------------------------------------------------------------------ export
 
 
 def _default_injection_name(value: Any) -> str:
     """Fallback name extractor when no export callback is provided."""
-    if isinstance(value, TriccReference):
-        return str(value.value)
-    if isinstance(value, TriccStatic):
-        return str(value.value)
-    if isinstance(value, TriccMessageText):
+    if isinstance(value, (TriccReference, TriccStatic)):
         return str(value.value)
     export_name = getattr(value, "export_name", None)
     if export_name:
@@ -581,71 +117,36 @@ def _default_injection_name(value: Any) -> str:
     return str(value)
 
 
-def _interp_token(value: Any, callback: Callable[[Any], str]) -> str:
-    return f"${{{callback(value)}}}"
+def _first_value(value: Any) -> Any:
+    if isinstance(value, dict):
+        return next(iter(value.values()), None)
+    return value
 
 
-def _markdown_nodes(nodes: List[Any], token: Callable[[Any], str]) -> str:
-    chunks: List[str] = []
-    for node in nodes or []:
-        chunks.append(_markdown_node(node, token))
-    return "".join(chunks)
-
-
-def _markdown_node(node: Any, token: Callable[[Any], str]) -> str:
-    """Markdown of a message node; ``token`` renders a reference (``${name}`` for ODK)."""
-    if node is None:
+def _part_text(part: Any, reference: Callable[[Any], str]) -> str:
+    """Text of one part of a leftover ``CONCATENATE`` (or of a bare value)."""
+    if part is None:
         return ""
-    if isinstance(node, dict):
-        if not node:
-            return ""
-        return _markdown_node(next(iter(node.values())), token)
-    if isinstance(node, str):
-        return node
-    if isinstance(node, TriccMessageText):
-        return node.value
-    if isinstance(node, TriccMessageBreak):
-        return "\n"
-    if isinstance(node, TriccReference):
-        return token(node)
-    if isinstance(node, TriccStatic):
-        return str(node.value)
-    if isinstance(node, TriccMessageMark):
-        inner = _markdown_nodes(node.children, token)
-        if node.kind == TriccMessageMarkKind.STRONG:
-            open_, close = STRONG_WRAP
-            return f"{open_}{inner}{close}"
-        if node.kind == TriccMessageMarkKind.EM:
-            open_, close = EM_WRAP
-            return f"{open_}{inner}{close}"
-        return inner
-    if isinstance(node, TriccMessageListItem):
-        return _markdown_nodes(node.children, token)
-    if isinstance(node, TriccMessageList):
-        lines = []
-        for i, item in enumerate(node.items or [], start=1):
-            prefix = f"{i}. " if node.ordered else "- "
-            lines.append(prefix + _markdown_nodes(item.children, token))
-        return "\n".join(lines)
-    if isinstance(node, TriccMessage):
-        return _markdown_nodes(node.children, token)
-    if isinstance(node, TriccNodeBaseModel):
-        return token(node)
-    if isinstance(node, TriccOperation):
-        if node.operator == TriccOperator.CONCATENATE:
-            return "".join(_markdown_node(part, token) for part in node.reference or [])
+    if isinstance(part, str):
+        return part
+    if isinstance(part, TriccStatic):
+        return str(part.value)
+    if isinstance(part, TriccText):
+        return to_markdown(part.doc, lambda name: reference(part.ref(name)))
+    if isinstance(part, (TriccReference, TriccNodeBaseModel)):
+        return reference(part)
+    if isinstance(part, TriccOperation):
+        if part.operator == TriccOperator.CONCATENATE:
+            return "".join(_part_text(p, reference) for p in part.reference or [])
         logger.error(
             "Display text has non-CONCATENATE operation %s; cannot serialize for JS text",
-            node.operator,
+            part.operator,
         )
         exit(1)
-    return str(node)
+    return str(part)
 
 
-def serialize_injection_for_js_text(
-    value: Any,
-    callback: Optional[Callable[[Any], str]] = None,
-) -> str:
+def serialize_injection_for_js_text(value: Any, callback: Optional[Callable[[Any], str]] = None) -> str:
     """Render display text for ODK/CHT: Markdown with ``${export_name}`` tokens.
 
     ``callback`` maps a resolved node or ``TriccReference`` to its export field
@@ -653,246 +154,66 @@ def serialize_injection_for_js_text(
     """
     if callback is None:
         callback = _default_injection_name
-    if value is None:
-        return ""
-    return _markdown_node(value, lambda ref: _interp_token(ref, callback))
+    return _part_text(_first_value(value), lambda ref: "${" + str(callback(ref)) + "}")
 
 
 def serialize_injection_markdown(value: Any, reference_text: str) -> str:
     """Markdown of display text with every reference shown as ``reference_text``."""
+    return _part_text(_first_value(value), lambda ref: reference_text).strip()
+
+
+def _as_doc(value: Any, reference_text: str) -> Optional[dict]:
+    """A document for any display value; a plain string is taken as written."""
+    value = _first_value(value)
     if value is None:
-        return ""
-    return _markdown_node(value, lambda ref: reference_text).strip()
-
-
-def _plain_nodes(nodes: List[Any], reference_text: str) -> str:
-    return "".join(_plain_node(node, reference_text) for node in nodes or [])
-
-
-def _plain_node(node: Any, reference_text: str) -> str:
-    if node is None:
-        return ""
-    if isinstance(node, dict):
-        return _plain_node(next(iter(node.values()), None), reference_text)
-    if isinstance(node, str):
-        return node
-    if isinstance(node, TriccMessageText):
-        return node.value
-    if isinstance(node, TriccMessageBreak):
-        return "\n"
-    if isinstance(node, TriccStatic):
-        return str(node.value)
-    if isinstance(node, (TriccReference, TriccNodeBaseModel)):
-        return reference_text
-    if isinstance(node, (TriccMessage, TriccMessageMark, TriccMessageListItem)):
-        return _plain_nodes(node.children, reference_text)
-    if isinstance(node, TriccMessageList):
-        return "\n".join(
-            (f"{i}. " if node.ordered else "• ") + _plain_nodes(item.children, reference_text)
-            for i, item in enumerate(node.items or [], start=1)
-        )
-    if isinstance(node, TriccOperation) and node.operator == TriccOperator.CONCATENATE:
-        return _plain_nodes(node.reference, reference_text)
-    return str(node)
+        return None
+    if isinstance(value, TriccText):
+        return value.doc
+    if isinstance(value, str):
+        return from_plain(value)
+    if isinstance(value, TriccOperation) and value.operator == TriccOperator.CONCATENATE:
+        content: List[dict] = []
+        for part in value.reference or []:
+            text = str(getattr(part, "value", part)) if isinstance(part, (TriccStatic, str)) else reference_text
+            for i, line in enumerate(text.split("\n")):
+                if i:
+                    content.append({"type": "hardBreak"})
+                if line:
+                    content.append(text_node(line))
+        return normalize({"type": "doc", "content": [paragraph(content)]}) if content else empty_doc()
+    if isinstance(value, TriccStatic):
+        return from_plain(str(value.value))
+    if isinstance(value, (TriccReference, TriccNodeBaseModel)):
+        return from_plain(reference_text)
+    return from_plain(str(value))
 
 
 def serialize_injection_plain(value: Any, reference_text: str) -> str:
     """Plain text of display text: no marks, line breaks kept, ``•`` list items, every
-    reference shown as ``reference_text``."""
-    return _plain_node(value, reference_text).strip()
-
-
-def _xhtml_list(node: TriccMessageList, reference_text: str) -> str:
-    tag = "ol" if node.ordered else "ul"
-    items = "".join(f"<li>{_xhtml_nodes(item.children, reference_text)}</li>" for item in node.items or [])
-    return f"<{tag}>{items}</{tag}>"
-
-
-def _xhtml_nodes(nodes: List[Any], reference_text: str) -> str:
-    return "".join(_xhtml_node(node, reference_text) for node in nodes or [])
-
-
-def _xhtml_node(node: Any, reference_text: str) -> str:
-    if node is None:
+    reference shown as ``reference_text``. A plain string is returned as written."""
+    value = _first_value(value)
+    if value is None:
         return ""
-    if isinstance(node, str):
-        return html.escape(node, quote=False).replace("\n", "<br/>")
-    if isinstance(node, TriccMessageText):
-        return html.escape(node.value, quote=False).replace("\n", "<br/>")
-    if isinstance(node, TriccMessageBreak):
-        return "<br/>"
-    if isinstance(node, TriccStatic):
-        return html.escape(str(node.value), quote=False)
-    if isinstance(node, (TriccReference, TriccNodeBaseModel)):
-        return html.escape(reference_text, quote=False)
-    if isinstance(node, TriccMessageMark):
-        tag = XHTML_MARK_TAGS.get(node.kind)
-        inner = _xhtml_nodes(node.children, reference_text)
-        return f"<{tag}>{inner}</{tag}>" if tag else inner
-    if isinstance(node, TriccMessageList):
-        return _xhtml_list(node, reference_text)
-    if isinstance(node, (TriccMessage, TriccMessageListItem)):
-        return _xhtml_nodes(node.children, reference_text)
-    if isinstance(node, TriccOperation) and node.operator == TriccOperator.CONCATENATE:
-        return _xhtml_nodes(node.reference, reference_text)
-    return html.escape(str(node), quote=False)
+    if isinstance(value, str):
+        return value.strip()
+    doc = _as_doc(value, reference_text)
+    return to_plain(doc, lambda name: reference_text) if doc else ""
 
 
 def serialize_injection_xhtml(value: Any, reference_text: str) -> str:
-    """An XHTML ``div`` (FHIR narrative style) of display text.
-
-    A blank line (two or more line breaks) separates ``p`` blocks, one line break is a
-    ``br``, a list is a ``ul`` / ``ol`` block, marks are ``strong`` / ``em`` / ``u``, text
-    is escaped and every reference is shown as ``reference_text``. Empty text gives ``""``.
-    """
-    if isinstance(value, dict):
-        value = next(iter(value.values()), None)
-    if value is None:
-        return ""
-    if isinstance(value, TriccMessage):
-        nodes = list(value.children or [])
-    elif isinstance(value, TriccOperation) and value.operator == TriccOperator.CONCATENATE:
-        nodes = list(value.reference or [])
-    elif isinstance(value, str):
-        nodes = []
-        for i, line in enumerate(value.split("\n")):
-            if i:
-                nodes.append(TriccMessageBreak())
-            nodes.append(TriccMessageText(value=line))
-    else:
-        nodes = [value]
-    blocks: List[str] = []
-    paragraph: List[str] = []
-    breaks = 0
-
-    def flush() -> None:
-        if paragraph:
-            blocks.append(f"<p>{''.join(paragraph)}</p>")
-            paragraph.clear()
-
-    for node in nodes:
-        if isinstance(node, TriccMessageBreak):
-            breaks += 1
-            continue
-        if isinstance(node, TriccMessageList):
-            flush()
-            blocks.append(_xhtml_list(node, reference_text))
-        else:
-            if breaks >= 2:
-                flush()
-            elif breaks == 1 and paragraph:
-                paragraph.append("<br/>")
-            inline = _xhtml_node(node, reference_text)
-            if inline.strip() or paragraph:
-                paragraph.append(inline)
-        breaks = 0
-    flush()
-    return f'<div xmlns="{XHTML_NS}">{"".join(blocks)}</div>' if blocks else ""
-
-
-def _concat_parts_from_nodes(nodes: List[Any]) -> List[Any]:
-    parts: List[Any] = []
-    for node in nodes or []:
-        parts.extend(_concat_parts_from_node(node))
-    return _merge_concat_statics(parts)
-
-
-def _merge_concat_statics(parts: List[Any]) -> List[Any]:
-    merged: List[Any] = []
-    for part in parts:
-        last_static = (
-            merged
-            and isinstance(merged[-1], TriccStatic)
-        )
-        this_static = isinstance(part, TriccStatic)
-        if last_static and this_static:
-            merged[-1] = TriccStatic(str(merged[-1].value) + str(part.value))
-        else:
-            merged.append(part)
-    return merged
-
-
-def _wrap_concat_parts(parts: List[Any], open_: str, close: str) -> List[Any]:
-    if not parts:
-        return []
-    wrapped = list(parts)
-    first_static = isinstance(wrapped[0], TriccStatic)
-    last_static = isinstance(wrapped[-1], TriccStatic)
-    if first_static:
-        wrapped[0] = TriccStatic(open_ + str(wrapped[0].value))
-    else:
-        wrapped.insert(0, TriccStatic(open_))
-    if last_static:
-        wrapped[-1] = TriccStatic(str(wrapped[-1].value) + close)
-    else:
-        wrapped.append(TriccStatic(close))
-    return wrapped
-
-
-def _concat_parts_from_node(node: Any) -> List[Any]:
-    if node is None:
-        return []
-    if isinstance(node, str):
-        return [TriccStatic(node)] if node else []
-    if isinstance(node, TriccMessageText):
-        return [TriccStatic(node.value)] if node.value else []
-    if isinstance(node, TriccMessageBreak):
-        return [TriccStatic("\n")]
-    if isinstance(node, TriccReference):
-        return [node]
-    if isinstance(node, TriccStatic):
-        return [node]
-    if issubclass(node.__class__, TriccNodeBaseModel):
-        return [node]
-    if isinstance(node, TriccMessageMark):
-        inner = _concat_parts_from_nodes(node.children)
-        if node.kind == TriccMessageMarkKind.STRONG:
-            return _wrap_concat_parts(inner, *STRONG_WRAP)
-        if node.kind == TriccMessageMarkKind.EM:
-            return _wrap_concat_parts(inner, *EM_WRAP)
-        return inner
-    if isinstance(node, TriccMessageListItem):
-        return _concat_parts_from_nodes(node.children)
-    if isinstance(node, TriccMessageList):
-        lines: List[Any] = []
-        for i, item in enumerate(node.items or [], start=1):
-            prefix = f"{i}. " if node.ordered else "- "
-            item_parts = _concat_parts_from_nodes(item.children)
-            piece = _wrap_concat_parts(item_parts, prefix, "") if item_parts else [TriccStatic(prefix)]
-            if lines:
-                lines.append(TriccStatic("\n"))
-            lines.extend(piece)
-        return lines
-    if isinstance(node, TriccMessage):
-        return _concat_parts_from_nodes(node.children)
-    if isinstance(node, TriccOperation):
-        if node.operator == TriccOperator.CONCATENATE:
-            return list(node.reference or [])
-        return [node]
-    return [TriccStatic(str(node))]
+    """An XHTML ``div`` (FHIR narrative style) of display text; ``""`` when empty."""
+    doc = _as_doc(value, reference_text)
+    return to_xhtml(doc, lambda name: reference_text) if doc else ""
 
 
 def message_to_concatenate_operation(value: Any) -> Optional[TriccOperation]:
-    """Serialize-time Concatenate for FHIRPath. Never stored as the message type."""
+    """Serialize-time Concatenate for FHIRPath / XLSForm: the Markdown of the text cut at
+    every ``${name}``, each one as what it stands for. None for static text."""
     if isinstance(value, TriccOperation) and value.operator == TriccOperator.CONCATENATE:
         return value
-    if not isinstance(value, TriccMessage):
+    if not isinstance(value, TriccText):
         return None
-    parts = _concat_parts_from_nodes(value.children)
-    if not parts:
-        return None
-    if len(parts) == 1 and isinstance(parts[0], TriccStatic):
-        return None
-
-    def _is_interp(part: Any) -> bool:
-        if isinstance(part, TriccReference):
-            return True
-        if isinstance(part, TriccStatic):
-            return False
-        if isinstance(part, TriccOperation):
-            return True
-        return issubclass(part.__class__, TriccNodeBaseModel)
-
-    if not any(_is_interp(p) for p in parts):
+    parts = [value.ref(p[0]) if isinstance(p, tuple) else TriccStatic(p) for p in markdown_parts(value.doc)]
+    if not any(not isinstance(p, TriccStatic) for p in parts):
         return None
     return TriccOperation(operator=TriccOperator.CONCATENATE, reference=parts)

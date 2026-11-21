@@ -17,11 +17,12 @@ This page documents TRICC modeling elements and their meaning based on:
 - `note`: informational text shown to users. Display fields (`label`, `hint`,
   `help`, `constraint_message`, `required_message`) on **display models only**
   may embed ODK/JS-style value injection with `${field_name}` (e.g.
-  `Patient is ${age} years`). Parsed at input load into a message tree (`TriccMessage`)
-  that keeps bold/italic/lists around live values, resolved during processing,
-  re-exported as Markdown with `${export_name}` for ODK/CHT and as static Markdown plus
-  a serialize-time concatenate FHIRPath for FHIR. Not applied to calculates or rhombus.
-  See `feature/display-text-injection.md` and `feature/20260909-display-message-ast.md`.
+  `Patient is ${age} years`). Parsed at input load into a ProseMirror document
+  (`TriccText`) that keeps bold/italic/lists around live values, resolved during
+  processing, re-exported as Markdown with `${export_name}` for ODK/CHT and as plain text,
+  Markdown or XHTML plus a serialize-time concatenate FHIRPath for FHIR. Not applied to
+  calculates or rhombus. See `feature/display-text-injection.md` and
+  `feature/20261120-prosemirror-display-text.md`.
 - `select_one`: single-choice question.
 - `select_multiple`: multiple-choice question.
 - `select_yesno`: yes/no convenience selection. In FHIR output this typically becomes a native `boolean` item type (preferred over `choice` for simple yes/no questions). OpenSRP export also attaches `questionnaire-choiceOrientation` = `horizontal` on visible boolean/yes-no items so Yes/No render side by side; hidden booleans (calculates, diagnoses, waits) do not.

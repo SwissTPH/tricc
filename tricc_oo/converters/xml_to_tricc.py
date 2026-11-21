@@ -1039,7 +1039,7 @@ def load_expressions(node):
 
         node.reference = node.expression_reference.get_references()
 
-    # Display-model only: HTML + ${REF} → TriccMessage (input load only)
+    # Display-model only: HTML + ${REF} → TriccText (input load only)
     if isinstance(node, TriccNodeDisplayModel):
         apply_display_text_injections(node)
     else:
@@ -1257,7 +1257,7 @@ def set_mandatory_attribute(elm, mandatory_attributes, diagram=None):
 
         elif attribute_value is not None:
             if attributes in DISPLAY_ATTRIBUTES:
-                # Keep raw HTML; display models parse it to TriccMessage in load_expressions.
+                # Keep raw HTML; display models parse it to TriccText in load_expressions.
                 param[attributes] = attribute_value.strip()
             else:
                 param[attributes] = attribute_value.strip() if isinstance(attribute_value, str) else attribute_value

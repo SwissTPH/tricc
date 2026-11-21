@@ -1,0 +1,23 @@
+{
+  "name": "html-entities",
+  "input": {
+    "html": "Tom &amp; Jerry &lt;3"
+  },
+  "doc": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Tom & Jerry <3"
+          }
+        ]
+      }
+    ]
+  },
+  "plain": "Tom & Jerry <3",
+  "markdown": "Tom & Jerry <3",
+  "xhtml": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Tom &amp; Jerry &lt;3</p></div>"
+}

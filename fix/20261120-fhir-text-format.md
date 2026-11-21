@@ -5,7 +5,7 @@
 | **Status** | Approved (2026-11-20, in conversation; decisions relayed from the fhir-workplace session) |
 | **Branch target** | `develop` |
 | **Scope** | `FHIRStrategy` → `OpenSRPStrategy` (Questionnaire text) |
-| **Related** | `fix/20260831-fhir-dynamic-display-text.md` (`cqf-expression` on `_text`), #85 (diazepam dose dropped) |
+| **Related** | `fix/20260831-fhir-dynamic-display-text.md` (`cqf-expression` on `_text`), #85 (diazepam dose dropped), `feature/20261120-prosemirror-display-text.md` (the tree, its normalisation and renderers move onto ProseMirror documents) |
 | **Issue** | SwissTPH/tricc#89 |
 
 Valid status values: `Draft` → `Approved` → `Implemented` → `Superseded`.

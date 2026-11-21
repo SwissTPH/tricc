@@ -1,0 +1,210 @@
+{
+  "name": "json-editor-document",
+  "input": {
+    "json": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "marks": [
+                {
+                  "type": "bold"
+                }
+              ],
+              "text": "Give "
+            },
+            {
+              "type": "interp",
+              "attrs": {
+                "name": "dose"
+              },
+              "marks": [
+                {
+                  "type": "bold"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "marks": [
+                {
+                  "type": "bold"
+                }
+              ],
+              "text": " mg"
+            },
+            {
+              "type": "hardBreak",
+              "marks": [
+                {
+                  "type": "bold"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "marks": [
+                {
+                  "type": "textStyle",
+                  "attrs": {
+                    "color": "#d32f2f"
+                  }
+                }
+              ],
+              "text": "with food"
+            }
+          ]
+        },
+        {
+          "type": "paragraph"
+        },
+        {
+          "type": "paragraph"
+        },
+        {
+          "type": "bulletList",
+          "content": [
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "x"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "bulletList",
+          "content": [
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "image",
+                      "attrs": {
+                        "src": "Binary/abc",
+                        "alt": null
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "paragraph"
+        }
+      ]
+    }
+  },
+  "doc": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ],
+            "text": "Give "
+          },
+          {
+            "type": "interp",
+            "attrs": {
+              "name": "dose"
+            },
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ],
+            "text": " mg"
+          },
+          {
+            "type": "hardBreak"
+          },
+          {
+            "type": "text",
+            "marks": [
+              {
+                "type": "textStyle",
+                "attrs": {
+                  "color": "#d32f2f"
+                }
+              }
+            ],
+            "text": "with food"
+          }
+        ]
+      },
+      {
+        "type": "paragraph"
+      },
+      {
+        "type": "bulletList",
+        "content": [
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "x"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "image",
+                    "attrs": {
+                      "src": "Binary/abc",
+                      "alt": null
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "plain": "Give … mg\nwith food\n\n• x\n•",
+  "markdown": "**Give ${dose} mg**\nwith food\n\n- x\n- ![](Binary/abc)",
+  "xhtml": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><strong>Give … mg</strong><br/><span style=\"color: #d32f2f\">with food</span></p><ul><li>x</li><li><img src=\"Binary/abc\"/></li></ul></div>"
+}

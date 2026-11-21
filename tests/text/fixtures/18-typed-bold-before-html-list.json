@@ -1,0 +1,60 @@
+{
+  "name": "typed-bold-before-html-list",
+  "input": {
+    "html": "<p>Give first dose of&nbsp;**CEFTRIAXONE (IM)**</p><ul><li>80-100mg/kg/dose</li></ul><p>Dissolving</p>"
+  },
+  "doc": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Give first dose of "
+          },
+          {
+            "type": "text",
+            "text": "CEFTRIAXONE (IM)",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "bulletList",
+        "content": [
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "80-100mg/kg/dose"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Dissolving"
+          }
+        ]
+      }
+    ]
+  },
+  "plain": "Give first dose of CEFTRIAXONE (IM)\n• 80-100mg/kg/dose\nDissolving",
+  "markdown": "Give first dose of **CEFTRIAXONE (IM)**\n- 80-100mg/kg/dose\nDissolving",
+  "xhtml": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Give first dose of <strong>CEFTRIAXONE (IM)</strong></p><ul><li>80-100mg/kg/dose</li></ul><p>Dissolving</p></div>"
+}

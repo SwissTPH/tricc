@@ -1,0 +1,44 @@
+{
+  "name": "bold-line-break-inside-mark",
+  "input": {
+    "html": "For <b>HIV exposed:<br></b><br>Refer"
+  },
+  "doc": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "For "
+          },
+          {
+            "type": "text",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ],
+            "text": "HIV exposed:"
+          }
+        ]
+      },
+      {
+        "type": "paragraph"
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Refer"
+          }
+        ]
+      }
+    ]
+  },
+  "plain": "For HIV exposed:\n\nRefer",
+  "markdown": "For **HIV exposed:**\n\nRefer",
+  "xhtml": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>For <strong>HIV exposed:</strong></p><p>Refer</p></div>"
+}

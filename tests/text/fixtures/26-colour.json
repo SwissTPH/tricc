@@ -1,0 +1,35 @@
+{
+  "name": "colour",
+  "input": {
+    "html": "<span style=\"color:red\">Danger</span> sign <span style=\"color: url(x)\">bad</span>"
+  },
+  "doc": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "marks": [
+              {
+                "type": "textStyle",
+                "attrs": {
+                  "color": "red"
+                }
+              }
+            ],
+            "text": "Danger"
+          },
+          {
+            "type": "text",
+            "text": " sign bad"
+          }
+        ]
+      }
+    ]
+  },
+  "plain": "Danger sign bad",
+  "markdown": "Danger sign bad",
+  "xhtml": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><span style=\"color: red\">Danger</span> sign bad</p></div>"
+}

@@ -1,0 +1,36 @@
+{
+  "name": "bold-split-word",
+  "input": {
+    "html": "For <b>H</b><b>erpes Zoster </b>Keep"
+  },
+  "doc": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "For "
+          },
+          {
+            "type": "text",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ],
+            "text": "Herpes Zoster "
+          },
+          {
+            "type": "text",
+            "text": "Keep"
+          }
+        ]
+      }
+    ]
+  },
+  "plain": "For Herpes Zoster Keep",
+  "markdown": "For **Herpes Zoster** Keep",
+  "xhtml": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>For <strong>Herpes Zoster </strong>Keep</p></div>"
+}

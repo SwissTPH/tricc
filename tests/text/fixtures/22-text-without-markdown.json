@@ -1,0 +1,23 @@
+{
+  "name": "text-without-markdown",
+  "input": {
+    "html": "Age (months) - 2 * 3"
+  },
+  "doc": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Age (months) - 2 * 3"
+          }
+        ]
+      }
+    ]
+  },
+  "plain": "Age (months) - 2 * 3",
+  "markdown": "Age (months) - 2 * 3",
+  "xhtml": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Age (months) - 2 * 3</p></div>"
+}

@@ -1,0 +1,64 @@
+{
+  "name": "typed-markers-in-own-bold-elements",
+  "input": {
+    "html": "Give oral <b>**</b><b style=\"x\">Ciprofloxacin</b><b>**</b>:<ul><li>**2** times per day</li></ul>"
+  },
+  "doc": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Give oral "
+          },
+          {
+            "type": "text",
+            "text": "Ciprofloxacin",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": ":"
+          }
+        ]
+      },
+      {
+        "type": "bulletList",
+        "content": [
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "2",
+                    "marks": [
+                      {
+                        "type": "bold"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "text",
+                    "text": " times per day"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "plain": "Give oral Ciprofloxacin:\n• 2 times per day",
+  "markdown": "Give oral **Ciprofloxacin**:\n- **2** times per day",
+  "xhtml": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Give oral <strong>Ciprofloxacin</strong>:</p><ul><li><strong>2</strong> times per day</li></ul></div>"
+}

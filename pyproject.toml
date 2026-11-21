@@ -7,7 +7,7 @@ name = "tricc-oo"
 version = "1.7.3"
 description = "Python library that converts CDSS L2 in L3"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
@@ -16,6 +16,8 @@ dependencies = [
     "lxml",
     "markdownify",
     "markdown-it-py>=3.0",
+    # display text as ProseMirror documents (feature/20261120-prosemirror-display-text.md)
+    "prosemirror>=0.6.1",
     "pydantic",
     "babel",
     "xlsxwriter",

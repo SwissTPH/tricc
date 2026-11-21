@@ -1,0 +1,71 @@
+{
+  "name": "html-lists",
+  "input": {
+    "html": "<i>Steps</i><br>now<ol><li>a</li><li>b</li></ol>"
+  },
+  "doc": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "marks": [
+              {
+                "type": "italic"
+              }
+            ],
+            "text": "Steps"
+          },
+          {
+            "type": "hardBreak"
+          },
+          {
+            "type": "text",
+            "text": "now"
+          }
+        ]
+      },
+      {
+        "type": "orderedList",
+        "attrs": {
+          "start": 1
+        },
+        "content": [
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "b"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "plain": "Steps\nnow\n1. a\n2. b",
+  "markdown": "_Steps_\nnow\n1. a\n2. b",
+  "xhtml": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><em>Steps</em><br/>now</p><ol><li>a</li><li>b</li></ol></div>"
+}

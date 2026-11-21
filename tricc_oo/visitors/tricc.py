@@ -6,7 +6,7 @@ import base64
 from collections import defaultdict
 from typing import Optional
 from tricc_oo.visitors.text_injection import TEXT_INJECTION_FIELDS
-from tricc_oo.models.message import TriccMessage
+from tricc_oo.text.model import TriccText
 
 from tricc_oo.converters.utils import generate_id
 from tricc_oo.models.base import (
@@ -1191,7 +1191,7 @@ def process_reference(
                 new_dict = {}
                 changed = False
                 for locale, entry in value.items():
-                    if isinstance(entry, (TriccOperation, TriccMessage)):
+                    if isinstance(entry, (TriccOperation, TriccText)):
                         modified = process_operation_reference(
                             entry,
                             node,
@@ -1213,7 +1213,7 @@ def process_reference(
                         new_dict[locale] = entry
                 if changed and replace_reference:
                     setattr(node, field, new_dict)
-            elif isinstance(value, (TriccOperation, TriccMessage)):
+            elif isinstance(value, (TriccOperation, TriccText)):
                 modified_expression = process_operation_reference(
                     value,
                     node,
@@ -1545,7 +1545,7 @@ def process_operation_reference(
             if modified_op is None:
                 modified_op = operation.copy(keep_node=True)
 
-            if isinstance(operation, (TriccOperation, TriccMessage)):
+            if isinstance(operation, (TriccOperation, TriccText)):
                 modified_op.replace_node(TriccReference(clean_ref), replacement)
             elif operation == TriccReference(clean_ref):
                 modified_op = replacement

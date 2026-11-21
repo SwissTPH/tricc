@@ -1,0 +1,59 @@
+{
+  "name": "line-break-closing-a-line",
+  "input": {
+    "html": "<div>For ${diag}<br></div><div>Give <b>it</b><br><br></div><div>now</div>"
+  },
+  "doc": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "For "
+          },
+          {
+            "type": "interp",
+            "attrs": {
+              "name": "diag"
+            }
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Give "
+          },
+          {
+            "type": "text",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ],
+            "text": "it"
+          }
+        ]
+      },
+      {
+        "type": "paragraph"
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "now"
+          }
+        ]
+      }
+    ]
+  },
+  "plain": "For …\nGive it\n\nnow",
+  "markdown": "For ${diag}\nGive **it**\n\nnow",
+  "xhtml": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>For …<br/>Give <strong>it</strong></p><p>now</p></div>"
+}

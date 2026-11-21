@@ -1,0 +1,54 @@
+{
+  "name": "container-div",
+  "input": {
+    "html": "<div><ul><li>a</li></ul></div><div><div>b</div><div><br></div><div>c</div></div><p></p>"
+  },
+  "doc": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "bulletList",
+        "content": [
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "a"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "b"
+          }
+        ]
+      },
+      {
+        "type": "paragraph"
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "c"
+          }
+        ]
+      }
+    ]
+  },
+  "plain": "• a\nb\n\nc",
+  "markdown": "- a\nb\n\nc",
+  "xhtml": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><ul><li>a</li></ul><p>b</p><p>c</p></div>"
+}

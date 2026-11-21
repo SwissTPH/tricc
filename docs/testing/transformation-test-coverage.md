@@ -78,7 +78,7 @@ This is the most important area for regression testing.
 | `as_concept_reference` | `converters/cql_to_operation.py` | Normalizes a concept-code argument to `TriccReference` whatever the quoting | `test_get_repeated_value.py` |
 | `is_factor_edge_label` / `process_factor_edge` / `get_factor_terms` | `xml_to_tricc.py`, `visitors/tricc.py` | Rhombus/select factor edges → `TriccNodeFactor` | `test_rhombus_factor_edge.py` |
 | `get_last_version`                 | `visitors/tricc.py`       | Most recent prior version | Same as version_filter |
-| Display text injection             | `visitors/text_injection.py` | `${ref}` → `TriccMessage` on DisplayModel fields | `test_text_injection.py`, `test_note_display_formatting.py`, `note_text_injection.yaml`, `note_display_formatting.yaml` |
+| Display text injection             | `visitors/text_injection.py`, `text/` | `${ref}` → `TriccText` (ProseMirror document) on DisplayModel fields | `test_text_injection.py`, `test_note_display_formatting.py`, `text/test_text_fixtures.py` (shared fixtures), `text/test_text_model.py`, `test_yaml_designation_doc.py`, `note_text_injection.yaml`, `note_display_formatting.yaml` |
 | Goto snippet injection             | `visitors/tricc.py`, drawio/yaml | `goto.instance=-1` inlines activity | `test_goto_snippet.py` |
 
 **Recommended test approach**:
