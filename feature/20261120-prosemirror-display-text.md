@@ -166,7 +166,11 @@ Every reader ends with `normalize(doc)`, and the shared fixtures hold documents 
   JSON. `value` stays the Markdown (`to_markdown`) for any FHIR reader.
 - The old `designation-message` extension is still read (`from_message_json`) and never written.
 - `YamlStrategy` reads `designation-doc` first, then `designation-message`, then `value`
-  (Markdown, via `from_markdown`).
+  (Markdown, read as a label is: `from_text`) — `concept_display_text` /
+  `designation_text` in `converters/datadictionnary.py`. An extension that cannot be read is
+  logged with the concept code and `value` is used.
+- The hint / help designations `tricc_oo` adds from authored nodes (`add_concept_texts`) carry
+  `designation-doc` when the text has structure (`designation_doc_extension`).
 
 ### 2. Validation and errors
 
