@@ -1,0 +1,47 @@
+{
+  "name": "list-item-trailing-breaks",
+  "input": {
+    "html": "<ul><li>a<br><br></li><li>b</li></ul>"
+  },
+  "doc": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "bulletList",
+        "content": [
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "b"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "plain": "• a\n• b",
+  "markdown": "- a\n- b",
+  "xhtml": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><ul><li>a</li><li>b</li></ul></div>"
+}

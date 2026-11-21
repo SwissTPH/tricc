@@ -1,0 +1,33 @@
+{
+  "name": "interp-split-over-spans",
+  "input": {
+    "html": "give <span>${</span><span style=\"x\">ors_dose} ml</span> of ORS"
+  },
+  "doc": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "give "
+          },
+          {
+            "type": "interp",
+            "attrs": {
+              "name": "ors_dose"
+            }
+          },
+          {
+            "type": "text",
+            "text": " ml of ORS"
+          }
+        ]
+      }
+    ]
+  },
+  "plain": "give … ml of ORS",
+  "markdown": "give ${ors_dose} ml of ORS",
+  "xhtml": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>give … ml of ORS</p></div>"
+}

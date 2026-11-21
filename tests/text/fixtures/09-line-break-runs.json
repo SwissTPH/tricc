@@ -1,0 +1,35 @@
+{
+  "name": "line-break-runs",
+  "input": {
+    "html": "a<br><br><br><br>b"
+  },
+  "doc": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "a"
+          }
+        ]
+      },
+      {
+        "type": "paragraph"
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "b"
+          }
+        ]
+      }
+    ]
+  },
+  "plain": "a\n\nb",
+  "markdown": "a\n\nb",
+  "xhtml": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>a</p><p>b</p></div>"
+}

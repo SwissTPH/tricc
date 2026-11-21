@@ -1,0 +1,23 @@
+{
+  "name": "markdown-not-read",
+  "input": {
+    "markdown": "# Not a heading, [not](a link), `code`, 2 * 3, &amp;"
+  },
+  "doc": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "# Not a heading, [not](a link), `code`, 2 * 3, &amp;"
+          }
+        ]
+      }
+    ]
+  },
+  "plain": "# Not a heading, [not](a link), `code`, 2 * 3, &amp;",
+  "markdown": "# Not a heading, [not](a link), `code`, 2 * 3, &amp;",
+  "xhtml": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p># Not a heading, [not](a link), `code`, 2 * 3, &amp;amp;</p></div>"
+}

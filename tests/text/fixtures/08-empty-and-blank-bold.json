@@ -1,0 +1,23 @@
+{
+  "name": "empty-and-blank-bold",
+  "input": {
+    "html": "Give oral <b></b><b> </b>Ciprofloxacin"
+  },
+  "doc": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Give oral Ciprofloxacin"
+          }
+        ]
+      }
+    ]
+  },
+  "plain": "Give oral Ciprofloxacin",
+  "markdown": "Give oral Ciprofloxacin",
+  "xhtml": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Give oral Ciprofloxacin</p></div>"
+}

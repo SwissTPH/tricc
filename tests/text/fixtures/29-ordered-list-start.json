@@ -1,0 +1,50 @@
+{
+  "name": "ordered-list-start",
+  "input": {
+    "html": "<ol start=\"3\"><li>third</li><li>fourth</li></ol>"
+  },
+  "doc": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "orderedList",
+        "attrs": {
+          "start": 3
+        },
+        "content": [
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "third"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "fourth"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "plain": "3. third\n4. fourth",
+  "markdown": "3. third\n4. fourth",
+  "xhtml": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><ol start=\"3\"><li>third</li><li>fourth</li></ol></div>"
+}

@@ -1,0 +1,76 @@
+{
+  "name": "json-paragraph-lines",
+  "input": {
+    "json": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "one"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "two"
+            },
+            {
+              "type": "hardBreak"
+            },
+            {
+              "type": "hardBreak"
+            },
+            {
+              "type": "text",
+              "text": "three"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "doc": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "one"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "two"
+          }
+        ]
+      },
+      {
+        "type": "paragraph"
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "three"
+          }
+        ]
+      }
+    ]
+  },
+  "plain": "one\ntwo\n\nthree",
+  "markdown": "one\ntwo\n\nthree",
+  "xhtml": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>one<br/>two</p><p>three</p></div>"
+}

@@ -1,0 +1,30 @@
+{
+  "name": "markdown-image",
+  "input": {
+    "markdown": "![Rash](Binary/rash-01) and ![x](http://example.org/x.png)"
+  },
+  "doc": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "image",
+            "attrs": {
+              "src": "Binary/rash-01",
+              "alt": "Rash"
+            }
+          },
+          {
+            "type": "text",
+            "text": " and ![x](http://example.org/x.png)"
+          }
+        ]
+      }
+    ]
+  },
+  "plain": "Rash and ![x](http://example.org/x.png)",
+  "markdown": "![Rash](Binary/rash-01) and ![x](http://example.org/x.png)",
+  "xhtml": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><img src=\"Binary/rash-01\" alt=\"Rash\"/> and ![x](http://example.org/x.png)</p></div>"
+}

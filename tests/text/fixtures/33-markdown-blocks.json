@@ -1,0 +1,122 @@
+{
+  "name": "markdown-blocks",
+  "input": {
+    "markdown": "First line\nsecond line\n\n* one\n* **two**\n\n1. a\n2. b\n\nLast"
+  },
+  "doc": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "First line"
+          },
+          {
+            "type": "hardBreak"
+          },
+          {
+            "type": "text",
+            "text": "second line"
+          }
+        ]
+      },
+      {
+        "type": "paragraph"
+      },
+      {
+        "type": "bulletList",
+        "content": [
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "one"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "two",
+                    "marks": [
+                      {
+                        "type": "bold"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "paragraph"
+      },
+      {
+        "type": "orderedList",
+        "content": [
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "b"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "attrs": {
+          "start": 1
+        }
+      },
+      {
+        "type": "paragraph"
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Last"
+          }
+        ]
+      }
+    ]
+  },
+  "plain": "First line\nsecond line\n\n• one\n• two\n\n1. a\n2. b\n\nLast",
+  "markdown": "First line\nsecond line\n\n- one\n- **two**\n\n1. a\n2. b\n\nLast",
+  "xhtml": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>First line<br/>second line</p><ul><li>one</li><li><strong>two</strong></li></ul><ol><li>a</li><li>b</li></ol><p>Last</p></div>"
+}

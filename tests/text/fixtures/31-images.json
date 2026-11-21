@@ -1,0 +1,34 @@
+{
+  "name": "images",
+  "input": {
+    "html": "See <img src=\"Binary/rash-01\" alt=\"Rash\"> or <img src=\"data:image/png;base64,AAAA\"> here"
+  },
+  "doc": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "See "
+          },
+          {
+            "type": "image",
+            "attrs": {
+              "src": "Binary/rash-01",
+              "alt": "Rash"
+            }
+          },
+          {
+            "type": "text",
+            "text": " or here"
+          }
+        ]
+      }
+    ]
+  },
+  "plain": "See Rash or here",
+  "markdown": "See ![Rash](Binary/rash-01) or here",
+  "xhtml": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>See <img src=\"Binary/rash-01\" alt=\"Rash\"/> or here</p></div>"
+}

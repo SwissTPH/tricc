@@ -1,0 +1,36 @@
+{
+  "name": "bold-space-inside-mark",
+  "input": {
+    "html": "Give one dose of <b>VITAMIN </b>A now"
+  },
+  "doc": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Give one dose of "
+          },
+          {
+            "type": "text",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ],
+            "text": "VITAMIN "
+          },
+          {
+            "type": "text",
+            "text": "A now"
+          }
+        ]
+      }
+    ]
+  },
+  "plain": "Give one dose of VITAMIN A now",
+  "markdown": "Give one dose of **VITAMIN** A now",
+  "xhtml": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Give one dose of <strong>VITAMIN </strong>A now</p></div>"
+}

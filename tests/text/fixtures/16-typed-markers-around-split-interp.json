@@ -1,0 +1,47 @@
+{
+  "name": "typed-markers-around-split-interp",
+  "input": {
+    "html": "give **<span>${</span><span style=\"x\">ors_dose} ml&nbsp;</span>ORS** now"
+  },
+  "doc": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "give "
+          },
+          {
+            "type": "interp",
+            "attrs": {
+              "name": "ors_dose"
+            },
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": " ml ORS",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": " now"
+          }
+        ]
+      }
+    ]
+  },
+  "plain": "give … ml ORS now",
+  "markdown": "give **${ors_dose} ml ORS** now",
+  "xhtml": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>give <strong>… ml ORS</strong> now</p></div>"
+}

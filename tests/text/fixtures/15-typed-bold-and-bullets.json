@@ -1,0 +1,85 @@
+{
+  "name": "typed-bold-and-bullets",
+  "input": {
+    "html": "<div>**IF CONVULSING NOW**</div><div><br></div><div>* Turn the child</div><div>* Avoid things</div><div><br></div><div>Give **Diazepam rectally**</div>"
+  },
+  "doc": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "IF CONVULSING NOW",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "paragraph"
+      },
+      {
+        "type": "bulletList",
+        "content": [
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Turn the child"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Avoid things"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "paragraph"
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Give "
+          },
+          {
+            "type": "text",
+            "text": "Diazepam rectally",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "plain": "IF CONVULSING NOW\n\n• Turn the child\n• Avoid things\n\nGive Diazepam rectally",
+  "markdown": "**IF CONVULSING NOW**\n\n- Turn the child\n- Avoid things\n\nGive **Diazepam rectally**",
+  "xhtml": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><strong>IF CONVULSING NOW</strong></p><ul><li>Turn the child</li><li>Avoid things</li></ul><p>Give <strong>Diazepam rectally</strong></p></div>"
+}
