@@ -201,6 +201,17 @@ def resolve_project_sources(
     return read(project_config.terminology, (".json",)), read(project_config.libraries, (".cql",))
 
 
+def resolve_decision_table_sources(in_filepath: str, project_config: TriccProjectConfig) -> List[Tuple[str, str]]:
+    """Read the tricc.yaml ``decision_tables`` files (``tables/<id>.yaml``)."""
+    if not project_config.decision_tables:
+        return []
+    project_root = find_project_root(in_filepath)
+    if not project_root:
+        raise ValueError("tricc.yaml decision_tables require a local -i directory as the project root")
+    files = resolve_segment_globs(project_root, project_config.decision_tables, (".yaml", ".yml"))
+    return list(zip(files, read_input_file_contents(files)))
+
+
 def load_input_project(
     groups: Sequence[Tuple[str, Sequence[str], Sequence[str]]],
     media_path: str,
@@ -208,6 +219,7 @@ def load_input_project(
     intervention: Optional[TriccInterventionConfig],
     terminology: Sources = (),
     libraries: Sources = (),
+    decision_tables: Sources = (),
 ):
     """Build the TriccIntervention from ``(strategy name, files, contents)`` groups.
 
@@ -220,6 +232,7 @@ def load_input_project(
     project = strategies[0][0].new_project(project_config, intervention)
     BaseInputStrategy.load_terminology(project, terminology)
     BaseInputStrategy.load_libraries(project, libraries)
+    BaseInputStrategy.load_decision_tables(project, decision_tables)
     for strategy, contents in strategies:
         logger.info("build the graph from strategy %s", type(strategy).__name__)
         strategy.load(list(contents), media_path, project)
@@ -243,6 +256,7 @@ def run_one_export(
     test_strategy_name: Optional[str] = None,
     terminology: Sources = (),
     libraries: Sources = (),
+    decision_tables: Sources = (),
 ) -> None:
     return run_grouped_export(
         [(input_strategy_name, files, file_content)],
@@ -253,6 +267,7 @@ def run_one_export(
         test_strategy_name=test_strategy_name,
         terminology=terminology,
         libraries=libraries,
+        decision_tables=decision_tables,
     )
 
 
@@ -265,11 +280,18 @@ def run_grouped_export(
     test_strategy_name: Optional[str] = None,
     terminology: Sources = (),
     libraries: Sources = (),
+    decision_tables: Sources = (),
 ):
     os.makedirs(out_dir, exist_ok=True)
     media_path = os.path.join(out_dir, "media-tmp")
     project = load_input_project(
-        groups, media_path, project_config, intervention, terminology=terminology, libraries=libraries
+        groups,
+        media_path,
+        project_config,
+        intervention,
+        terminology=terminology,
+        libraries=libraries,
+        decision_tables=decision_tables,
     )
     OutputStrategyCls = get_output_strategy(output_strategy_name)
     output_strategy = OutputStrategyCls(project, out_dir)
@@ -313,6 +335,7 @@ def run_project_build(
             dest_dir=os.path.join(out_path, ".tricc-drive-cache"),
         )
         terminology, libraries = resolve_project_sources(in_filepath, project_config)
+        decision_tables = resolve_decision_table_sources(in_filepath, project_config)
     except ValueError as exc:
         logger.critical("%s", exc)
         return 1
@@ -345,6 +368,7 @@ def run_project_build(
                 test_strategy_name=test_strategy_name,
                 terminology=terminology,
                 libraries=libraries,
+                decision_tables=decision_tables,
             )
             if intervention is not None:
                 built[intervention.id] = output_strategy

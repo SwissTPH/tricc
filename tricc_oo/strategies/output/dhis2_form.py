@@ -878,7 +878,31 @@ class DHIS2Strategy(BaseOutPutStrategy):
         return " || ".join(parts)
 
     def tricc_operation_ifs(self, ref_expressions, original_references=None):
+        # [[cond, value], …, default?] → nested if(), as tricc_operation_if (empty when none)
+        if ref_expressions and isinstance(ref_expressions[0], list):
+            expr = "''"
+            items = list(ref_expressions)
+            if not isinstance(items[-1], list):
+                expr = str(items.pop())
+            for cond, value in reversed(items):
+                expr = self.tricc_operation_if([cond, value, expr])
+            return expr
         return self.tricc_operation_case(ref_expressions[1:])
+
+    def tricc_operation_list_if(self, ref_expressions, original_references=None):
+        """Decision table ``rule_order`` result, space-separated as in XLSForm."""
+        items = [
+            self.tricc_operation_if([i[0], i[1], "''"]) if isinstance(i, list) else str(i) for i in ref_expressions
+        ]
+        if not items:
+            return "''"
+        if len(items) == 1:
+            return items[0]
+        separator = ", ' ', "
+        return f"d2:concatenate({separator.join(items)})"
+
+    def tricc_operation_floor(self, ref_expressions, original_references=None):
+        return f"d2:floor({ref_expressions[0]})"
 
     def tricc_operation_if(self, ref_expressions, original_references=None):
         return f"if({ref_expressions[0]}, {ref_expressions[1]}, {ref_expressions[2]})"

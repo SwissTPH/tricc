@@ -145,8 +145,28 @@ class BaseInputStrategy:
             if default_lang:
                 project.lang_code = default_lang
                 project.languages = languages
+            from tricc_oo.models.decision_table import decode_aliases
+
+            project.aliases = decode_aliases(project_config.aliases)
         project.config = intervention
         return project
+
+    @staticmethod
+    def load_decision_tables(project, sources) -> None:
+        """Load tricc.yaml ``decision_tables`` (``[(path, yaml text)]``) into ``project.decision_tables``.
+
+        Raises:
+            DecisionTableError: A file is not a valid table, or two files share an id.
+        """
+        from tricc_oo.models.decision_table import DecisionTableError, read_table
+
+        tables = dict(project.decision_tables or {})
+        for path, text in sources:
+            table = read_table(text, path)
+            if table.id in tables:
+                raise DecisionTableError("E_DMN_SHAPE", f"{path}: decision table {table.id!r} is defined twice.")
+            tables[table.id] = table
+        project.decision_tables = tables
 
     def load(self, file_content, media_path, project) -> None:
         """Read this strategy's files into ``project.pages``; no linking."""

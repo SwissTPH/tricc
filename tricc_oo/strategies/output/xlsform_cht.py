@@ -1095,12 +1095,6 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             self.clean_coalesce(ref_expressions[3])
             }, true"""
 
-    def tricc_operation_drug_dosage(self, ref_expressions, original_references=None):
-        # drug name
-        # age
-        # weight
-        return f"cht:extension-lib('drugs.js',{','.join(map(self.clean_coalesce, ref_expressions))})"
-
 
     def tricc_operation_get_inherited_value(self, ref_expressions, original_references=None):  
         """CHT supports coalesce(., …) for the current question value."""

@@ -490,7 +490,12 @@ class TriccOperator(StrEnum):
     CAST_NUMBER = "cast_number"
     CAST_INTEGER = "cast_integer"
     CAST_DECIMAL = "cast_decimal"
-    DRUG_DOSAGE = "drug_dosage"  # drug name, *param1 (ex: weight, age)
+    # decision table call, expanded to IFS / LIST_IF before references are resolved:
+    # [function name ('DMN', 'DMNFirst', 'DMNList' or an alias), table, *args, TUPLE?]
+    DMN = "dmn"
+    TUPLE = "tuple"  # CQL Tuple{ k: v }: [TriccStatic(k), v, ...] (named DMN arguments)
+    LIST_IF = "list_if"  # [cond, value], ...: the values whose condition holds, in order
+    FLOOR = "floor"
     COALESCE = "coalesce"
     GET_INHERITED_VALUE = "get_inherited_value"
     CAST_DATE = "cast_date"
@@ -561,12 +566,13 @@ RETURNS_NUMBER = [
     TriccOperator.CAST_NUMBER,
     TriccOperator.CAST_INTEGER,
     TriccOperator.CAST_DECIMAL,
+    TriccOperator.FLOOR,
     TriccOperator.GET_NUMBER_OF_REPEAT
 ]
 
 RETURNS_DATE = [TriccOperator.CAST_DATE]
 
-RETURNS_LIST = [TriccOperator.DIAGNOSIS_LIST]
+RETURNS_LIST = [TriccOperator.DIAGNOSIS_LIST, TriccOperator.LIST_IF]
 
 RETURNS_STRING = [
     TriccOperator.CONCATENATE,
@@ -1238,6 +1244,7 @@ def simplify_with_sympy(operation):
         TriccOperator.ROUND: lambda x: sp.round(x),
         TriccOperator.CAST_NUMBER: lambda x: x,  # Identity for numbers
         TriccOperator.CAST_INTEGER: lambda x: sp.floor(x),
+        TriccOperator.FLOOR: lambda x: sp.floor(x),
         TriccOperator.CAST_DECIMAL: lambda x: sp.Float(x),
 
 
