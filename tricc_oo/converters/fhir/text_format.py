@@ -39,7 +39,7 @@ def build_text_rendering_extension(value: Any, text_format: str) -> Optional[dic
     """The rendering extension carrying ``value`` formatted in ``text_format``.
 
     Args:
-        value: Display-text value (``TriccMessage``, string, …).
+        value: Display-text value (``TriccText``, string, …).
         text_format: :data:`TEXT_FORMAT_MARKDOWN` or :data:`TEXT_FORMAT_HTML`.
 
     Returns:
