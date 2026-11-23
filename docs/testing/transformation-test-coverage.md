@@ -79,7 +79,7 @@ This is the most important area for regression testing.
 | `is_factor_edge_label` / `process_factor_edge` / `get_factor_terms` | `xml_to_tricc.py`, `visitors/tricc.py` | Rhombus/select factor edges → `TriccNodeFactor` | `test_rhombus_factor_edge.py` |
 | `get_last_version`                 | `visitors/tricc.py`       | Most recent prior version | Same as version_filter |
 | Display text injection             | `visitors/text_injection.py`, `text/` | `${ref}` → `TriccText` (ProseMirror document) on DisplayModel fields | `test_text_injection.py`, `test_note_display_formatting.py`, `text/test_text_fixtures.py` (shared fixtures), `text/test_text_model.py`, `test_yaml_designation_doc.py`, `note_text_injection.yaml`, `note_display_formatting.yaml` |
-| Goto snippet injection             | `visitors/tricc.py`, drawio/yaml | `goto.instance=-1` inlines activity | `test_goto_snippet.py` |
+| Goto snippet injection             | `visitors/tricc.py`, drawio/yaml | `goto` `asGroup: false` (deprecated `instance=-1`) inlines activity | `test_goto_snippet.py` |
 
 **Recommended test approach**:
 Create YAML fixtures that deliberately create name collisions across activities (e.g. two different "is_adult" calculates or two "final_diagnosis" nodes). This is extremely hard to do reliably with draw.io.
@@ -153,7 +153,8 @@ These are usually exercised indirectly by the higher-level methods above.
 - `tests/test_skip_display_not_path.py` — skip hides the later **widget**, not graph path / successors; same-slot vs `repeat=2`; `repeat=-1`
 - `tests/test_display_reference_inheritance.py` — multi-version DisplayModel → `GET_INHERITED_VALUE`
 - `tests/test_text_injection.py` — display `${ref}` parse / ODK serialize
-- `tests/test_goto_snippet.py` — goto `instance=-1` snippet injection
+- `tests/test_goto_snippet.py` — goto `asGroup: false` / `instance=-1` snippet injection
+- `tests/test_questionnaire_flat_sections.py`, `tests/test_questionnaire_pages.py`, `tests/test_xlsform_pages.py` — one-level FHIR sections, form pages, `asGroup` (`feature/20261120-questionnaire-pages.md`)
 - `tests/test_populate_context.py` — populate context behaviour
 - `tests/test_get_repeated_value.py` — `GetRepeatedValue` slot-scoped resolve, omit-slot latest, XLSForm export
 - `tests/test_rhombus_factor_edge.py` — Integer (+/-) factor labels on rhombus out-edges

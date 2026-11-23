@@ -11,7 +11,7 @@ from tricc_oo.serializers.xls_form_translations import MORE_INFO_TEXT_USES, reme
 from tricc_oo.converters.utils import clean_name, remove_html, remove_html_full, generate_id
 from tricc_oo.models.base import (
     TriccOperator,
-    TriccOperation, TriccStatic, TriccReference, and_join, TriccNodeType
+    TriccOperation, TriccStatic, TriccReference, and_join, TriccNodeType, TriccGroup
 )
 from tricc_oo.text.model import TriccText
 from tricc_oo.models.calculate import (
@@ -121,6 +121,7 @@ def start_group(
 
     else:
         groups[name] = 0
+    relevance_requested = relevance
     relevance = relevance and cur_group.relevance is not None and cur_group.relevance != ""
     past_instances = len(getattr(cur_group.base_instance, "instances", []))
     group_calc_required = get_export_group_required(cur_group)
@@ -155,8 +156,24 @@ def start_group(
             )
 
     relevance_expression = cur_group.relevance
-    relevance_expression = get_applicability_expression(cur_group, processed_nodes, process, relevance_expression)
-    relevance_expression = get_prev_instance_skip_expression(cur_group, processed_nodes, process, relevance_expression)
+    if isinstance(cur_group, TriccGroup):
+        # a group of questions inside an activity: shown only with its activity, whose group
+        # relevance was computed when the activity's own group started
+        activity_relevance = getattr(strategy, "_activity_group_relevance", {}).get(id(cur_group.activity))
+        if isinstance(activity_relevance, (TriccOperation, TriccReference)):
+            relevance_expression = (
+                and_join([activity_relevance, relevance_expression]) if relevance_expression else activity_relevance
+            )
+            relevance = relevance_requested
+    else:
+        relevance_expression = get_applicability_expression(cur_group, processed_nodes, process, relevance_expression)
+        relevance_expression = get_prev_instance_skip_expression(
+            cur_group, processed_nodes, process, relevance_expression
+        )
+        if relevance and relevance_expression is not None:
+            if not hasattr(strategy, "_activity_group_relevance"):
+                strategy._activity_group_relevance = {}
+            strategy._activity_group_relevance.setdefault(id(cur_group), relevance_expression)
     relevance_expression = get_process_skip_expression(cur_group, processed_nodes, process, relevance_expression)
 
     if not relevance:

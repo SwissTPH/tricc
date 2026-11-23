@@ -377,6 +377,18 @@ def build_item_control_extension(control_code: str) -> dict:
     }
 
 
+def build_page_item_control_extension() -> dict:
+    """Build the ``itemControl = page`` extension of a top-level group shown on its own screen.
+
+    In the Android SDC renderer every top-level item is a page once one is, so a paginated
+    Questionnaire marks every section (``feature/20261120-questionnaire-pages.md``).
+
+    Returns:
+        FHIR extension dict.
+    """
+    return build_item_control_extension("page")
+
+
 def build_item_control_display_item(link_id: str, text: str, control_code: str) -> dict:
     """Build a nested display item that carries a questionnaire-itemControl code.
 

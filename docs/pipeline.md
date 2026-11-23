@@ -36,7 +36,8 @@ This allows draft pages to stay in the model without entering full downstream ge
 `DrawioStrategy.linking_nodes` wires page graph semantics:
 
 - normal next/prev links
-- `goto` traversal and activity instances (`instance > 0` / `0`), or snippet injection when `instance == -1`
+- `goto` traversal and activity instances (`instance > 0` / `0`), or snippet injection when
+  `asGroup` is false (deprecated: `instance == -1`); `page` resolved onto the instance
 - `link_out` to `link_in` resolution
 - loop warnings and edge validation
 

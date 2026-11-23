@@ -3,6 +3,9 @@ import logging
 import base64
 import os
 import re
+import warnings
+from types import SimpleNamespace
+from typing import Optional
 from tricc_oo.converters.cql_to_operation import transform_cql_to_operation
 from tricc_oo.converters.utils import (
     clean_str,
@@ -91,6 +94,8 @@ def is_factor_edge_label(label: str) -> bool:
     return bool(FACTOR_EDGE_PATTERN.match(label.strip()))
 
 DISPLAY_ATTRIBUTES = ["label", "hint", "help"]
+# yes/no attributes: draw.io name -> model field
+BOOL_ATTRIBUTES = {"page": "page", "asGroup": "as_group"}
 logger = logging.getLogger("default")
 
 
@@ -203,8 +208,195 @@ def apply_goto_repeat_to_activity(goto, activity):
     propagate_activity_repeat(activity)
 
 
+# ── Form pages and asGroup (feature/20261120-questionnaire-pages.md) ──
+
+class TriccPageConflictError(ValueError):
+    """Two gotos opening one shared activity instance set different ``page`` values."""
+
+
+def parse_bool_attribute(value, attribute: str, where: str) -> Optional[bool]:
+    """Read a yes/no setting (``page``, ``asGroup``): a bool, ``true``/``false`` or ``1``/``0``.
+
+    Args:
+        value: The authored value (draw.io attribute string, YAML scalar).
+        attribute: The attribute name, for the warning.
+        where: The node, for the warning.
+
+    Returns:
+        The bool, or None when the value is absent or not a boolean (warning, ignored).
+    """
+    if value is None or isinstance(value, bool):
+        return value
+    if isinstance(value, int) and value in (0, 1):
+        return bool(value)
+    text = str(value).strip().lower()
+    if text in ("true", "1"):
+        return True
+    if text in ("false", "0"):
+        return False
+    logger.warning(f"{where}: {attribute}={value!r} is not a boolean, ignored")
+    return None
+
+
+def check_page_as_group(container, where: str) -> None:
+    """``page: true`` implies a section: with ``asGroup: false`` set on the same container or
+    call, warn and keep the page (``as_group`` becomes True).
+
+    Args:
+        container: A start node, goto, block call or ``TriccGroup``.
+        where: The container, for the warning.
+    """
+    if getattr(container, "page", None) is True and getattr(container, "as_group", None) is False:
+        logger.warning(f"{where}: page: true with asGroup: false, the page wins (a page is a section)")
+        container.as_group = True
+
+
+def resolve_as_group(goto, activity_start=None, warn: bool = True) -> bool:
+    """Whether a goto opens its activity as a group (True) or inlines it in the caller.
+
+    The goto's ``as_group`` wins, then the called start node's, else True. For a block
+    call: the call's, then the ``block_start``'s, else False; a block is always inlined,
+    True wraps its nodes in a generated group (``wrap_snippet_in_group``).
+
+    Args:
+        goto: The ``TriccNodeGoTo`` (or ``TriccNodeBlock``).
+        activity_start: The called activity's start node, when known.
+        warn: Emit the deprecation warning of ``instance = -1``; only the linking step
+            passes True, so it is given once per goto.
+
+    Returns:
+        The resolved flag.
+    """
+    from tricc_oo.models.tricc import TriccNodeBlock
+
+    as_group = getattr(goto, "as_group", None)
+    if as_group is None:
+        as_group = getattr(activity_start, "as_group", None)
+    if isinstance(goto, TriccNodeBlock):
+        return bool(as_group)
+    # DEPRECATED: instance = -1 is read as as_group=False until DrawTRICC migrates the
+    # projects; it becomes an error one release later.
+    if getattr(goto, "instance", 1) == -1:
+        if warn:
+            message = (
+                f"goto {goto.name or goto.id}: instance = -1 is deprecated, use asGroup: false "
+                "(feature/20261120-questionnaire-pages.md)"
+            )
+            if as_group is not None:
+                message += f"; asGroup: {str(as_group).lower()} is set and wins"
+            logger.warning(message)
+            warnings.warn(message, DeprecationWarning, stacklevel=2)
+        if as_group is None:
+            as_group = False
+    return True if as_group is None else as_group
+
+
+def resolve_goto_page(goto, activity_start=None) -> bool:
+    """``page`` set on the goto (or block), else on the called start node, else False."""
+    page = getattr(goto, "page", None)
+    if page is None:
+        page = getattr(activity_start, "page", None)
+    return bool(page)
+
+
+def wrap_snippet_in_group(clone, goto, page: bool) -> TriccGroup:
+    """Wrap the nodes of an inlined activity or block in a generated group.
+
+    A block call with ``as_group`` and an inlined call or block with ``page`` are a section;
+    an inlined call has no group of its own. The group is moved into the caller with the
+    nodes by ``inject_activity_as_snippet``.
+
+    Args:
+        clone: The cloned activity, before it is injected.
+        goto: The goto or block inlining it.
+        page: The resolved ``page`` of the call.
+
+    Returns:
+        The group (``as_group = True``, ``call = True``), named after the block or activity.
+    """
+    base_name = getattr(clone.root, "name", None) or clone.name
+    group = TriccGroup(
+        id=generate_id(f"pg{clone.id}{goto.id}"),
+        name=f"{base_name}_Ii_{clone.instance}",
+        label=clone.label or getattr(goto, "label", None),
+        activity=clone,
+        group=clone,
+        page=page,
+        call=True,
+    )
+    for node in list(clone.nodes.values()) + list(clone.calculates):
+        if getattr(node, "group", None) is None or node.group is clone:
+            node.group = group
+    for other in clone.groups.values():
+        if getattr(other, "group", None) is None or other.group is clone:
+            other.group = group
+    clone.groups[group.id] = group
+    return group
+
+
+def dissolve_inline_groups(activity) -> None:
+    """Drop the groups of questions with ``as_group = False`` from an activity.
+
+    Such a group is only a frame on the canvas: its nodes and nested groups move to the
+    nearest enclosing group that is a section, else the activity. Run when the activity's
+    groups are built, before any instance is made.
+    """
+    groups = getattr(activity, "groups", None) or {}
+    inline = [g for g in groups.values() if not g.as_group]
+    if not inline:
+        return
+
+    def section_of(group):
+        seen = set()
+        while isinstance(group, TriccGroup) and not group.as_group and id(group) not in seen:
+            seen.add(id(group))
+            group = group.group
+        return group if group is not None else activity
+
+    members = list(activity.nodes.values()) + list(getattr(activity, "calculates", None) or [])
+    for node in list(members):
+        members += list((getattr(node, "options", None) or {}).values())
+    for node in members:
+        group = getattr(node, "group", None)
+        if isinstance(group, TriccGroup) and not group.as_group:
+            node.group = section_of(group)
+    for group in groups.values():
+        if group.as_group and isinstance(group.group, TriccGroup) and not group.group.as_group:
+            group.group = section_of(group.group)
+    for group in inline:
+        if group.relevance is not None:
+            logger.warning(f"group {group.get_name()}: asGroup: false, its relevance is not exported")
+        del activity.groups[group.id]
+
+
+def apply_goto_page_to_activity(goto, activity) -> None:
+    """Store the resolved ``page`` of a goto on the activity instance it opens.
+
+    ``page`` set on the goto, else on the called start node, else False. A shared instance
+    (same ``instance`` n) follows the goto that sets ``page``; gotos leaving it unset follow.
+
+    Raises:
+        TriccPageConflictError: Two gotos set ``page`` differently on one instance.
+    """
+    page = getattr(goto, "page", None)
+    if page is not None:
+        previous = getattr(activity, "page_set_by", None)
+        caller = goto.name or goto.id
+        if previous is not None and previous != caller and activity.page != page:
+            message = (
+                f"gotos {previous} and {caller} open instance {activity.instance} of "
+                f"{activity.name or activity.id} with different page values"
+            )
+            logger.error(message)
+            raise TriccPageConflictError(message)
+        activity.page = page
+        activity.page_set_by = caller
+    elif getattr(activity, "page_set_by", None) is None:
+        activity.page = bool(getattr(getattr(activity, "root", None), "page", None))
+
+
 def get_activity_details(diagram, activity, project, media_path):
-    nodes = get_nodes(diagram, activity)
+    nodes = get_nodes(diagram, activity, project)
     terminology = project.terminology_concepts
     # hint / help shapes are attached by process_edges, so their designations come after
     authored_concepts = []
@@ -268,6 +460,8 @@ def get_activity_details(diagram, activity, project, media_path):
         activity.groups = groups
     if nodes and len(nodes) > 0:
         activity.nodes = nodes
+    # groups with asGroup false are only frames (feature/20261120-questionnaire-pages.md)
+    dissolve_inline_groups(activity)
     images = process_edges(diagram, media_path, activity, nodes, project)
     if images:
         project.images += images
@@ -600,7 +794,36 @@ def assign_rhombus_path(node, nodes, activity):
     return None
 
 
-def get_nodes(diagram, activity):
+def _goto_inlined_at_parse(goto, project) -> bool:
+    """Whether a draw.io goto inlines its activity, before the called page is built.
+
+    The called start node is not loaded yet: its ``asGroup`` comes from
+    ``project.start_as_group``, read from every diagram up front.
+    """
+    from tricc_oo.models.tricc import TriccNodeBlock
+
+    if isinstance(goto, TriccNodeBlock):
+        # a block is always inlined, asGroup only wraps it in a group
+        return True
+    start_as_group = getattr(project, "start_as_group", None) or {}
+    link = getattr(goto, "link", None)
+    as_group = None
+    if isinstance(link, str):
+        # a page built for parameter values has the id of its template plus env_suffix
+        as_group = start_as_group.get(link, start_as_group.get(re.sub(r"__p[0-9a-f]{8}$", "", link)))
+    return not resolve_as_group(goto, SimpleNamespace(as_group=as_group), warn=False)
+
+
+def read_start_as_group(diagram) -> Optional[bool]:
+    """``asGroup`` authored on the activity_start of a diagram, None when not set."""
+    for obj in ("object", "UserObject"):
+        elm = get_tricc_type(diagram, obj, TriccNodeType.activity_start)
+        if elm is not None:
+            return parse_bool_attribute(elm.attrib.get("asGroup"), "asGroup", diagram.attrib.get("name", ""))
+    return None
+
+
+def get_nodes(diagram, activity, project=None):
     nodes = {activity.root.id: activity.root}
     get_all_nodes(diagram, activity, nodes)
     # get_all_nodes reloads the root shape; that copy shares the activity name too
@@ -618,8 +841,9 @@ def get_nodes(diagram, activity):
             if calc:
                 new_nodes[calc.id] = calc
         elif isinstance(node, TriccNodeGoTo):
-            # instance == -1: snippet inject at link time — keep prev→goto→next edges as-is
-            if getattr(node, "instance", 1) == -1:
+            # inlined call (asGroup false, deprecated instance = -1): snippet inject at link
+            # time — keep prev→goto→next edges as-is
+            if _goto_inlined_at_parse(node, project):
                 continue
             # find if the node has next nodes, if yes, add a bridge + Rhoimbus
             path = inject_bridge_path(node, {**nodes, **new_nodes})
@@ -706,6 +930,7 @@ def create_root_node(diagram):
                 relevance=elm.attrib.get("relevance"),
                 instance=int(elm.attrib.get("instance") if elm.attrib.get("instance") is not None else 1),
             )
+            set_additional_attributes(["page", "asGroup"], elm, node)
     load_expressions(node)
     return node, _get_name(elm.attrib.get("name", "act_"), external_id, diagram.attrib.get("id")) if node else None
 
@@ -724,11 +949,19 @@ def set_additional_attributes(attribute_names, elm, node):
                 attribute = [attribute]
             elif attributename in ["priority", "instance", "repeat"]:
                 attribute = int(attribute)
+            elif attributename in BOOL_ATTRIBUTES:
+                # page / asGroup (feature/20261120-questionnaire-pages.md)
+                attribute = parse_bool_attribute(attribute, attributename, node.get_name())
+                if attribute is None:
+                    continue
+                attributename = BOOL_ATTRIBUTES[attributename]
             elif attributename == "relevance":
                 attribute = remove_html(attribute.strip())
             else:
                 attribute
             setattr(node, attributename, attribute)
+    if "page" in attribute_names and "asGroup" in attribute_names:
+        check_page_as_group(node, node.get_name())
 
 
 def get_concept_type(node):
@@ -1282,6 +1515,7 @@ def get_groups(diagram, nodes, activity):
 def add_group(elm, diagram, nodes, groups, parent_group, activity):
     external_id = elm.attrib.get("id")
     id = get_id(external_id, diagram.attrib.get("id"))
+    where = f"group {elm.attrib.get('name')}"
     if id not in groups:
         group = TriccGroup(
             name=elm.attrib.get("name"),
@@ -1290,7 +1524,12 @@ def add_group(elm, diagram, nodes, groups, parent_group, activity):
             external_id=external_id,
             group=parent_group,
             activity=activity,
+            # own form page; asGroup false: only a frame (feature/20261120-questionnaire-pages.md)
+            page=bool(parse_bool_attribute(elm.attrib.get("page"), "page", where)),
         )
+        as_group = parse_bool_attribute(elm.attrib.get("asGroup"), "asGroup", where)
+        group.as_group = True if as_group is None else as_group
+        check_page_as_group(group, where)
         # get elememt witn parent = id and tricc_type defiend
         list_child = get_tricc_type_list(diagram, ["object", "UserObject"], tricc_type=None, parent_id=id)
         add_group_to_child(group, diagram, list_child, nodes, groups, parent_group)
@@ -1312,7 +1551,7 @@ def add_group_to_child(group, diagram, list_child, nodes, groups, parent_group):
         elif child_elm.attrib.get("tricc_type") == TriccNodeType.page:
             child_group_id = child_elm.attrib.get("id")
             if child_group_id not in groups:
-                child_group = add_group(child_elm, diagram, nodes, groups, group)
+                child_group = add_group(child_elm, diagram, nodes, groups, group, group.activity)
             else:
                 child_group = groups[child_group_id]
             child_group.group = group

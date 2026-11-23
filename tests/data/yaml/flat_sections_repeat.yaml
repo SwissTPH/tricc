@@ -1,0 +1,73 @@
+# An activity with repeat: 2 called twice: distinct sections and hidden items
+# (feature/20261120-questionnaire-pages.md).
+
+id: main_page
+title: "Main"
+process: main
+
+nodes:
+  - id: start
+    type: start
+    form_id: flat_sections_repeat
+    label: "Start"
+    name: start_main
+
+  - id: first
+    type: integer
+    name: first_q
+    label: "First"
+
+  - id: goto_r1
+    type: goto
+    name: goto_r1
+    label: "Vitals, first"
+    link: act_r
+    instance: 1
+
+  - id: goto_r2
+    type: goto
+    name: goto_r2
+    label: "Vitals, second"
+    link: act_r
+    instance: 2
+
+  - id: end
+    type: end
+    label: "End"
+    name: end_main
+
+edges:
+  - source: start
+    target: first
+  - source: first
+    target: goto_r1
+  - source: goto_r1
+    target: goto_r2
+  - source: goto_r2
+    target: end
+
+---
+id: act_r
+title: "Vitals"
+process: main
+
+nodes:
+  - id: r_start
+    type: activity_start
+    label: "Vitals"
+    name: act_r
+    repeat: 2
+
+  - id: r_temp
+    type: decimal
+    name: r_temp
+    label: "Temperature"
+
+  - id: r_end
+    type: activity_end
+
+edges:
+  - source: r_start
+    target: r_temp
+  - source: r_temp
+    target: r_end

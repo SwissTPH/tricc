@@ -45,7 +45,7 @@ TYPE_MAP = {
     },
     TriccNodeType.activity_start: {
         "objects": ["UserObject", "object"],
-        "attributes": ["parent", "parent", "instance", "repeat", "relevance", "priority"],
+        "attributes": ["parent", "parent", "instance", "repeat", "relevance", "priority", "page", "asGroup"],
         # a sequence node: no business name; it shares the activity's (see create_root_node)
         "mandatory_attributes": ["label"],
         "model": TriccNodeActivityStart,
@@ -293,7 +293,7 @@ TYPE_MAP = {
     },
     TriccNodeType.goto: {
         "objects": ["UserObject", "object"],
-        "attributes": ["instance", "priority", "repeat"],
+        "attributes": ["instance", "priority", "repeat", "page", "asGroup"],
         "mandatory_attributes": ["link", "label", "name"],
         "model": TriccNodeGoTo,
     },
@@ -301,7 +301,7 @@ TYPE_MAP = {
     # the block instance when the page is built, ``param.<name>`` attributes are its args
     TriccNodeType.block: {
         "objects": ["UserObject", "object"],
-        "attributes": ["priority", "repeat", "name"],
+        "attributes": ["priority", "repeat", "name", "page", "asGroup"],
         "mandatory_attributes": ["link", "label"],
         "model": TriccNodeBlock,
     },

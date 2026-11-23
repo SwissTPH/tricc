@@ -129,7 +129,9 @@ Output: FHIR SDC resources (Questionnaire, PlanDefinition, Library+CQL, Structur
       (`fix/20260820-opensrp-inherited-value.md`).
 - [x] Concept repeat: Questionnaire item extension + Helper repeat functions + FML hints (`repeat_helper.py`).
 - [x] `FHIRStrategy` registered via `@register_output_strategy("FHIRStrategy")` and eager import in `strategies/__init__.py`.
-- [x] Basic nesting support for groups/activities in Questionnaires.
+- [x] One-level sections: an activity is a top-level section (split around the activities it
+  calls), its relevance a hidden boolean item; optional pagination with `itemControl = page`
+  (`feature/20261120-questionnaire-pages.md`).
 - [x] Full StructureMap / data extraction driven by concept_type (CodeSystem `conceptType`: Symptom-Finding/Question → Observation; proposed_diagnosis → Condition provisional; AcceptDiag → confirmed/refuted; `repeat != 1` → Observation extension). One extract group per concept + repeat; versioned `linkId`s share that group and take the first non-null answer newest-first (HAPI `resolveGroupReference` requires unique group names — `fix/20260824-structuremap-duplicate-extract-groups.md`).
 - [ ] Complete ValueSet generation.
 - [x] Binary (images) generation — question/answer illustration images via `itemMedia`/
