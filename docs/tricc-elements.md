@@ -92,6 +92,69 @@ This page documents TRICC modeling elements and their meaning based on:
   note above and [Troubleshooting — Node after a repeated activity call](./troubleshooting.md#node-after-a-repeated-activity-call-never-appears).
 - `exclusive`: exclusivity helper.
 
+## Decision tables
+
+A lookup such as a dosing table ("from 6 kg, give 0.75 ml") is a **decision table**: one
+`tables/<id>.yaml` file per table, listed in `tricc.yaml` (`decision_tables: [tables/*.yaml]`).
+The DrawTRICC table editor writes these files; `python -m tricc_oo.tools.drugs_js_to_tables`
+turns a CHT `drugs.js` into them. Specs: `feature/20261123-decision-tables.md`,
+`feature/20261123-dmn-named-overrides.md`.
+
+```yaml
+id: diazepam
+title: Diazepam, rectal (ml)
+hit_policy: first            # first (default) | unique | rule_order
+inputs:
+  - {name: weight, concept: CHE.B6.DE07, type: decimal}
+  - {name: age, concept: age_in_months, type: integer}   # rounded down before the tests
+outputs:
+  - {name: dose, type: string}
+rules:                       # one cell per input, then the outputs; read top to bottom
+  - [">= 20",    "-",        "2.5"]
+  - ["[15..20)", "-",        "1.7"]
+  - ["-",        "[12..36)", "1.2"]
+```
+
+**Cells** (a FEEL unary-test subset, the same in the editor):
+
+| Cell | Test |
+|---|---|
+| `-` | any value, also "not entered" |
+| `null` / `not(null)` | not entered / entered |
+| `< v`, `<= v`, `> v`, `>= v`, `= v`, `v` | comparison / equality (`v`: number, `'text'`, `true` / `false`) |
+| `[a..b)`, `(a..b]`, `[a..b]`, `(a..b)` | range, square bracket = bound included |
+| `a, b, c` | any of |
+
+A value that is not entered only passes `-`, `null` and lists holding `null`.
+
+**Calls**, anywhere an expression is allowed:
+
+| Call | Result |
+|---|---|
+| `DMN('diazepam', "weight", "age_in_months")` | the table's hit policy |
+| `DMNFirst('diazepam', …)` | the first matching row's output (empty when none) |
+| `DMNList('diazepam', …)` | every matching row's output, in row order (a list: `Count`, `exists`, `selected`) |
+| `DMN('t.note', …)` | the output column `note` instead of the first one |
+| `DMN('diazepam')` | an input left out reads its column `concept` |
+| `DMN('diazepam', Tuple{ weight: null })` | an input given by name; the others from their concepts |
+| `DrugDosage('diazepam', age, weight)` | built-in alias of `DMN`; `tricc.yaml` `aliases` adds others |
+
+The table name must be a text literal. `null` (or any literal) is evaluated when the form is
+built: rows that cannot match are dropped and no reference is created for it, so the form
+does not wait for that question.
+
+**Export.** Each call is expanded, by policy, into nested ifs (`first`, `unique`: FHIRPath
+`iif`, XPath `if`, CQL `if … then … else`) or a list (`rule_order`: FHIRPath
+`iif(c1, v1, {}).combine(…)`, XPath `normalize-space(concat(if(c1, 'v1', ''), ' ', …))`, CQL
+`flatten { if c1 then {v1} else {}, … }`), computed in the form like any calculate. An integer
+input is wrapped in a floor (XPath `int()`, which truncates: the same for non-negative values).
+In XPath a list output value cannot contain a space.
+
+**Errors** (shared with the editor): `E_DMN_CELL`, `E_DMN_TYPE`, `E_DMN_SHAPE`,
+`E_DMN_OVERLAP` (`unique` rows that can both match), `E_DMN_LIST_VALUE`,
+`E_DMN_TABLE_UNKNOWN`, `E_DMN_TABLE_NOT_STATIC`, `E_DMN_ARITY`, `E_DMN_ARG_UNKNOWN`,
+`E_DMN_ARG_TWICE`, `E_ALIAS_UNKNOWN_INPUT`. A table no expression calls is a warning.
+
 ## Navigation/linking elements
 
 - `goto`: jump to another page/activity.
