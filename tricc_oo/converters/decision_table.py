@@ -86,6 +86,7 @@ def expand_decision_tables(
     tables: Dict[str, DecisionTable],
     aliases: Optional[Dict[str, FunctionAlias]] = None,
     used: Optional[Set[str]] = None,
+    keep_calls: bool = False,
 ) -> Any:
     """``expr`` with every table call replaced by its expansion (calls in arguments too).
 
@@ -94,6 +95,9 @@ def expand_decision_tables(
         tables: The project's tables by id.
         aliases: The project's aliases (``DrugDosage`` is built in).
         used: Collects the ids of the tables called.
+        keep_calls: Wrap each expansion that is not a constant in ``DMN_CALL`` (inline
+            expansion, table, policy, output, one argument per input), for a strategy that
+            evaluates the tables itself.
 
     Raises:
         DecisionTableError: A call cannot be expanded (unknown table, arguments, …).
@@ -101,15 +105,15 @@ def expand_decision_tables(
     known = effective_aliases(aliases)
     if not contains_table_call(expr, aliases):
         return expr
-    return _expand(expr, tables, known, used if used is not None else set())
+    return _expand(expr, tables, known, used if used is not None else set(), keep_calls)
 
 
-def _expand(expr: Any, tables, aliases, used) -> Any:
+def _expand(expr: Any, tables, aliases, used, keep_calls=False) -> Any:
     if isinstance(expr, list):
-        return [_expand(e, tables, aliases, used) for e in expr]
+        return [_expand(e, tables, aliases, used, keep_calls) for e in expr]
     if not isinstance(expr, TriccOperation):
         return expr
-    reference = [_expand(r, tables, aliases, used) for r in expr.reference or []]
+    reference = [_expand(r, tables, aliases, used, keep_calls) for r in expr.reference or []]
     name = _call_name(expr, aliases)
     if name is None:
         if expr.operator != TriccOperator.TUPLE and any(
@@ -122,7 +126,7 @@ def _expand(expr: Any, tables, aliases, used) -> Any:
             copy._invalidate_identity_cache()
             return copy
         return expr
-    return expand_call(name, reference[1:], tables, aliases, used)
+    return expand_call(name, reference[1:], tables, aliases, used, keep_calls)
 
 
 def _split_named(args: List[Any]) -> Tuple[List[Any], List[Tuple[str, Any]]]:
@@ -154,7 +158,12 @@ def _bind(
 
 
 def expand_call(
-    name: str, args: List[Any], tables: Dict[str, DecisionTable], aliases: Dict[str, FunctionAlias], used: Set[str]
+    name: str,
+    args: List[Any],
+    tables: Dict[str, DecisionTable],
+    aliases: Dict[str, FunctionAlias],
+    used: Set[str],
+    keep_calls: bool = False,
 ) -> Any:
     """The expansion of one call ``name(args…)`` (arguments already expanded)."""
     args, named = _split_named(list(args))
@@ -213,7 +222,12 @@ def expand_call(
         policy = "first"
     elif function == "DMNList":
         policy = "rule_order"
-    return _expansion(table, values, out_at, policy)
+    expansion = _expansion(table, values, out_at, policy)
+    if not keep_calls or isinstance(expansion, TriccStatic):
+        return expansion
+    call_args = [TriccStatic(value="") if v is _NULL else v for v in values]
+    head = [TriccStatic(value=table.id), TriccStatic(value=policy), TriccStatic(value=table.outputs[out_at].name)]
+    return TriccOperation(TriccOperator.DMN_CALL, [expansion, *head, *call_args])
 
 
 def _static(value: Any) -> Tuple[bool, Any]:
@@ -308,6 +322,7 @@ def expand_node_tables(
     tables: Dict[str, DecisionTable],
     aliases: Optional[Dict[str, FunctionAlias]] = None,
     used: Optional[Set[str]] = None,
+    keep_calls: bool = False,
 ) -> bool:
     """Expand the table calls of a node's expressions in place; ``True`` when one changed.
 
@@ -324,7 +339,7 @@ def expand_node_tables(
         if not isinstance(expr, TriccOperation):
             continue
         try:
-            expanded = expand_decision_tables(expr, tables, aliases, used)
+            expanded = expand_decision_tables(expr, tables, aliases, used, keep_calls)
         except DecisionTableError as exc:
             raise DecisionTableError(exc.code, f"{_node_label(node)} {attribute}: {exc.message}") from exc
         if expanded is not expr:
@@ -334,7 +349,7 @@ def expand_node_tables(
                 node.reference = list(expanded.get_references())
     reference = getattr(node, "reference", None)
     if isinstance(reference, TriccOperation):
-        expanded = expand_decision_tables(reference, tables, aliases, used)
+        expanded = expand_decision_tables(reference, tables, aliases, used, keep_calls)
         if expanded is not reference:
             node.reference = expanded
             changed = True
@@ -370,10 +385,11 @@ def expand_project_tables(project: Any) -> Set[str]:
     """
     tables = getattr(project, "decision_tables", None) or {}
     aliases = getattr(project, "aliases", None) or {}
+    keep_calls = bool(getattr(project, "decision_table_calls", False))
     used: Set[str] = set()
     nodes = list(iter_activity_nodes(list(project.pages.values()) + list(project.library_calculates or [])))
     for node in nodes:
-        expand_node_tables(node, tables, aliases, used)
+        expand_node_tables(node, tables, aliases, used, keep_calls)
     for table_id in tables:
         if table_id not in used:
             logger.warning(f"decision table {table_id!r} is not called by any expression")

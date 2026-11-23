@@ -468,7 +468,12 @@ def load_calculate(
                 return True
     if node not in processed_nodes:
         # a node the project pass did not reach (feature/20261123-decision-tables.md)
-        expand_node_tables(node, kwargs.get("decision_tables") or {}, kwargs.get("aliases"))
+        expand_node_tables(
+            node,
+            kwargs.get("decision_tables") or {},
+            kwargs.get("aliases"),
+            keep_calls=bool(kwargs.get("decision_table_calls")),
+        )
         # generate condition
         if is_ready_to_process(node, processed_nodes, True) and process_reference(
             node,

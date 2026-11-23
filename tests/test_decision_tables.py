@@ -40,12 +40,14 @@ from tricc_oo.models.decision_table import (
 )
 from tricc_oo.models.project_config import TriccProjectConfig
 from tricc_oo.runner import run_project_build
+from tricc_oo.serializers.dmn_js import build_dmn_js, library_name
 from tricc_oo.tools.drugs_js_to_tables import drug_tables, read_drugs_js, write_tables
 
 HERE = os.path.dirname(__file__)
 VECTORS = os.path.join(HERE, "data", "decision_tables")
 PROJECT = os.path.join(HERE, "data", "projects", "decision_tables")
 DRUGS_JS = os.path.join(VECTORS, "drugs.cjs")
+TABLE_FILE = os.path.join(PROJECT, "tables", "diazepam.yaml")
 YAML_FIXTURE = os.path.join(HERE, "data", "yaml", "content_version.yaml")
 
 
@@ -437,17 +439,55 @@ def _build(tmp_path, strategy):
     return tmp_path / "out"
 
 
-def test_cht_form_computes_the_dose(tmp_path):
-    out = _build(tmp_path, "XLSFormCHTStrategy")
+def _calculations(out):
     (form,) = glob.glob(str(out / "**" / "dosing.xlsx"), recursive=True)
     survey = pd.read_excel(form, sheet_name="survey", dtype=str).fillna("")
-    calc = dict(zip(survey["name"], survey["calculation"]))
+    assert not any("drugs.js" in c for c in survey["calculation"])
+    return dict(zip(survey["name"], survey["calculation"]))
+
+
+def test_odk_form_computes_the_dose_inline(tmp_path):
+    calc = _calculations(_build(tmp_path, "XLSFormStrategy"))
     assert calc["dose"].startswith("if(coalesce(${weight},-2147483648)>=20,'2.5',")
     assert calc["dose"] == calc["legacy_dose"] == calc["alias_dose"]
     assert calc["doses"].startswith("normalize-space(concat(")
     assert "${weight}" not in calc["dose_by_age"] and calc["dose_by_age"].startswith("if(int(coalesce(${age_in_months}")
     assert "count-selected(${doses})" in calc["dose_count"]
-    assert not any("drugs.js" in c for c in survey["calculation"])
+
+
+def test_cht_form_calls_the_project_library(tmp_path):
+    out = _build(tmp_path, "XLSFormCHTStrategy")
+    calc = _calculations(out)
+    lib = "cht:extension-lib('dmn-decision-tables.js', 'diazepam'"
+    assert calc["dose"] == f"{lib}, 'first', 'dose', ${{weight}}, ${{age_in_months}})"
+    assert calc["dose"] == calc["legacy_dose"] == calc["alias_dose"]
+    assert calc["doses"] == f"{lib}, 'rule_order', 'dose', ${{weight}}, ${{age_in_months}})"
+    assert calc["dose_by_age"] == f"{lib}, 'first', 'dose', '', ${{age_in_months}})"
+    assert "count-selected(${doses})" in calc["dose_count"]
+    (path,) = glob.glob(str(out / "**" / "extension-libs" / "dmn-decision-tables.js"), recursive=True)
+    with open(path, encoding="utf-8") as file:
+        assert file.read() == build_dmn_js({"diazepam": read_table(open(TABLE_FILE).read(), TABLE_FILE)},
+                                           "Decision tables")
+
+
+def test_kept_call_wraps_the_inline_expansion():
+    tables = {"diazepam": DIAZEPAM}
+    call = expand_decision_tables(transform_cql_to_operation("DMN('diazepam', Tuple{ weight: null })"), tables,
+                                  keep_calls=True)
+    assert call.operator == TriccOperator.DMN_CALL
+    assert call.reference[0] == expand("DMN('diazepam', Tuple{ weight: null })")
+    assert call.reference[1:] == [
+        TriccStatic(value="diazepam"), TriccStatic(value="first"), TriccStatic(value="dose"),
+        TriccStatic(value=""), TriccReference("age_in_months"),
+    ]
+    assert call.get_datatype() == call.reference[0].get_datatype()  # the wrapper is transparent
+    folded = expand_decision_tables(transform_cql_to_operation("DMN('diazepam', 11.5, 24)"), tables, keep_calls=True)
+    assert folded == TriccStatic(value="1.2")
+
+
+def test_library_name_carries_the_project():
+    assert library_name("Global Almanach (L4)") == "dmn-global-almanach-l4.js"
+    assert library_name(None) == "dmn.js"
 
 
 def test_fhir_questionnaire_computes_the_dose(tmp_path):
@@ -525,6 +565,91 @@ for (const d of drugs) for (const w of weights) for (const a of ages)
   out[`${d}|${w}|${a}`] = fn({ v: d }, arg(a), arg(w)).v;
 process.stdout.write(JSON.stringify(out));
 """
+
+
+LIBRARY_SCRIPT = """
+const lib = require(process.argv[1]);
+const calls = JSON.parse(require('fs').readFileSync(0, 'utf8'));
+const arg = (v) => (v === null ? { t: 'arr', v: [] } : { t: 'num', v: { textContent: String(v) } });
+const str = (v) => ({ t: 'str', v });
+process.stdout.write(JSON.stringify(calls.map(([table, policy, output, inputs]) =>
+  lib(str(table), str(policy), str(output), ...inputs.map(arg)).v)));
+"""
+
+
+def run_library(source, calls, tmp_path):
+    """Call the generated library with node as CHT does: ``[(table, policy, output, inputs)]``."""
+    path = tmp_path / "dmn.js"
+    path.write_text(source, encoding="utf-8")
+    result = subprocess.run(
+        ["node", "-e", LIBRARY_SCRIPT, str(path)], input=json.dumps(calls), capture_output=True, text=True, check=True
+    )
+    return json.loads(result.stdout)
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is needed to run the library")
+def test_library_gives_the_vector_results(tmp_path):
+    source = build_dmn_js(TABLE_MAP, "Vectors")
+    cases = TABLES["cases"]
+    calls = [[c["table"], "first", "dose", c["inputs"]] for c in cases]
+    calls += [[c["table"], "rule_order", "dose", c["inputs"]] for c in cases]
+    got = run_library(source, calls, tmp_path)
+    assert got[: len(cases)] == [c["first"] or "" for c in cases]
+    assert got[len(cases):] == [" ".join(c["list"]) for c in cases]
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is needed to run the library")
+def test_library_reads_every_cell_form(tmp_path):
+    table = DecisionTable(
+        id="cells",
+        inputs=[
+            DIAZEPAM.inputs[0].__class__(name="n", type="decimal"),
+            DIAZEPAM.inputs[0].__class__(name="s", type="string"),
+            DIAZEPAM.inputs[0].__class__(name="b", type="boolean"),
+        ],
+        outputs=[DIAZEPAM.outputs[0].__class__(name="out", type="integer")],
+        rules=[
+            ["null", "-", "-", "1"],
+            ["(3..6]", "'a', 'b'", "-", "2"],
+            ["1, 3, [5..7)", "-", "true", "3"],
+            ["not(null)", "-", "-", "4"],
+        ],
+    )
+    inputs = [[None, None, None], [6, "b", None], [3, "c", True], [3, "c", False], [4.5, "a", None]]
+    path = tmp_path / "cells.js"
+    path.write_text(build_dmn_js({"cells": table}), encoding="utf-8")
+    script = (
+        "const lib = require(process.argv[1]);"
+        "const s = (v) => (v === null ? { t: 'arr', v: [] } : { t: 'str', v: { textContent: String(v) } });"
+        "process.stdout.write(JSON.stringify(JSON.parse(process.argv[2]).map((i) =>"
+        " lib('cells', 'first', 'out', ...i.map(s)))));"
+    )
+    result = subprocess.run(["node", "-e", script, str(path), json.dumps(inputs)], capture_output=True, text=True,
+                            check=True)
+    got = json.loads(result.stdout)
+    expected = [evaluate_table(table, i)[1] for i in inputs]
+    assert [g["v"] if g["v"] != "" else None for g in got] == [e[0] if e else None for e in expected]
+    assert got[0] == {"t": "num", "v": 1}
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is needed to run drugs.js")
+def test_library_gives_the_dose_drugs_js_gives(drugs, tmp_path):
+    tables = drug_tables(drugs)
+    expected = subprocess.run(
+        ["node", "-e", NODE_SCRIPT, os.path.abspath(DRUGS_JS), json.dumps([[t.id for t in tables], WEIGHTS, AGES])],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    expected = json.loads(expected.stdout)
+    keys, calls = [], []
+    for table in tables:
+        for weight in WEIGHTS:
+            for age in AGES:
+                keys.append(f"{table.id}|{'null' if weight is None else weight}|{age}")
+                calls.append([table.id, "first", "dose", [weight, age]])
+    got = run_library(build_dmn_js({t.id: t for t in tables}, "Global"), calls, tmp_path)
+    assert dict(zip(keys, got)) == expected
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node is needed to run drugs.js")

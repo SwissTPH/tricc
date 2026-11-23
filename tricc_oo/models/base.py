@@ -494,6 +494,9 @@ class TriccOperator(StrEnum):
     # [function name ('DMN', 'DMNFirst', 'DMNList' or an alias), table, *args, TUPLE?]
     DMN = "dmn"
     TUPLE = "tuple"  # CQL Tuple{ k: v }: [TriccStatic(k), v, ...] (named DMN arguments)
+    # an expanded call kept for a strategy that evaluates tables itself (CHT dmn-<project>.js):
+    # [inline expansion, table, policy, output, *one argument per input]
+    DMN_CALL = "dmn_call"
     LIST_IF = "list_if"  # [cond, value], ...: the values whose condition holds, in order
     FLOOR = "floor"
     COALESCE = "coalesce"
@@ -675,15 +678,24 @@ class TriccOperation(BaseModel):
         elif self.operator in RETURNS_LIST:
             return "list"
         elif self.operator in RETURNS_CONCEPT:
-            return self.get_reference_datatype(self.reference[0])
+            return self.get_reference_datatype(self.reference[:1])
         elif self.operator == TriccOperator.PARENTHESIS:
             return self.get_reference_datatype(self.reference)
+        elif self.operator == TriccOperator.DMN_CALL:
+            return self.get_reference_datatype(self.reference[:1])
         elif self.operator == TriccOperator.IF:
             return self.get_reference_datatype(self.reference[1:])
         elif self.operator in (TriccOperator.IFS, TriccOperator.CASE):
+            # the type of the branch values: [cond, value] pairs and the default (a value CASE
+            # starts with the tested value, which is not a result)
             rtype = set()
-            for rl in self.reference:
-                rtype.add(self.get_reference_datatype(self.reference[-2:]))
+            items = list(self.reference)
+            if self.operator == TriccOperator.CASE and items and not isinstance(items[0], list):
+                items = items[1:]
+            for rl in items:
+                rtype.add(self.get_reference_datatype([rl[-1] if isinstance(rl, list) else rl]))
+            if not rtype:
+                return None
             if len(rtype) > 1:
                 return "mixed"
             else:

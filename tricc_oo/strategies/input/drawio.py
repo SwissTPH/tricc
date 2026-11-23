@@ -81,6 +81,7 @@ class DrawioStrategy(BaseInputStrategy):
             codesystems=project.code_systems,
             decision_tables=project.decision_tables,
             aliases=project.aliases,
+            decision_table_calls=project.decision_table_calls,
             process=[start_page.root.process],
         )
 

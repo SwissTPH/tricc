@@ -40,8 +40,8 @@ must be computed in the form, offline, on Android and on the web.
 - `DrugDosage('diazepam', age, weight)` keeps working as an alias: existing drawings (31
   drugs in the Global Almanach) need no change.
 - Every export computes it from the same table: in the form when the inputs are in the form
-  (FHIRPath in FHIR, XPath in CHT and ODK), from the record otherwise (CQL), like any other
-  calculation. `drugs.js` is no longer needed.
+  (FHIRPath in FHIR, XPath in ODK, a library generated from the tables in CHT), from the
+  record otherwise (CQL), like any other calculation. `drugs.js` is no longer needed.
 
 Example (`tables/diazepam.yaml`):
 
@@ -215,11 +215,24 @@ Where the code differs from, or adds to, Part II:
   calls at expansion with the node named. `E_DMN_SHAPE` (row width, bad file) and the
   #96 codes `E_DMN_ARG_UNKNOWN` / `E_DMN_ARG_TWICE` are added. "A list result used as one
   value" (`E_DMN_TYPE`) is not checked.
+- **CHT extension library** (added 2026-11-23). The runner tells the input stage whether the
+  output strategy evaluates tables itself (`decision_table_calls = True` on
+  `XLSFormCHTStrategy`); then each expansion that is not a constant is kept as
+  `DMN_CALL(inline expansion, table, policy, output, one argument per input)`, so the arguments
+  are resolved and versioned like any operand. Other strategies never see `DMN_CALL`. CHT
+  writes `cht:extension-lib('dmn-<project>.js', 'table', 'policy', 'output', input1, …)` (each
+  field read once, instead of once per row inline) and `extension-libs/dmn-<project>.js`
+  (`tricc_oo/serializers/dmn_js.py`: an ES5 evaluator and every table of the project, cells
+  parsed; the same file for every intervention). A `null` argument is passed as `''`.
+- **`IFS` / `CASE` datatype.** `TriccOperation.get_datatype` read a slice instead of the branch
+  values; it now returns the type of the values.
 - **Tests.** `tests/test_decision_tables.py`: the shared vectors (copied unchanged into
   `tests/data/decision_tables/`), the expansion evaluated against them, serialisation per
   strategy, errors, the editor's file format, parity with `drugs.js` (run with node; skipped
   without it), and end to end on `tests/data/projects/decision_tables/` (a project folder:
-  tables need `tricc.yaml`) with `XLSFormCHTStrategy` and `OpenSRPStrategy`.
+  tables need `tricc.yaml`) with `XLSFormStrategy` (inline), `XLSFormCHTStrategy` (library) and
+  `OpenSRPStrategy`; the generated library run with node against the vectors, every cell form
+  and `drugs.js`.
 
 ## Decisions
 
@@ -229,3 +242,6 @@ Where the code differs from, or adds to, Part II:
   are declared per project in `tricc.yaml` `aliases`; CHT `drugs.js` is dropped (the migration
   tool can be extended if a project needs it) — the RFC's recommendations, approved with the
   implementation request (@delcroip, in conversation)
+- 2026-11-23: CHT evaluates the tables in a generated extension library by default, named per
+  project (`dmn-<project>.js`); an inline CHT strategy can be added if the library causes
+  problems (@delcroip, in conversation)

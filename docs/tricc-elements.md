@@ -150,6 +150,12 @@ does not wait for that question.
 input is wrapped in a floor (XPath `int()`, which truncates: the same for non-negative values).
 In XPath a list output value cannot contain a space.
 
+**CHT** (`XLSFormCHTStrategy`, `XLSFormCHTHFStrategy`) does not inline the tables: a call becomes
+`cht:extension-lib('dmn-<project>.js', 'diazepam', 'first', 'dose', ${weight}, ${age_in_months})`,
+each field read once, and the build writes `extension-libs/dmn-<project>.js` (every table of
+the project, the project being the `tricc.yaml` title) next to the forms. Upload it with
+`cht-conf upload-extension-libs`. It replaces `drugs.js`.
+
 **Errors** (shared with the editor): `E_DMN_CELL`, `E_DMN_TYPE`, `E_DMN_SHAPE`,
 `E_DMN_OVERLAP` (`unique` rows that can both match), `E_DMN_LIST_VALUE`,
 `E_DMN_TABLE_UNKNOWN`, `E_DMN_TABLE_NOT_STATIC`, `E_DMN_ARITY`, `E_DMN_ARG_UNKNOWN`,

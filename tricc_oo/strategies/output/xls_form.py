@@ -471,6 +471,8 @@ class XLSFormStrategy(BaseOutPutStrategy):
         original_references = []
         if not hasattr(operation, "reference"):
             return self.get_tricc_operation_operand(operation)
+        if getattr(operation, "operator", None) == TriccOperator.DMN_CALL:
+            return self.table_call_expression(operation)
 
         operator = getattr(operation, "operator", "")
         coalesce_fallback = OPERATOR_COALESCE_FALLBACK[operator] if operator in OPERATOR_COALESCE_FALLBACK else "''"
@@ -721,6 +723,10 @@ class XLSFormStrategy(BaseOutPutStrategy):
             return f"normalize-space({parts[0]})"
         separator = ",' ',"
         return f"normalize-space(concat({separator.join(parts)}))"
+
+    def table_call_expression(self, operation):
+        """A kept decision table call (``DMN_CALL``): its inline expansion here; CHT calls a library."""
+        return self.get_tricc_operation_expression(operation.reference[0])
 
     def tricc_operation_floor(self, ref_expressions, original_references=None):
         # ODK XPath has no floor(); int() truncates, the same for the non-negative values

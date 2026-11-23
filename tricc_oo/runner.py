@@ -220,6 +220,7 @@ def load_input_project(
     terminology: Sources = (),
     libraries: Sources = (),
     decision_tables: Sources = (),
+    decision_table_calls: bool = False,
 ):
     """Build the TriccIntervention from ``(strategy name, files, contents)`` groups.
 
@@ -230,6 +231,8 @@ def load_input_project(
     """
     strategies = [(get_input_strategy(name)(list(files)), contents) for name, files, contents in groups]
     project = strategies[0][0].new_project(project_config, intervention)
+    # the output strategy evaluates the decision tables itself (CHT dmn-<project>.js)
+    project.decision_table_calls = decision_table_calls
     BaseInputStrategy.load_terminology(project, terminology)
     BaseInputStrategy.load_libraries(project, libraries)
     BaseInputStrategy.load_decision_tables(project, decision_tables)
@@ -284,6 +287,7 @@ def run_grouped_export(
 ):
     os.makedirs(out_dir, exist_ok=True)
     media_path = os.path.join(out_dir, "media-tmp")
+    OutputStrategyCls = get_output_strategy(output_strategy_name)
     project = load_input_project(
         groups,
         media_path,
@@ -292,8 +296,8 @@ def run_grouped_export(
         terminology=terminology,
         libraries=libraries,
         decision_tables=decision_tables,
+        decision_table_calls=bool(getattr(OutputStrategyCls, "decision_table_calls", False)),
     )
-    OutputStrategyCls = get_output_strategy(output_strategy_name)
     output_strategy = OutputStrategyCls(project, out_dir)
     logger.info("Using strategy %s", OutputStrategyCls.__name__)
     output_strategy.check_retrievals()
