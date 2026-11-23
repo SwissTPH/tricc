@@ -1,0 +1,65 @@
+# asGroup on the activity_start, and a goto overriding it (feature/20261120-questionnaire-pages.md).
+# inline_mod says asGroup: false: goto_x inlines it; goto_y sets asGroup: true and opens an instance.
+
+id: parent_main
+title: "Parent Main"
+process: main
+
+nodes:
+  - id: start
+    type: start
+    form_id: parent_main
+    label: "Start"
+    name: start_parent
+
+  - id: goto_x
+    type: goto
+    name: goto_x
+    label: "Inline module"
+    link: inline_mod
+
+  - id: goto_y
+    type: goto
+    name: goto_y
+    label: "Module as a group"
+    link: inline_mod
+    asGroup: true
+
+  - id: end
+    type: end
+    label: "End"
+    name: end_parent
+
+edges:
+  - source: start
+    target: goto_x
+  - source: goto_x
+    target: goto_y
+  - source: goto_y
+    target: end
+
+---
+id: inline_mod
+title: "Inline module"
+process: main
+
+nodes:
+  - id: im_start
+    type: activity_start
+    label: "Inline module"
+    name: inline_mod
+    asGroup: false
+
+  - id: im_age
+    type: integer
+    name: im_age
+    label: "Age"
+
+  - id: im_end
+    type: activity_end
+
+edges:
+  - source: im_start
+    target: im_age
+  - source: im_age
+    target: im_end

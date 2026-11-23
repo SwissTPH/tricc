@@ -1,0 +1,155 @@
+# asGroup on blocks and groups of questions (feature/20261120-questionnaire-pages.md, rev.
+# 2026-11-20). No page anywhere: the FHIR sections are not paginated.
+# main: q0, call_a (asGroup: true, its block_start unset) -> own section, call_b (asGroup:
+# false, its block_start asGroup: true) -> inlined, call_c (unset, its block_start asGroup:
+# true) -> own section, q1 framed by g_frame (asGroup: false) -> no group, q2 framed by
+# g_head (default) -> a sub-heading.
+
+id: main_page
+title: "Main"
+process: main
+
+groups:
+  - id: g_frame
+    name: frame
+    label: "Frame"
+    asGroup: false
+  - id: g_head
+    name: head
+    label: "Head"
+
+nodes:
+  - id: start
+    type: start
+    form_id: as_group_blocks
+    label: "Start"
+    name: start_main
+
+  - id: q0
+    type: integer
+    name: q0
+    label: "Before"
+
+  - id: call_a
+    type: block
+    name: call_a
+    label: "Block A"
+    link: blk_a
+    asGroup: true
+
+  - id: call_b
+    type: block
+    name: call_b
+    label: "Block B"
+    link: blk_b
+    asGroup: false
+
+  - id: call_c
+    type: block
+    name: call_c
+    label: "Block C"
+    link: blk_c
+
+  - id: q1
+    type: integer
+    name: q1
+    label: "Framed"
+    group: g_frame
+
+  - id: q2
+    type: integer
+    name: q2
+    label: "Headed"
+    group: g_head
+
+  - id: end
+    type: end
+    label: "End"
+    name: end_main
+
+edges:
+  - source: start
+    target: q0
+  - source: q0
+    target: call_a
+  - source: call_a
+    target: call_b
+  - source: call_b
+    target: call_c
+  - source: call_c
+    target: q1
+  - source: q1
+    target: q2
+  - source: q2
+    target: end
+
+---
+id: blk_a
+name: blk_a
+title: "Block A"
+nodes:
+  - id: a_start
+    type: block_start
+    name: blk_a
+
+  - id: a_q
+    type: integer
+    name: a_q
+    label: "A question"
+
+  - id: a_end
+    type: activity_end
+
+edges:
+  - source: a_start
+    target: a_q
+  - source: a_q
+    target: a_end
+
+---
+id: blk_b
+name: blk_b
+title: "Block B"
+nodes:
+  - id: b_start
+    type: block_start
+    name: blk_b
+    asGroup: true
+
+  - id: b_q
+    type: integer
+    name: b_q
+    label: "B question"
+
+  - id: b_end
+    type: activity_end
+
+edges:
+  - source: b_start
+    target: b_q
+  - source: b_q
+    target: b_end
+
+---
+id: blk_c
+name: blk_c
+title: "Block C"
+nodes:
+  - id: c_start
+    type: block_start
+    name: blk_c
+    asGroup: true
+
+  - id: c_q
+    type: integer
+    name: c_q
+    label: "C question"
+
+  - id: c_end
+    type: activity_end
+
+edges:
+  - source: c_start
+    target: c_q
+  - source: c_q
+    target: c_end

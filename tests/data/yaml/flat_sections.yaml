@@ -1,0 +1,221 @@
+# One-level FHIR sections (feature/20261120-questionnaire-pages.md).
+# main asks go_p: yes -> activity act_p, no -> activity act_q.
+# act_p asks p_cough, calls act_d (only called here) in the middle, calls act_c (instance 1)
+# when coughing, then asks p_after.
+# act_q asks q_fever and calls the same instance of act_c last.
+# An integer named act_p_Ss_1 ends like a section linkId.
+
+id: main_page
+title: "Main"
+process: main
+
+nodes:
+  - id: start
+    type: start
+    form_id: flat_sections
+    label: "Start"
+    name: start_main
+
+  - id: go_p
+    type: select_yesno
+    name: go_p
+    label: "Path P?"
+    required: true
+
+  - id: tricky
+    type: integer
+    name: act_p_Ss_1
+    label: "Named like a section"
+
+  - id: r_go
+    type: rhombus
+    label: "P?"
+    reference: "\"go_p\" = true"
+
+  - id: goto_p
+    type: goto
+    name: goto_p
+    label: "Activity P"
+    link: act_p
+
+  - id: goto_q
+    type: goto
+    name: goto_q
+    label: "Activity Q"
+    link: act_q
+
+  - id: end
+    type: end
+    label: "End"
+    name: end_main
+
+edges:
+  - source: start
+    target: go_p
+  - source: go_p
+    target: tricky
+    value: follow
+  - source: tricky
+    target: r_go
+  - source: r_go
+    target: goto_p
+    value: "yes"
+  - source: r_go
+    target: goto_q
+    value: "no"
+  - source: goto_p
+    target: end
+  - source: goto_q
+    target: end
+
+---
+id: act_p
+title: "Activity P"
+process: main
+
+nodes:
+  - id: p_start
+    type: activity_start
+    label: "Activity P"
+    name: act_p
+
+  - id: p_cough
+    type: select_yesno
+    name: p_cough
+    label: "Cough?"
+    required: true
+
+  - id: goto_d
+    type: goto
+    name: goto_d
+    label: "Activity D"
+    link: act_d
+
+  - id: r_cough
+    type: rhombus
+    label: "Cough?"
+    reference: "\"p_cough\" = true"
+
+  - id: goto_c1
+    type: goto
+    name: goto_c1
+    label: "Activity C"
+    link: act_c
+
+  - id: p_after
+    type: integer
+    name: p_after
+    label: "After C"
+
+  - id: p_end
+    type: activity_end
+
+edges:
+  - source: p_start
+    target: p_cough
+  - source: p_cough
+    target: goto_d
+    value: follow
+  - source: goto_d
+    target: r_cough
+  - source: r_cough
+    target: goto_c1
+    value: "yes"
+  - source: r_cough
+    target: p_after
+    value: "no"
+  - source: goto_c1
+    target: p_after
+  - source: p_after
+    target: p_end
+
+---
+id: act_q
+title: "Activity Q"
+process: main
+
+nodes:
+  - id: q_start
+    type: activity_start
+    label: "Activity Q"
+    name: act_q
+
+  - id: q_fever
+    type: integer
+    name: q_fever
+    label: "Fever days"
+
+  - id: goto_c2
+    type: goto
+    name: goto_c2
+    label: "Activity C"
+    link: act_c
+
+  - id: q_end
+    type: activity_end
+
+edges:
+  - source: q_start
+    target: q_fever
+  - source: q_fever
+    target: goto_c2
+  - source: goto_c2
+    target: q_end
+
+---
+id: act_c
+title: "Activity C"
+process: main
+
+nodes:
+  - id: c_start
+    type: activity_start
+    label: "Activity C"
+    name: act_c
+
+  - id: c_temp
+    type: decimal
+    name: c_temp
+    label: "Temperature"
+
+  - id: c_check
+    type: integer
+    name: c_check
+    label: "Cough days"
+    relevance: "\"p_cough\" = true"
+
+  - id: c_end
+    type: activity_end
+
+edges:
+  - source: c_start
+    target: c_temp
+  - source: c_temp
+    target: c_check
+  - source: c_check
+    target: c_end
+
+---
+id: act_d
+title: "Activity D"
+process: main
+
+nodes:
+  - id: d_start
+    type: activity_start
+    label: "Activity D"
+    name: act_d
+
+  - id: d_breath
+    type: integer
+    name: d_breath
+    label: "Breaths per minute"
+
+  - id: d_end
+    type: activity_end
+
+edges:
+  - source: d_start
+    target: d_breath
+  - source: d_breath
+    target: d_end

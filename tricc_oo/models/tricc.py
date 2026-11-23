@@ -108,6 +108,11 @@ class TriccNodeActivity(TriccNodeBaseModel):
     # plain-language twin of ``applicability`` (text or {lang: text}); informational
     intent: Optional[Union[str, Dict[str, str]]] = None
     is_sequence_defined: bool = False
+    # resolved from the calls and the start node: shown on its own form page; the goto
+    # that set it, for the conflict check of a shared instance
+    # (feature/20261120-questionnaire-pages.md)
+    page: bool = False
+    page_set_by: Optional[str] = None
 
     # redefine
     def make_instance(self, instance_nb=None, **kwargs):
@@ -186,18 +191,24 @@ class TriccNodeActivity(TriccNodeBaseModel):
             return instance
 
     def update_groups_group(self, group):
+        # point the copies nested in ``group`` (template) at the copy of ``group``
+        group_instance = next((g for g in self.groups.values() if g.base_instance is group), None)
         for instance_group in self.groups.values():
-            if instance_group.group == group:
-                instance_group.group = instance_group
-            elif instance_group.group == self.base_instance:
+            parent = getattr(instance_group.base_instance, "group", None)
+            if parent is group and group_instance is not None:
+                instance_group.group = group_instance
+            elif not isinstance(parent, TriccGroup):
                 instance_group.group = self
 
     def update_groups(self, group):
         # create new group
         instance_group = group.make_instance(self.instance, activity=self)
-        # update the group in all activity
+        instance_group.activity = self
+        # update the group in all activity: a node copy has the activity as its group, its
+        # template (base_instance) still has the template group
         for node in list(self.nodes.values()):
-            if node.group == group:
+            origin = getattr(node, "base_instance", None)
+            if node.group == group or getattr(origin, "group", None) is group:
                 node.group = instance_group
         self.groups[instance_group.id] = instance_group
 
@@ -380,8 +391,13 @@ class TriccNodeGoTo(TriccNodeBaseModel):
     tricc_type: TriccNodeType = TriccNodeType.goto
     link: Union[TriccNodeActivity, triccId]
     datatype: str = "n/a"
-    #  n > 0: named nested activity instance; 0: auto-unique instance; -1: snippet inject into caller
+    #  n > 0: named nested activity instance; 0: auto-unique instance
+    # -1: DEPRECATED, use as_group=False (feature/20261120-questionnaire-pages.md)
     instance: int = 1
+    # None: not set, the called activity_start decides (feature/20261120-questionnaire-pages.md)
+    page: Optional[bool] = None
+    # False: inline the activity in the caller (no group, no instance)
+    as_group: Optional[bool] = None
 
     # no need ot copy
     def make_instance(self, instance_nb, activity, **kwargs):
@@ -395,7 +411,8 @@ class TriccNodeGoTo(TriccNodeBaseModel):
 class TriccNodeBlock(TriccNodeGoTo):
     """Uses a block: ``link`` names the block instance built for ``args``.
 
-    Linked like a ``goto`` with ``instance == -1``: the block is cloned and inlined.
+    Linked like a ``goto`` with ``as_group=False``: the block is cloned and inlined; with
+    ``as_group`` or ``page`` resolved true its nodes are wrapped in a generated group.
     """
 
     tricc_type: TriccNodeType = TriccNodeType.block
@@ -544,6 +561,9 @@ class TriccIntervention(BaseModel):
     # graph_process_start: Dict = {}
     # list of context:
     pages: Dict[str, TriccNodeActivity] = {}
+    # draw.io: ``asGroup`` of each page's start node by page id, read before the pages are
+    # built, for the goto bridge skip (feature/20261120-questionnaire-pages.md)
+    start_as_group: Dict[str, bool] = {}
     start_pages: Dict[str, TriccNodeActivity] = {}
     # process name -> authored segments (main-start pages)
     segments: Dict[str, List[TriccSegment]] = {}
