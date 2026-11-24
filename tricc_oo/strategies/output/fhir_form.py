@@ -4144,6 +4144,16 @@ class FHIRStrategy(BaseOutPutStrategy):
     def tricc_operation_floor(self, ref_expressions, original_references=None):
         return f"Floor({ref_expressions[0]})"
 
+    def tricc_operation_zscore_lms(self, ref_expressions, original_references=None):
+        # WHO: ((y / m)^l - 1) / (s * l)  (feature/20261123-dmn-instance-lookup.md)
+        y, ll, m, s = ref_expressions
+        return f"((Power(({y}) / ({m}), {ll}) - 1) / (({s}) * ({ll})))"
+
+    def tricc_operation_izscore_lms(self, ref_expressions, original_references=None):
+        # WHO: m * (z * s * l + 1)^(1/l)
+        z, ll, m, s = ref_expressions
+        return f"(({m}) * Power(({z}) * ({s}) * ({ll}) + 1, 1.0 / ({ll})))"
+
     # ============================================================
     # ADDITIONAL / FALLBACK
     # ============================================================
@@ -4571,6 +4581,16 @@ class FHIRStrategy(BaseOutPutStrategy):
     def tricc_operation_fhirpath_floor(self, ref_expressions, original_references=None):
         src = original_references[0] if original_references else None
         return f"({self._fhirpath_numeric_operand(ref_expressions[0], src)}).floor()"
+
+    def tricc_operation_fhirpath_zscore_lms(self, ref_expressions, original_references=None):
+        # WHO: ((y / m)^l - 1) / (s * l)
+        y, ll, m, s = self._fhirpath_numeric_parts(ref_expressions, original_references)
+        return f"((({y} / {m}).power({ll}) - 1) / ({s} * {ll}))"
+
+    def tricc_operation_fhirpath_izscore_lms(self, ref_expressions, original_references=None):
+        # WHO: m * (z * s * l + 1)^(1/l)
+        z, ll, m, s = self._fhirpath_numeric_parts(ref_expressions, original_references)
+        return f"({m} * ({z} * {s} * {ll} + 1).power(1.0 / {ll}))"
 
     def tricc_operation_fhirpath_has_qualifier(self, ref_expressions, original_references=None):
         raise NotImplementedError("HAS_QUALIFIER is not supported by FHIRPath 2.0")

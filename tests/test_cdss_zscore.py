@@ -1,9 +1,6 @@
-"""Tests for CDSS Zscore/Izscore LMS secondary instances."""
+"""WHO LMS tables (data/anthro). Zscore itself: tests/test_dmn_instance.py."""
 
 import unittest
-from unittest.mock import MagicMock
-
-import pandas as pd
 
 from tricc_oo.data.anthro.ranges import points_to_ranges
 from tricc_oo.data.anthro.registry import (
@@ -11,20 +8,6 @@ from tricc_oo.data.anthro.registry import (
     is_supported_table,
     normalize_table_id,
 )
-from tricc_oo.models.base import TriccOperation, TriccOperator, TriccReference, TriccStatic
-from tricc_oo.serializers.xls_form import CHOICE_MAP
-from tricc_oo.strategies.output.xlsform_cdss import XLSFormCDSSStrategy
-
-
-def _fresh_cdss() -> XLSFormCDSSStrategy:
-    """Build a CDSS strategy with isolated dataframes (class attrs are shared)."""
-    project = MagicMock()
-    strategy = XLSFormCDSSStrategy(project, "/tmp")
-    strategy.df_survey = pd.DataFrame(columns=strategy.df_survey.columns)
-    strategy.df_choice = pd.DataFrame(columns=list(CHOICE_MAP.keys()))
-    strategy.df_calculate = pd.DataFrame(columns=strategy.df_calculate.columns)
-    strategy._used_zscore_tables = set()
-    return strategy
 
 
 class TestAnthroRanges(unittest.TestCase):
@@ -89,73 +72,6 @@ class TestAnthroRegistry(unittest.TestCase):
         # ((y/m)^l - 1) / (s * l) with y==m → 0
         z = (((y / m) ** l) - 1) / (s * l)
         self.assertAlmostEqual(z, 0.0, places=10)
-
-
-class TestCdssZscoreOps(unittest.TestCase):
-    def test_formula_and_y_min_max_filter(self):
-        strategy = _fresh_cdss()
-        refs = ["'wfa'", "${sex}", "${age_days}", "${weight}"]
-        expr = strategy.tricc_operation_zscore(refs)
-        self.assertIn("instance('wfa')", expr)
-        self.assertIn("y_min<=", expr)
-        self.assertIn("y_max>", expr)
-        self.assertNotIn("x_min", expr)
-        self.assertNotIn("x_max", expr)
-        # WHO formula shape: (pow - 1) div (s * l)
-        self.assertIn("pow(", expr)
-        self.assertIn(") * (", expr)
-        self.assertIn("wfa", strategy._used_zscore_tables)
-
-    def test_izscore_formula(self):
-        strategy = _fresh_cdss()
-        refs = ["'wfa'", "${sex}", "${age_days}", "${z}"]
-        expr = strategy.tricc_operation_izscore(refs)
-        self.assertIn("instance('wfa')", expr)
-        self.assertIn("y_min<=", expr)
-        # reverse: m * pow(z*s*l + 1, 1/l)
-        self.assertIn("+ 1", expr)
-        self.assertIn("1 div (", expr)
-
-    def test_unknown_table_raises(self):
-        strategy = _fresh_cdss()
-        with self.assertRaises(ValueError):
-            strategy.tricc_operation_zscore(["'nope'", "1", "2", "3"])
-
-    def test_lazy_injection_only_when_used(self):
-        strategy = _fresh_cdss()
-        strategy.inject_used_zscore_tables()
-        self.assertEqual(len(strategy.df_choice), 0)
-
-        strategy.tricc_operation_zscore(["'wfa'", "${sex}", "${age}", "${wt}"])
-        strategy.inject_used_zscore_tables()
-        self.assertGreater(len(strategy.df_choice), 0)
-        self.assertTrue((strategy.df_choice["list_name"] == "wfa").all())
-        self.assertIn("sex", strategy.df_choice.columns)
-        self.assertIn("y_min", strategy.df_choice.columns)
-        self.assertIn("y_max", strategy.df_choice.columns)
-
-    def test_no_injection_without_register(self):
-        strategy = _fresh_cdss()
-        # Parent path without CDSS register would not inject; CDSS requires register
-        self.assertEqual(strategy._used_zscore_tables, set())
-        strategy.inject_used_zscore_tables()
-        self.assertEqual(len(strategy.df_choice), 0)
-
-    def test_operation_expression_end_to_end(self):
-        strategy = _fresh_cdss()
-        op = TriccOperation(
-            operator=TriccOperator.ZSCORE,
-            reference=[
-                TriccStatic(value="wfa"),
-                TriccReference("sex"),
-                TriccReference("age_days"),
-                TriccReference("weight"),
-            ],
-        )
-        expr = strategy.get_tricc_operation_expression(op)
-        self.assertIn("instance('wfa')", expr)
-        self.assertIn("y_min", expr)
-        self.assertEqual(strategy._used_zscore_tables, {"wfa"})
 
 
 if __name__ == "__main__":

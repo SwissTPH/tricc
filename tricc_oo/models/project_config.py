@@ -231,6 +231,9 @@ class TriccProjectConfig(BaseModel):
     # Function aliases of the table functions, e.g.
     # ``DrugDosage: {function: DMN, args: [table, age, weight]}`` (DrugDosage is built in).
     aliases: Dict[str, Any] = Field(default_factory=dict)
+    # ODK / CDSS: a table with more rows is read from a secondary instance instead of an
+    # inline if() chain (feature/20261123-dmn-instance-lookup.md); 0 = always the instance.
+    decision_table_max_inline_rows: int = Field(default=10, ge=0)
     interventions: List[TriccInterventionConfig] = Field(default_factory=list)
     # Reusable blocks, read with every intervention (never listed on one).
     blocks: List[TriccBlockRef] = Field(default_factory=list)

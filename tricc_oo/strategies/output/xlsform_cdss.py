@@ -1,6 +1,6 @@
 import logging
 import re
-from typing import List, Set
+from typing import List
 
 from tricc_oo.models.tricc import TriccNodeActivity
 from tricc_oo.models.calculate import TriccNodePopulate
@@ -12,8 +12,6 @@ from tricc_oo.models.base import (
     TriccStatic,
 )
 from tricc_oo.converters.tricc_to_xls_form import get_export_name
-from tricc_oo.data.anthro import get_choice_rows, is_supported_table, normalize_table_id
-from tricc_oo.serializers.xls_form import CHOICE_MAP
 from tricc_oo.strategies.output.xls_form import XLSFormStrategy
 from tricc_oo.strategies.registry import register_output_strategy
 from tricc_oo.models.lang import SingletonLangClass
@@ -43,105 +41,13 @@ def _comma_join_survey_trigger_refs(*chunks: str) -> str:
 @register_output_strategy("XLSFormCDSSStrategy")
 class XLSFormCDSSStrategy(XLSFormStrategy):
 
-    def __init__(self, project, output_path):
-        self._used_zscore_tables: Set[str] = set()
-        super().__init__(project, output_path)
-
-    def do_clean(self, **kwargs):
-        super().do_clean(**kwargs)
-        self._used_zscore_tables = set()
-
     def process_export(self, start_pages, **kwargs):
         self.activity_export(start_pages[self.processes[0]], **kwargs)
-
-    def export(self, start_pages, version):
-        # Inject only LMS tables actually referenced by Zscore/Izscore.
-        self.inject_used_zscore_tables()
-        return super().export(start_pages, version)
 
     def generate_export(self, node, **kwargs):
         # Coalesce($this, …) becomes coalesce(${…},'') plus triggers (CDSS only).
         self._extract_this_coalesce_trigger(node)
         return super().generate_export(node, **kwargs)
-
-    def _register_zscore_table(self, table_expr) -> str:
-        """Record a zscore table id; return normalized id. Raises if unsupported."""
-        tid = normalize_table_id(table_expr)
-        if not tid:
-            raise ValueError("Zscore/Izscore requires a non-empty table id (e.g. 'wfa')")
-        if not is_supported_table(tid):
-            raise ValueError(
-                f"Unknown zscore table '{tid}'. Supported: wfa "
-                f"(more XForY tables can be registered later)"
-            )
-        self._used_zscore_tables.add(tid)
-        return tid
-
-    def tricc_operation_zscore(self, ref_expressions, original_references=None):
-        if not ref_expressions or len(ref_expressions) < 4:
-            raise ValueError("Zscore(table, sex, x, y) requires 4 arguments")
-        self._register_zscore_table(ref_expressions[0])
-        return super().tricc_operation_zscore(ref_expressions, original_references)
-
-    def tricc_operation_izscore(self, ref_expressions, original_references=None):
-        if not ref_expressions or len(ref_expressions) < 4:
-            raise ValueError("Izscore(table, sex, x, z) requires 4 arguments")
-        self._register_zscore_table(ref_expressions[0])
-        return super().tricc_operation_izscore(ref_expressions, original_references)
-
-    def inject_used_zscore_tables(self):
-        """Append LMS choice rows for tables referenced during expression emission."""
-        if not self._used_zscore_tables:
-            return
-        empty_label = langs.get_trads("", force_dict=True)
-        for tid in sorted(self._used_zscore_tables):
-            # Skip if already injected (idempotent re-export)
-            if (
-                len(self.df_choice)
-                and "list_name" in self.df_choice.columns
-                and (self.df_choice["list_name"] == tid).any()
-            ):
-                continue
-            try:
-                rows = get_choice_rows(tid)
-            except ValueError as exc:
-                logger.error(str(exc))
-                raise
-            for row in rows:
-                values = []
-                for column in CHOICE_MAP:
-                    if column == "list_name":
-                        values.append(tid)
-                    elif column == "value":
-                        values.append(row["value"])
-                    elif column.startswith("label"):
-                        # Empty label — secondary instance only, not shown to user
-                        arr = column.split("::")
-                        trad = arr[1] if len(arr) == 2 else None
-                        if trad and trad in empty_label:
-                            values.append(empty_label[trad])
-                        else:
-                            values.append(next(iter(empty_label.values()), ""))
-                    elif column == "sex":
-                        values.append(row["sex"])
-                    elif column == "y_min":
-                        values.append(row["y_min"])
-                    elif column == "y_max":
-                        values.append(row["y_max"])
-                    elif column == "l":
-                        values.append(row["l"])
-                    elif column == "s":
-                        values.append(row["s"])
-                    elif column == "m":
-                        values.append(row["m"])
-                    else:
-                        values.append("")
-                self.df_choice.loc[len(self.df_choice)] = values
-            logger.info(
-                "Injected %s LMS rows for zscore table '%s' into choices",
-                len(rows),
-                tid,
-            )
 
     @staticmethod
     def _is_this_marker(value):

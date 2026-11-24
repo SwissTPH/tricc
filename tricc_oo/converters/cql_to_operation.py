@@ -36,6 +36,9 @@ FUNCTION_MAP = {
     "Concatenate": TriccOperator.CONCATENATE,
     "iZScore": TriccOperator.IZSCORE,
     "ZScore": TriccOperator.ZSCORE,
+    # the spelling of feature/cdss-zscore.md (and of xpath_to_cql)
+    "Izscore": TriccOperator.IZSCORE,
+    "Zscore": TriccOperator.ZSCORE,
     "Round": TriccOperator.ROUND,
     "Integer": TriccOperator.CAST_INTEGER,
     # decision tables (feature/20261123-decision-tables.md): the name is kept as the first

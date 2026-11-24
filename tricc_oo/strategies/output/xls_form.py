@@ -101,6 +101,8 @@ OPERATOR_COALESCE_FALLBACK = {
 
 @register_output_strategy("XLSFormStrategy")
 class XLSFormStrategy(BaseOutPutStrategy):
+    # keep decision table calls (DMN_CALL): large tables are read from an instance
+    decision_table_calls = True
     pd.set_option("display.max_colwidth", None)
     df_survey = pd.DataFrame(columns=SURVEY_MAP.keys())
     df_calculate = pd.DataFrame(columns=SURVEY_MAP.keys())
@@ -154,6 +156,8 @@ class XLSFormStrategy(BaseOutPutStrategy):
         self.df_choice = pd.DataFrame(columns=CHOICE_MAP.keys())
         # (sheet, key) -> (node, column uses), to translate rows at export
         self.translation_rows = {}
+        # decision tables read from a secondary instance in this form, by id
+        self.instance_tables = {}
         self.do_clean()
 
     def apply_translations(self):
@@ -250,6 +254,41 @@ class XLSFormStrategy(BaseOutPutStrategy):
             "",  # choice_filter
         ]
 
+    def inject_table_instances(self) -> None:
+        """The choice rows of the tables read from an instance, and a hidden select per table.
+
+        The select (``relevant`` ``false()``) makes every pyxform version write the instance
+        (feature/20261123-dmn-instance-lookup.md); a select needs labels, so each item is
+        labelled with its name.
+        """
+        from tricc_oo.serializers.dmn_instance import instance_items, item_columns, list_name
+
+        for table_id, (table, policy) in sorted(self.instance_tables.items()):
+            name = list_name(table_id)
+            if "list_name" in self.df_choice.columns and (self.df_choice["list_name"] == name).any():
+                continue
+            for column in item_columns(table):
+                if column not in self.df_choice.columns:
+                    self.df_choice[column] = ""
+            rows = []
+            for item in instance_items(table, policy):
+                row = {c: "" for c in self.df_choice.columns}
+                row.update({k: v for k, v in item.items() if k != "name"})
+                row["list_name"], row["value"] = name, item["name"]
+                for column in self.df_choice.columns:
+                    if str(column).split("::")[0] == "label":
+                        row[column] = item["name"]
+                rows.append(row)
+            self.df_choice = pd.concat([self.df_choice, pd.DataFrame(rows, columns=self.df_choice.columns)],
+                                       ignore_index=True)
+            select = {c: "" for c in self.df_survey.columns}
+            select.update({"type": f"select_one {name}", "name": f"{name}_instance", "relevance": "false()"})
+            for column in self.df_survey.columns:
+                if str(column).split("::")[0] == "label":
+                    select[column] = name
+            self.df_survey.loc[len(self.df_survey)] = [select[c] for c in self.df_survey.columns]
+            logger.info(f"decision table {table_id!r}: {len(rows)} rows in the instance {name!r}")
+
     def export(self, start_pages, version):
         form_id = self.project.intervention_name()
         if not form_id:
@@ -280,6 +319,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
 
         self.inject_retrievals()
         self.inject_version()
+        self.inject_table_instances()
         self.apply_translations()
 
         # create a Pandas Excel writer using XlsxWriter as the engine
@@ -724,9 +764,58 @@ class XLSFormStrategy(BaseOutPutStrategy):
         separator = ",' ',"
         return f"normalize-space(concat({separator.join(parts)}))"
 
+    def check_list_values(self, table, policy, output) -> None:
+        """XPath lists are space-separated: a ``rule_order`` output value cannot hold a space."""
+        from tricc_oo.models.decision_table import DecisionTableError, list_value_message
+
+        if policy != "rule_order" or table is None:
+            return
+        at = table.output_index(output) or 0
+        for row in table.rules:
+            value = row[len(table.inputs) + at] if len(row) > len(table.inputs) + at else ""
+            if re.search(r"\s", value.strip()):
+                raise DecisionTableError("E_DMN_LIST_VALUE", list_value_message(value))
+
+    def table_call_operand(self, arg) -> str:
+        """A ``DMN_CALL`` argument as an XPath value (empty when not entered)."""
+        expr = (
+            self.get_tricc_operation_expression(arg)
+            if isinstance(arg, TriccOperation)
+            else self.get_tricc_operation_operand(arg)
+        )
+        return self.clean_coalesce(expr)
+
     def table_call_expression(self, operation):
-        """A kept decision table call (``DMN_CALL``): its inline expansion here; CHT calls a library."""
-        return self.get_tricc_operation_expression(operation.reference[0])
+        """A kept decision table call (``DMN_CALL``): inline, or read from an instance when large.
+
+        A table with more rows than ``decision_table_max_inline_rows`` (tricc.yaml, default 10)
+        is read from the secondary instance ``dmn_<table>`` (feature/20261123-dmn-instance-lookup.md);
+        CHT overrides this with its library.
+        """
+        from tricc_oo.serializers.dmn_instance import lookup_expression, valid_row_count
+
+        table_id, policy, output = (r.value for r in operation.reference[1:4])
+        table = (getattr(self.project, "decision_tables", None) or {}).get(table_id)
+        limit = getattr(self.project, "decision_table_max_inline_rows", 10)
+        if table is None or valid_row_count(table) <= limit:
+            return self.get_tricc_operation_expression(operation.reference[0])
+        self.check_list_values(table, policy, output)
+        arguments = []
+        for column, arg in zip(table.inputs, operation.reference[4:]):
+            raw = self.table_call_operand(arg)
+            number = f"int({raw})" if column.type == "integer" else f"number({raw})"
+
+            def boolean_test(value, arg=arg):
+                return self.get_tricc_operation_expression(
+                    TriccOperation(TriccOperator.EQUAL, [arg, TriccStatic(value=value)])
+                )
+
+            arguments.append((raw, number, boolean_test))
+        expression = lookup_expression(table, policy, output, arguments)
+        previous = self.instance_tables.get(table_id)
+        if previous is None or policy == "rule_order":
+            self.instance_tables[table_id] = (table, policy)
+        return expression
 
     def tricc_operation_floor(self, ref_expressions, original_references=None):
         # ODK XPath has no floor(); int() truncates, the same for the non-negative values
@@ -802,40 +891,21 @@ class XLSFormStrategy(BaseOutPutStrategy):
         else:
             return f"int({ref_expressions[0]})"
 
-    def tricc_operation_zscore(self, ref_expressions, original_references=None):
-        y, ll, m, s = self.get_zscore_params(ref_expressions)
-        # WHO anthrobase: ((y / m)^l - 1) / (s * l)
-        return f"((pow(({y}) div ({m}), {ll}) - 1) div (({s}) * ({ll})))"
-
     def tricc_operation_datetime_to_decimal(self, ref_expressions, original_references=None):
         return f"decimal-date-time({ref_expressions[0]})"
 
     def tricc_operation_round(self, ref_expressions, original_references=None):
         return f"round({ref_expressions[0]})"
 
-    def tricc_operation_izscore(self, ref_expressions, original_references=None):
-        z, ll, m, s = self.get_zscore_params(ref_expressions)
-        # WHO anthrobase: m * (z * s * l + 1)^(1/l)
+    def tricc_operation_zscore_lms(self, ref_expressions, original_references=None):
+        # WHO: ((y / m)^l - 1) / (s * l); l, m, s looked up in the LMS decision table
+        y, ll, m, s = ref_expressions
+        return f"((pow(({y}) div ({m}), {ll}) - 1) div (({s}) * ({ll})))"
+
+    def tricc_operation_izscore_lms(self, ref_expressions, original_references=None):
+        # WHO: m * (z * s * l + 1)^(1/l)
+        z, ll, m, s = ref_expressions
         return f"(({m}) * pow(({z}) * ({s}) * ({ll}) + 1, 1 div ({ll})))"
-
-    def get_zscore_params(self, ref_expressions):
-        """Resolve LMS params via secondary instance filter on sex + y_min/y_max.
-
-        Args order: table, sex, x (independent axis), yz (measured Y or target Z).
-        """
-        table = ref_expressions[0]
-        sex = self.clean_coalesce(ref_expressions[1])
-        x = self.clean_coalesce(ref_expressions[2])
-        yz = self.clean_coalesce(ref_expressions[3])
-        item = (
-            f"instance({table})/root/item["
-            f"sex={sex} and y_min<={x} and y_max>{x}"
-            f"]"
-        )
-        ll = f"number({item}/l)"
-        m = f"number({item}/m)"
-        s = f"number({item}/s)"
-        return yz, ll, m, s
 
     def get_tricc_operation_operand(self, r, coalesce_fallback="''"):
         # function transform an object to XLSFORM value

@@ -566,6 +566,14 @@ class OpenMRSStrategy(BaseOutPutStrategy):
     def tricc_operation_floor(self, ref_expressions, original_references=None):
         return f"Math.floor({ref_expressions[0]})"
 
+    def tricc_operation_zscore_lms(self, ref_expressions, original_references=None):
+        y, ll, m, s = ref_expressions
+        return f"((Math.pow(({y}) / ({m}), {ll}) - 1) / (({s}) * ({ll})))"
+
+    def tricc_operation_izscore_lms(self, ref_expressions, original_references=None):
+        z, ll, m, s = ref_expressions
+        return f"(({m}) * Math.pow(({z}) * ({s}) * ({ll}) + 1, 1 / ({ll})))"
+
     def tricc_operation_if(self, ref_expressions, original_references=None):
         return f"if({ref_expressions[0]}, {ref_expressions[1]}, {ref_expressions[2]})"
 

@@ -358,13 +358,6 @@ CHOICE_MAP = {
     **langs.get_trads_map("label"),
     "media::image": "image",
     "choice_filter": "",
-    # LMS secondary-instance columns (zscore / izscore tables)
-    "sex": "",
-    "y_min": "",
-    "y_max": "",
-    "l": "",
-    "s": "",
-    "m": "",
 }
 
 TRAD_MAP = ["label", "constraint_message", "required_message", "hint", "help"]
