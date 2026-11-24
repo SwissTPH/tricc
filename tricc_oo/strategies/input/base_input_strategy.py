@@ -148,6 +148,7 @@ class BaseInputStrategy:
             from tricc_oo.models.decision_table import decode_aliases
 
             project.aliases = decode_aliases(project_config.aliases)
+            project.decision_table_max_inline_rows = project_config.decision_table_max_inline_rows
         project.config = intervention
         return project
 

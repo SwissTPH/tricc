@@ -470,7 +470,7 @@ def load_calculate(
         # a node the project pass did not reach (feature/20261123-decision-tables.md)
         expand_node_tables(
             node,
-            kwargs.get("decision_tables") or {},
+            kwargs["decision_tables"] if kwargs.get("decision_tables") is not None else {},
             kwargs.get("aliases"),
             keep_calls=bool(kwargs.get("decision_table_calls")),
         )

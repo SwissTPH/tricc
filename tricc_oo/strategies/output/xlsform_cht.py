@@ -3,7 +3,6 @@ import json
 import logging
 import os
 import shutil
-import re
 import subprocess
 import tempfile
 import zipfile
@@ -873,24 +872,9 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
 
         Each input is read once; the library evaluates the table (tricc_oo.serializers.dmn_js).
         """
-        from tricc_oo.models.decision_table import DecisionTableError, list_value_message
-
         table_id, policy, output = (r.value for r in operation.reference[1:4])
-        table = (getattr(self.project, "decision_tables", None) or {}).get(table_id)
-        if policy == "rule_order" and table is not None:
-            at = table.output_index(output)
-            for row in table.rules:
-                value = row[len(table.inputs) + at] if len(row) > len(table.inputs) + at else ""
-                if re.search(r"\s", value.strip()):
-                    raise DecisionTableError("E_DMN_LIST_VALUE", list_value_message(value))
-        args = []
-        for arg in operation.reference[4:]:
-            expr = (
-                self.get_tricc_operation_expression(arg)
-                if isinstance(arg, TriccOperation)
-                else self.get_tricc_operation_operand(arg)
-            )
-            args.append(self.clean_coalesce(expr))
+        self.check_list_values((getattr(self.project, "decision_tables", None) or {}).get(table_id), policy, output)
+        args = [self.table_call_operand(arg) for arg in operation.reference[4:]]
         self._decision_table_calls = True
         head = ", ".join(f"'{v}'" for v in (table_id, policy, output))
         return f"cht:extension-lib('{self.decision_table_library()}', {head}, {', '.join(args)})"
@@ -1124,33 +1108,6 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
         except Exception as e:
             logger.error(f"Failed to download ODK Validate JAR: {str(e)}")
             return None
-
-    def tricc_operation_zscore(self, ref_expressions, original_references=None):
-        y, ll, m, s = self.get_zscore_params(ref_expressions)
-        #  return ((Math.pow((y / m), l) - 1) / (s * l));
-        return f"""cht:extension-lib('{
-            ref_expressions[0][1:-1]
-            }.js',{
-            self.clean_coalesce(ref_expressions[1])
-            } ,{
-            self.clean_coalesce(ref_expressions[2])
-            } ,{
-            self.clean_coalesce(ref_expressions[3])
-            })"""
-
-    def tricc_operation_izscore(self, ref_expressions, original_references=None):
-        z, ll, m, s = self.get_zscore_params(ref_expressions)
-        #  return  (m * (z*s*l-1)^(1/l));
-        return f"""cht:extension-lib('{
-            ref_expressions[0][1:-1]
-            }.js',{
-            self.clean_coalesce(ref_expressions[1])
-            } ,{
-            self.clean_coalesce(ref_expressions[2])
-            } ,{
-            self.clean_coalesce(ref_expressions[3])
-            }, true"""
-
 
     def tricc_operation_get_inherited_value(self, ref_expressions, original_references=None):  
         """CHT supports coalesce(., …) for the current question value."""

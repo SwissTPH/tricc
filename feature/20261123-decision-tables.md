@@ -6,7 +6,7 @@
 | **Branch target** | `feature/decision-tables` → `develop` |
 | **Scope**         | `models` (`project_config`), `converters/cql_to_operation`, `visitors/tricc` (`load_calculate`), all output strategies through `IFS` (`XLSFormStrategy` → `XLSFormCHTStrategy`, `FHIRStrategy` → `OpenSRPStrategy`, `OpenMRSStrategy`, `DHIS2Strategy`) |
 | **RFC**           | #85 (implementation #91) |
-| **Related** | `tricc-frontend/feature/20261120-decision-table-editor.md` (mirror: the table editor, SwissTPH/tricc-frontend#51), `feature/20261123-dmn-named-overrides.md` (RFC #96: named overrides, `null` inputs), `fix/20261118-fhir-end-node-process-skip.md` (origin: the empty diazepam dose in FHIR), `feature/20261111-block-params-and-start-node.md` (not needed: a function, not a block) |
+| **Related** | `tricc-frontend/feature/20261120-decision-table-editor.md` (mirror: the table editor, SwissTPH/tricc-frontend#51), `feature/20261123-dmn-named-overrides.md` (RFC #96: named overrides, `null` inputs), `feature/20261123-dmn-instance-lookup.md` (large tables as ODK instances, zscore on tables), `fix/20261118-fhir-end-node-process-skip.md` (origin: the empty diazepam dose in FHIR), `feature/20261111-block-params-and-start-node.md` (not needed: a function, not a block) |
 
 Valid status values: `Draft` → `Approved` → `Implemented` → `Superseded`.
 

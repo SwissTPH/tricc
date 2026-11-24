@@ -8,6 +8,42 @@ logger = logging.getLogger("default")
 
 
 @register_output_strategy("BaseOutPutStrategy")
+def _wrapped(expr: str) -> bool:
+    """Whether ``expr`` is one bracketed group: ``(a - b)``, not ``(a) - (b)``."""
+    if not (expr.startswith("(") and expr.endswith(")")):
+        return False
+    depth = 0
+    for i, ch in enumerate(expr):
+        depth += ch == "("
+        depth -= ch == ")"
+        if depth == 0 and i < len(expr) - 1:
+            return False
+    return True
+
+
+def bracket_arithmetic(ref_expressions, original_references=None):
+    """The operands, an arithmetic operation among them in brackets.
+
+    The arithmetic writers join their operands with the operator, so ``(a + b) / 2`` would be
+    written ``a + b div 2`` without them.
+    """
+    from tricc_oo.models.base import TriccOperation, TriccOperator
+
+    arithmetic = (
+        TriccOperator.PLUS, TriccOperator.MINUS, TriccOperator.MULTIPLIED, TriccOperator.DIVIDED,
+        TriccOperator.MODULO, TriccOperator.POWER,
+    )
+    refs = list(original_references or [])
+    out = []
+    for i, expr in enumerate(ref_expressions):
+        ref = refs[i] if i < len(refs) else None
+        text = str(expr)
+        if isinstance(ref, TriccOperation) and ref.operator in arithmetic and not _wrapped(text):
+            text = f"({text})"
+        out.append(text)
+    return out
+
+
 class BaseOutPutStrategy(abc.ABC):
     processes = ["main"]
     project = None

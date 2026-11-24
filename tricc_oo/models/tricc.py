@@ -593,6 +593,8 @@ class TriccIntervention(BaseModel):
     # keep each expanded call as DMN_CALL for an output strategy that evaluates the tables
     # itself (XLSFormCHTStrategy: dmn-<project>.js); set by the runner from the strategy class
     decision_table_calls: bool = False
+    # tricc.yaml decision_table_max_inline_rows: XLSForm reads larger tables from an instance
+    decision_table_max_inline_rows: int = 10
     # Functions the tricc.yaml ``libraries`` declare, by name: FunctionSignature (return
     # type, arguments, CQL documentation tags such as @retrieve); see
     # tricc_oo.converters.cql_library.function_signature
