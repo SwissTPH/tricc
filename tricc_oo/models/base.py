@@ -498,9 +498,7 @@ class TriccOperator(StrEnum):
     # [inline expansion, table, policy, output, *one argument per input]
     DMN_CALL = "dmn_call"
     LIST_IF = "list_if"  # [cond, value], ...: the values whose condition holds, in order
-    # zscore once the LMS parameters are looked up (ZSCORE / IZSCORE expanded on decision tables):
-    ZSCORE_LMS = "zscore_lms"  # [y, l, m, s] -> ((y/m)^l - 1) / (s*l)
-    IZSCORE_LMS = "izscore_lms"  # [z, l, m, s] -> m * (z*s*l + 1)^(1/l)
+    POWER = "power"  # [base, exponent]
     FLOOR = "floor"
     COALESCE = "coalesce"
     GET_INHERITED_VALUE = "get_inherited_value"
@@ -573,8 +571,7 @@ RETURNS_NUMBER = [
     TriccOperator.CAST_INTEGER,
     TriccOperator.CAST_DECIMAL,
     TriccOperator.FLOOR,
-    TriccOperator.ZSCORE_LMS,
-    TriccOperator.IZSCORE_LMS,
+    TriccOperator.POWER,
     TriccOperator.GET_NUMBER_OF_REPEAT
 ]
 
@@ -1248,6 +1245,7 @@ def simplify_with_sympy(operation):
         TriccOperator.MULTIPLIED: Mul,
         TriccOperator.DIVIDED: lambda x, y: Mul(x, Pow(y, -1)),
         TriccOperator.MODULO: lambda x, y: x % y,  # Modulo
+        TriccOperator.POWER: lambda x, y: x ** y,
 
         # Comparison operations
         TriccOperator.EQUAL: Eq,

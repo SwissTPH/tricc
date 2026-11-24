@@ -141,7 +141,7 @@ from tricc_oo.models.tricc import (
     TriccNodeTrigger,
 )
 from tricc_oo.models.calculate import TriccNodeDisplayCalculateBase, TriccNodePopulate
-from tricc_oo.strategies.output.base_output_strategy import BaseOutPutStrategy
+from tricc_oo.strategies.output.base_output_strategy import BaseOutPutStrategy, bracket_arithmetic
 from tricc_oo.strategies.registry import register_output_strategy
 from tricc_oo.visitors.tricc import (
     get_applicability_expression,
@@ -3261,12 +3261,13 @@ class FHIRStrategy(BaseOutPutStrategy):
         return f"not {ref_expressions[0]}"
 
     def tricc_operation_plus(self, ref_expressions, original_references=None):
-        return " + ".join(ref_expressions)
+        return " + ".join(bracket_arithmetic(ref_expressions, original_references))
 
     def tricc_operation_minus(self, ref_expressions, original_references=None):
-        if len(ref_expressions) > 1:
-            return " - ".join(ref_expressions)
-        return f"-{ref_expressions[0]}"
+        parts = bracket_arithmetic(ref_expressions, original_references)
+        if len(parts) > 1:
+            return " - ".join(parts)
+        return f"-{parts[0]}"
 
     def tricc_operation_more(self, ref_expressions, original_references=None):
         return f"{ref_expressions[0]} > {ref_expressions[1]}"
@@ -3929,13 +3930,18 @@ class FHIRStrategy(BaseOutPutStrategy):
     # ARITHMETIC OPERATORS
     # ============================================================
     def tricc_operation_divided(self, ref_expressions, original_references=None):
-        return f"({ref_expressions[0]} / {ref_expressions[1]})"
+        a, b = bracket_arithmetic(ref_expressions, original_references)[:2]
+        return f"({a} / {b})"
 
     def tricc_operation_multiplied(self, ref_expressions, original_references=None):
-        return f"({ref_expressions[0]} * {ref_expressions[1]})"
+        return f"({' * '.join(bracket_arithmetic(ref_expressions, original_references))})"
 
     def tricc_operation_modulo(self, ref_expressions, original_references=None):
-        return f"({ref_expressions[0]} mod {ref_expressions[1]})"
+        a, b = bracket_arithmetic(ref_expressions, original_references)[:2]
+        return f"({a} mod {b})"
+
+    def tricc_operation_power(self, ref_expressions, original_references=None):
+        return f"Power({ref_expressions[0]}, {ref_expressions[1]})"
 
     def tricc_operation_round(self, ref_expressions, original_references=None):
         return f"Round({ref_expressions[0]})"
@@ -4144,19 +4150,6 @@ class FHIRStrategy(BaseOutPutStrategy):
     def tricc_operation_floor(self, ref_expressions, original_references=None):
         return f"Floor({ref_expressions[0]})"
 
-    def tricc_operation_zscore_lms(self, ref_expressions, original_references=None):
-        # WHO: ((y / m)^l - 1) / (s * l)  (feature/20261123-dmn-instance-lookup.md)
-        y, ll, m, s = ref_expressions
-        return f"((Power(({y}) / ({m}), {ll}) - 1) / (({s}) * ({ll})))"
-
-    def tricc_operation_izscore_lms(self, ref_expressions, original_references=None):
-        # WHO: m * (z * s * l + 1)^(1/l)
-        z, ll, m, s = ref_expressions
-        return f"(({m}) * Power(({z}) * ({s}) * ({ll}) + 1, 1.0 / ({ll})))"
-
-    # ============================================================
-    # ADDITIONAL / FALLBACK
-    # ============================================================
     def tricc_operation_native(self, ref_expressions, original_references=None):
         name = (original_references or [None])[0]
         if isinstance(name, str) and name.lower() in _NATIVE_UNSUPPORTED_FUNCTIONS:
@@ -4248,12 +4241,13 @@ class FHIRStrategy(BaseOutPutStrategy):
         return self._fhirpath_as_decimal(wrapped, original_ref)
 
     def _fhirpath_numeric_parts(self, ref_expressions, original_references=None):
-        """Wrap each arithmetic operand as a FHIRPath decimal scalar."""
+        """Wrap each arithmetic operand as a FHIRPath decimal scalar (nested arithmetic bracketed)."""
         refs = list(original_references or [])
-        return [
+        parts = [
             self._fhirpath_numeric_operand(expr, refs[i] if i < len(refs) else None)
             for i, expr in enumerate(ref_expressions)
         ]
+        return bracket_arithmetic(parts, refs)
 
     def _fhirpath_numeric_compare(self, operator: str, ref_expressions, original_references=None) -> str:
         parts = self._fhirpath_numeric_parts(ref_expressions, original_references)
@@ -4582,15 +4576,9 @@ class FHIRStrategy(BaseOutPutStrategy):
         src = original_references[0] if original_references else None
         return f"({self._fhirpath_numeric_operand(ref_expressions[0], src)}).floor()"
 
-    def tricc_operation_fhirpath_zscore_lms(self, ref_expressions, original_references=None):
-        # WHO: ((y / m)^l - 1) / (s * l)
-        y, ll, m, s = self._fhirpath_numeric_parts(ref_expressions, original_references)
-        return f"((({y} / {m}).power({ll}) - 1) / ({s} * {ll}))"
-
-    def tricc_operation_fhirpath_izscore_lms(self, ref_expressions, original_references=None):
-        # WHO: m * (z * s * l + 1)^(1/l)
-        z, ll, m, s = self._fhirpath_numeric_parts(ref_expressions, original_references)
-        return f"({m} * ({z} * {s} * {ll} + 1).power(1.0 / {ll}))"
+    def tricc_operation_fhirpath_power(self, ref_expressions, original_references=None):
+        base, exponent = self._fhirpath_numeric_parts(ref_expressions, original_references)[:2]
+        return f"({base}).power({exponent})"
 
     def tricc_operation_fhirpath_has_qualifier(self, ref_expressions, original_references=None):
         raise NotImplementedError("HAS_QUALIFIER is not supported by FHIRPath 2.0")

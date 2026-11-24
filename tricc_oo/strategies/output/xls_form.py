@@ -57,7 +57,7 @@ from tricc_oo.serializers.xls_form import (
     get_export_group_required,
     start_group,
 )
-from tricc_oo.strategies.output.base_output_strategy import BaseOutPutStrategy
+from tricc_oo.strategies.output.base_output_strategy import BaseOutPutStrategy, bracket_arithmetic
 from tricc_oo.strategies.registry import register_output_strategy
 
 logger = logging.getLogger("default")
@@ -548,13 +548,18 @@ class XLSFormStrategy(BaseOutPutStrategy):
         return f"count-selected({self.clean_coalesce(ref_expressions[0])})"
 
     def tricc_operation_multiplied(self, ref_expressions, original_references=None):
-        return "*".join(map(str, ref_expressions))
+        return "*".join(bracket_arithmetic(ref_expressions, original_references))
 
     def tricc_operation_divided(self, ref_expressions, original_references=None):
-        return f"{ref_expressions[0]} div {ref_expressions[1]}"
+        a, b = bracket_arithmetic(ref_expressions, original_references)[:2]
+        return f"{a} div {b}"
 
     def tricc_operation_modulo(self, ref_expressions, original_references=None):
-        return f"{ref_expressions[0]} mod {ref_expressions[1]}"
+        a, b = bracket_arithmetic(ref_expressions, original_references)[:2]
+        return f"{a} mod {b}"
+
+    def tricc_operation_power(self, ref_expressions, original_references=None):
+        return f"pow({ref_expressions[0]}, {ref_expressions[1]})"
 
     def tricc_operation_coalesce(self, ref_expressions, original_references=None):
         if len(ref_expressions) <= 1:
@@ -568,13 +573,14 @@ class XLSFormStrategy(BaseOutPutStrategy):
         return f"{ref_expressions[0]} mod {ref_expressions[1]}"
 
     def tricc_operation_minus(self, ref_expressions, original_references=None):
-        if len(ref_expressions) > 1:
-            return " - ".join(map(str, ref_expressions))
-        elif len(ref_expressions) == 1:
-            return f"-{ref_expressions[0]}"
+        parts = bracket_arithmetic(ref_expressions, original_references)
+        if len(parts) > 1:
+            return " - ".join(parts)
+        elif len(parts) == 1:
+            return f"-{parts[0]}"
 
     def tricc_operation_plus(self, ref_expressions, original_references=None):
-        return " + ".join(map(str, ref_expressions))
+        return " + ".join(bracket_arithmetic(ref_expressions, original_references))
 
     def tricc_operation_not(self, ref_expressions, original_references=None):
         return f"not({ref_expressions[0]})"
@@ -896,16 +902,6 @@ class XLSFormStrategy(BaseOutPutStrategy):
 
     def tricc_operation_round(self, ref_expressions, original_references=None):
         return f"round({ref_expressions[0]})"
-
-    def tricc_operation_zscore_lms(self, ref_expressions, original_references=None):
-        # WHO: ((y / m)^l - 1) / (s * l); l, m, s looked up in the LMS decision table
-        y, ll, m, s = ref_expressions
-        return f"((pow(({y}) div ({m}), {ll}) - 1) div (({s}) * ({ll})))"
-
-    def tricc_operation_izscore_lms(self, ref_expressions, original_references=None):
-        # WHO: m * (z * s * l + 1)^(1/l)
-        z, ll, m, s = ref_expressions
-        return f"(({m}) * pow(({z}) * ({s}) * ({ll}) + 1, 1 div ({ll})))"
 
     def get_tricc_operation_operand(self, r, coalesce_fallback="''"):
         # function transform an object to XLSFORM value

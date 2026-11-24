@@ -103,15 +103,19 @@ version writes the instance into the XForm.
 `l`, `m`, `s` decimal; one `first` row per LMS point: `'male'`, `[y_min..y_max)`). The
 expansion resolves a table id missing from the project against these built-in tables, so
 `DMN('wfa.l', …)` works too. `ZSCORE(table, sex, x, y)` and `IZSCORE(table, sex, x, z)`
-are expanded at the same stage: three lookups (`'t.l'`, `'t.m'`, `'t.s'`, policy `first`) and
-the new operators `ZSCORE_LMS(y, l, m, s)` = `((y/m)^l − 1) / (s·l)` and
-`IZSCORE_LMS(z, l, m, s)` = `m·(z·s·l + 1)^(1/l)`:
+are expanded at the same stage into the WHO formula, with three lookups (`'t.l'`, `'t.m'`,
+`'t.s'`, policy `first`): `((y/m)^l − 1) / (s·l)` and `m·(z·s·l + 1)^(1/l)`. The formula is
+written with the arithmetic operators, so `ZSCORE` / `IZSCORE` are the only zscore operators
+and no strategy serialises them. The exponent is a new generic `TriccOperator.POWER`:
 
 | Strategy | Serialisation |
 |---|---|
-| XPath (ODK, CDSS, CHT) | `pow()` |
-| FHIRPath | `.power()` |
-| CQL | `Power()` |
+| XPath (ODK, CDSS, CHT) | `pow(a, b)` |
+| FHIRPath | `(a).power(b)` |
+| CQL | `Power(a, b)` |
+
+The arithmetic writers (XLSForm, CQL, FHIRPath) bracket an operand that is itself arithmetic:
+they joined operands with the operator, so `("a" + "b") / 2` was written `a + b div 2`.
 
 The CDSS choice injection (`inject_used_zscore_tables`), `get_zscore_params`, the CHT
 `wfa.js` calls and the LMS columns of `CHOICE_MAP` are removed. A table that is not a literal
@@ -147,6 +151,8 @@ None.
 - **Spelling.** `Zscore` / `Izscore`, the names of `feature/cdss-zscore.md`, parsed as unknown
   native functions (only `ZScore` / `iZScore` were mapped): both spellings now map to the
   operators.
+- **Brackets.** The bracketing of nested arithmetic also fixes authored expressions such as
+  `("a" + "b") / 2`, which every XLSForm, CQL and FHIRPath export wrote without brackets.
 - **CHT** reads l, m and s with three library calls each; `l` appears twice in the formula, so
   a `Zscore` is four reads (the same in the ODK lookup).
 - **FHIR** has no list mode: a table is written inline, so a `Zscore` there is very long

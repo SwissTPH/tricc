@@ -34,7 +34,7 @@ from tests.test_decision_tables import yaml_project  # noqa: F401 (a fixture)
 from tricc_oo.converters.cql_to_operation import transform_cql_to_operation
 from tricc_oo.converters.decision_table import expand_decision_tables
 from tricc_oo.data.anthro import builtin_decision_table, get_choice_rows
-from tricc_oo.models.base import TriccOperator
+from tricc_oo.models.base import TriccOperation, TriccOperator, TriccReference
 from tricc_oo.models.decision_table import (
     DecisionTable,
     DecisionTableError,
@@ -191,6 +191,23 @@ def test_wfa_is_a_built_in_table():
     assert builtin_decision_table("nope") is None
 
 
+def arithmetic(expr, env):
+    """Evaluate the zscore formula: arithmetic on table lookups (``run`` for the lookups)."""
+    if isinstance(expr, TriccOperation) and expr.operator in ARITHMETIC:
+        values = [arithmetic(r, env) for r in expr.reference]
+        return ARITHMETIC[expr.operator](values)
+    return run(expr, env)
+
+
+ARITHMETIC = {
+    TriccOperator.PLUS: lambda v: sum(v),
+    TriccOperator.MINUS: lambda v: v[0] - v[1],
+    TriccOperator.MULTIPLIED: lambda v: math.prod(v),
+    TriccOperator.DIVIDED: lambda v: v[0] / v[1],
+    TriccOperator.POWER: lambda v: v[0] ** v[1],
+}
+
+
 def _lms(sex, x):
     return next(r for r in get_choice_rows("wfa") if r["sex"] == sex and r["y_min"] <= x < r["y_max"])
 
@@ -199,13 +216,13 @@ def test_zscore_expands_to_three_lookups():
     tables = {}
     expr = expand_decision_tables(transform_cql_to_operation("Zscore('wfa', \"sex\", \"age\", \"weight\")"), tables)
     assert set(tables) == {"wfa"}  # the built-in table, added when called
-    assert expr.operator == TriccOperator.ZSCORE_LMS
-    y, ll, m, s = expr.reference
+    assert expr.operator == TriccOperator.DIVIDED  # ((y / m)^l - 1) / (s * l), no zscore operator left
     row = _lms("female", 100.5)
-    env = {"sex": "female", "age": 100.5}
-    assert [run(ll, env), run(m, env), run(s, env)] == [row["l"], row["m"], row["s"]]
-    inverse = expand_decision_tables(transform_cql_to_operation("Izscore('wfa', \"sex\", \"age\", 0)"), tables)
-    assert inverse.operator == TriccOperator.IZSCORE_LMS
+    env = {"sex": "female", "age": 100.5, "weight": 6.5}
+    l, m, s = row["l"], row["m"], row["s"]
+    assert arithmetic(expr, env) == pytest.approx(((6.5 / m) ** l - 1) / (s * l))
+    inverse = expand_decision_tables(transform_cql_to_operation("Izscore('wfa', \"sex\", \"age\", 2)"), tables)
+    assert arithmetic(inverse, env) == pytest.approx(m * (2 * s * l + 1) ** (1 / l))
 
 
 def test_a_project_table_replaces_the_built_in_one():
@@ -216,7 +233,7 @@ def test_a_project_table_replaces_the_built_in_one():
         rules=[["-", "-", "1", "2", "3"]],
     )
     expr = expand_decision_tables(transform_cql_to_operation("Zscore('wfa', \"sex\", \"age\", \"w\")"), {"wfa": own})
-    assert [r.value for r in expr.reference[1:]] == [1, 2, 3]
+    assert arithmetic(expr, {"w": 4}) == pytest.approx(((4 / 2) ** 1 - 1) / (3 * 1))
 
 
 @pytest.mark.parametrize(
@@ -233,16 +250,19 @@ def test_zscore_errors(cql, code):
     assert exc.value.code == code
 
 
-def test_lms_serialisation(yaml_project, tmp_path):  # noqa: F811
+def test_nested_arithmetic_is_bracketed(yaml_project, tmp_path):  # noqa: F811
     from tricc_oo.strategies.output.fhir_form import FHIRStrategy
     from tricc_oo.strategies.output.xls_form import XLSFormStrategy
 
+    formula = transform_cql_to_operation("(\"a\" + \"b\") / 2 - \"c\" * (\"d\" - 1)")
     xpath = XLSFormStrategy(yaml_project, str(tmp_path))
-    assert xpath.tricc_operation_zscore_lms(["y", "l", "m", "s"]) == "((pow((y) div (m), l) - 1) div ((s) * (l)))"
-    assert xpath.tricc_operation_izscore_lms(["z", "l", "m", "s"]) == "((m) * pow((z) * (s) * (l) + 1, 1 div (l)))"
+    assert xpath.get_tricc_operation_expression(formula) == "((${a} + ${b}) div 2) - (${c}*(${d} - 1))"
+    power = TriccOperation(TriccOperator.POWER, [TriccOperation(TriccOperator.MINUS, [TriccReference("a"), 1]), 2])
+    assert xpath.get_tricc_operation_expression(power) == "pow(${a} - 1, 2)"
     fhir = FHIRStrategy(yaml_project, str(tmp_path))
-    assert fhir.tricc_operation_zscore_lms(["y", "l", "m", "s"]) == "((Power((y) / (m), l) - 1) / ((s) * (l)))"
-    assert ".power(" in fhir.tricc_operation_fhirpath_zscore_lms(["y", "l", "m", "s"])
+    cql = re.sub(r"Helper\.GetObservationValue\('(\w)'\)", r"\1", fhir.get_tricc_operation_expression(formula))
+    assert cql == "((a + b) / 2) - (c * (d - 1))"
+    assert ".power(2" in fhir.get_tricc_operation_expression_fhirpath(power)
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node is needed to run the library")

@@ -16,9 +16,9 @@ Arguments bind table inputs (feature/20261123-dmn-named-overrides.md):
 a test that holds is removed, so no reference is created for it.
 
 ``Zscore(table, sex, x, y)`` / ``Izscore(table, sex, x, z)`` are expanded here too: three
-lookups of the LMS table (``'t.l'``, ``'t.m'``, ``'t.s'``) feeding ``ZSCORE_LMS`` /
-``IZSCORE_LMS``. A table id the project does not define is looked up among the WHO tables that
-ship with TRICC (feature/20261123-dmn-instance-lookup.md).
+lookups of the LMS table (``'t.l'``, ``'t.m'``, ``'t.s'``) in the WHO formula, written with the
+arithmetic operators (``POWER`` for the exponent). A table id the project does not define is
+looked up among the WHO tables that ship with TRICC (feature/20261123-dmn-instance-lookup.md).
 """
 
 from __future__ import annotations
@@ -57,11 +57,7 @@ _NULL = object()  # an argument bound to null
 #: a table this large written inline (strategies that do not keep the calls, e.g. FHIR) is logged
 INLINE_WARNING_ROWS = 50
 
-#: Zscore / Izscore and the operator they become once l, m, s are looked up
-_ZSCORE_OPERATORS = {
-    TriccOperator.ZSCORE: TriccOperator.ZSCORE_LMS,
-    TriccOperator.IZSCORE: TriccOperator.IZSCORE_LMS,
-}
+_ZSCORE_OPERATORS = (TriccOperator.ZSCORE, TriccOperator.IZSCORE)
 
 
 def resolve_table(table_id: str, tables: Dict[str, DecisionTable]) -> Optional[DecisionTable]:
@@ -158,7 +154,10 @@ def _expand(expr: Any, tables, aliases, used, keep_calls=False) -> Any:
 
 
 def _expand_zscore(operator, args, tables, aliases, used, keep_calls) -> TriccOperation:
-    """``Zscore(table, sex, x, y)`` → ``ZSCORE_LMS(y, l, m, s)``, each of l, m, s a table lookup."""
+    """The WHO LMS formula, each of l, m, s a table lookup.
+
+    ``Zscore``: ``((y / m)^l - 1) / (s * l)``; ``Izscore``: ``m * (z * s * l + 1)^(1 / l)``.
+    """
     name = "Zscore" if operator == TriccOperator.ZSCORE else "Izscore"
     if len(args) != 4:
         raise DecisionTableError("E_DMN_ARITY", f"{name}(table, sex, x, value) takes 4 arguments; got {len(args)}.")
@@ -172,7 +171,15 @@ def _expand_zscore(operator, args, tables, aliases, used, keep_calls) -> TriccOp
         expand_call("DMNFirst", [TriccStatic(value=f"{table_id}.{out}"), sex, x], tables, aliases, used, keep_calls)
         for out in ("l", "m", "s")
     ]
-    return TriccOperation(_ZSCORE_OPERATORS[operator], [value, *lms])
+    ll, m, s = lms
+    one = TriccStatic(value=1)
+    if operator == TriccOperator.ZSCORE:
+        ratio = TriccOperation(TriccOperator.DIVIDED, [value, m])
+        top = TriccOperation(TriccOperator.MINUS, [TriccOperation(TriccOperator.POWER, [ratio, ll]), one])
+        return TriccOperation(TriccOperator.DIVIDED, [top, TriccOperation(TriccOperator.MULTIPLIED, [s, ll])])
+    base = TriccOperation(TriccOperator.PLUS, [TriccOperation(TriccOperator.MULTIPLIED, [value, s, ll]), one])
+    exponent = TriccOperation(TriccOperator.DIVIDED, [one, ll])
+    return TriccOperation(TriccOperator.MULTIPLIED, [m, TriccOperation(TriccOperator.POWER, [base, exponent])])
 
 
 def _split_named(args: List[Any]) -> Tuple[List[Any], List[Tuple[str, Any]]]:
