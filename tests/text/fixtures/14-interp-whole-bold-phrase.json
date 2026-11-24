@@ -1,0 +1,58 @@
+{
+  "name": "interp-whole-bold-phrase",
+  "input": {
+    "html": "<b>Give ${dose} mg</b> of ${drug}"
+  },
+  "doc": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Give ",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          },
+          {
+            "type": "interp",
+            "attrs": {
+              "name": "dose"
+            },
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": " mg",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": " of "
+          },
+          {
+            "type": "interp",
+            "attrs": {
+              "name": "drug"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "plain": "Give … mg of …",
+  "markdown": "**Give ${dose} mg** of ${drug}",
+  "xhtml": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><strong>Give … mg</strong> of …</p></div>"
+}

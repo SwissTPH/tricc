@@ -1,0 +1,41 @@
+{
+  "name": "unknown-elements-unwrapped",
+  "input": {
+    "html": "<font face=\"Arial\"><b>Yes</b></font> <a href=\"x\">Link</a><table><tr><td>cell</td></tr></table>"
+  },
+  "doc": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ],
+            "text": "Yes"
+          },
+          {
+            "type": "text",
+            "text": " Link"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "cell"
+          }
+        ]
+      }
+    ]
+  },
+  "plain": "Yes Link\ncell",
+  "markdown": "**Yes** Link\ncell",
+  "xhtml": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><strong>Yes</strong> Link<br/>cell</p></div>"
+}

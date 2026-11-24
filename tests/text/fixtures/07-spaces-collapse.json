@@ -1,0 +1,32 @@
+{
+  "name": "spaces-collapse",
+  "input": {
+    "html": "apply for<b>  4 weeks</b>"
+  },
+  "doc": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "apply for"
+          },
+          {
+            "type": "text",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ],
+            "text": " 4 weeks"
+          }
+        ]
+      }
+    ]
+  },
+  "plain": "apply for 4 weeks",
+  "markdown": "apply for **4 weeks**",
+  "xhtml": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>apply for<strong> 4 weeks</strong></p></div>"
+}

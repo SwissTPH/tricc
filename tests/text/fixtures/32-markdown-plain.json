@@ -1,0 +1,33 @@
+{
+  "name": "markdown-plain",
+  "input": {
+    "markdown": "Age is ${age} years"
+  },
+  "doc": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Age is "
+          },
+          {
+            "type": "interp",
+            "attrs": {
+              "name": "age"
+            }
+          },
+          {
+            "type": "text",
+            "text": " years"
+          }
+        ]
+      }
+    ]
+  },
+  "plain": "Age is … years",
+  "markdown": "Age is ${age} years",
+  "xhtml": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Age is … years</p></div>"
+}

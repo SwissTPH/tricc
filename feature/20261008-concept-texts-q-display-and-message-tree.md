@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|-------|
 | **Status** | Draft |
-| **Related** | `feature/20260909-display-message-ast.md` (Implemented; this adds a JSON input path to the tree), `feature/display-text-injection.md`, `feature/20260907-project-config.md`, commits 9676af2 (YamlStrategy reads node and option texts from the CodeSystem), d76bf11 (hint/help as designations), a3ad036 (translations from designations) |
+| **Related** | §3 (the `designation-message` tree) superseded by `feature/20261120-prosemirror-display-text.md` (`designation-doc`; the tree is only read). `feature/20260909-display-message-ast.md` (Superseded), `feature/display-text-injection.md`, `feature/20260907-project-config.md`, commits 9676af2 (YamlStrategy reads node and option texts from the CodeSystem), d76bf11 (hint/help as designations), a3ad036 (translations from designations) |
 | **Frontend** | `../tricc_frontend/feature/20261008-data-dictionary-and-concept-texts.md` §2.0, §2.4, §2.5, §2.6, §2.7. The frontend side of every item below is implemented, not committed. |
 | **Strategy** | `YamlStrategy` (input). XLSForm/CHT and FHIR translation output (`serializers/xls_form_translations.py`). `converters/datadictionnary.py`. |
 | **Approval** | — |

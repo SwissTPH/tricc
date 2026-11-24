@@ -164,7 +164,7 @@ Checks:
 - Token must be a bare field name (`${age}`), not an expression (`${age + 1}`).
 - ODK/CHT rewrites to Markdown with `${export_name}` after processing; FHIR keeps that
   Markdown in `item.text` and attaches a concatenate FHIRPath at serialize time.
-- See `feature/display-text-injection.md` and `feature/20260909-display-message-ast.md`.
+- See `feature/display-text-injection.md` and `feature/20261120-prosemirror-display-text.md`.
 - For scoring flows (rhombus → `count`), use a signed integer on the true branch
   instead of leaving the edge unlabeled with a non-standard text label.
 

@@ -1,0 +1,122 @@
+{
+  "name": "convulsion-note",
+  "input": {
+    "html": "<b>IF THE CHILD IS CONVULSING NOW - TREAT IMMEDIATELY</b><br><br><br><br><ul><li>Turn the child to his/her side</li><li>Do not put anything in the mouth</li></ul><br>For this child give <b>${diazepam_dose}ml</b> <b>Diazepam</b> per <b>rectum</b>"
+  },
+  "doc": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ],
+            "text": "IF THE CHILD IS CONVULSING NOW - TREAT IMMEDIATELY"
+          }
+        ]
+      },
+      {
+        "type": "paragraph"
+      },
+      {
+        "type": "bulletList",
+        "content": [
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Turn the child to his/her side"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Do not put anything in the mouth"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "paragraph"
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "For this child give "
+          },
+          {
+            "type": "interp",
+            "attrs": {
+              "name": "diazepam_dose"
+            },
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": "ml",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": " "
+          },
+          {
+            "type": "text",
+            "text": "Diazepam",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": " per "
+          },
+          {
+            "type": "text",
+            "text": "rectum",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "plain": "IF THE CHILD IS CONVULSING NOW - TREAT IMMEDIATELY\n\n• Turn the child to his/her side\n• Do not put anything in the mouth\n\nFor this child give …ml Diazepam per rectum",
+  "markdown": "**IF THE CHILD IS CONVULSING NOW - TREAT IMMEDIATELY**\n\n- Turn the child to his/her side\n- Do not put anything in the mouth\n\nFor this child give **${diazepam_dose}ml** **Diazepam** per **rectum**",
+  "xhtml": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><strong>IF THE CHILD IS CONVULSING NOW - TREAT IMMEDIATELY</strong></p><ul><li>Turn the child to his/her side</li><li>Do not put anything in the mouth</li></ul><p>For this child give <strong>…ml</strong> <strong>Diazepam</strong> per <strong>rectum</strong></p></div>"
+}

@@ -1,0 +1,44 @@
+{
+  "name": "div-lines",
+  "input": {
+    "html": "Check the child<div>Then weigh</div><div><br></div><div>Then refer</div>"
+  },
+  "doc": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Check the child"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Then weigh"
+          }
+        ]
+      },
+      {
+        "type": "paragraph"
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Then refer"
+          }
+        ]
+      }
+    ]
+  },
+  "plain": "Check the child\nThen weigh\n\nThen refer",
+  "markdown": "Check the child\nThen weigh\n\nThen refer",
+  "xhtml": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Check the child<br/>Then weigh</p><p>Then refer</p></div>"
+}

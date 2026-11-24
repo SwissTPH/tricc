@@ -1,0 +1,38 @@
+{
+  "name": "interp-inside-bold",
+  "input": {
+    "html": "Patient is <b>${age}</b> years old"
+  },
+  "doc": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Patient is "
+          },
+          {
+            "type": "interp",
+            "attrs": {
+              "name": "age"
+            },
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": " years old"
+          }
+        ]
+      }
+    ]
+  },
+  "plain": "Patient is … years old",
+  "markdown": "Patient is **${age}** years old",
+  "xhtml": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Patient is <strong>…</strong> years old</p></div>"
+}

@@ -2,8 +2,8 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Implemented |
-| **Related** | `feature/display-text-injection.md` (Implemented — `${REF}` authoring stays; Concatenate as the in-memory message type is replaced by this spec), `docs/tricc-elements.md`, `docs/pipeline.md` |
+| **Status** | Superseded |
+| **Related** | Superseded by `feature/20261120-prosemirror-display-text.md` (ProseMirror documents replace the tree). `feature/display-text-injection.md` (Implemented — `${REF}` authoring stays; Concatenate as the in-memory message type is replaced by this spec), `docs/tricc-elements.md`, `docs/pipeline.md` |
 | **Strategy** | All strategies that emit display text: `XLSFormStrategy` (+ CHT variants), `FHIRStrategy` / `OpenSRPStrategy`, `HTMLStrategy`, test-spec. `TriccOperator.CONCATENATE` is unchanged for **calculate** expressions. |
 | **Approval** | Approved 2026-09-14 |
 

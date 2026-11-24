@@ -1,0 +1,57 @@
+{
+  "name": "line-break-opening-a-line",
+  "input": {
+    "html": "Give:<div><br>- apply once</div><br>then rest"
+  },
+  "doc": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Give:"
+          }
+        ]
+      },
+      {
+        "type": "paragraph"
+      },
+      {
+        "type": "bulletList",
+        "content": [
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "apply once"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "paragraph"
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "then rest"
+          }
+        ]
+      }
+    ]
+  },
+  "plain": "Give:\n\n• apply once\n\nthen rest",
+  "markdown": "Give:\n\n- apply once\n\nthen rest",
+  "xhtml": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Give:</p><ul><li>apply once</li></ul><p>then rest</p></div>"
+}

@@ -156,7 +156,7 @@ from tricc_oo.visitors.text_injection import (
     message_to_concatenate_operation,
     serialize_injection_for_js_text,
 )
-from tricc_oo.models.message import TriccMessage
+from tricc_oo.text.model import TriccText
 logger = logging.getLogger("default")
 
 # ---------------------------------------------------------------------------
@@ -914,21 +914,21 @@ class FHIRStrategy(BaseOutPutStrategy):
     def _display_text_and_operation(self, value) -> Tuple[Optional[str], Optional[object]]:
         """Split a display-text field into static text and its dynamic tree.
 
-        ``${REF}`` injection is loaded as a ``TriccMessage``
+        ``${REF}`` injection is loaded as a ``TriccText``
         (``feature/20260909-display-message-ast.md``). FHIR keeps the author's
         tokens in ``item.text`` as a fallback and returns the tree so a
         ``cqf-expression`` can be attached once every Questionnaire item exists.
 
         Args:
             value: Raw ``label`` / ``hint`` / ``help`` value (str, dict of locales,
-                node, ``TriccMessage``, or leftover ``TriccOperation``).
+                node, ``TriccText``, or leftover ``TriccOperation``).
 
         Returns:
             ``(static text or None, message/CONCATENATE or None)``.
         """
         if value is None:
             return None, None
-        if issubclass(value.__class__, TriccNodeBaseModel) and not isinstance(value, TriccMessage):
+        if issubclass(value.__class__, TriccNodeBaseModel) and not isinstance(value, TriccText):
             return self._display_text_and_operation(getattr(value, "label", None))
         if isinstance(value, dict):
             for locale_value in value.values():
@@ -936,7 +936,7 @@ class FHIRStrategy(BaseOutPutStrategy):
                 if text:
                     return text, operation
             return None, None
-        if isinstance(value, TriccMessage):
+        if isinstance(value, TriccText):
             static = serialize_injection_for_js_text(value, self._injection_export_name).strip()
             dynamic = message_to_concatenate_operation(value)
             return (static or None), dynamic
@@ -977,7 +977,7 @@ class FHIRStrategy(BaseOutPutStrategy):
         """The display-text value to render: a node's label, the first non-empty locale
         of a dict, the tree or string itself. A non-``${REF}`` operation gives its
         static text."""
-        if issubclass(value.__class__, TriccNodeBaseModel) and not isinstance(value, TriccMessage):
+        if issubclass(value.__class__, TriccNodeBaseModel) and not isinstance(value, TriccText):
             return self._display_value(getattr(value, "label", None))
         if isinstance(value, dict):
             return next((v for v in value.values() if v), None)
@@ -1408,13 +1408,13 @@ class FHIRStrategy(BaseOutPutStrategy):
 
         Args:
             item: Questionnaire item the text belongs to (for diagnostics).
-            operation: ``CONCATENATE`` emitted from a ``TriccMessage`` at serialize time.
+            operation: ``CONCATENATE`` emitted from a ``TriccText`` at serialize time.
 
         Returns:
             FHIRPath expression returning a single string, or ``None`` when the
             text cannot be rendered dynamically (the static fallback then stands).
         """
-        if isinstance(operation, TriccMessage):
+        if isinstance(operation, TriccText):
             operation = message_to_concatenate_operation(operation)
             if operation is None:
                 return None
@@ -1450,7 +1450,7 @@ class FHIRStrategy(BaseOutPutStrategy):
 
     def _text_reference_link_ids(self, operation) -> List[str]:
         """Every Questionnaire ``linkId`` a display-text operation reads."""
-        if isinstance(operation, TriccMessage):
+        if isinstance(operation, TriccText):
             operation = message_to_concatenate_operation(operation)
             if operation is None:
                 return []

@@ -13,7 +13,7 @@ from tricc_oo.models.base import (
     TriccOperator,
     TriccOperation, TriccStatic, TriccReference, and_join, TriccNodeType, TriccGroup
 )
-from tricc_oo.models.message import TriccMessage
+from tricc_oo.text.model import TriccText
 from tricc_oo.models.calculate import (
     TriccNodeDisplayCalculateBase,
     TriccNodeCalculate
@@ -384,8 +384,8 @@ def get_xfrom_trad(strategy, node, column, mapping, clean_html=False):
         and node.expression.get_datatype() in ("number", "boolean")
     ):
         value = f"number({value})" if str(value) not in ["0", "1"] else value
-    # ODK/CHT display columns: TriccMessage / leftover CONCATENATE → "text ${export} text"
-    _display_types = (TriccOperation, TriccReference, TriccStatic, TriccMessage)
+    # ODK/CHT display columns: TriccText / leftover CONCATENATE → "text ${export} text"
+    _display_types = (TriccOperation, TriccReference, TriccStatic, TriccText)
     if new_column in TRAD_MAP and isinstance(value, _display_types):
         value = serialize_injection_for_js_text(value, get_export_name)
     elif new_column in TRAD_MAP and isinstance(value, dict):

@@ -41,9 +41,16 @@ This allows draft pages to stay in the model without entering full downstream ge
 - `link_out` to `link_in` resolution
 - loop warnings and edge validation
 
-Display text with `${field}` tokens is parsed to a `TriccMessage` tree at **input load**
-for display models only (see `feature/display-text-injection.md` and
-`feature/20260909-display-message-ast.md`).
+Display text is read at **input load**, for display models only, into a ProseMirror
+document (`TriccText`, `tricc_oo/text/`; a text without structure stays a plain `str`):
+draw.io label HTML through the schema's parse rules, YAML labels and designation `value`s as
+Markdown, editor documents from the `designation-doc` extension. `${field}` tokens become
+`interp` nodes whose names `process_reference` resolves like any reference. Every output
+renders the same document: Markdown for ODK/CHT, plain text plus Markdown or XHTML for FHIR,
+a `CONCATENATE` for dynamic text. The schema, the canonical form and the shared fixtures
+(`tests/text/fixtures/`, also run by the frontend) are in
+`feature/20261120-prosemirror-display-text.md`; `${field}` authoring in
+`feature/display-text-injection.md`.
 
 **Project retrievals** (`feature/20261109-project-retrievals.md`): once every page is loaded,
 `attach_library_calculates` also reads the retrieval dictionary

@@ -1,0 +1,35 @@
+{
+  "name": "typed-markdown-in-colour-kept",
+  "input": {
+    "html": "<span style=\"color:#d32f2f\">**Danger**</span> sign"
+  },
+  "doc": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "marks": [
+              {
+                "type": "textStyle",
+                "attrs": {
+                  "color": "#d32f2f"
+                }
+              }
+            ],
+            "text": "**Danger**"
+          },
+          {
+            "type": "text",
+            "text": " sign"
+          }
+        ]
+      }
+    ]
+  },
+  "plain": "**Danger** sign",
+  "markdown": "**Danger** sign",
+  "xhtml": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><span style=\"color: #d32f2f\">**Danger**</span> sign</p></div>"
+}

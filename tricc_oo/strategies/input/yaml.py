@@ -43,7 +43,7 @@ from tricc_oo.models.params import (
     substitute,
 )
 from tricc_oo.converters.utils import generate_id
-from tricc_oo.converters.datadictionnary import concept_text, find_concept, is_template_concept
+from tricc_oo.converters.datadictionnary import concept_display_text, find_concept, is_template_concept
 from tricc_oo.converters.xml_to_tricc import (
     _get_name,
     assign_rhombus_path,
@@ -1059,12 +1059,15 @@ class YamlStrategy(BaseInputStrategy):
         return found
 
     @staticmethod
-    def _concept_texts(concept, project: TriccIntervention) -> Dict[str, str]:
+    def _concept_texts(concept, project: TriccIntervention) -> Dict[str, Any]:
+        """Label / hint / help of a concept in the default language: the designation's
+        ``designation-doc`` document, else its old ``designation-message`` tree, else its
+        text (Markdown) (feature/20261120-prosemirror-display-text.md §1.3)."""
         if concept is None:
             return {}
         texts = {}
         for field, use in TEXT_FIELD_USES.items():
-            text = concept_text(concept, use, project.lang_code, project.lang_code)
+            text = concept_display_text(concept, use, project.lang_code, project.lang_code)
             if text:
                 texts[field] = text
         return texts

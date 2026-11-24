@@ -1,0 +1,23 @@
+{
+  "name": "typed-intraword-underscore-is-text",
+  "input": {
+    "html": "weight_for_age in kg"
+  },
+  "doc": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "weight_for_age in kg"
+          }
+        ]
+      }
+    ]
+  },
+  "plain": "weight_for_age in kg",
+  "markdown": "weight_for_age in kg",
+  "xhtml": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>weight_for_age in kg</p></div>"
+}

@@ -1,0 +1,59 @@
+{
+  "name": "typed-ordered-list",
+  "input": {
+    "html": "1. Give **extra fluid**<br>2. Continue feeding"
+  },
+  "doc": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "orderedList",
+        "content": [
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Give "
+                  },
+                  {
+                    "type": "text",
+                    "text": "extra fluid",
+                    "marks": [
+                      {
+                        "type": "bold"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Continue feeding"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "attrs": {
+          "start": 1
+        }
+      }
+    ]
+  },
+  "plain": "1. Give extra fluid\n2. Continue feeding",
+  "markdown": "1. Give **extra fluid**\n2. Continue feeding",
+  "xhtml": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><ol><li>Give <strong>extra fluid</strong></li><li>Continue feeding</li></ol></div>"
+}

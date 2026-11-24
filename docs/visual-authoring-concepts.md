@@ -84,6 +84,6 @@ TRICC implements this through start/process orchestration, activity diagrams, an
   group keeps it as a frame on the canvas only, its questions joining the enclosing section.
 - **Display text injection:** notes and question labels may embed `${field_name}`
   so runtime forms show live values (`feature/display-text-injection.md`,
-  `feature/20260909-display-message-ast.md`).
+  `feature/20261120-prosemirror-display-text.md`).
 - **Populate:** non-display nodes preload patient / facility / encounter / history
   data via `context` (+ optional `period`) — `feature/populate-context.md`.

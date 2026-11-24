@@ -5,9 +5,10 @@ from fhir.resources.codesystem import (
     CodeSystemConceptProperty,
 )
 from fhir.resources.coding import Coding
-from tricc_oo.visitors.text_injection import serialize_injection_for_js_text
+from tricc_oo.visitors.text_injection import serialize_injection_for_js_text, text_from_doc
 
 from fhir.resources.valueset import ValueSet
+import json
 import logging
 import uuid
 
@@ -38,21 +39,91 @@ def designation_use(designation):
     return None
 
 
-def get_designation(concept, use, language):
-    """Value of the ``use`` designation of ``concept`` in ``language``, or None."""
+# A designation's formatted text, as compact ProseMirror JSON in ``valueString``; ``value`` stays
+# its Markdown (feature/20261120-prosemirror-display-text.md §1.3). The old message tree
+# (``designation-message``) is still read, never written.
+DESIGNATION_DOC_EXT = "https://tricc.org/StructureDefinition/designation-doc"
+DESIGNATION_MESSAGE_EXT = "https://tricc.org/StructureDefinition/designation-message"
+
+
+def find_designation(concept, use, language):
+    """The ``use`` designation of ``concept`` in ``language``, or None."""
     for designation in getattr(concept, "designation", None) or []:
         if designation.language == language and designation_use(designation) == use:
-            return designation.value
+            return designation
     return None
 
 
-def add_designation(concept, use, language, value):
-    """Add a ``use`` designation unless one already exists for that language."""
+def get_designation(concept, use, language):
+    """Value of the ``use`` designation of ``concept`` in ``language``, or None."""
+    designation = find_designation(concept, use, language)
+    return designation.value if designation is not None else None
+
+
+def _extension_string(designation, url):
+    for extension in getattr(designation, "extension", None) or []:
+        if getattr(extension, "url", None) == url:
+            return getattr(extension, "valueString", None)
+    return None
+
+
+def designation_text(designation, where=None):
+    """The display text of a designation: its ``designation-doc`` document, else its old
+    ``designation-message`` tree, else its ``value`` (Markdown) as is.
+
+    A document or tree that cannot be read is logged (with ``where``) and ``value`` is used.
+
+    Returns:
+        ``TriccText`` for a structured document, else a ``str`` (or None).
+    """
+    from tricc_oo.text import TextSchemaError, from_json, from_message_json
+
+    for url, reader in ((DESIGNATION_DOC_EXT, from_json), (DESIGNATION_MESSAGE_EXT, from_message_json)):
+        raw = _extension_string(designation, url)
+        if raw is None:
+            continue
+        try:
+            return text_from_doc(reader(json.loads(raw)))
+        except (TextSchemaError, ValueError, TypeError) as exc:
+            logger.warning(f"{where or 'designation'}: {url.rsplit('/', 1)[-1]} not read ({exc}); using its value")
+    return designation.value
+
+
+def designation_doc_extension(value):
+    """The ``designation-doc`` extension for a display value, or None when it has no
+    structure (a plain string costs no extension)."""
+    from tricc_oo.text.model import TriccText
+
+    if not isinstance(value, TriccText):
+        return None
+    return {"url": DESIGNATION_DOC_EXT, "valueString": json.dumps(value.doc, ensure_ascii=False, separators=(",", ":"))}
+
+
+def concept_display_text(concept, use, language, default_language=None):
+    """``use`` text of ``concept`` in ``language``, formatted: the designation's document when
+    it carries one (:func:`designation_text`), else :func:`concept_text`."""
+    designation = find_designation(concept, use, language)
+    if designation is not None and (
+        _extension_string(designation, DESIGNATION_DOC_EXT) is not None
+        or _extension_string(designation, DESIGNATION_MESSAGE_EXT) is not None
+    ):
+        return designation_text(designation, where=f"concept {getattr(concept, 'code', '')} {use} {language}")
+    return concept_text(concept, use, language, default_language)
+
+
+def add_designation(concept, use, language, value, doc=None):
+    """Add a ``use`` designation unless one already exists for that language.
+
+    ``doc`` is the structured text ``value`` (Markdown) renders; when it has structure it goes
+    in a ``designation-doc`` extension.
+    """
     if not value or not language or get_designation(concept, use, language) is not None:
         return False
     system, code = DESIGNATION_USES[use]
+    extension = designation_doc_extension(doc)
     designation = CodeSystemConceptDesignation(
-        language=language, use=Coding(system=system, code=code), value=value
+        language=language, use=Coding(system=system, code=code), value=value,
+        **({"extension": [extension]} if extension else {}),
     )
     if not getattr(concept, "designation", None):
         concept.designation = []
@@ -110,7 +181,7 @@ def add_concept_texts(concept, language, hint=None, help=None):
     """Store an authored node's hint / help as designations of its concept (gaps only)."""
     for use, value in (("hint", hint), ("help", help)):
         if value is not None:
-            add_designation(concept, use, language, serialize_injection_for_js_text(value).strip())
+            add_designation(concept, use, language, serialize_injection_for_js_text(value).strip(), doc=value)
 
 
 #: ``meta.tag`` system naming a CodeSystem's role in a project (code ``calculate``: the
