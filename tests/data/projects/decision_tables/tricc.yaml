@@ -1,0 +1,16 @@
+# Decision tables read by DMN(...) (feature/20261123-decision-tables.md) and named overrides
+# (feature/20261123-dmn-named-overrides.md).
+title: Decision tables
+input_strategy: YamlStrategy
+output_strategies:
+  - XLSFormCHTStrategy
+decision_tables:
+  - tables/*.yaml
+aliases:
+  Dose: {function: DMNFirst, args: [weight, table]}
+interventions:
+  - id: dosing
+    name: dosing
+    title: Dosing
+    activity:
+      - activities/dosing.activity.yaml

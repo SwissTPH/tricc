@@ -586,6 +586,13 @@ class TriccIntervention(BaseModel):
     # Calculates from the tricc.yaml ``libraries`` (CQL defines); attached to the main
     # start page as dangling calculates, i.e. stashed next to the root.
     library_calculates: List[Any] = []
+    # tricc.yaml ``decision_tables`` by id and ``aliases`` (DecisionTable / FunctionAlias),
+    # read by the DMN expansion (feature/20261123-decision-tables.md)
+    decision_tables: Dict[str, Any] = {}
+    aliases: Dict[str, Any] = {}
+    # keep each expanded call as DMN_CALL for an output strategy that evaluates the tables
+    # itself (XLSFormCHTStrategy: dmn-<project>.js); set by the runner from the strategy class
+    decision_table_calls: bool = False
     # Functions the tricc.yaml ``libraries`` declare, by name: FunctionSignature (return
     # type, arguments, CQL documentation tags such as @retrieve); see
     # tricc_oo.converters.cql_library.function_signature

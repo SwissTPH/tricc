@@ -1,0 +1,53 @@
+{
+  "description": "Decision table results per hit policy. Shared with tricc_oo: keep both copies identical. inputs are in input-column order (null = not entered); first is the output of the first matching row (null when none), list the outputs of every matching row.",
+  "tables": {
+    "diazepam": {
+      "id": "diazepam",
+      "title": "Diazepam, rectal (ml)",
+      "hit_policy": "first",
+      "inputs": [
+        { "name": "weight", "concept": "CHE.B6.DE07", "type": "decimal" },
+        { "name": "age", "concept": "age_in_months", "type": "integer" }
+      ],
+      "outputs": [{ "name": "dose", "type": "string" }],
+      "rules": [
+        [">= 20", "-", "2.5"],
+        ["[15..20)", "-", "1.7"],
+        ["[10..15)", "-", "1.2"],
+        ["[6..10)", "-", "0.75"],
+        ["[3..6)", "-", "0.4"],
+        ["-", ">= 36", "1.7"],
+        ["-", "[12..36)", "1.2"],
+        ["-", "[5..12)", "0.75"],
+        ["-", "[2..5)", "0.4"]
+      ]
+    }
+  },
+  "cases": [
+    {
+      "table": "diazepam",
+      "inputs": [11.5, 24],
+      "matches": [2, 6],
+      "first": "1.2",
+      "list": ["1.2", "1.2"]
+    },
+    { "table": "diazepam", "inputs": [null, 24], "matches": [6], "first": "1.2", "list": ["1.2"] },
+    { "table": "diazepam", "inputs": [2, 24], "matches": [6], "first": "1.2", "list": ["1.2"] },
+    { "table": "diazepam", "inputs": [null, 1], "matches": [], "first": null, "list": [] },
+    {
+      "table": "diazepam",
+      "inputs": [25, 40],
+      "matches": [0, 5],
+      "first": "2.5",
+      "list": ["2.5", "1.7"]
+    },
+    {
+      "table": "diazepam",
+      "inputs": [20, 11.9],
+      "matches": [0, 7],
+      "first": "2.5",
+      "list": ["2.5", "0.75"]
+    },
+    { "table": "diazepam", "inputs": [null, 35.9], "matches": [6], "first": "1.2", "list": ["1.2"] }
+  ]
+}

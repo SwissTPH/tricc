@@ -59,6 +59,18 @@ parameters:
 # libraries:
 #   - cql/*.cql
 
+# Decision tables (one tables/<id>.yaml per table, written by DrawTRICC's table editor or
+# by `python -m tricc_oo.tools.drugs_js_to_tables drugs.js tables/`), read in any
+# expression with DMN('<id>', input1, input2, …). See docs/tricc-elements.md
+# "Decision tables" and feature/20261123-decision-tables.md.
+# decision_tables:
+#   - tables/*.yaml
+
+# Other names for the table functions: the call's arguments go to table inputs by name,
+# `table` marks the table name. DrugDosage(table, age, weight) is built in.
+# aliases:
+#   Dose: {function: DMNFirst, args: [table, weight]}
+
 # Retrieval dictionary (CodeSystem url, id or name): data read before the consultation,
 # referenced in expressions as "#name" (e.g. "#age_months" < 2). A CodeSystem tagged
 # codesystem-role|retrieve wins; else <default>-retrieve. feature/20261109-project-retrievals.md

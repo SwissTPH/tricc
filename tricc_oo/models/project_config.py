@@ -225,6 +225,12 @@ class TriccProjectConfig(BaseModel):
     terminology: List[str] = Field(default_factory=list)
     # CQL libraries; every ``define`` becomes a calculate available to all activities.
     libraries: List[str] = Field(default_factory=list)
+    # Decision tables read by DMN(table, …): globs of tables/<id>.yaml, relative to tricc.yaml
+    # (feature/20261123-decision-tables.md).
+    decision_tables: List[str] = Field(default_factory=list)
+    # Function aliases of the table functions, e.g.
+    # ``DrugDosage: {function: DMN, args: [table, age, weight]}`` (DrugDosage is built in).
+    aliases: Dict[str, Any] = Field(default_factory=dict)
     interventions: List[TriccInterventionConfig] = Field(default_factory=list)
     # Reusable blocks, read with every intervention (never listed on one).
     blocks: List[TriccBlockRef] = Field(default_factory=list)
@@ -235,7 +241,7 @@ class TriccProjectConfig(BaseModel):
     # consultation, referenced as "#code" (feature/20261109-project-retrievals.md).
     retrieve_code_system: Optional[str] = None
 
-    @field_validator("terminology", "libraries")
+    @field_validator("terminology", "libraries", "decision_tables")
     @classmethod
     def _clean_globs(cls, value: List[str]) -> List[str]:
         return [(g or "").strip() for g in value if (g or "").strip()]

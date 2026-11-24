@@ -546,8 +546,25 @@ class OpenMRSStrategy(BaseOutPutStrategy):
         return " || ".join(parts)  # Simplified
 
     def tricc_operation_ifs(self, ref_expressions, original_references=None):
+        # [[cond, value], …, default?] → (c1) ? v1 : (c2) ? v2 : default (null when none)
+        if ref_expressions and isinstance(ref_expressions[0], list):
+            expr = "null"
+            items = list(ref_expressions)
+            if not isinstance(items[-1], list):
+                expr = str(items.pop())
+            for cond, value in reversed(items):
+                expr = f"(({cond}) ? {value} : {expr})"
+            return expr
         # Similar to case
         return self.tricc_operation_case(ref_expressions[1:])
+
+    def tricc_operation_list_if(self, ref_expressions, original_references=None):
+        """Decision table ``rule_order`` result, space-separated as in XLSForm."""
+        items = [f"(({i[0]}) ? {i[1]} : null)" if isinstance(i, list) else str(i) for i in ref_expressions]
+        return f"[{', '.join(items)}].filter(v => v !== null).join(' ')"
+
+    def tricc_operation_floor(self, ref_expressions, original_references=None):
+        return f"Math.floor({ref_expressions[0]})"
 
     def tricc_operation_if(self, ref_expressions, original_references=None):
         return f"if({ref_expressions[0]}, {ref_expressions[1]}, {ref_expressions[2]})"

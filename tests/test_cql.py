@@ -17,12 +17,18 @@ class TestCql(unittest.TestCase):
         )
         self.assertEqual(str(dg_operation), str(dg_expected))
 
-    def test_durg_doage(self):
+    def test_drug_dosage(self):
+        # DrugDosage is an alias of DMN (feature/20261123-decision-tables.md); the name is kept
         if_cql = 'DrugDosage(\'paracetamol\', "p_weight", "p_age")'
         dg_operation = transform_cql_to_operation(if_cql)
         dg_expected = TriccOperation(
-            operator=TriccOperator.DRUG_DOSAGE,
-            reference=[TriccStatic(value="paracetamol"), TriccReference("p_weight"), TriccReference("p_age")],
+            operator=TriccOperator.DMN,
+            reference=[
+                TriccStatic(value="DrugDosage"),
+                TriccStatic(value="paracetamol"),
+                TriccReference("p_weight"),
+                TriccReference("p_age"),
+            ],
         )
         self.assertEqual(str(dg_operation), str(dg_expected))
 

@@ -38,7 +38,13 @@ FUNCTION_MAP = {
     "ZScore": TriccOperator.ZSCORE,
     "Round": TriccOperator.ROUND,
     "Integer": TriccOperator.CAST_INTEGER,
-    "DrugDosage": TriccOperator.DRUG_DOSAGE,
+    # decision tables (feature/20261123-decision-tables.md): the name is kept as the first
+    # operand, so the expansion knows the policy (DMNFirst / DMNList) or the alias (DrugDosage);
+    # an alias declared in tricc.yaml parses as NATIVE and is recognised by the expansion
+    "DMN": TriccOperator.DMN,
+    "DMNFirst": TriccOperator.DMN,
+    "DMNList": TriccOperator.DMN,
+    "DrugDosage": TriccOperator.DMN,
     "HasQualifier": TriccOperator.HAS_QUALIFIER,
     "DateTimeToDecimal": TriccOperator.DATETIME_TO_DECIMAL,
     "ToDate": TriccOperator.CAST_DATE,
@@ -204,6 +210,8 @@ class cqlToXlsFormVisitor(cqlVisitor):
             op.reference = [
                 function_name,
             ]
+        elif operator == TriccOperator.DMN:
+            op.reference = [TriccStatic(value=function_name)]
         args = ctx.paramList()
         if args:
             op.reference += [self.visit(arg) for arg in args.expression() if arg]
@@ -442,6 +450,17 @@ class cqlToXlsFormVisitor(cqlVisitor):
         test = self.visit(ctx.expression(0))
         result = self.visit(ctx.expression(1))
         return [test, result]
+
+    def visitTupleSelector(self, ctx):
+        """``Tuple{ k: v, … }`` → ``TUPLE(k, v, …)``, keys as text (named DMN arguments, RFC #96)."""
+        op = TriccOperation(TriccOperator.TUPLE)
+        op.reference = []
+        for element in ctx.tupleElementSelector():
+            key = element.referentialIdentifier().getText()
+            if len(key) > 1 and key[0] == key[-1] and key[0] in "\"`'":
+                key = key[1:-1]
+            op.reference += [TriccStatic(value=key), self.visit(element.expression())]
+        return op
 
     def visitIfThenElseExpressionTerm(self, ctx):
         condition = self.visit(ctx.expression(0))

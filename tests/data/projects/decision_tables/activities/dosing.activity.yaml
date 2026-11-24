@@ -1,0 +1,31 @@
+id: dosing
+title: Dosing
+process: main
+nodes:
+  - {id: start, type: start, name: start_dosing, label: Dosing}
+  - {id: age, type: integer, name: age_in_months, label: Age (months)}
+  - {id: weight, type: decimal, name: weight, label: Weight (kg)}
+  # positional, the table's hit policy (first)
+  - {id: dose, type: calculate, name: dose, label: Dose, calculate: "DMN('diazepam', \"weight\", \"age_in_months\")"}
+  # every matching row, inputs from the column concepts
+  - {id: doses, type: calculate, name: doses, label: Doses, calculate: "DMNList('diazepam')"}
+  # built-in alias: DrugDosage(table, age, weight)
+  - {id: legacy, type: calculate, name: legacy_dose, label: Legacy dose,
+     calculate: "DrugDosage('diazepam', \"age_in_months\", \"weight\")"}
+  # project alias: Dose(weight, table)
+  - {id: alias, type: calculate, name: alias_dose, label: Alias dose, calculate: "Dose(\"weight\", 'diazepam.dose')"}
+  # named override: no weight yet, the age from its concept
+  - {id: by_age, type: calculate, name: dose_by_age, label: Dose by age,
+     calculate: "DMN('diazepam', Tuple{ weight: null })"}
+  - {id: note, type: note, name: dose_note,
+     label: "Give ${dose} ml (legacy ${legacy_dose}; alias ${alias_dose}; by age ${dose_by_age})"}
+  # a list result (a repeating item in FHIR) read through Count
+  - {id: count, type: calculate, name: dose_count, label: Matching doses, calculate: "Count(\"doses\")"}
+  - {id: all, type: note, name: doses_note, label: "${dose_count} rows match"}
+  - {id: end, type: end, name: end_dosing, label: End}
+edges:
+  - {id: e1, source: start, target: age}
+  - {id: e2, source: age, target: weight}
+  - {id: e3, source: weight, target: note}
+  - {id: e4, source: note, target: all}
+  - {id: e5, source: all, target: end}

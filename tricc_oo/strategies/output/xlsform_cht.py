@@ -3,9 +3,11 @@ import json
 import logging
 import os
 import shutil
+import re
 import subprocess
 import tempfile
 import zipfile
+from typing import Optional
 import pandas as pd
 
 from pyxform.xls2xform import convert
@@ -51,6 +53,9 @@ def _cht_condition_reference_names(node):
 
 @register_output_strategy("XLSFormCHTStrategy")
 class XLSFormCHTStrategy(XLSFormCDSSStrategy):
+    # decision table calls stay calls: cht:extension-lib('dmn-<project>.js', …), the library
+    # written next to the forms (feature/20261123-decision-tables.md)
+    decision_table_calls = True
     def generate_export(self, node, **kwargs):
         # CDSS-only coalesce/$this handling must not run for CHT exports.
         return XLSFormStrategy.generate_export(self, node, **kwargs)
@@ -850,11 +855,62 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
 
         # Export returns list of generated files for CHT strategy
         generated_files = self.export(self.project.start_pages, version=version)
+        self.write_decision_table_library()
 
         logger.info("validate the output")
         if not self.validate(generated_files):
             logger.error("CHT validation failed - aborting build")
             exit(1)
+
+    def decision_table_library(self) -> str:
+        """The project's decision table library: ``dmn-<project>.js``."""
+        from tricc_oo.serializers.dmn_js import library_name
+
+        return library_name(getattr(self.project, "title", None))
+
+    def table_call_expression(self, operation):
+        """``cht:extension-lib('dmn-<project>.js', 'table', 'policy', 'output', input1, …)``.
+
+        Each input is read once; the library evaluates the table (tricc_oo.serializers.dmn_js).
+        """
+        from tricc_oo.models.decision_table import DecisionTableError, list_value_message
+
+        table_id, policy, output = (r.value for r in operation.reference[1:4])
+        table = (getattr(self.project, "decision_tables", None) or {}).get(table_id)
+        if policy == "rule_order" and table is not None:
+            at = table.output_index(output)
+            for row in table.rules:
+                value = row[len(table.inputs) + at] if len(row) > len(table.inputs) + at else ""
+                if re.search(r"\s", value.strip()):
+                    raise DecisionTableError("E_DMN_LIST_VALUE", list_value_message(value))
+        args = []
+        for arg in operation.reference[4:]:
+            expr = (
+                self.get_tricc_operation_expression(arg)
+                if isinstance(arg, TriccOperation)
+                else self.get_tricc_operation_operand(arg)
+            )
+            args.append(self.clean_coalesce(expr))
+        self._decision_table_calls = True
+        head = ", ".join(f"'{v}'" for v in (table_id, policy, output))
+        return f"cht:extension-lib('{self.decision_table_library()}', {head}, {', '.join(args)})"
+
+    def write_decision_table_library(self) -> Optional[str]:
+        """Write ``extension-libs/dmn-<project>.js`` when a form calls a table; returns its path.
+
+        Every table of the project goes in, so the file is the same for each intervention.
+        """
+        if not getattr(self, "_decision_table_calls", False):
+            return None
+        from tricc_oo.serializers.dmn_js import build_dmn_js
+
+        folder = os.path.join(self.output_path, "extension-libs")
+        os.makedirs(folder, exist_ok=True)
+        path = os.path.join(folder, self.decision_table_library())
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write(build_dmn_js(self.project.decision_tables, getattr(self.project, "title", None)))
+        logger.info(f"decision tables written to {path}: upload with cht-conf upload-extension-libs")
+        return path
 
     def _write_demand_properties(self, form_id, title):
         intervention = getattr(self.project, "config", None)
@@ -1094,12 +1150,6 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
             } ,{
             self.clean_coalesce(ref_expressions[3])
             }, true"""
-
-    def tricc_operation_drug_dosage(self, ref_expressions, original_references=None):
-        # drug name
-        # age
-        # weight
-        return f"cht:extension-lib('drugs.js',{','.join(map(self.clean_coalesce, ref_expressions))})"
 
 
     def tricc_operation_get_inherited_value(self, ref_expressions, original_references=None):  

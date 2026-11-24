@@ -1,6 +1,7 @@
 import logging
 import os
 
+from tricc_oo.converters.decision_table import expand_project_tables
 from tricc_oo.converters.xml_to_tricc import (
     apply_goto_page_to_activity,
     apply_goto_repeat_to_activity,
@@ -58,6 +59,9 @@ class DrawioStrategy(BaseInputStrategy):
     file_extensions = (".drawio",)
 
     def process_pages(self, start_page, project):
+        # decision table calls become IFS / LIST_IF before anything reads the expressions
+        # (feature/20261123-decision-tables.md)
+        expand_project_tables(project)
         # create the graph
         self.linking_nodes(start_page.root, start_page, project.pages)
         # Save the calculate list [node]
@@ -75,6 +79,9 @@ class DrawioStrategy(BaseInputStrategy):
             calculates=calculates,
             recursive=False,
             codesystems=project.code_systems,
+            decision_tables=project.decision_tables,
+            aliases=project.aliases,
+            decision_table_calls=project.decision_table_calls,
             process=[start_page.root.process],
         )
 

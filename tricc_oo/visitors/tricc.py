@@ -57,6 +57,7 @@ from tricc_oo.models.tricc import (
     TRICC_TRUE_VALUE,
 )
 from tricc_oo.visitors.utils import PROCESSES
+from tricc_oo.converters.decision_table import expand_node_tables
 from tricc_oo.converters.cql_to_operation import transform_cql_to_operation
 from tricc_oo.converters.datadictionnary import lookup_codesystems_code
 from tricc_oo.converters.tricc_to_xls_form import get_list_names, get_export_name
@@ -466,6 +467,13 @@ def load_calculate(
     if isinstance(node, TriccGroup):
                 return True
     if node not in processed_nodes:
+        # a node the project pass did not reach (feature/20261123-decision-tables.md)
+        expand_node_tables(
+            node,
+            kwargs.get("decision_tables") or {},
+            kwargs.get("aliases"),
+            keep_calls=bool(kwargs.get("decision_table_calls")),
+        )
         # generate condition
         if is_ready_to_process(node, processed_nodes, True) and process_reference(
             node,

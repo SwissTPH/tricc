@@ -471,6 +471,8 @@ class XLSFormStrategy(BaseOutPutStrategy):
         original_references = []
         if not hasattr(operation, "reference"):
             return self.get_tricc_operation_operand(operation)
+        if getattr(operation, "operator", None) == TriccOperator.DMN_CALL:
+            return self.table_call_expression(operation)
 
         operator = getattr(operation, "operator", "")
         coalesce_fallback = OPERATOR_COALESCE_FALLBACK[operator] if operator in OPERATOR_COALESCE_FALLBACK else "''"
@@ -695,6 +697,41 @@ class XLSFormStrategy(BaseOutPutStrategy):
         for i in range(ifs):
             exp += ")"
         return exp
+
+    def tricc_operation_list_if(self, ref_expressions, original_references=None):
+        """Decision table ``rule_order`` result: the values whose condition holds, space-separated.
+
+        ``normalize-space(concat(if(c1, 'v1', ''), ' ', if(c2, 'v2', '')…))``, read by
+        ``selected()`` and ``count-selected()`` (feature/20261123-decision-tables.md).
+        """
+        from tricc_oo.models.decision_table import DecisionTableError, list_value_message
+
+        parts = []
+        for i, item in enumerate(ref_expressions):
+            original = (original_references or [None] * len(ref_expressions))[i]
+            value = original[1] if isinstance(original, list) else original
+            text = value.value if isinstance(value, TriccStatic) else None
+            if isinstance(text, str) and re.search(r"\s", text.strip()):
+                raise DecisionTableError("E_DMN_LIST_VALUE", list_value_message(text))
+            if isinstance(item, list):
+                parts.append(f"if({item[0]},{item[1]},'')")
+            else:
+                parts.append(str(item))
+        if not parts:
+            return "''"
+        if len(parts) == 1:
+            return f"normalize-space({parts[0]})"
+        separator = ",' ',"
+        return f"normalize-space(concat({separator.join(parts)}))"
+
+    def table_call_expression(self, operation):
+        """A kept decision table call (``DMN_CALL``): its inline expansion here; CHT calls a library."""
+        return self.get_tricc_operation_expression(operation.reference[0])
+
+    def tricc_operation_floor(self, ref_expressions, original_references=None):
+        # ODK XPath has no floor(); int() truncates, the same for the non-negative values
+        # (ages, counts) a decision table rounds down.
+        return f"int({ref_expressions[0]})"
 
     def get_empty_label(self):
         return "---"

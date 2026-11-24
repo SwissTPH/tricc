@@ -3560,7 +3560,12 @@ class FHIRStrategy(BaseOutPutStrategy):
         return "integer" if all(t == "integer" for t in types) else "decimal"
 
     def _apply_calculate_item_type(self, item: Optional[dict], expression) -> None:
-        """Coerce a default ``string`` calculate item to boolean / integer / decimal."""
+        """Coerce a default ``string`` calculate item to boolean / integer / decimal.
+
+        A decision table list (``DMNList``) gives several answers: the item repeats.
+        """
+        if item and isinstance(expression, TriccOperation) and expression.operator == TriccOperator.LIST_IF:
+            item["repeats"] = True
         if not item or item.get("type") != "string":
             return
         if self._expression_returns_boolean(expression):
@@ -4035,8 +4040,11 @@ class FHIRStrategy(BaseOutPutStrategy):
         return ref_expressions[0]
 
     def tricc_operation_ifs(self, ref_expressions, original_references=None):
-        # Build nested if-then-else chain
-        # ref_expressions layout: [cond1, res1, cond2, res2, ..., default]
+        # ``[[cond, res], …, default?]`` (as the XLSForm and FHIRPath serialisers read it) →
+        # ``if c1 then r1 else if … else default`` (null when no default).
+        if ref_expressions and isinstance(ref_expressions[0], list):
+            return self._cql_searched_case(ref_expressions)
+        # Legacy flat layout: [cond1, res1, cond2, res2, ..., default]
         if len(ref_expressions) < 2:
             return ref_expressions[0] if ref_expressions else "null"
         parts = []
@@ -4121,8 +4129,20 @@ class FHIRStrategy(BaseOutPutStrategy):
     def tricc_operation_izscore(self, ref_expressions, original_references=None):
         raise NotImplementedError("IZSCORE is not supported yet")
 
-    def tricc_operation_drug_dosage(self, ref_expressions, original_references=None):
-        raise NotImplementedError("DRUG_DOSAGE is not supported yet")
+    def tricc_operation_list_if(self, ref_expressions, original_references=None):
+        """Decision table ``rule_order`` result: ``flatten { if c1 then {v1} else {}, … }``."""
+        items = []
+        for item in ref_expressions:
+            if isinstance(item, list):
+                items.append(f"if {item[0]} then {{ {item[1]} }} else {{ }}")
+            else:
+                items.append(f"{{ {item} }}")
+        if not items:
+            return "{ }"
+        return f"flatten {{ {', '.join(items)} }}"
+
+    def tricc_operation_floor(self, ref_expressions, original_references=None):
+        return f"Floor({ref_expressions[0]})"
 
     # ============================================================
     # ADDITIONAL / FALLBACK
@@ -4527,8 +4547,30 @@ class FHIRStrategy(BaseOutPutStrategy):
     def tricc_operation_fhirpath_izscore(self, ref_expressions, original_references=None):
         raise NotImplementedError("IZSCORE is not supported by FHIRPath 2.0")
 
-    def tricc_operation_fhirpath_drug_dosage(self, ref_expressions, original_references=None):
-        raise NotImplementedError("DRUG_DOSAGE is not supported by FHIRPath 2.0")
+    def tricc_operation_fhirpath_list_if(self, ref_expressions, original_references=None):
+        """Decision table ``rule_order`` result: ``iif(c1, v1, {}).combine(iif(c2, v2, {}))…``.
+
+        ``combine``, not ``|``, keeps duplicates (feature/20261123-decision-tables.md).
+        """
+        refs = list(original_references or [])
+        items = []
+        for i, item in enumerate(ref_expressions):
+            orig = refs[i] if i < len(refs) else None
+            if isinstance(item, list) and len(item) >= 2:
+                cond, value = self._fhirpath_pair_wrap(item, orig)
+                items.append(f"iif({cond}, {value}, {{}})")
+            else:
+                items.append(self._fhirpath_typed_scalar(item, orig))
+        if not items:
+            return "{}"
+        head, rest = items[0], items[1:]
+        if rest and not head.startswith("iif("):
+            head = f"({head})"
+        return head + "".join(f".combine({item})" for item in rest)
+
+    def tricc_operation_fhirpath_floor(self, ref_expressions, original_references=None):
+        src = original_references[0] if original_references else None
+        return f"({self._fhirpath_numeric_operand(ref_expressions[0], src)}).floor()"
 
     def tricc_operation_fhirpath_has_qualifier(self, ref_expressions, original_references=None):
         raise NotImplementedError("HAS_QUALIFIER is not supported by FHIRPath 2.0")

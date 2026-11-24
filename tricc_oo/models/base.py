@@ -488,7 +488,15 @@ class TriccOperator(StrEnum):
     CAST_NUMBER = "cast_number"
     CAST_INTEGER = "cast_integer"
     CAST_DECIMAL = "cast_decimal"
-    DRUG_DOSAGE = "drug_dosage"  # drug name, *param1 (ex: weight, age)
+    # decision table call, expanded to IFS / LIST_IF before references are resolved:
+    # [function name ('DMN', 'DMNFirst', 'DMNList' or an alias), table, *args, TUPLE?]
+    DMN = "dmn"
+    TUPLE = "tuple"  # CQL Tuple{ k: v }: [TriccStatic(k), v, ...] (named DMN arguments)
+    # an expanded call kept for a strategy that evaluates tables itself (CHT dmn-<project>.js):
+    # [inline expansion, table, policy, output, *one argument per input]
+    DMN_CALL = "dmn_call"
+    LIST_IF = "list_if"  # [cond, value], ...: the values whose condition holds, in order
+    FLOOR = "floor"
     COALESCE = "coalesce"
     GET_INHERITED_VALUE = "get_inherited_value"
     CAST_DATE = "cast_date"
@@ -559,12 +567,13 @@ RETURNS_NUMBER = [
     TriccOperator.CAST_NUMBER,
     TriccOperator.CAST_INTEGER,
     TriccOperator.CAST_DECIMAL,
+    TriccOperator.FLOOR,
     TriccOperator.GET_NUMBER_OF_REPEAT
 ]
 
 RETURNS_DATE = [TriccOperator.CAST_DATE]
 
-RETURNS_LIST = [TriccOperator.DIAGNOSIS_LIST]
+RETURNS_LIST = [TriccOperator.DIAGNOSIS_LIST, TriccOperator.LIST_IF]
 
 RETURNS_STRING = [
     TriccOperator.CONCATENATE,
@@ -667,15 +676,24 @@ class TriccOperation(BaseModel):
         elif self.operator in RETURNS_LIST:
             return "list"
         elif self.operator in RETURNS_CONCEPT:
-            return self.get_reference_datatype(self.reference[0])
+            return self.get_reference_datatype(self.reference[:1])
         elif self.operator == TriccOperator.PARENTHESIS:
             return self.get_reference_datatype(self.reference)
+        elif self.operator == TriccOperator.DMN_CALL:
+            return self.get_reference_datatype(self.reference[:1])
         elif self.operator == TriccOperator.IF:
             return self.get_reference_datatype(self.reference[1:])
         elif self.operator in (TriccOperator.IFS, TriccOperator.CASE):
+            # the type of the branch values: [cond, value] pairs and the default (a value CASE
+            # starts with the tested value, which is not a result)
             rtype = set()
-            for rl in self.reference:
-                rtype.add(self.get_reference_datatype(self.reference[-2:]))
+            items = list(self.reference)
+            if self.operator == TriccOperator.CASE and items and not isinstance(items[0], list):
+                items = items[1:]
+            for rl in items:
+                rtype.add(self.get_reference_datatype([rl[-1] if isinstance(rl, list) else rl]))
+            if not rtype:
+                return None
             if len(rtype) > 1:
                 return "mixed"
             else:
@@ -1236,6 +1254,7 @@ def simplify_with_sympy(operation):
         TriccOperator.ROUND: lambda x: sp.round(x),
         TriccOperator.CAST_NUMBER: lambda x: x,  # Identity for numbers
         TriccOperator.CAST_INTEGER: lambda x: sp.floor(x),
+        TriccOperator.FLOOR: lambda x: sp.floor(x),
         TriccOperator.CAST_DECIMAL: lambda x: sp.Float(x),
 
 
