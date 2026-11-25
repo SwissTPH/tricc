@@ -25,14 +25,28 @@ import logging
 import os
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
-from tricc_oo.converters.call_binding import MISSING, NULL, CallParam
+from dataclasses import dataclass
+
+from tricc_oo.converters.call_binding import (
+    E_CALL_ARG_UNKNOWN,
+    MISSING,
+    NULL,
+    CallParam,
+    TriccParameterReference,
+    bind_arguments,
+    is_named_arguments,
+    split_named,
+    substitute_parameters,
+)
 from tricc_oo.converters.decision_table import (
     EXPRESSION_ATTRIBUTES,
     check_node_tables,
+    check_project_tables,
     contains_table_call,
     expand_decision_tables,
+    iter_activity_nodes,
 )
-from tricc_oo.models.base import TriccNodeBaseModel, TriccOperation, TriccReference, TriccStatic
+from tricc_oo.models.base import TriccNodeBaseModel, TriccOperation, TriccOperator, TriccReference, TriccStatic
 
 logger = logging.getLogger("default")
 
@@ -48,6 +62,53 @@ W_PARAM_NO_VALUE = "W_PARAM_NO_VALUE"
 
 #: the node fields that may hold a call
 CALL_ATTRIBUTES = (*EXPRESSION_ATTRIBUTES, "reference", "constraint")
+
+E_FUNCTION_UNKNOWN = "E_FUNCTION_UNKNOWN"
+E_PARAM_FALLBACK_UNKNOWN = "E_PARAM_FALLBACK_UNKNOWN"
+E_PARAM_RETRIEVAL_UNKNOWN = "E_PARAM_RETRIEVAL_UNKNOWN"
+W_FUNCTION_NAME_SHARED = "W_FUNCTION_NAME_SHARED"
+#: nested function calls deeper than this are taken for a recursion (out of scope, §Part I)
+MAX_CALL_DEPTH = 16
+
+
+@dataclass
+class FunctionCall:
+    """A call of a calculate function with its arguments bound to the parameters.
+
+    Attributes:
+        name: The function name as called.
+        signature: The function (``cql_library.FunctionSignature``).
+        values: One per parameter: the passed value, ``NULL`` or ``MISSING``.
+    """
+
+    name: str
+    signature: Any
+    values: List[Any]
+    kind: str = "function"
+
+    @property
+    def key(self) -> str:
+        """The carry-over key (§2.6): the same function."""
+        return f"F:{self.signature.name}"
+
+    @property
+    def params(self) -> List[CallParam]:
+        return self.signature.call_params
+
+    @property
+    def sources(self) -> List[str]:
+        return list(self.signature.sources)
+
+
+def function_name(op: Any) -> Optional[str]:
+    """The name of the function a ``native`` operation calls, else None."""
+    if isinstance(op, TriccOperation) and op.operator == TriccOperator.NATIVE and op.reference:
+        head = op.reference[0]
+        name = head.value if isinstance(head, TriccStatic) else head
+        if isinstance(name, str):
+            return name.strip("'`\"")
+    return None
+
 
 #: pending free-standing calculates by node id -> their CallState (§2.5), so the reference
 #: resolution (``process_operation_reference``) can instantiate one where it is first read
@@ -113,6 +174,11 @@ class CallState:
         self.keep_calls = (
             bool(getattr(project, "decision_table_calls", False)) if keep_calls is None else bool(keep_calls)
         )
+        signatures = getattr(project, "function_signatures", None) or {}
+        #: the functions with a body, by lower-case name (a declaration is called as written)
+        self.functions: Dict[str, Any] = {n.lower(): f for n, f in signatures.items() if f.body is not None}
+        #: wrap each expanded function call in FUNCTION_CALL (FHIR writes a Helper function)
+        self.function_calls = bool(getattr(project, "function_calls", False))
         self.arguments: Dict[str, Dict[str, Any]] = {}
         self.records: List[Dict[str, Any]] = []
         self.pending: Dict[str, Tuple[Any, Callable[[], None]]] = {}
@@ -132,6 +198,68 @@ class CallState:
             return
         self._checked.add(node.id)
         check_node_tables(node, self.tables, self.aliases)
+        self.check_node_functions(node)
+
+    def function_of(self, op: Any) -> Any:
+        """The function (with a body) ``op`` calls, else None."""
+        name = function_name(op)
+        return self.functions.get(name.lower()) if name else None
+
+    def bind_function_call(self, op: TriccOperation, args: Optional[List[Any]] = None) -> FunctionCall:
+        """Bind the arguments of a function call to its parameters (no fallback yet).
+
+        Raises:
+            FunctionError: ``E_CALL_*``.
+        """
+        from tricc_oo.converters.cql_library import FunctionError
+
+        signature = self.function_of(op)
+        name = function_name(op)
+        positional, named = split_named(list(op.reference[1:] if args is None else args))
+        values = bind_arguments(
+            name,
+            signature.param_names,
+            positional,
+            [(E_CALL_ARG_UNKNOWN, k, v) for k, v in named],
+            error=FunctionError,
+            owner=f"function {signature.name!r}",
+        )
+        return FunctionCall(name=name, signature=signature, values=values)
+
+    def check_node_functions(self, node: Any) -> None:
+        """Check the function calls of a node (§2.2, load).
+
+        Raises:
+            FunctionError: ``E_CALL_*``, ``E_FUNCTION_UNKNOWN`` (named arguments to a function the
+                project does not define), with the node named.
+        """
+        from tricc_oo.converters.cql_library import FunctionError
+        from tricc_oo.converters.decision_table import _call_name, _node_label
+        from tricc_oo.models.decision_table import effective_aliases
+
+        aliases = effective_aliases(self.aliases)
+        for attribute in CALL_ATTRIBUTES:
+            stack = [getattr(node, attribute, None)]
+            while stack:
+                item = stack.pop()
+                if isinstance(item, list):
+                    stack.extend(item)
+                    continue
+                if not isinstance(item, TriccOperation):
+                    continue
+                stack.extend(item.reference or [])
+                name = function_name(item)
+                if name is None or _call_name(item, aliases):
+                    continue
+                try:
+                    if self.function_of(item) is not None:
+                        self.bind_function_call(item)
+                    elif any(is_named_arguments(r) for r in item.reference[1:]):
+                        raise FunctionError(
+                            E_FUNCTION_UNKNOWN, f"{name}(…, Tuple{{…}}): no function {name!r} in the project"
+                        )
+                except FunctionError as exc:
+                    raise FunctionError(exc.code, f"{_node_label(node)} {attribute}: {exc.message}") from exc
 
     # ------------------------------------------------------------ queries
 
@@ -140,7 +268,23 @@ class CallState:
         return any(self._expr_has_calls(getattr(node, a, None)) for a in CALL_ATTRIBUTES)
 
     def _expr_has_calls(self, expr: Any) -> bool:
-        return isinstance(expr, TriccOperation) and contains_table_call(expr, self.aliases)
+        return isinstance(expr, TriccOperation) and (
+            contains_table_call(expr, self.aliases) or self._contains_function_call(expr)
+        )
+
+    def _contains_function_call(self, expr: Any) -> bool:
+        if not self.functions:
+            return False
+        stack = [expr]
+        while stack:
+            item = stack.pop()
+            if isinstance(item, list):
+                stack.extend(item)
+            elif isinstance(item, TriccOperation):
+                if self.function_of(item) is not None:
+                    return True
+                stack.extend(item.reference or [])
+        return False
 
     def node_call_keys(self, node: Any) -> Set[str]:
         """The call keys (function, table and output) of the calls a node holds or held."""
@@ -158,10 +302,27 @@ class CallState:
             keys.add(call.key)
             return [NULL if v is MISSING else v for v in values]
 
+        stack = [expr]
+        while stack:
+            item = stack.pop()
+            if isinstance(item, list):
+                stack.extend(item)
+            elif isinstance(item, TriccOperation):
+                if self.function_of(item) is not None:
+                    keys.add(f"F:{self.function_of(item).name}")
+                stack.extend(item.reference or [])
         try:
             expand_decision_tables(expr, dict(self.tables), self.aliases, binder=record)
         except ValueError:
             pass
+
+    def drop_same_call_versions(self, node: Any, prev_versions: List[Any]) -> List[Any]:
+        """The previous versions to inherit from: not those calling the same function (table and
+        output) as ``node``, whose arguments the later call carries over (§3, version inheritance)."""
+        keys = self.node_call_keys(node)
+        if not keys:
+            return prev_versions
+        return [p for p in prev_versions if not (keys & self.node_call_keys(p))]
 
     # ------------------------------------------------------------ free-standing calculates (§2.5)
 
@@ -219,11 +380,101 @@ class CallState:
             if not self._expr_has_calls(expr):
                 continue
             binder = self._binder(node, processed_nodes, keys)
-            expanded = expand_decision_tables(expr, self.tables, self.aliases, keep_calls=self.keep_calls,
-                                              binder=binder)
+            expanded = self._expand_functions(expr, node, processed_nodes, binder, 0)
+
+            def table_binder(call, params, values, binder=binder):
+                values = binder(call, params, values)
+                if len(call.table.rules) <= 1:
+                    return values
+                # a calculated argument is read once per row: its own calculate (§2.4)
+                return [self.sub_calculate(node, call, p.name, v, processed_nodes) for p, v in zip(params, values)]
+
+            expanded = expand_decision_tables(
+                expanded, self.tables, self.aliases, keep_calls=self.keep_calls, binder=table_binder
+            )
             setattr(node, attribute, expanded)
         if keys:
             self.call_keys[node.id] = keys
+
+    def _expand_functions(self, expr: Any, node: Any, processed_nodes: Any, binder, depth: int) -> Any:
+        """``expr`` with every function call bound and replaced by its body (§2.3, §3)."""
+        if isinstance(expr, list):
+            return [self._expand_functions(e, node, processed_nodes, binder, depth) for e in expr]
+        if not isinstance(expr, TriccOperation):
+            return expr
+        signature = self.function_of(expr)
+        if signature is None:
+            reference = [self._expand_functions(r, node, processed_nodes, binder, depth) for r in expr.reference or []]
+            if any(a is not b for a, b in zip(reference, expr.reference or [])):
+                copy = TriccOperation(expr.operator, reference)
+                copy.retrieves_stored_data = expr.retrieves_stored_data
+                return copy
+            return expr
+        if depth >= MAX_CALL_DEPTH:
+            raise ValueError(f"{signature.name}: functions that call themselves are not supported")
+        # arguments are expanded first (a call in an argument), as written otherwise
+        args = [self._expand_functions(r, node, processed_nodes, binder, depth) for r in expr.reference[1:]]
+        call = self.bind_function_call(expr, args)
+        values = binder(call, call.params, list(call.values))
+        return self.expand_function(call, values, node, processed_nodes, binder, depth)
+
+    def expand_function(self, call: FunctionCall, values: List[Any], node: Any, processed_nodes: Any,
+                        binder=None, depth: int = 0) -> Any:
+        """The body of ``call`` with its bound arguments (a calculated argument used more than
+        once becomes a sub-calculate); a pure function of constants folds to a constant."""
+        signature = call.signature
+        uses = _parameter_uses(signature.body)
+        arguments = {}
+        for param, value in zip(call.params, values):
+            if value is NULL or value is MISSING:
+                value = None
+            elif uses.get(param.name.lower(), 0) > 1:
+                value = self.sub_calculate(node, call, param.name, value, processed_nodes)
+            arguments[param.name.lower()] = value
+        expansion = fold_nulls(substitute_parameters(signature.body, arguments))
+        if expansion is None:
+            expansion = TriccStatic(value="")  # no value, as a table call matching no row
+        if binder is not None and self._contains_function_call(expansion):
+            expansion = self._expand_functions(expansion, node, processed_nodes, binder, depth + 1)
+        if not signature.retrieve and all(v is None or isinstance(v, TriccStatic) for v in arguments.values()):
+            folded = _fold(expansion)
+            if folded is not None:
+                return folded
+        if self.function_calls:
+            args = [TriccStatic(value="") if v is None else v for v in arguments.values()]
+            return TriccOperation(TriccOperator.FUNCTION_CALL, [expansion, TriccStatic(value=signature.name), *args])
+        return expansion
+
+    def sub_calculate(self, node: Any, call: Any, param: str, value: Any, processed_nodes: Any) -> Any:
+        """A calculated argument as its own calculate, owned by the call (§2.4).
+
+        It is not walked: it is instantiated here, with the call, and hung on the node's activity
+        so every output writes it once. A reference, a node or a literal is returned as it is.
+        """
+        if not isinstance(value, TriccOperation):
+            return value
+        from tricc_oo.converters.utils import clean_name, generate_id
+        from tricc_oo.models.calculate import TriccNodeCalculate
+        from tricc_oo.visitors.tricc import process_reference
+
+        target = _target(call) or "call"
+        name = clean_name(f"{node.name}_{target}_{param}".replace(".", "_")).lower()
+        sub = TriccNodeCalculate(
+            id=generate_id(f"sub:{node.id}:{call.key}:{param}:{len(self.records)}"),
+            name=name,
+            label=f"{param} of {target} for {node.get_name()}",
+            expression=value,
+            activity=node.activity,
+            group=node.group,
+            path_len=node.path_len,
+        )
+        process_reference(sub, processed_nodes, {}, replace_reference=True)
+        sub.is_sequence_defined = True
+        node.activity.nodes[sub.id] = sub
+        node.activity.calculates.append(sub)
+        processed_nodes.add(sub)
+        logger.debug(f"sub-calculate {name} for {param!r} of {target} in {node.get_name()}")
+        return sub
 
     def _binder(self, node: Any, processed_nodes: Any, keys: Set[str]):
         def bind(call: Any, params: List[CallParam], values: List[Any]) -> List[Any]:
@@ -311,9 +562,9 @@ class CallState:
         activity = getattr(node, "activity", None)
         return {
             "call": getattr(call, "name", None),
-            "kind": "decision_table",
+            "kind": getattr(call, "kind", "decision_table"),
             "target": _target(call),
-            "sources": ["decision_table"],
+            "sources": getattr(call, "sources", None) or ["decision_table"],
             "calculate": getattr(node, "name", None),
             "node": node.id,
             "activity": getattr(activity, "name", None) or getattr(activity, "id", None),
@@ -325,7 +576,123 @@ def _target(call: Any) -> Optional[str]:
     table = getattr(call, "table", None)
     if table is not None:
         return f"{table.id}.{table.outputs[call.out_at].name}"
-    return getattr(call, "name", None)
+    signature = getattr(call, "signature", None)
+    return signature.name if signature is not None else getattr(call, "name", None)
+
+
+def _parameter_uses(body: Any) -> Dict[str, int]:
+    """How many times each parameter (lower case) appears in a body."""
+    uses: Dict[str, int] = {}
+    stack = [body]
+    while stack:
+        item = stack.pop()
+        if isinstance(item, TriccParameterReference):
+            uses[item.value.lower()] = uses.get(item.value.lower(), 0) + 1
+        elif isinstance(item, list):
+            stack.extend(item)
+        elif isinstance(item, TriccOperation):
+            stack.extend(item.reference or [])
+    return uses
+
+
+_NULL_SAFE = {
+    TriccOperator.ISNULL: True,
+    TriccOperator.ISNOTNULL: False,
+}
+
+
+def fold_nulls(expr: Any) -> Any:
+    """Fold the ``null`` arguments of an expanded body away (CQL null semantics), so no output
+    has to write a null operand: ``Coalesce`` skips them, ``is null`` is decided, an ``if`` on
+    null takes its ``else``, ``and`` / ``or`` drop them, any other operator on null is null.
+
+    Returns:
+        The folded expression; None when it is null.
+    """
+    if isinstance(expr, list):
+        return [fold_nulls(e) for e in expr]
+    if not isinstance(expr, TriccOperation):
+        return expr
+    refs = [fold_nulls(r) for r in expr.reference or []]
+    operator = expr.operator
+    if None not in refs:
+        if any(a is not b for a, b in zip(refs, expr.reference or [])):
+            copy = TriccOperation(operator, refs)
+            copy.retrieves_stored_data = expr.retrieves_stored_data
+            return copy
+        return expr
+    if operator in _NULL_SAFE and len(refs) == 1:
+        return TriccStatic(_NULL_SAFE[operator])
+    if operator in (TriccOperator.COALESCE, TriccOperator.AND, TriccOperator.OR):
+        kept = [r for r in refs if r is not None]
+        if not kept:
+            return None
+        return kept[0] if len(kept) == 1 else TriccOperation(operator, kept)
+    if operator == TriccOperator.IF and len(refs) == 3:
+        return refs[2] if refs[0] is None else TriccOperation(operator, refs)
+    if operator in (TriccOperator.IFS, TriccOperator.CASE, TriccOperator.IF, TriccOperator.NATIVE):
+        return TriccOperation(operator, [TriccStatic(value="") if r is None else r for r in refs])
+    return None
+
+
+def _fold(expansion: Any) -> Optional[TriccStatic]:
+    """The value of a constant expansion (a pure function of constants), else None."""
+    from tricc_oo.visitors.constant_eval import evaluate_constant
+
+    if isinstance(expansion, TriccStatic):
+        return expansion
+    try:
+        value = evaluate_constant(expansion)
+    except Exception:
+        return None
+    return value if value is not None else None
+
+
+def check_project_calls(project: Any) -> None:
+    """Check the calls and the parameter metadata of a loaded project (§2.2, §5).
+
+    Raises:
+        DecisionTableError: An invalid table call.
+        FunctionError: An invalid function call, ``E_PARAM_FALLBACK_UNKNOWN``,
+            ``E_PARAM_RETRIEVAL_UNKNOWN``.
+    """
+    from tricc_oo.converters.cql_library import FunctionError
+    from tricc_oo.converters.datadictionnary import lookup_codesystems_code
+
+    check_project_tables(project)
+    state = getattr(project, "call_state", None) or CallState(project)
+    nodes = list(iter_activity_nodes(list(project.pages.values()) + list(project.library_calculates or [])))
+    names = {getattr(n, "name", None) for n in nodes} - {None}
+    for node in nodes:
+        state.check_node_functions(node)
+    retrievals = None
+    for function in (getattr(project, "function_signatures", None) or {}).values():
+        if function.name in names or function.name.lower() in {str(n).lower() for n in names}:
+            logger.warning(
+                f"{W_FUNCTION_NAME_SHARED}: function {function.name!r} has the name of a calculate or define; "
+                "a call is always written with ()"
+            )
+        for param in function.params:
+            if param.fallback and param.fallback not in names and not lookup_codesystems_code(
+                getattr(project, "code_systems", None) or {}, param.fallback
+            ):
+                raise FunctionError(
+                    E_PARAM_FALLBACK_UNKNOWN,
+                    f"function {function.name!r}: parameter {param.name!r} falls back to {param.fallback!r}, "
+                    "neither a concept nor a node of the project",
+                )
+            if param.retrievals:
+                if retrievals is None:
+                    from tricc_oo.converters.retrieval import read_project_retrievals
+
+                    retrievals = read_project_retrievals(project)
+                unknown = [r for r in param.retrievals if r not in retrievals]
+                if unknown:
+                    raise FunctionError(
+                        E_PARAM_RETRIEVAL_UNKNOWN,
+                        f"function {function.name!r}: parameter {param.name!r} lists retrieval "
+                        f"{', '.join(unknown)}, not in the retrieval dictionary",
+                    )
 
 
 def _label(call: Any) -> str:
@@ -354,3 +721,34 @@ def write_data_needs(project: Any, out_dir: str, form: Optional[str] = None) -> 
         json.dump({"form": form, "calls": records}, file, indent=2, ensure_ascii=False)
     logger.info(f"data needs: {path} ({len(records)} calls)")
     return path
+
+
+E_FUNCTION_NOT_EXPORTABLE = "E_FUNCTION_NOT_EXPORTABLE"
+
+
+def inline_function_call(operation: TriccOperation, serialise: Callable[[Any], str], strategy: str) -> str:
+    """Write a kept function call (``FUNCTION_CALL``) as its expanded body.
+
+    Raises:
+        FunctionError: ``E_FUNCTION_NOT_EXPORTABLE`` when the strategy cannot write the body.
+    """
+    from tricc_oo.converters.cql_library import FunctionError
+
+    name = function_call_name(operation)
+    try:
+        return serialise(operation.reference[0])
+    except (NotImplementedError, KeyError, AttributeError) as exc:
+        raise FunctionError(
+            E_FUNCTION_NOT_EXPORTABLE, f"function {name!r}: {strategy} cannot write its body ({exc})"
+        ) from exc
+
+
+def function_call_name(operation: TriccOperation) -> str:
+    """The function name of a kept function call (``FUNCTION_CALL``)."""
+    head = operation.reference[1] if len(operation.reference or []) > 1 else None
+    return str(getattr(head, "value", head))
+
+
+def function_call_arguments(operation: TriccOperation) -> List[Any]:
+    """The bound arguments of a kept function call, ``None`` for no value."""
+    return [None if a == TriccStatic(value="") else a for a in (operation.reference or [])[2:]]

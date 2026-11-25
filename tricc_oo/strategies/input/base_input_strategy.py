@@ -205,23 +205,32 @@ class BaseInputStrategy:
     def load_libraries(project, sources) -> None:
         """Parse tricc.yaml ``libraries`` (``[(path, cql text)]``) into calculates.
 
-        Function declarations go to ``project.function_signatures``.
+        Function declarations go to ``project.function_signatures``, linked with the functions
+        of the calculate dictionary (load the terminology first;
+        feature/20261125-calculate-functions.md §1).
         """
-        from tricc_oo.converters.cql_library import build_library_calculates, parse_cql_library_functions
+        from tricc_oo.converters.cql_library import (
+            build_library_calculates,
+            link_functions,
+            parse_cql_library_functions,
+            read_dictionary_functions,
+        )
 
         seen = {}
         declared = {}
+        library_functions = {}
         for path, text in sources:
             for name, signature in parse_cql_library_functions(text, path).items():
                 if name in declared:
                     raise ValueError(f"{path}: function {name!r} is already declared in {declared[name]}")
                 declared[name] = path
-                project.function_signatures[name] = signature
+                library_functions[name] = signature
             for calc in build_library_calculates(text, path):
                 if calc.name in seen:
                     raise ValueError(f"{path}: define {calc.name!r} is already defined in {seen[calc.name]}")
                 seen[calc.name] = path
                 project.library_calculates.append(calc)
+        project.function_signatures.update(link_functions(library_functions, read_dictionary_functions(project)))
 
     @staticmethod
     def write_terminology(project, media_path) -> None:

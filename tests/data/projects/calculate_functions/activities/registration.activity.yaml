@@ -1,0 +1,24 @@
+# The #54 case, second half: is_adult from a declared answer in registration. age is left out:
+# the form has no age_years, so it comes from the triage call (age_estimated). The two versions
+# of is_adult no longer wait for each other.
+id: registration
+title: Registration
+process: main
+nodes:
+  - {id: r_start, type: activity_start, name: registration, label: Registration}
+  - id: r_declared
+    type: select_one
+    name: declared_adult
+    label: Declared adult?
+    options:
+      - {id: r_opt_yes, name: "yes", label: "Yes"}
+      - {id: r_opt_no, name: "no", label: "No"}
+  # a calculated argument used once by the body: injected
+  - {id: r_adult, type: calculate, name: is_adult, label: Is adult,
+     calculate: "IsAdult(Tuple{ declared: \"declared_adult\" = 'yes' })"}
+  - {id: r_note, type: note, name: registration_note, label: "Adult ${is_adult}"}
+  - {id: r_end, type: activity_end, name: registration_end, label: End of registration}
+edges:
+  - {source: r_start, target: r_declared}
+  - {source: r_declared, target: r_note}
+  - {source: r_note, target: r_end}

@@ -500,6 +500,8 @@ def load_calculate(
             all_prev_versions = get_versions(node_name, processed_nodes, get_repeat(node))
             # Exclude the current node itself
             all_prev_versions = [v for v in all_prev_versions if v != node]
+            # a version calling the same function carries its arguments over: no inheritance
+            all_prev_versions = call_state.drop_same_call_versions(node, all_prev_versions)
 
             if all_prev_versions:
                 get_version_inheritance(node, all_prev_versions, processed_nodes)

@@ -43,6 +43,16 @@
           "valueCode": "integer"
         }
       ]
+    },
+    {
+      "code": "age_years",
+      "display": "Age (years)",
+      "property": [
+        {
+          "code": "dataType",
+          "valueCode": "integer"
+        }
+      ]
     }
   ]
 }

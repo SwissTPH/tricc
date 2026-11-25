@@ -4,7 +4,14 @@
   "name": "demo-retrieve",
   "title": "Retrievals",
   "url": "http://example.org/fhir/CodeSystem/demo-retrieve",
-  "meta": {"tag": [{"system": "http://tricc.org/fhir/CodeSystem/codesystem-role", "code": "retrieve"}]},
+  "meta": {
+    "tag": [
+      {
+        "system": "http://tricc.org/fhir/CodeSystem/codesystem-role",
+        "code": "retrieve"
+      }
+    ]
+  },
   "status": "draft",
   "content": "complete",
   "concept": [
@@ -12,18 +19,72 @@
       "code": "#prev_weight",
       "display": "Weight in the last 30 days",
       "property": [
-        {"code": "context", "valueCode": "history"},
-        {"code": "function", "valueCode": "Latest"},
-        {"code": "reads", "valueCoding": {"system": "http://example.org/fhir/CodeSystem/demo", "code": "weight"}},
-        {"code": "period", "valueString": "P30D"}
+        {
+          "code": "context",
+          "valueCode": "history"
+        },
+        {
+          "code": "function",
+          "valueCode": "Latest"
+        },
+        {
+          "code": "reads",
+          "valueCoding": {
+            "system": "http://example.org/fhir/CodeSystem/demo",
+            "code": "weight"
+          }
+        },
+        {
+          "code": "period",
+          "valueString": "P30D"
+        }
       ]
     },
     {
       "code": "#age_years",
       "display": "Age in years",
       "property": [
-        {"code": "context", "valueCode": "patient"},
-        {"code": "function", "valueCode": "AgeInYears"}
+        {
+          "code": "context",
+          "valueCode": "patient"
+        },
+        {
+          "code": "function",
+          "valueCode": "AgeInYears"
+        }
+      ]
+    },
+    {
+      "code": "#last_weight",
+      "display": "Last recorded weight",
+      "property": [
+        {
+          "code": "context",
+          "valueCode": "custom"
+        },
+        {
+          "code": "reads",
+          "valueCoding": {
+            "system": "http://example.org/fhir/CodeSystem/demo",
+            "code": "weight"
+          }
+        }
+      ],
+      "extension": [
+        {
+          "url": "http://tricc.org/fhir/StructureDefinition/retrieve-expression",
+          "valueExpression": {
+            "language": "text/cql",
+            "expression": "Helper.ValueAsDecimal(Helper.GetObservationValue({{code}}))"
+          }
+        },
+        {
+          "url": "http://tricc.org/fhir/StructureDefinition/retrieve-expression",
+          "valueExpression": {
+            "language": "text/x-xlsform",
+            "expression": "''"
+          }
+        }
       ]
     }
   ]

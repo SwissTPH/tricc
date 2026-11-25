@@ -69,7 +69,11 @@ formula.
 
 - **Dictionary.** A function is a calculate-dictionary concept (`calculate_code_system`) with
   parameters as an extension list (`name`, `type`, `fallback` Coding, `retrievals` `#code` list)
-  and, optionally, a body as a FHIR `Expression` extension (`text/cql`).
+  and, optionally, a body as a FHIR `Expression` extension (`text/cql`). URLs:
+  `http://tricc.org/fhir/StructureDefinition/function-parameter` (one per parameter, sub-extensions
+  `name`, `type`, `fallback` (valueCoding), `retrieval` (valueCode, repeated)) and
+  `.../function-body` (valueExpression); the concept's `dataType` is the return type. A decision
+  table input lists its retrievals as `retrievals: ["#code", …]` next to `concept`.
 - **Library.** tricc.yaml `libraries` may define it (`define function F(p Type, …) returns T:
   <body>`); `cql_library._function_signature` stops rejecting a body. Parameter tags, one per
   parameter, the name after a dot: `@param.age: fallback=age_years retrievals=#age_years`

@@ -1,0 +1,33 @@
+# The #54 case, first half: is_adult worked out from the estimated age in triage.
+id: triage
+title: Triage
+process: main
+nodes:
+  - {id: t_start, type: activity_start, name: triage, label: Triage}
+  - {id: t_age, type: integer, name: age_estimated, label: Estimated age (years)}
+  # drawn without an arrow: instantiated where the note reads it
+  - {id: t_adult, type: calculate, name: is_adult, label: Is adult, calculate: "IsAdult(\"age_estimated\")"}
+  # read before weight is collected and with no earlier BMI call: weight is the listed retrieval
+  # (#prev_weight), so FHIR computes it in CQL with the Helper function
+  - {id: t_bmi_record, type: calculate, name: bmi_record, label: Recorded BMI,
+     calculate: "BMI(Tuple{ height: 1.7 })"}
+  # a pure function (@retrieve: false) of constants folds to a constant
+  - {id: t_adult_const, type: calculate, name: adult_const, label: Adult at 20, calculate: "IsAdult(20)"}
+  # BMI may read recorded data (no @retrieve: false): constants do not fold; FHIR writes a CQL
+  # call to the Helper function
+  - {id: t_bmi_ref, type: calculate, name: bmi_reference, label: Reference BMI, calculate: "BMI(70, 1.75)"}
+  - {id: t_record_note, type: note, name: record_note,
+     label: "Recorded BMI ${bmi_record} (${adult_const}), reference ${bmi_reference}"}
+  - {id: t_weight, type: decimal, name: weight, label: Weight (kg)}
+  - {id: t_height, type: decimal, name: height_cm, label: Height (cm)}
+  # height is used twice by the body: the calculated argument becomes a sub-calculate
+  - {id: t_bmi, type: calculate, name: bmi, label: BMI, calculate: "BMI(\"weight\", \"height_cm\" / 100)"}
+  - {id: t_note, type: note, name: triage_note, label: "Adult ${is_adult}, BMI ${bmi}"}
+  - {id: t_end, type: activity_end, name: triage_end, label: End of triage}
+edges:
+  - {source: t_start, target: t_age}
+  - {source: t_age, target: t_record_note}
+  - {source: t_record_note, target: t_weight}
+  - {source: t_weight, target: t_height}
+  - {source: t_height, target: t_note}
+  - {source: t_note, target: t_end}

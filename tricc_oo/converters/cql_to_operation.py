@@ -143,6 +143,14 @@ class cqlToXlsFormVisitor(cqlVisitor):
         # look for the system, if not found fallback on default system
         # look for the code in the system
         # if no code or not found return None
+        parameters = getattr(self, "parameters", None)
+        if parameters:
+            bare = arg[1:-1] if arg.startswith('"') and arg.endswith('"') else arg
+            if bare.lower() in parameters:
+                # a parameter of the function whose body is parsed (feature/20261125-calculate-functions.md)
+                from tricc_oo.converters.call_binding import TriccParameterReference
+
+                return TriccParameterReference(bare)
         if arg.startswith('"') and arg.endswith('"'):
             return TriccReference(arg[1:-1])
         elif arg.lower() in ["true", "false"]:
@@ -488,7 +496,7 @@ class CQLErrorListener(ErrorListener):
         self.errors.append(error)
 
 
-def transform_cql_to_operation(cql_input, context=None, quiet=False):
+def transform_cql_to_operation(cql_input, context=None, quiet=False, parameters=None):
     """Parse a CQL expression into a TriccOperation / TriccReference / TriccStatic.
 
     A bare identifier is text (``TriccStatic``); a reference is a ``"quoted"`` identifier.
@@ -497,6 +505,8 @@ def transform_cql_to_operation(cql_input, context=None, quiet=False):
         cql_input: The expression.
         context: Shown in error messages.
         quiet: Do not report grammar errors (the caller treats unparsable input as text).
+        parameters: The parameter names of the function whose body this is: those
+            identifiers, bare or quoted, become ``TriccParameterReference``.
 
     Returns:
         The parsed expression, or None when it does not parse.
@@ -528,6 +538,7 @@ def transform_cql_to_operation(cql_input, context=None, quiet=False):
 
     # If no errors, proceed with visitor
     visitor = cqlToXlsFormVisitor()
+    visitor.parameters = {p.lower() for p in parameters} if parameters else None
 
     visitor.visit(tree)
     if visitor.errors:

@@ -1,8 +1,7 @@
 import logging
 import os
 
-from tricc_oo.converters.decision_table import check_project_tables
-from tricc_oo.visitors.calls import CallState
+from tricc_oo.visitors.calls import CallState, check_project_calls
 from tricc_oo.converters.xml_to_tricc import (
     apply_goto_page_to_activity,
     apply_goto_repeat_to_activity,
@@ -60,10 +59,11 @@ class DrawioStrategy(BaseInputStrategy):
     file_extensions = (".drawio",)
 
     def process_pages(self, start_page, project):
-        # decision table calls are checked here and stay calls during the walk: they are bound
+        # calls (decision tables, functions) are checked here and stay calls during the walk: bound
         # and expanded when their node is instantiated (feature/20261125-calculate-functions.md)
-        check_project_tables(project)
         call_state = project.call_state or CallState(project)
+        project.call_state = call_state
+        check_project_calls(project)
         call_state.start_page = start_page
         processed_nodes = OrderedSet()
         # create the graph

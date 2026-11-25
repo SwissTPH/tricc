@@ -17,7 +17,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, List, Optional, Sequence, Tuple, Type
 
-from tricc_oo.models.base import TriccOperation, TriccOperator
+from tricc_oo.models.base import TriccOperation, TriccOperator, TriccReference
 
 E_CALL_ARG_UNKNOWN = "E_CALL_ARG_UNKNOWN"
 E_CALL_ARG_TWICE = "E_CALL_ARG_TWICE"
@@ -68,6 +68,29 @@ class CallParam:
     type: Optional[str] = None
     fallback: Optional[str] = None
     retrievals: Tuple[str, ...] = field(default_factory=tuple)
+
+
+class TriccParameterReference(TriccReference):
+    """A parameter of a function, inside its body (replaced by the argument when called)."""
+
+
+def substitute_parameters(body: Any, arguments: dict) -> Any:
+    """A copy of a function body with each parameter replaced by its argument.
+
+    Args:
+        body: The parsed body (an operation, a reference, a literal or a list of them).
+        arguments: The value per parameter name (lower case); ``None`` is no value.
+    """
+    if isinstance(body, TriccParameterReference):
+        value = arguments.get(body.value.lower())
+        return value.copy() if isinstance(value, TriccOperation) else value
+    if isinstance(body, list):
+        return [substitute_parameters(b, arguments) for b in body]
+    if isinstance(body, TriccOperation):
+        copy = TriccOperation(body.operator, [substitute_parameters(r, arguments) for r in body.reference or []])
+        copy.retrieves_stored_data = body.retrieves_stored_data
+        return copy
+    return body
 
 
 def is_named_arguments(arg: Any) -> bool:

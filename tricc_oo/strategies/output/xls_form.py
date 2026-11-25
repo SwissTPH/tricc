@@ -10,6 +10,7 @@ import re
 import pandas as pd
 from pyxform import create_survey_from_xls
 
+from tricc_oo.visitors.calls import inline_function_call
 from tricc_oo.converters.utils import clean_name
 from tricc_oo.models.base import (
     TriccOperator,
@@ -103,6 +104,9 @@ OPERATOR_COALESCE_FALLBACK = {
 class XLSFormStrategy(BaseOutPutStrategy):
     # keep decision table calls (DMN_CALL): large tables are read from an instance
     decision_table_calls = True
+    # keep calculate function calls (FUNCTION_CALL), written inline, so a body this output
+    # cannot write is reported with the function named (E_FUNCTION_NOT_EXPORTABLE)
+    function_calls = True
     pd.set_option("display.max_colwidth", None)
     df_survey = pd.DataFrame(columns=SURVEY_MAP.keys())
     df_calculate = pd.DataFrame(columns=SURVEY_MAP.keys())
@@ -513,6 +517,9 @@ class XLSFormStrategy(BaseOutPutStrategy):
             return self.get_tricc_operation_operand(operation)
         if getattr(operation, "operator", None) == TriccOperator.DMN_CALL:
             return self.table_call_expression(operation)
+        if getattr(operation, "operator", None) == TriccOperator.FUNCTION_CALL:
+            # a calculate function: its body, inline (feature/20261125-calculate-functions.md §3)
+            return inline_function_call(operation, self.get_tricc_operation_expression, type(self).__name__)
 
         operator = getattr(operation, "operator", "")
         coalesce_fallback = OPERATOR_COALESCE_FALLBACK[operator] if operator in OPERATOR_COALESCE_FALLBACK else "''"

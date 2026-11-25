@@ -50,6 +50,12 @@ from tricc_oo.converters.fhir.cql_value import (
     wrap_cql_for_item_type,
 )
 from tricc_oo.converters.retrieval import iter_retrievals
+from tricc_oo.visitors.calls import (
+    E_FUNCTION_NOT_EXPORTABLE,
+    function_call_arguments,
+    function_call_name,
+    inline_function_call,
+)
 from tricc_oo.converters.cql_library import native_function_type
 from tricc_oo.converters.fhir.populate_helper import (
     ENCOUNTER_CONTEXT,
@@ -343,6 +349,9 @@ class FHIRStrategy(BaseOutPutStrategy):
     """
 
     processes = ["main"]
+    # calculate functions are kept as FUNCTION_CALL: FHIRPath writes the body inline, CQL calls
+    # a ``define function`` written once in the Helper library (feature/20261125-calculate-functions.md)
+    function_calls = True
     project = None
     output_path = None
 
@@ -437,6 +446,8 @@ class FHIRStrategy(BaseOutPutStrategy):
         original_references = []
         if not hasattr(operation, "reference"):
             return self.get_tricc_operation_operand(operation)
+        if operation.operator == TriccOperator.FUNCTION_CALL:
+            return self.function_call_cql(operation)
         for r in operation.reference:
             if isinstance(r, list):
                 r_expr = [
@@ -2844,6 +2855,45 @@ class FHIRStrategy(BaseOutPutStrategy):
         else:
             raise NotImplementedError(f"This type of node {r.__class__} is not supported within an operation")
 
+    def function_call_cql(self, operation) -> str:
+        """A calculate function called from CQL: ``Helper."Name"(arguments)``; the function is
+        written once in the Helper library (:meth:`function_cql_defines`)."""
+        name = function_call_name(operation)
+        args = [
+            "null" if a is None else (
+                self.get_tricc_operation_expression(a) if isinstance(a, TriccOperation)
+                else self.get_tricc_operation_operand(a)
+            )
+            for a in function_call_arguments(operation)
+        ]
+        args = [a if isinstance(a, str) else str(self.get_tricc_operation_operand(a)) for a in args]
+        if not hasattr(self, "_used_functions"):
+            self._used_functions = set()
+        self._used_functions.add(name)
+        return f'Helper."{name}"({", ".join(args)})'
+
+    def function_cql_defines(self) -> str:
+        """``define function`` of each calculate function called from CQL, for the Helper.
+
+        Raises:
+            FunctionError: ``E_FUNCTION_NOT_EXPORTABLE``, a function without its CQL body.
+        """
+        from tricc_oo.converters.cql_library import FunctionError, function_signature
+
+        blocks = []
+        for name in sorted(getattr(self, "_used_functions", set())):
+            signature = function_signature(self.project, name)
+            if signature is None or not signature.body_text:
+                raise FunctionError(
+                    E_FUNCTION_NOT_EXPORTABLE, f"function {name!r}: {type(self).__name__} has no CQL body to write"
+                )
+            params = ", ".join(f"{p.name} {_cql_type(p.type)}" for p in signature.call_params)
+            blocks.append(
+                f'define function "{signature.name}"({params}) returns {_cql_type(signature.return_type)}:\n'
+                f"  {signature.body_text}\n"
+            )
+        return "\n".join(blocks)
+
     def retrieval_expression(self, retrieval) -> str:
         """CQL of a project retrieval's Helper define (``retrieval_cql_expression``)."""
         return retrieval_cql_expression(retrieval, type(self).__name__)
@@ -2941,6 +2991,9 @@ class FHIRStrategy(BaseOutPutStrategy):
         retrievals = retrieval_cql_defines(iter_retrievals(self.project), type(self).__name__)
         if retrievals:
             helper_cql += "\n" + retrievals
+        functions = self.function_cql_defines()
+        if functions:
+            helper_cql += "\n" + functions
         self.cql_libraries[helper_key] = helper_cql
 
         # Create FHIR Library resource for helper
@@ -3133,6 +3186,11 @@ class FHIRStrategy(BaseOutPutStrategy):
         original_references = []
         if not hasattr(operation, "reference"):
             return self.get_tricc_operation_operand_fhirpath(operation)
+        if operation.operator == TriccOperator.FUNCTION_CALL:
+            # an argument is an item of this Questionnaire: the body, inline
+            return inline_function_call(
+                operation, self.get_tricc_operation_expression_fhirpath, type(self).__name__
+            )
         for r in operation.reference:
             if isinstance(r, list):
                 r_expr = [
@@ -4858,3 +4916,24 @@ class FHIRStrategy(BaseOutPutStrategy):
                             item_types.get(target),
                         )
         return offenders
+
+
+_CQL_SYSTEM_TYPES = {
+    "boolean": "Boolean",
+    "integer": "Integer",
+    "decimal": "Decimal",
+    "quantity": "Decimal",
+    "string": "String",
+    "text": "String",
+    "coded": "String",
+    "code": "String",
+    "date": "Date",
+    "datetime": "DateTime",
+}
+
+
+def _cql_type(type_text) -> str:
+    """A parameter or return type as a CQL type (``integer`` -> ``Integer``; CQL kept as written)."""
+    if not type_text:
+        return "Any"
+    return _CQL_SYSTEM_TYPES.get(str(type_text).lower(), str(type_text))

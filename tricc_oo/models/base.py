@@ -495,6 +495,9 @@ class TriccOperator(StrEnum):
     # an expanded call kept for a strategy that evaluates tables itself (CHT dmn-<project>.js):
     # [inline expansion, table, policy, output, *one argument per input]
     DMN_CALL = "dmn_call"
+    # an expanded calculate function kept for a strategy that writes the function itself (FHIR
+    # Helper library): [inline expansion, function name, *one argument per parameter]
+    FUNCTION_CALL = "function_call"
     LIST_IF = "list_if"  # [cond, value], ...: the values whose condition holds, in order
     POWER = "power"  # [base, exponent]
     FLOOR = "floor"
@@ -681,7 +684,7 @@ class TriccOperation(BaseModel):
             return self.get_reference_datatype(self.reference[:1])
         elif self.operator == TriccOperator.PARENTHESIS:
             return self.get_reference_datatype(self.reference)
-        elif self.operator == TriccOperator.DMN_CALL:
+        elif self.operator in (TriccOperator.DMN_CALL, TriccOperator.FUNCTION_CALL):
             return self.get_reference_datatype(self.reference[:1])
         elif self.operator == TriccOperator.IF:
             return self.get_reference_datatype(self.reference[1:])

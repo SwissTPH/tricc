@@ -1,0 +1,21 @@
+# Calculate functions with parameter fallbacks (feature/20261125-calculate-functions.md, RFC #101):
+# IsAdult (library body, dictionary parameters) and BMI (dictionary body), the #54 case.
+title: Calculate functions
+input_strategy: YamlStrategy
+output_strategies:
+  - XLSFormStrategy
+terminology:
+  - terminology/*.codesystem.json
+libraries:
+  - libraries/*.cql
+decision_tables:
+  - tables/*.yaml
+retrieve_code_system: demo-retrieve
+interventions:
+  - id: functions
+    name: functions
+    title: Functions
+    activity:
+      - activities/visit.activity.yaml
+      - activities/triage.activity.yaml
+      - activities/registration.activity.yaml

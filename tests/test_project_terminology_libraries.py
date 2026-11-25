@@ -121,7 +121,6 @@ def test_parse_library_accepts_quoted_identifiers():
 @pytest.mark.parametrize(
     "text, message",
     [
-        ("define function Double(x Integer): x * 2", "functions with a body are not supported"),
         ('define "Has fever": temperature > 37.5', "plain identifier"),
         ("define a: 1\ndefine a: 2", "appears twice"),
         ("define a:\n", "not valid CQL at line 2"),
@@ -177,7 +176,10 @@ def test_functions_are_signatures_not_calculates():
             "define function F() returns Boolean: external\ndefine function F() returns Boolean: external",
             "appears twice",
         ),
-        ("define function F(x Integer) returns Integer: x * 2", "body are not supported yet"),
+        # a body is read since RFC #101 (feature/20261125-calculate-functions.md); it must still
+        # declare its type
+        ("define function Double(x Integer): x * 2", "must declare its type"),
+        ("define function F(x Integer) returns Integer: x * ", "not valid CQL"),
         ("/* @retrieve: maybe */\ndefine function F() returns Boolean: external", "must be true or false"),
         ("/* @retrieve: true\n@retrieve: false */\ndefine function F() returns Boolean: external", "twice"),
         ("define function F(x) returns Boolean: external", "not valid CQL"),

@@ -222,6 +222,7 @@ def load_input_project(
     libraries: Sources = (),
     decision_tables: Sources = (),
     decision_table_calls: bool = False,
+    function_calls: bool = False,
 ):
     """Build the TriccIntervention from ``(strategy name, files, contents)`` groups.
 
@@ -234,6 +235,8 @@ def load_input_project(
     project = strategies[0][0].new_project(project_config, intervention)
     # the output strategy evaluates the decision tables itself (CHT dmn-<project>.js)
     project.decision_table_calls = decision_table_calls
+    # the output strategy writes each calculate function once (FHIR Helper library)
+    project.function_calls = function_calls
     BaseInputStrategy.load_terminology(project, terminology)
     BaseInputStrategy.load_libraries(project, libraries)
     BaseInputStrategy.load_decision_tables(project, decision_tables)
@@ -298,6 +301,7 @@ def run_grouped_export(
         libraries=libraries,
         decision_tables=decision_tables,
         decision_table_calls=bool(getattr(OutputStrategyCls, "decision_table_calls", False)),
+        function_calls=bool(getattr(OutputStrategyCls, "function_calls", False)),
     )
     output_strategy = OutputStrategyCls(project, out_dir)
     logger.info("Using strategy %s", OutputStrategyCls.__name__)

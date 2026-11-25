@@ -602,6 +602,9 @@ class TriccIntervention(BaseModel):
     # the calls' shared state across the walks (tricc_oo.visitors.calls.CallState) and the data
     # needs report it fills (feature/20261125-calculate-functions.md §2.6, §4)
     call_state: Optional[Any] = None
+    # keep each expanded function call as FUNCTION_CALL for an output strategy that writes the
+    # function once (FHIRStrategy: a Helper ``define function``); set by the runner
+    function_calls: bool = False
     data_needs: List[Dict[str, Any]] = []
     # block pages (rooted by block_start), by id: templates, never start pages
     blocks: Dict[str, Any] = {}
