@@ -169,8 +169,9 @@ them:
   and scope it needs, e.g. `define "EncounterObservations"` (current encounter, final / amended /
   corrected) and `define "HistoryObservations"` (the patient's, same statuses); likewise
   Conditions, Procedures, and MedicationRequest / Dispense (#75). Every Helper function and
-  retrieval define reads from these defines instead of a bare `[Observation]`. Only the
-  resource / scope pairs used are written.
+  retrieval define reads from these defines instead of a bare `[Observation]`. The static Helper
+  functions read every pair, so all pairs are written; an engine evaluates a define only when an
+  expression reaches it, so an unused pair costs nothing.
 - **One list per concept and window.** Reads that share concept, scope and window share one
   define, `define "#weight@P3M:records"`: the matching resources sorted by date, latest first.
   The fields are derived from it: `value` = `First(…).value` (typed as today), `date` =
@@ -184,8 +185,8 @@ them:
   `Helper.GetObservationValue('weight')` in the item.
 - **CHT.** The contact summary is computed once per contact, so reads are already aggregated
   there. The CHT export lists the keys it needs grouped by concept and window (one lookup per
-  concept, its fields side by side), so the deployment's contact-summary code reads each
-  concept once.
+  concept, its fields side by side) in `<form>.contact-summary.json` next to the form, so the
+  deployment's contact-summary code reads each concept once.
 - **XLSForm / CDSS** read no database: unchanged.
 
 How many queries an engine runs in the end (one per evaluation or per item) depends on the

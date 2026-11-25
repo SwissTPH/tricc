@@ -121,8 +121,8 @@ def test_required_concept_is_an_encounter_read_fhir(tmp_path):
     (main,) = glob.glob(str(out / "**" / "consult-main.cql"), recursive=True)
     with open(main, encoding="utf-8") as f:
         cql = f.read()
-    read = "Helper.ValueAsDecimal(Helper.GetEncounterObservationValue('weight', null, null))"
-    assert f"define Calc_weight_Vv_1: {read}" in cql
+    # the encounter read is a Helper define (§4)
+    assert 'define Calc_weight_Vv_1: Helper."@weight"' in cql
 
 
 @pytest.mark.skip(reason="#101 (function parameter fallbacks) is not implemented")
@@ -261,3 +261,67 @@ def test_implied_read_errors(tmp_path, replace, error):
             run_project_build(str(fixture), str(tmp_path / "out"), cli_output_strategy="XLSFormCHTStrategy")
     finally:
         logging.disable(logging.NOTSET)
+
+
+# --- §4 export: one read per record ------------------------------------------------------------
+
+
+def _fhir_libraries(out):
+    libraries = {}
+    for path in glob.glob(str(out / "**" / "*.cql"), recursive=True):
+        with open(path, encoding="utf-8") as f:
+            libraries[os.path.basename(path)] = f.read()
+    return libraries
+
+
+def test_fields_of_one_concept_and_window_share_one_records_list(tmp_path):
+    import re
+
+    libraries = _fhir_libraries(_build(tmp_path, "FHIRStrategy", IMPLIED))
+    (helper,) = [cql for name, cql in libraries.items() if name.endswith("-Helper.cql")]
+    assert helper.count('define "#weight@P3M:records":') == 1
+    for field_define in ('"#weight@P3M"', '"#weight@P3M.date"', '"#weight@P3M.count"', '"#weight@P3M.exists"'):
+        body = helper.split(f"define {field_define}:\n", 1)[1].split("\n\n", 1)[0]
+        assert '"#weight@P3M:records"' in body and "(" + "'weight'" not in body
+    # the records lists read the shared retrieves, never a bare one
+    for records in re.findall(r'define "[^"]+:(?:records|dispenses)":\n  (.*)', helper):
+        assert records.startswith('("History') or records.startswith('("Encounter')
+    for resource in ("Observation", "Condition", "Procedure", "MedicationRequest", "MedicationDispense"):
+        assert helper.count(f"[{resource}]") == 1
+
+
+def test_items_name_defines_not_helper_function_calls(tmp_path):
+    import re
+
+    for fixture in (IMPLIED, REQUIRES):
+        out = _build(tmp_path / os.path.basename(fixture), "FHIRStrategy", fixture)
+        for name, cql in _fhir_libraries(out).items():
+            if name.endswith("-Helper.cql"):
+                continue
+            for define, body in re.findall(r"^define (\w+): (.*)$", cql, re.M):
+                assert not re.search(r"\bHelper\.\w+\(\s*[^)\s]", body), f"{name}: {define}: {body}"
+
+
+def test_encounter_reads_are_helper_defines(tmp_path):
+    libraries = _fhir_libraries(_build(tmp_path, "FHIRStrategy"))
+    assert 'define Calc_weight_Vv_1: Helper."@weight"' in libraries["consult-main.cql"]
+    assert 'define "@weight":\n  ValueAsDecimal(GetEncounterObservationValue(\'weight\', null, null))' in (
+        libraries["consult-Helper.cql"]
+    )
+
+
+def test_cht_contact_summary_keys_grouped_by_concept_and_window(tmp_path):
+    import json
+
+    out = _build(tmp_path, "XLSFormCHTStrategy", IMPLIED)
+    (path,) = glob.glob(str(out / "**" / "visit.contact-summary.json"), recursive=True)
+    with open(path, encoding="utf-8") as f:
+        keys = json.load(f)
+    weight = next(g for g in keys["concepts"] if (g["concept"], g["window"]) == ("weight", "P3M"))
+    assert weight["fields"] == {
+        "value": "weight_P3M", "date": "weight_P3M_date", "exists": "weight_P3M_exists", "count": "weight_P3M_count",
+    }
+    assert {(g["concept"], g["context"], g["window"]) for g in keys["concepts"]} >= {
+        ("weight", "history", None), ("weight", "encounter", None), ("metformin", "history", "P6M"),
+    }
+    assert keys["other"] == [{"key": "age_months", "retrieval": "#age_months", "function": "AgeInMonths"}]

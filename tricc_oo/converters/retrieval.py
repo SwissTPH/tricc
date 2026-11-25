@@ -672,6 +672,48 @@ def unsupported(retrieval: Retrieval, strategy: str) -> TriccRetrievalError:
     )
 
 
+def contact_summary_keys(retrievals: Iterable[Retrieval], populates: Iterable[Any] = ()) -> Dict[str, Any]:
+    """The contact-summary keys a CHT form reads, grouped by concept, scope and window.
+
+    One group per concept read (one lookup in the contact-summary script), its fields side by
+    side: ``{"concept": "weight", "context": "history", "window": "P3M", "fields": {"value":
+    "weight_P3M", "date": "weight_P3M_date"}}``. Reads of no concept (patient functions,
+    custom) are listed under ``other``. feature/20261125-requires-and-implied-retrievals.md §4.
+
+    Args:
+        retrievals: The used retrievals.
+        populates: Populate nodes read from the contact summary (``(key, concept, context,
+            period)`` tuples).
+
+    Returns:
+        ``{"concepts": [group, …], "other": [{"key", "retrieval", "function"}, …]}``.
+    """
+    fields_by_function = {function: field for field, function in RETRIEVE_FIELDS.items()}
+    groups: Dict[tuple, Dict[str, Any]] = {}
+    other = []
+
+    def add(concept, context, window, field, key):
+        group = groups.setdefault(
+            (concept, context, window or ""),
+            {"concept": concept, "context": context, "window": window, "fields": {}},
+        )
+        group["fields"].setdefault(field, key)
+
+    for retrieval in retrievals:
+        function = retrieval.effective_function
+        if retrieval.context in _TIMED and retrieval.reads_code and function in fields_by_function:
+            window = None if retrieval.context == "encounter" else retrieval.period
+            add(retrieval.reads_code, retrieval.context, window, fields_by_function[function], retrieval.name)
+        else:
+            other.append({"key": retrieval.name, "retrieval": retrieval.code, "function": function or CUSTOM_CONTEXT})
+    for key, concept, context, period in populates:
+        add(concept, context, period, DEFAULT_FIELD, key)
+    return {
+        "concepts": [groups[k] for k in sorted(groups)],
+        "other": sorted(other, key=lambda item: item["key"]),
+    }
+
+
 def is_retrieval_node(node) -> bool:
     """True for a ``TriccNodeRetrieval``."""
     from tricc_oo.models.calculate import TriccNodeRetrieval

@@ -207,10 +207,10 @@ class TestReadBack(unittest.TestCase):
             self.assertEqual(prev["type"], "boolean")
             self.assertIn({"url": HIDDEN, "valueBoolean": True}, prev["extension"])
             self.assertEqual(_expression(prev, INITIAL), "ActivityDone_module_c_done_prev")
-            self.assertIn(
-                "define ActivityDone_module_c_done_prev: Helper.GetEncounterProcedureValue('module_c', null)",
-                _by_process(self.cql, process),
-            )
+            # the item define names a generated Helper define (requires-and-implied-retrievals §4)
+            self.assertIn('define ActivityDone_module_c_done_prev: Helper."@module_c"', _by_process(self.cql, process))
+            helper = next(cql for name, cql in self.cql.items() if name.endswith("-Helper.cql"))
+            self.assertIn('define "@module_c":\n  GetEncounterProcedureValue(\'module_c\', null)', helper)
 
     def test_group_is_skipped_when_done_before(self):
         for process, trigger in zip(PROCESSES, ("trigger_a", "trigger_d")):

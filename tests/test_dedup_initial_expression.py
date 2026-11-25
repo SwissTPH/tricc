@@ -40,8 +40,9 @@ class TestDedupInitialExpression(unittest.TestCase):
         item = strategy.questionnaires["main"]["item"][0]
         exts = item.get("extension", [])
         self.assertTrue(any(e["url"] == SDC_EXT_INITIAL_EXPR for e in exts))
-        cql_defines = "\n".join(strategy.cql_defines.get("main", []))
-        self.assertIn("Helper.GetObservationValue('cough')", cql_defines)
+        # the item define names a generated Helper define holding the read (requires-and-implied-retrievals §4)
+        cql_defines = "\n".join(strategy.cql_defines.get("main", []) + list(strategy._helper_defines.values()))
+        self.assertIn("GetObservationValue('cough')", cql_defines)
 
     def test_observation_repeat_slot_uses_get_repeated_value(self):
         strategy = _make_strategy()
@@ -57,9 +58,10 @@ class TestDedupInitialExpression(unittest.TestCase):
             repeat=2,
         )
         strategy.generate_export(node)
-        cql_defines = "\n".join(strategy.cql_defines.get("main", []))
-        self.assertIn("Helper.GetRepeatedValue('weight', 2)", cql_defines)
-        self.assertNotIn("Helper.GetObservationValue('weight')", cql_defines)
+        # the item define names a generated Helper define holding the read (requires-and-implied-retrievals §4)
+        cql_defines = "\n".join(strategy.cql_defines.get("main", []) + list(strategy._helper_defines.values()))
+        self.assertIn("GetRepeatedValue('weight', 2)", cql_defines)
+        self.assertNotIn("GetObservationValue('weight')", cql_defines)
 
     def test_condition_item_gets_dedup_initial_expression(self):
         strategy = _make_strategy()
@@ -74,8 +76,9 @@ class TestDedupInitialExpression(unittest.TestCase):
         item = strategy.questionnaires["main"]["item"][0]
         exts = item.get("extension", [])
         self.assertTrue(any(e["url"] == SDC_EXT_INITIAL_EXPR for e in exts))
-        cql_defines = "\n".join(strategy.cql_defines.get("main", []))
-        self.assertIn("Helper.GetConditionValue('malaria')", cql_defines)
+        # the item define names a generated Helper define holding the read (requires-and-implied-retrievals §4)
+        cql_defines = "\n".join(strategy.cql_defines.get("main", []) + list(strategy._helper_defines.values()))
+        self.assertIn("GetConditionValue('malaria')", cql_defines)
 
     def test_author_authored_calculated_expression_is_not_overwritten(self):
         strategy = _make_strategy()

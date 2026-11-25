@@ -123,11 +123,16 @@ def test_custom_without_expression_for_the_language_fails():
 
 def test_cql_catalogue():
     assert retrieval_cql_expression(Retrieval(code="#a", context="patient", function="Sex")) == "PatientGender"
+    from tricc_oo.converters.fhir.populate_helper import retrieval_records
+
+    # timed reads are one-line reads of the concept's records list (requires-and-implied-retrievals §4)
     count = Retrieval(code="#c", context="history", function="Count", reads_code="weight", period="P7D")
-    assert "ObservationHasCode(O, 'weight')" in retrieval_cql_expression(count)
-    assert "Now() - 7 days" in retrieval_cql_expression(count)
+    assert retrieval_cql_expression(count) == 'Count("#weight@P7D:records")'
+    ((name, body),) = retrieval_records(count)
+    assert name == "#weight@P7D:records"
+    assert "ObservationHasCode(O, 'weight')" in body and "Now() - 7 days" in body
     exists = Retrieval(code="#e", context="encounter", function="Exists", reads_code="weight")
-    assert retrieval_cql_expression(exists) == "exists(GetObservations('weight'))"
+    assert retrieval_cql_expression(exists) == 'exists("#weight@encounter:records")'
 
 
 # --- export --------------------------------------------------------------------------------
@@ -163,10 +168,8 @@ def test_fhir_helper_defines_each_used_retrieval(tmp_path):
     with open(helper, encoding="utf-8") as f:
         cql = f.read()
     assert 'define "#age_months":\n  AgeInMonths' in cql
-    assert (
-        'define "#prev_weight":\n'
-        "  ValueAsDecimal(GetHistoryObservationValueSince('weight', Now() - 30 days, 1, null))"
-    ) in cql
+    assert 'define "#prev_weight":\n  ValueAsDecimal(First("#weight@P30D:records").value)' in cql
+    assert 'define "#weight@P30D:records":\n  ("HistoryObservations") O' in cql
     assert "Now() - 2 weeks, 2, null)), 0)" in cql  # custom text/cql, {{period}} as a quantity
     assert '"#sex"' not in cql
     (main,) = glob.glob(str(out / "**" / "*-main.cql"), recursive=True)

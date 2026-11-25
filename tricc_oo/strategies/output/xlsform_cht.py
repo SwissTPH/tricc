@@ -13,7 +13,7 @@ from pyxform.xls2xform import convert
 
 from tricc_oo.models.lang import SingletonLangClass
 from tricc_oo.converters.fhir.populate_helper import populate_uses_inputs_group
-from tricc_oo.models.calculate import TriccNodeEnd
+from tricc_oo.models.calculate import TriccNodeEnd, TriccNodePopulate
 from tricc_oo.models.base import TriccOperation, TriccReference
 from tricc_oo.models.tricc import TriccNodeDisplayModel
 from tricc_oo.serializers.xls_form import (
@@ -863,6 +863,7 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
         # Export returns list of generated files for CHT strategy
         generated_files = self.export(self.project.start_pages, version=version)
         self.write_decision_table_library()
+        self.write_contact_summary_keys()
 
         logger.info("validate the output")
         if not self.validate(generated_files):
@@ -902,6 +903,40 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
         with open(path, "w", encoding="utf-8") as handle:
             handle.write(build_dmn_js(self.project.decision_tables, getattr(self.project, "title", None)))
         logger.info(f"decision tables written to {path}: upload with cht-conf upload-extension-libs")
+        return path
+
+    def write_contact_summary_keys(self) -> Optional[str]:
+        """Write ``<form>.contact-summary.json``: the contact-summary keys the form reads, grouped
+        by concept, scope and window, so the deployment's contact-summary script reads each
+        concept once (feature/20261125-requires-and-implied-retrievals.md §4).
+
+        Returns:
+            The path written, or None when the form reads no contact-summary key.
+        """
+        from tricc_oo.converters.fhir.populate_helper import populate_source_concept
+        from tricc_oo.converters.retrieval import contact_summary_keys, is_retrieval_node, iter_retrievals
+        from tricc_oo.converters.tricc_to_xls_form import _concept_export_base_name
+
+        populates = []
+        for page in (getattr(self.project, "pages", None) or {}).values():
+            for node in (getattr(page, "nodes", None) or {}).values():
+                if (
+                    isinstance(node, TriccNodePopulate)
+                    and not is_retrieval_node(node)
+                    and node.context in ("history",)
+                    and not populate_uses_inputs_group(node)
+                ):
+                    key = _concept_export_base_name(node)
+                    populates.append((key, populate_source_concept(node), node.context, node.period))
+        keys = contact_summary_keys(iter_retrievals(self.project), sorted(set(populates)))
+        if not keys["concepts"] and not keys["other"]:
+            return None
+        form_id = getattr(self, "_form_id", None) or self.project.intervention_name()
+        path = os.path.join(self.output_path, f"{form_id}.contact-summary.json")
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump({"form": form_id, **keys}, handle, indent=2, ensure_ascii=False)
+            handle.write("\n")
+        logger.info("Wrote CHT contact-summary keys: %s", path)
         return path
 
     def _write_demand_properties(self, form_id, title):

@@ -175,9 +175,11 @@ class TestHelperCQLConceptRetrieval(unittest.TestCase):
 
     def test_no_undeclared_quoted_identifier(self):
         # The library declares no codesystem / code / valueset, so the only quoted
-        # identifier left may be its own name.
+        # identifiers left may be its own name and its own defines (the shared per-resource
+        # retrieves, requires-and-implied-retrievals §4).
         quoted = set(re.findall(r'"[^"]+"', self.helper))
-        self.assertEqual(quoted, {'"demo-Helper"'})
+        declared = set(re.findall(r'^define ("[^"]+"):', self.helper, re.M))
+        self.assertEqual(quoted - declared, {'"demo-Helper"'})
         self.assertNotIn('~ "active"', self.helper)
 
     def test_code_matching_helpers_defined(self):
@@ -194,7 +196,8 @@ class TestHelperCQLConceptRetrieval(unittest.TestCase):
         for fn, matcher in self.RETRIEVES:
             with self.subTest(function=fn):
                 body = self._function_body(self.helper, fn)
-                self.assertRegex(body, r"\[(Observation|Condition)\]")
+                # one shared retrieve per resource and scope (requires-and-implied-retrievals §4)
+                self.assertRegex(body, r'\("(Encounter|History)(Observations|Conditions)"\)')
                 self.assertIn(f"{matcher}(", body)
 
     def test_has_condition_matches_clinical_status_by_code(self):

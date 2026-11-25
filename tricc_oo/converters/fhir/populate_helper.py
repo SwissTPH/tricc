@@ -293,6 +293,24 @@ def resolve_populate_reference(
     return f"{prefix}GetPatientValue('{code}')"
 
 
+def populate_define_name(node: "TriccNodePopulate", multiple: bool = False) -> str:
+    """Name of the Helper define a populate node's read becomes (§4 of
+    feature/20261125-requires-and-implied-retrievals.md): ``@weight`` (encounter),
+    ``@weight@P1Y`` (history), ``@weight@P1Y.codes`` (a select_multiple's option codes),
+    ``@facility.district`` (master data); ``#<slot>`` for a repeat slot other than 1.
+    """
+    concept = populate_source_concept(node)
+    ctx = getattr(node, "context", None) or "patient"
+    if ctx == ENCOUNTER_CONTEXT:
+        name = f"@{concept}"
+    elif ctx == HISTORY_CONTEXT:
+        name = f"@{concept}@{node.period or DEFAULT_HISTORY_PERIOD}" + (".codes" if multiple else "")
+    else:
+        name = f"@{ctx}.{concept}"
+    repeat = get_repeat(node)
+    return name if repeat == 1 else f"{name}#{repeat}"
+
+
 def populate_fhir_item_type(node) -> Optional[str]:
     """FHIR Questionnaire item type for a populate node, or None to keep the default.
 
@@ -402,10 +420,31 @@ define function GetEncounterValue(code String, repeatIndex Integer, period Strin
 // active MedicationRequest whose dispense validity period has not ended; the history
 // window applies to authoredOn.
 
+define "Medications":
+  [Medication]
+
+define "HistoryMedicationRequests":
+  [MedicationRequest]
+
+define "EncounterMedicationRequests":
+  if encounterid is null then {} as List<MedicationRequest>
+  else
+    ("HistoryMedicationRequests") M
+      where M.encounter.reference = 'Encounter/' + encounterid
+
+define "HistoryMedicationDispenses":
+  [MedicationDispense] D where D.status = 'completed'
+
+define "EncounterMedicationDispenses":
+  if encounterid is null then {} as List<MedicationDispense>
+  else
+    ("HistoryMedicationDispenses") D
+      where D.context.reference = 'Encounter/' + encounterid
+
 define function MedicationRequestHasCode(M MedicationRequest, conceptCode String):
   exists(((M.medication as FHIR.CodeableConcept).coding) C where C.code = conceptCode)
     or exists(
-      [Medication] Med
+      ("Medications") Med
         where (M.medication as FHIR.Reference).reference = 'Medication/' + Med.id
           and exists(Med.code.coding C where C.code = conceptCode)
     )
@@ -414,7 +453,7 @@ define function MedicationRequestCode(M MedicationRequest):
   Coalesce(
     First((M.medication as FHIR.CodeableConcept).coding).code.value,
     First(
-      First([Medication] Med where (M.medication as FHIR.Reference).reference = 'Medication/' + Med.id).code.coding
+      First(("Medications") Med where (M.medication as FHIR.Reference).reference = 'Medication/' + Med.id).code.coding
     ).code.value
   )
 
@@ -426,11 +465,7 @@ define function IsOpenMedicationRequest(M MedicationRequest):
     )
 
 define function GetEncounterOpenMedicationRequests():
-  if encounterid is null then {} as List<MedicationRequest>
-  else
-    [MedicationRequest] M
-      where IsOpenMedicationRequest(M)
-        and M.encounter.reference = 'Encounter/' + encounterid
+  ("EncounterMedicationRequests") M where IsOpenMedicationRequest(M)
 
 define function GetEncounterMedicationRequests(code String):
   (GetEncounterOpenMedicationRequests()) M where MedicationRequestHasCode(M, code)
@@ -439,7 +474,7 @@ define function GetEncounterMedicationRequestValue(code String):
   exists(GetEncounterMedicationRequests(code))
 
 define function GetOpenMedicationRequestsSince(since DateTime):
-  [MedicationRequest] M
+  ("HistoryMedicationRequests") M
     where IsOpenMedicationRequest(M)
       and (since is null or M.authoredOn.value >= since)
 
@@ -476,40 +511,31 @@ define function IsPrescribedMedicationRequest(M MedicationRequest):
   not (M.status in {'cancelled', 'entered-in-error', 'draft'})
 
 define function GetEncounterMedicationRequestDate(code String):
-  if encounterid is null then null as DateTime
-  else
-    Max(
-      (
-        [MedicationRequest] M
-          where IsPrescribedMedicationRequest(M)
-            and MedicationRequestHasCode(M, code)
-            and M.encounter.reference = 'Encounter/' + encounterid
-          return M.authoredOn.value
-      )
+  Max(
+    (
+      ("EncounterMedicationRequests") M
+        where IsPrescribedMedicationRequest(M)
+          and MedicationRequestHasCode(M, code)
+        return M.authoredOn.value
     )
+  )
 
 // MedicationDispense: a completed dispense of the drug (context = the encounter); the
 // history window and the date are whenHandedOver.
 define function MedicationDispenseHasCode(D MedicationDispense, conceptCode String):
   exists(((D.medication as FHIR.CodeableConcept).coding) C where C.code = conceptCode)
     or exists(
-      [Medication] Med
+      ("Medications") Med
         where (D.medication as FHIR.Reference).reference = 'Medication/' + Med.id
           and exists(Med.code.coding C where C.code = conceptCode)
     )
 
 define function GetEncounterMedicationDispenses(code String):
-  if encounterid is null then {} as List<MedicationDispense>
-  else
-    [MedicationDispense] D
-      where D.status = 'completed'
-        and MedicationDispenseHasCode(D, code)
-        and D.context.reference = 'Encounter/' + encounterid
+  ("EncounterMedicationDispenses") D where MedicationDispenseHasCode(D, code)
 
 define function GetMedicationDispenses(code String, since DateTime):
-  [MedicationDispense] D
-    where D.status = 'completed'
-      and MedicationDispenseHasCode(D, code)
+  ("HistoryMedicationDispenses") D
+    where MedicationDispenseHasCode(D, code)
       and (since is null or D.whenHandedOver.value >= since)
 
 define function GetEncounterMedicationDispenseDate(code String):
@@ -521,7 +547,7 @@ define function GetLastMedicationDispenseDate(code String, since DateTime):
 define function GetMedicationRequestDate(code String, since DateTime):
   Max(
     (
-      [MedicationRequest] M
+      ("HistoryMedicationRequests") M
         where IsPrescribedMedicationRequest(M)
           and MedicationRequestHasCode(M, code)
         return M.authoredOn.value
@@ -574,97 +600,150 @@ _RETRIEVAL_VALUE_TYPES = {
 }
 
 
-#: (FHIR resource, context, catalogue function) -> Helper CQL, ``{code}`` the concept code and
-#: ``{since}`` the start of the history window (``null``: no window). A resource missing here is
-#: read as an Observation (the historical fallback); a function missing for a known resource is
-#: unsupported. ``Latest`` of an Observation is converted to the value type
-#: (``_retrieval_observation_value``).
-_TIMED_CQL = {
-    ("Observation", ENCOUNTER_CONTEXT): {
-        "Latest": "GetEncounterObservationValue('{code}', null, null)",
-        "Exists": "exists(GetObservations('{code}'))",
-        "Count": "Count(GetObservations('{code}'))",
-        "LatestDate": "GetEncounterObservationTime('{code}')",
-    },
-    ("Observation", HISTORY_CONTEXT): {
-        "Latest": "GetHistoryObservationValueSince('{code}', {since}, 1, null)",
-        "Exists": "GetHistoryObservationSince('{code}', {since}, 1, null) is not null",
-        "Count": (
-            "Count([Observation] O where ObservationHasCode(O, '{code}')"
-            " and O.status in {{'final', 'amended', 'corrected'}}"
-            " and ({since} is null or (O.effective as FHIR.dateTime).value >= {since}))"
-        ),
-        "LatestDate": "LatestObservationTime('{code}', {since})",
-    },
-    ("Condition", ENCOUNTER_CONTEXT): {
-        "Latest": "GetEncounterConditionValue('{code}')",
-        "Exists": "GetConditionValue('{code}')",
-        "Count": "Count(GetActiveConditions('{code}'))",
-        "LatestDate": "GetEncounterConditionDate('{code}')",
-    },
-    ("Condition", HISTORY_CONTEXT): {
-        "Latest": "GetHistoryConditionValue('{code}')",
-        "Exists": "GetHistoryConditionValue('{code}')",
-        "Count": (
-            "Count([Condition] C where ConditionHasCode(C, '{code}')"
-            " and ConditionVerificationCode(C) != 'refuted'"
-            " and ConditionVerificationCode(C) != 'entered-in-error')"
-        ),
-        "LatestDate": "GetHistoryConditionDate('{code}', {since})",
-    },
+#: FHIR resource -> (alias, the shared defines by context, the records of a concept, the time
+#: the history window applies to). A concept's records are its resources in the encounter or
+#: the window, latest first: ``"#weight@P3M:records"``
+#: (feature/20261125-requires-and-implied-retrievals.md §4).
+_RECORDS = {
+    "Observation": (
+        "O",
+        {ENCOUNTER_CONTEXT: "EncounterObservations", HISTORY_CONTEXT: "HistoryObservations"},
+        "ObservationHasCode(O, '{code}')",
+        "(O.effective as FHIR.dateTime).value",
+    ),
+    "Condition": (
+        "C",
+        {ENCOUNTER_CONTEXT: "EncounterConditions", HISTORY_CONTEXT: "HistoryConditions"},
+        "ConditionHasCode(C, '{code}') and ConditionVerificationCode(C) != 'refuted'"
+        " and ConditionVerificationCode(C) != 'entered-in-error'",
+        "ConditionDate(C)",
+    ),
+    "Procedure": (
+        "P",
+        {ENCOUNTER_CONTEXT: "EncounterProcedures", HISTORY_CONTEXT: "HistoryProcedures"},
+        "ProcedureHasCode(P, '{code}')",
+        "ProcedureTime(P)",
+    ),
+    "MedicationRequest": (
+        "M",
+        {ENCOUNTER_CONTEXT: "EncounterMedicationRequests", HISTORY_CONTEXT: "HistoryMedicationRequests"},
+        "MedicationRequestHasCode(M, '{code}') and IsPrescribedMedicationRequest(M)",
+        "M.authoredOn.value",
+    ),
+    "MedicationDispense": (
+        "D",
+        {ENCOUNTER_CONTEXT: "EncounterMedicationDispenses", HISTORY_CONTEXT: "HistoryMedicationDispenses"},
+        "MedicationDispenseHasCode(D, '{code}')",
+        "D.whenHandedOver.value",
+    ),
+}
+#: sort key of each resource's records (a comparable system value; cql-to-elm 3.12)
+_RECORDS_SORT = {
+    "Observation": "(effective as FHIR.dateTime).value",
+    "Condition": "recordedDate.value",
+    "Procedure": "(performed as FHIR.dateTime).value",
+    "MedicationRequest": "authoredOn.value",
+    "MedicationDispense": "whenHandedOver.value",
+}
+_OPEN = "(({records}) M where IsOpenMedicationRequest(M))"
+#: (resource, catalogue function) -> CQL of the read from ``{records}`` (the quoted records
+#: define), ``{dispenses}`` (the concept's dispenses, same window), ``{code}`` and ``{since}``.
+#: A function missing for a resource is unsupported. ``Latest`` of an Observation is converted
+#: to the value type (``_retrieval_observation_value``).
+_RECORD_READS = {
+    ("Observation", "Latest"): "First({records}).value",
+    ("Observation", "Exists"): "exists({records})",
+    ("Observation", "Count"): "Count({records})",
+    ("Observation", "LatestDate"): "(First({records}).effective as FHIR.dateTime).value",
+    ("Condition", "Latest"): "exists({records})",
+    ("Condition", "Exists"): "exists({records})",
+    ("Condition", "Count"): "Count({records})",
+    ("Condition", "LatestDate"): "Max(({records}) C return ConditionDate(C))",
     # done: completed and not Unsuccessful (#74); Latest is "done", like Exists
-    ("Procedure", ENCOUNTER_CONTEXT): {
-        "Latest": "GetEncounterProcedureValue('{code}', null)",
-        "Exists": "GetEncounterProcedureValue('{code}', null)",
-        "Count": "Count(GetProcedures('{code}'))",
-        "LatestDate": "GetEncounterProcedureDate('{code}')",
-    },
-    ("Procedure", HISTORY_CONTEXT): {
-        "Latest": "GetHistoryProcedureDate('{code}', {since}) is not null",
-        "Exists": "GetHistoryProcedureDate('{code}', {since}) is not null",
-        "Count": "Count(GetHistoryProcedures('{code}', {since}))",
-        "LatestDate": "GetHistoryProcedureDate('{code}', {since})",
-    },
-    # open prescriptions (feature/20261125-populate-medication.md); Latest is "on treatment"
-    ("MedicationRequest", ENCOUNTER_CONTEXT): {
-        "Latest": "{on_treatment_encounter}",
-        "Exists": "{on_treatment_encounter}",
-        "Count": "Count(GetEncounterMedicationRequests('{code}'))",
-        "ActiveDrugs": "GetEncounterMedicationCodes()",
-        "OpenDosage": "GetEncounterMedicationDosage('{code}')",
-        "LatestDate": "GetEncounterMedicationRequestDate('{code}')",
-    },
-    ("MedicationRequest", HISTORY_CONTEXT): {
-        "Latest": "{on_treatment_history}",
-        "Exists": "{on_treatment_history}",
-        "Count": "Count(GetActiveMedicationRequests('{code}', {since}))",
-        "ActiveDrugs": "GetActiveMedicationCodesSince({since})",
-        "OpenDosage": "GetMedicationDosageSince('{code}', {since})",
-        "LatestDate": "GetMedicationRequestDate('{code}', {since})",
-    },
-    # completed dispenses (feature/20261125-populate-medication.md phase 3)
-    ("MedicationDispense", ENCOUNTER_CONTEXT): {
-        "Latest": "exists(GetEncounterMedicationDispenses('{code}'))",
-        "Exists": "exists(GetEncounterMedicationDispenses('{code}'))",
-        "Count": "Count(GetEncounterMedicationDispenses('{code}'))",
-        "LatestDate": "GetEncounterMedicationDispenseDate('{code}')",
-    },
-    ("MedicationDispense", HISTORY_CONTEXT): {
-        "Latest": "exists(GetMedicationDispenses('{code}', {since}))",
-        "Exists": "exists(GetMedicationDispenses('{code}', {since}))",
-        "Count": "Count(GetMedicationDispenses('{code}', {since}))",
-        "LatestDate": "GetLastMedicationDispenseDate('{code}', {since})",
-    },
+    ("Procedure", "Latest"): "exists({records})",
+    ("Procedure", "Exists"): "exists({records})",
+    ("Procedure", "Count"): "Count({records})",
+    ("Procedure", "LatestDate"): "Max(({records}) P return ProcedureTime(P))",
+    # on treatment: an open prescription, or else a completed dispense (decision 2026-11-25)
+    ("MedicationRequest", "Latest"): f"exists{_OPEN} or exists({{dispenses}})",
+    ("MedicationRequest", "Exists"): f"exists{_OPEN} or exists({{dispenses}})",
+    ("MedicationRequest", "Count"): f"Count{_OPEN}",
+    ("MedicationRequest", "OpenDosage"): f"MedicationRequestDosage(First{_OPEN})",
+    ("MedicationRequest", "LatestDate"): "Max(({records}) M return M.authoredOn.value)",
+    ("MedicationDispense", "Latest"): "exists({records})",
+    ("MedicationDispense", "Exists"): "exists({records})",
+    ("MedicationDispense", "Count"): "Count({records})",
+    ("MedicationDispense", "LatestDate"): "Max(({records}) D return D.whenHandedOver.value)",
 }
-#: "on treatment": an open prescription, or else a completed dispense (decision 2026-11-25)
-_ON_TREATMENT = {
-    "on_treatment_encounter": (
-        "GetEncounterMedicationRequestValue('{code}') or exists(GetEncounterMedicationDispenses('{code}'))"
-    ),
-    "on_treatment_history": (
-        "exists(GetActiveMedicationRequests('{code}', {since})) or exists(GetMedicationDispenses('{code}', {since}))"
-    ),
+#: reads that are not of one concept: the drug codes of every open prescription
+_RESOURCE_READS = {
+    ("MedicationRequest", ENCOUNTER_CONTEXT, "ActiveDrugs"): "GetEncounterMedicationCodes()",
+    ("MedicationRequest", HISTORY_CONTEXT, "ActiveDrugs"): "GetActiveMedicationCodesSince({since})",
 }
+
+
+def _retrieval_resource(retrieval) -> str:
+    """The resource a timed retrieval reads (Observation for an unmapped one, as before)."""
+    from tricc_oo.converters.fhir.concept_mapper import get_fhir_resource
+
+    resource = get_fhir_resource(retrieval.reads_concept_type, None)[0]
+    return resource if resource in _RECORDS else "Observation"
+
+
+def _retrieval_since(retrieval) -> Optional[str]:
+    """Start of a history retrieval's window (``Now() - 3 months``), or None (no window)."""
+    if retrieval.context != HISTORY_CONTEXT or not retrieval.period:
+        return None
+    since = cql_lookback_start(retrieval.period)
+    if since is None:
+        logger.warning(
+            f"retrieval {retrieval.code}: period '{retrieval.period}' is not a date-only ISO duration; "
+            "reading without a window"
+        )
+    return since
+
+
+def records_define_name(retrieval, resource: Optional[str] = None) -> str:
+    """Name of the records define of a retrieval's concept, scope and window.
+
+    ``#weight@P3M:records`` (history, 3 months), ``#weight@:records`` (no window),
+    ``#weight@encounter:records``; a MedicationDispense list read for a prescription
+    concept ends in ``:dispenses``.
+    """
+    from tricc_oo.converters.retrieval import ENCOUNTER_WINDOW, implied_code
+
+    window = ENCOUNTER_WINDOW if retrieval.context == ENCOUNTER_CONTEXT else retrieval.period
+    own = resource is None or _retrieval_resource(retrieval) == resource
+    suffix = "records" if own else "dispenses"
+    return f"{implied_code(retrieval.reads_code or '', window)}:{suffix}"
+
+
+def records_define_body(retrieval, resource: str) -> str:
+    """CQL of the records define: the concept's ``resource`` records, latest first."""
+    alias, sources, match, time = _RECORDS[resource]
+    code = (retrieval.reads_code or "").replace("'", "\\'")
+    where = match.format(code=code)
+    since = _retrieval_since(retrieval)
+    if since:
+        where += f" and {time} >= {since}"
+    return (
+        f'("{sources[retrieval.context]}") {alias}\n    where {where}\n    sort by {_RECORDS_SORT[resource]} desc'
+    )
+
+
+def retrieval_records(retrieval) -> list:
+    """``[(define name, CQL)]`` of the records lists a retrieval reads (empty: none)."""
+    function = retrieval.effective_function
+    if retrieval.context not in (ENCOUNTER_CONTEXT, HISTORY_CONTEXT) or function in (None, "ActiveDrugs"):
+        return []
+    resource = _retrieval_resource(retrieval)
+    lists = [(records_define_name(retrieval), records_define_body(retrieval, resource))]
+    if "{dispenses}" in _RECORD_READS.get((resource, function), ""):
+        lists.append(
+            (records_define_name(retrieval, "MedicationDispense"),
+             records_define_body(retrieval, "MedicationDispense"))
+        )
+    return lists
 
 
 def retrieval_cql_type(retrieval) -> Optional[str]:
@@ -674,12 +753,13 @@ def retrieval_cql_type(retrieval) -> Optional[str]:
     return _RETRIEVAL_VALUE_TYPES.get(retrieval.value_type or "string", (None, None))[1]
 
 
-def _retrieval_observation_value(retrieval, accessor: str) -> str:
-    """An Observation value accessor converted to the retrieval's value type."""
-    from tricc_oo.converters.fhir.cql_value import wrap_cql_for_item_type
+def _retrieval_observation_value(retrieval, value: str) -> str:
+    """An ``Observation.value[x]`` converted to the retrieval's value type (``ValueAsDecimal(…)``)."""
+    from tricc_oo.converters.fhir.cql_value import VALUE_CONVERSION_BY_ITEM_TYPE
 
     item_type = _RETRIEVAL_VALUE_TYPES.get(retrieval.value_type or "string", ("string", None))[0]
-    return wrap_cql_for_item_type(accessor, item_type, qualified=False)
+    function = VALUE_CONVERSION_BY_ITEM_TYPE.get(item_type)
+    return f"{function}({value})" if function else value
 
 
 def retrieval_cql_expression(retrieval, strategy: str = "FHIRStrategy") -> str:
@@ -696,7 +776,6 @@ def retrieval_cql_expression(retrieval, strategy: str = "FHIRStrategy") -> str:
         TriccRetrievalError: No mapping for the function, or a custom retrieval without a
             ``text/cql`` expression.
     """
-    from tricc_oo.converters.fhir.concept_mapper import get_fhir_resource
     from tricc_oo.converters.retrieval import CQL_LANGUAGE, custom_expression, unsupported
 
     function = retrieval.effective_function
@@ -716,36 +795,41 @@ def retrieval_cql_expression(retrieval, strategy: str = "FHIRStrategy") -> str:
         return f"GetPatientValue('{code}')"
     if function in RETRIEVAL_VALUE_CQL:
         return f"{RETRIEVAL_VALUE_CQL[function]}('{code}')"
-    resource, _, _ = get_fhir_resource(retrieval.reads_concept_type, None)
-    if (resource, retrieval.context) not in _TIMED_CQL:
-        resource = "Observation"
-    templates = _TIMED_CQL.get((resource, retrieval.context), {})
-    if function not in templates:
+    resource = _retrieval_resource(retrieval)
+    since = _retrieval_since(retrieval)
+    read = _RESOURCE_READS.get((resource, retrieval.context, function))
+    if read is not None:
+        return read.format(since=since or "null")
+    read = _RECORD_READS.get((resource, function))
+    if read is None or retrieval.context not in (ENCOUNTER_CONTEXT, HISTORY_CONTEXT):
         raise unsupported(retrieval, strategy)
-    since = None
-    if retrieval.context == HISTORY_CONTEXT and retrieval.period:
-        since = cql_lookback_start(retrieval.period)
-        if since is None:
-            logger.warning(
-                f"retrieval {retrieval.code}: period '{retrieval.period}' is not a date-only ISO duration; "
-                "reading without a window"
-            )
-    template = templates[function]
-    for name, value in _ON_TREATMENT.items():
-        template = template.replace("{" + name + "}", value)
-    expression = template.format(code=code, since=since or "null")
+    records = f'"{records_define_name(retrieval)}"'
+    if resource == "Observation" and retrieval.context == ENCOUNTER_CONTEXT and function == "Latest":
+        # the default repeat slot, as GetObservationValue
+        records = f"(({records}) O where ObservationRepeatIndex(O) is null or ObservationRepeatIndex(O) = 1)"
+    expression = read.format(
+        records=records, dispenses=f'"{records_define_name(retrieval, "MedicationDispense")}"'
+    )
     if resource == "Observation" and function == "Latest":
         return _retrieval_observation_value(retrieval, expression)
     return expression
 
 
 def retrieval_cql_defines(retrievals, strategy: str = "FHIRStrategy") -> str:
-    """The Helper defines of the used retrievals (empty when there is none)."""
-    defines = [
-        f'define "{retrieval.code}":\n  {retrieval_cql_expression(retrieval, strategy)}'
-        for retrieval in retrievals
-    ]
+    """The Helper defines of the used retrievals (empty when there is none).
+
+    Reads of one concept, scope and window share one records define
+    (``"#weight@P3M:records"``); each retrieval's own define is a one-line read of it.
+    """
+    records = {}
+    defines = []
+    for retrieval in retrievals:
+        expression = retrieval_cql_expression(retrieval, strategy)
+        for name, body in retrieval_records(retrieval):
+            records.setdefault(name, body)
+        defines.append(f'define "{retrieval.code}":\n  {expression}')
     if not defines:
         return ""
     header = "// ── Project retrievals (feature/20261109-project-retrievals.md) ─────────────"
-    return header + "\n\n" + "\n\n".join(defines) + "\n"
+    lists = [f'define "{name}":\n  {body}' for name, body in sorted(records.items())]
+    return header + "\n\n" + "\n\n".join(lists + defines) + "\n"

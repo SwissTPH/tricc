@@ -185,7 +185,10 @@ class TestHelperCqlIsTranslatable(unittest.TestCase):
             r"define function IsDoneProcedure\(P Procedure\):\s+P\.status = 'completed'\s+"
             r"and not exists\(P\.outcome\.coding O where O\.code = '385671000'\)",
         )
-        self.assertEqual(self.helper.count("IsDoneProcedure(P)"), 3)
+        # every Procedure read goes through the shared "HistoryProcedures" retrieve
+        self.assertEqual(self.helper.count("IsDoneProcedure(P)"), 1)
+        self.assertIn('define "HistoryProcedures":\n  [Procedure] P where IsDoneProcedure(P)', self.helper)
+        self.assertEqual(self.helper.count("[Procedure]"), 1)
 
     def test_procedure_repeat_slot_uses_the_observation_extension(self):
         self.assertIn("define function ProcedureRepeatIndex(P Procedure):", self.helper)
@@ -221,7 +224,30 @@ class TestMedicationReads(unittest.TestCase):
         self.assertNotIn("system", body)
 
     def test_dispense_counts_completed_only(self):
-        self.assertIn("D.status = 'completed'", self._define("GetMedicationDispenses"))
+        self.assertIn('define "HistoryMedicationDispenses":\n  [MedicationDispense] D where D.status = \'completed\'',
+                      self.helper)
+        self.assertIn('("HistoryMedicationDispenses") D', self._define("GetMedicationDispenses"))
+
+
+class TestOneRetrievePerResourceAndScope(unittest.TestCase):
+    """feature/20261125-requires-and-implied-retrievals.md §4: the Helper retrieves each resource
+    once per scope, in a define every function reads (a define is cached, a function call is not)."""
+
+    def setUp(self):
+        self.helper = _helper_cql()
+
+    def test_each_resource_is_retrieved_once(self):
+        for resource in ("Observation", "Condition", "Procedure", "MedicationRequest", "MedicationDispense",
+                         "Medication"):
+            with self.subTest(resource=resource):
+                self.assertEqual(self.helper.count(f"[{resource}]"), 1)
+
+    def test_encounter_scope_reads_the_history_define(self):
+        for resource in ("Observations", "Conditions", "Procedures", "MedicationRequests", "MedicationDispenses"):
+            with self.subTest(resource=resource):
+                body = self.helper.split(f'define "Encounter{resource}":', 1)[1].split("\n\n", 1)[0]
+                self.assertIn(f'("History{resource}")', body)
+                self.assertIn("encounterid", body)
 
 
 class TestLibraryCanonicalUrl(unittest.TestCase):

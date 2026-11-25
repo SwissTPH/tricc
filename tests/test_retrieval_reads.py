@@ -16,6 +16,10 @@ OBSERVATION = "Symptom-Finding"
 CONDITION = "diagnosis"
 
 
+#: the shared records list of `weight` per window (feature/20261125-requires-and-implied-retrievals.md §4)
+ENC, EVER, P3M, P6M, P1Y = (f'"#weight@{w}:records"' for w in ("encounter", "", "P3M", "P6M", "P1Y"))
+
+
 def _retrieval(function, context="history", concept_type=OBSERVATION, period=None, data_type="decimal"):
     return Retrieval(
         code="#r", context=context, function=function, reads_code="weight", period=period,
@@ -35,16 +39,39 @@ def test_latest_date_is_a_timed_catalogue_function():
 @pytest.mark.parametrize(
     "concept_type, context, period, expected",
     [
-        (OBSERVATION, "encounter", None, "GetEncounterObservationTime('weight')"),
-        (OBSERVATION, "history", "P3M", "LatestObservationTime('weight', Now() - 3 months)"),
-        (OBSERVATION, "history", None, "LatestObservationTime('weight', null)"),
-        (CONDITION, "encounter", None, "GetEncounterConditionDate('weight')"),
-        (CONDITION, "history", "P1Y", "GetHistoryConditionDate('weight', Now() - 1 year)"),
-        (CONDITION, "history", None, "GetHistoryConditionDate('weight', null)"),
+        (OBSERVATION, "encounter", None, f"(First({ENC}).effective as FHIR.dateTime).value"),
+        (OBSERVATION, "history", "P3M", f"(First({P3M}).effective as FHIR.dateTime).value"),
+        (OBSERVATION, "history", None, f"(First({EVER}).effective as FHIR.dateTime).value"),
+        (CONDITION, "encounter", None, f"Max(({ENC}) C return ConditionDate(C))"),
+        (CONDITION, "history", "P1Y", f"Max(({P1Y}) C return ConditionDate(C))"),
+        (CONDITION, "history", None, f"Max(({EVER}) C return ConditionDate(C))"),
     ],
 )
 def test_latest_date_per_resource_and_context(concept_type, context, period, expected):
     assert retrieval_cql_expression(_retrieval("LatestDate", context, concept_type, period)) == expected
+
+
+@pytest.mark.parametrize(
+    "concept_type, context, period, source, window",
+    [
+        (OBSERVATION, "encounter", None, '("EncounterObservations") O', None),
+        (OBSERVATION, "history", "P3M", '("HistoryObservations") O',
+         "(O.effective as FHIR.dateTime).value >= Now() - 3 months"),
+        (OBSERVATION, "history", None, '("HistoryObservations") O', None),
+        (CONDITION, "encounter", None, '("EncounterConditions") C', None),
+        (CONDITION, "history", "P1Y", '("HistoryConditions") C', "ConditionDate(C) >= Now() - 1 year"),
+        ("procedure", "history", "P6M", '("HistoryProcedures") P', "ProcedureTime(P) >= Now() - 6 months"),
+        ("medication", "history", "P6M", '("HistoryMedicationRequests") M', "M.authoredOn.value >= Now() - 6 months"),
+        ("dispense", "encounter", None, '("EncounterMedicationDispenses") D', None),
+    ],
+)
+def test_records_list_per_concept_and_window(concept_type, context, period, source, window):
+    from tricc_oo.converters.fhir.populate_helper import retrieval_records
+
+    ((name, body),) = retrieval_records(_retrieval("Count", context, concept_type, period))[:1]
+    assert name == "#weight@" + ("encounter" if context == "encounter" else period or "") + ":records"
+    assert body.startswith(source) and "'weight'" in body and " desc" in body
+    assert (window in body) if window else (">=" not in body)
 
 
 def test_latest_date_needs_reads():
@@ -75,14 +102,14 @@ PROCEDURE = "procedure"
 @pytest.mark.parametrize(
     "function, context, period, expected",
     [
-        ("Latest", "encounter", None, "GetEncounterProcedureValue('weight', null)"),
-        ("Exists", "encounter", None, "GetEncounterProcedureValue('weight', null)"),
-        ("Count", "encounter", None, "Count(GetProcedures('weight'))"),
-        ("LatestDate", "encounter", None, "GetEncounterProcedureDate('weight')"),
-        ("Latest", "history", "P6M", "GetHistoryProcedureDate('weight', Now() - 6 months) is not null"),
-        ("Exists", "history", None, "GetHistoryProcedureDate('weight', null) is not null"),
-        ("Count", "history", "P1Y", "Count(GetHistoryProcedures('weight', Now() - 1 year))"),
-        ("LatestDate", "history", "P1Y", "GetHistoryProcedureDate('weight', Now() - 1 year)"),
+        ("Latest", "encounter", None, f"exists({ENC})"),
+        ("Exists", "encounter", None, f"exists({ENC})"),
+        ("Count", "encounter", None, f"Count({ENC})"),
+        ("LatestDate", "encounter", None, f"Max(({ENC}) P return ProcedureTime(P))"),
+        ("Latest", "history", "P6M", f"exists({P6M})"),
+        ("Exists", "history", None, f"exists({EVER})"),
+        ("Count", "history", "P1Y", f"Count({P1Y})"),
+        ("LatestDate", "history", "P1Y", f"Max(({P1Y}) P return ProcedureTime(P))"),
     ],
 )
 def test_procedure_reads(function, context, period, expected):
@@ -97,17 +124,12 @@ def test_procedure_latest_is_done_yes_no():
 # --- #75 medication: MedicationRequest ----------------------------------------------------
 
 MEDICATION = "medication"
+OPEN_ENC = f"(({ENC}) M where IsOpenMedicationRequest(M))"
+OPEN_P6M = f"(({P6M}) M where IsOpenMedicationRequest(M))"
 # an open prescription, or else a completed dispense
-ON_TREATMENT_ENCOUNTER = (
-    "GetEncounterMedicationRequestValue('weight') or exists(GetEncounterMedicationDispenses('weight'))"
-)
-ON_TREATMENT_P6M = (
-    "exists(GetActiveMedicationRequests('weight', Now() - 6 months))"
-    " or exists(GetMedicationDispenses('weight', Now() - 6 months))"
-)
-ON_TREATMENT_EVER = (
-    "exists(GetActiveMedicationRequests('weight', null)) or exists(GetMedicationDispenses('weight', null))"
-)
+ON_TREATMENT_ENCOUNTER = f'exists(({ENC}) M where IsOpenMedicationRequest(M)) or exists("#weight@encounter:dispenses")'
+ON_TREATMENT_P6M = f'exists(({P6M}) M where IsOpenMedicationRequest(M)) or exists("#weight@P6M:dispenses")'
+ON_TREATMENT_EVER = f'exists(({EVER}) M where IsOpenMedicationRequest(M)) or exists("#weight@:dispenses")'
 
 
 @pytest.mark.parametrize(
@@ -115,16 +137,23 @@ ON_TREATMENT_EVER = (
     [
         ("Latest", "encounter", None, ON_TREATMENT_ENCOUNTER),
         ("Exists", "encounter", None, ON_TREATMENT_ENCOUNTER),
-        ("Count", "encounter", None, "Count(GetEncounterMedicationRequests('weight'))"),
+        ("Count", "encounter", None, f"Count(({ENC}) M where IsOpenMedicationRequest(M))"),
         ("ActiveDrugs", "encounter", None, "GetEncounterMedicationCodes()"),
         ("Latest", "history", "P6M", ON_TREATMENT_P6M),
         ("Exists", "history", None, ON_TREATMENT_EVER),
-        ("Count", "history", "P1Y", "Count(GetActiveMedicationRequests('weight', Now() - 1 year))"),
+        ("Count", "history", "P1Y", f"Count(({P1Y}) M where IsOpenMedicationRequest(M))"),
         ("ActiveDrugs", "history", "P6M", "GetActiveMedicationCodesSince(Now() - 6 months)"),
     ],
 )
 def test_medication_request_reads(function, context, period, expected):
     assert retrieval_cql_expression(_retrieval(function, context, MEDICATION, period)) == expected
+
+
+def test_on_treatment_reads_the_dispenses_of_the_same_window():
+    from tricc_oo.converters.fhir.populate_helper import retrieval_records
+
+    names = [name for name, _ in retrieval_records(_retrieval("Exists", "history", MEDICATION, "P6M"))]
+    assert names == ["#weight@P6M:records", "#weight@P6M:dispenses"]
 
 
 def test_on_treatment_is_yes_no_and_active_drugs_coded():
@@ -149,10 +178,10 @@ def test_medication_function_on_another_resource_fails(function):
 @pytest.mark.parametrize(
     "function, context, period, expected",
     [
-        ("OpenDosage", "encounter", None, "GetEncounterMedicationDosage('weight')"),
-        ("OpenDosage", "history", "P6M", "GetMedicationDosageSince('weight', Now() - 6 months)"),
-        ("LatestDate", "encounter", None, "GetEncounterMedicationRequestDate('weight')"),
-        ("LatestDate", "history", None, "GetMedicationRequestDate('weight', null)"),
+        ("OpenDosage", "encounter", None, f"MedicationRequestDosage(First{OPEN_ENC})"),
+        ("OpenDosage", "history", "P6M", f"MedicationRequestDosage(First{OPEN_P6M})"),
+        ("LatestDate", "encounter", None, f"Max(({ENC}) M return M.authoredOn.value)"),
+        ("LatestDate", "history", None, f"Max(({EVER}) M return M.authoredOn.value)"),
     ],
 )
 def test_medication_dosage_and_date(function, context, period, expected):
@@ -187,12 +216,12 @@ DISPENSE = "dispense"
 @pytest.mark.parametrize(
     "function, context, period, expected",
     [
-        ("Latest", "encounter", None, "exists(GetEncounterMedicationDispenses('weight'))"),
-        ("Count", "encounter", None, "Count(GetEncounterMedicationDispenses('weight'))"),
-        ("LatestDate", "encounter", None, "GetEncounterMedicationDispenseDate('weight')"),
-        ("Exists", "history", "P3M", "exists(GetMedicationDispenses('weight', Now() - 3 months))"),
-        ("Count", "history", None, "Count(GetMedicationDispenses('weight', null))"),
-        ("LatestDate", "history", "P1Y", "GetLastMedicationDispenseDate('weight', Now() - 1 year)"),
+        ("Latest", "encounter", None, f"exists({ENC})"),
+        ("Count", "encounter", None, f"Count({ENC})"),
+        ("LatestDate", "encounter", None, f"Max(({ENC}) D return D.whenHandedOver.value)"),
+        ("Exists", "history", "P3M", f"exists({P3M})"),
+        ("Count", "history", None, f"Count({EVER})"),
+        ("LatestDate", "history", "P1Y", f"Max(({P1Y}) D return D.whenHandedOver.value)"),
     ],
 )
 def test_medication_dispense_reads(function, context, period, expected):

@@ -141,9 +141,11 @@ class TestAttachInitialExpression(unittest.TestCase):
         )
         self.assertTrue(attached)
         self.assertEqual(_initial_expression(item), "Calc_load_w")
-        self.assertIn(
-            "define Calc_load_w: Helper.ValueAsString(Helper.GetHistoryObservationValue('weight_c', 'P1Y', 1, null))",
-            self.strategy.cql_defines["registration"],
+        # the converted read is a generated Helper define (requires-and-implied-retrievals §4)
+        self.assertIn('define Calc_load_w: Helper."@weight_c"', self.strategy.cql_defines["registration"])
+        self.assertEqual(
+            self.strategy._helper_defines["@weight_c"],
+            "ValueAsString(GetHistoryObservationValue('weight_c', 'P1Y', 1, null))",
         )
 
     def test_no_cql_initial_expression_on_answer_option_items(self):
