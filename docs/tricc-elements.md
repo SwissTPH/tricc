@@ -69,7 +69,10 @@ This page documents TRICC modeling elements and their meaning based on:
 
 ## Logic and computation elements
 
-- `calculate`: computed value.
+- `calculate`: computed value. Its expression may call a **calculate function** (see
+  "Calculate functions" below). A calculate drawn without an arrow into it whose expression
+  holds a call is worked out where it is first read; if nothing reads it, at the end, and only
+  when its value is saved to the record (otherwise it is dropped).
 - `add`: arithmetic compute helper.
 - `count`: option/count compute helper.
 - Anthropometric operators: `Zscore(table, sex, x, y)` and `Izscore(table, sex, x, z)` read
@@ -136,13 +139,21 @@ A value that is not entered only passes `-`, `null` and lists holding `null`.
 | `DMNFirst('diazepam', …)` | the first matching row's output (empty when none) |
 | `DMNList('diazepam', …)` | every matching row's output, in row order (a list: `Count`, `exists`, `selected`) |
 | `DMN('t.note', …)` | the output column `note` instead of the first one |
-| `DMN('diazepam')` | an input left out reads its column `concept` |
-| `DMN('diazepam', Tuple{ weight: null })` | an input given by name; the others from their concepts |
+| `DMN('diazepam')` | an input left out takes its fallbacks (below) |
+| `DMN('diazepam', Tuple{ weight: null })` | an input given by name (`null`: no value); the others from their fallbacks |
 | `DrugDosage('diazepam', age, weight)` | built-in alias of `DMN`; `tricc.yaml` `aliases` adds others |
 
 The table name must be a text literal. `null` (or any literal) is evaluated when the form is
 built: rows that cannot match are dropped and no reference is created for it, so the form
 does not wait for that question.
+
+Only the inputs a call **passes** make the form wait. An input left out is bound where the
+calculate is used, to the first of: the latest value of its column `concept`; what the latest
+earlier call of the same table and output passed for it (as written, read again here); the
+first retrieval listed on the input (`retrievals: ["#prev_weight"]` next to `concept`, built
+when used); else no value (`W_PARAM_NO_VALUE`). To wait for a question, pass it. A calculated
+argument (`DMN('t', "weight" / 2)`) read by several rows becomes its own calculate. See
+`feature/20261125-calculate-functions.md`.
 
 **Export.** Each call is expanded, by policy, into nested ifs (`first`, `unique`: FHIRPath
 `iif`, XPath `if`, CQL `if … then … else`) or a list (`rule_order`: FHIRPath
@@ -168,8 +179,60 @@ the project, the project being the `tricc.yaml` title) next to the forms. Upload
 **Errors** (shared with the editor): `E_DMN_CELL`, `E_DMN_TYPE`, `E_DMN_SHAPE`,
 `E_DMN_OVERLAP` (`unique` rows that can both match), `E_DMN_LIST_VALUE`, `E_DMN_LIST_OVERLAP`
 (ODK list mode: two values of one list cell that can both match, under `rule_order`),
-`E_DMN_TABLE_UNKNOWN`, `E_DMN_TABLE_NOT_STATIC`, `E_DMN_ARITY`, `E_DMN_ARG_UNKNOWN`,
-`E_DMN_ARG_TWICE`, `E_ALIAS_UNKNOWN_INPUT`. A table no expression calls is a warning.
+`E_DMN_TABLE_UNKNOWN`, `E_DMN_TABLE_NOT_STATIC`, `E_CALL_ARITY`, `E_CALL_ARG_UNKNOWN`,
+`E_CALL_ARG_TWICE` (shared with the calculate functions; were `E_DMN_ARITY`, `E_DMN_ARG_UNKNOWN`,
+`E_DMN_ARG_TWICE`), `E_ALIAS_UNKNOWN_INPUT`, `E_PARAM_RETRIEVAL_UNKNOWN`. A table no expression
+calls is a warning.
+
+## Calculate functions
+
+A calculation needed in several places is written once as a **function** with named
+parameters, and every place calls it: `IsAdult("age_estimated")` in triage,
+`IsAdult(Tuple{ declared: "declared_adult" = 'yes' })` in registration. Spec:
+`feature/20261125-calculate-functions.md` (RFC #101).
+
+**Defining.** In a `tricc.yaml` library, with a body; a tag per parameter says where a
+left-out argument comes from:
+
+```cql
+/*
+@retrieve: false
+@param.age: fallback=age_years retrievals=#age_years
+*/
+define function IsAdult(age Integer, declared Boolean) returns Boolean:
+  Coalesce(declared, age >= 18)
+```
+
+Or in the calculate dictionary: a concept with one
+`http://tricc.org/fhir/StructureDefinition/function-parameter` extension per parameter
+(sub-extensions `name`, `type`, `fallback` Coding, `retrieval` code, repeated), optionally a
+`.../function-body` extension (`valueExpression`, `text/cql`), and its `dataType` as the return
+type. A library function and a dictionary concept with the same code are one function: the
+parameters and their fallbacks come from either, the body from the one that has it. The data
+needs report lists the sources.
+
+**Calling.** Positional arguments, then a trailing `Tuple{ name: value }`. A passed value is
+used (and the form waits for it); `null` is no value; a parameter left out takes, in order, the
+latest value of its fallback concept, the argument of the latest earlier call of the same
+function (as written, read again here: a question collected again gives its newer value), the
+first listed retrieval, else no value (`W_PARAM_NO_VALUE`). Two versions of a calculate calling
+the same function do not inherit from each other: the later call carries the arguments over.
+
+**Export.** XLSForm, CDSS and CHT write the body inline. FHIR writes it inline in FHIRPath when
+an argument is an item of the Questionnaire, else the CQL calls `Helper."IsAdult"(…)`, a
+`define function` written once in the Helper library. A calculated argument used more than once
+by the body becomes its own calculate (an XLSForm row, a FHIR item); used once, it is injected.
+A function marked `@retrieve: false` called with constants folds to a constant. Each build that
+binds a call writes `<form>.data-needs.json` next to the output: per call, the function or
+table, its sources, the calculate and activity, and how each parameter was bound (`passed`,
+`null`, `form`, `earlier_call`, `retrieval`, `none`).
+
+**Errors**: `E_FUNCTION_TWICE` (a body on both sides), `E_FUNCTION_SIGNATURE_MISMATCH`,
+`E_FUNCTION_UNKNOWN` (named arguments to an unknown function), `E_CALL_ARITY`,
+`E_CALL_ARG_UNKNOWN`, `E_CALL_ARG_TWICE`, `E_PARAM_FALLBACK_UNKNOWN`,
+`E_PARAM_RETRIEVAL_UNKNOWN`, `E_PARAM_TAG_UNKNOWN`, `E_FUNCTION_NOT_EXPORTABLE`; warnings
+`W_FUNCTION_NAME_SHARED` (a function with the name of a calculate: a call is always `F(…)`) and
+`W_PARAM_NO_VALUE`.
 
 ## Navigation/linking elements
 

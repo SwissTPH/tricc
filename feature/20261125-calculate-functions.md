@@ -2,7 +2,7 @@
 
 | Field             | Value |
 | ----------------- | ----- |
-| **Status**        | Approved (2026-11-25, RFC #101) |
+| **Status**        | Implemented (2026-11-25, phases 1–2; phase 3 is the frontend mirror) |
 | **Branch target** | `feature/calculate-functions` → `develop` |
 | **Scope**         | `converters/cql_library`, `converters/decision_table`, `converters/retrieval`, `visitors/tricc` (`load_calculate`, `is_ready_to_process`, `process_reference`, `process_operation_reference`, `get_version_inheritance`), `strategies/input/base_input_strategy`, `YamlStrategy`, `DrawioStrategy`, `FHIRStrategy` → `OpenSRPStrategy`, `XLSFormStrategy` → `XLSFormCDSSStrategy` → `XLSFormCHTStrategy` → `XLSFormCHTHFStrategy` |
 | **Related** | Supersedes #54 (Calculate Registry). `feature/20261123-decision-tables.md` and `feature/20261123-dmn-named-overrides.md` (same call binding; DMN inputs gain the same fallbacks; `E_DMN_ARG_*` / `E_DMN_ARITY` renamed). `feature/20261109-project-retrievals.md` (retrievals as a fallback). #104 (requires and implied retrievals: a required concept becomes an ordinary version, so step 1 of §2.3 finds it). #102 (output capability statements: `E_FUNCTION_NOT_EXPORTABLE` moves there). #103 (`system."code"` references, for `fallback`). #98 (function catalogue). Frontend mirror (parameter fallbacks in the dictionary editor, call chip, data needs view, renamed `E_CALL_*` codes in `validate/tables.ts`): SwissTPH/tricc-frontend, to open. |
@@ -251,3 +251,5 @@ None.
 - 2026-11-24: A listed retrieval is built when a call binds it. (@delcroip)
 - 2026-11-24: Prerequisites (`requires`) move to #104. (@delcroip)
 - 2026-11-25: Approved for implementation (phases 1–2; phase 3 is the frontend mirror). (@delcroip)
+- 2026-11-25: Phases 1–2 implemented on `feature/calculate-functions`; phase 3 (frontend mirror)
+  remains in SwissTPH/tricc-frontend.

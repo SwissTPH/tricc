@@ -96,10 +96,12 @@ interventions:
 - **`libraries`** lists CQL files, parsed with the CQL grammar (a syntax error stops the
   build with the file and line). Each `define name: <expression>` becomes a
   calculate that any activity can reference by name, processed like a free-floating
-  calculate on the main page (computed once its references are available). Only
-  expression defines are supported: declarations (`library`, `using`, `include`,
-  `context`, …) are ignored, functions with a body are rejected, names must be plain
-  identifiers, and a name may be defined once across all libraries.
+  calculate on the main page (computed once its references are available). Expression
+  defines and functions are read: declarations (`library`, `using`, `include`,
+  `context`, …) are ignored, names must be plain identifiers, and a name may be defined
+  once across all libraries. A function with a body is a calculate function (see
+  `docs/tricc-elements.md` "Calculate functions"), linked with the calculate dictionary
+  concept of the same code.
   A function declares what a call written as is returns, so outputs can type its value
   (the FHIR item type of a calculate using it). CQL documentation tags in the comment just
   before it add data about it:
@@ -115,8 +117,12 @@ interventions:
   - `returns` is required: a FHIR data type (`FHIR.boolean`, `FHIR.integer`,
     `FHIR.decimal`, `FHIR.string`, `FHIR.date`, `FHIR.dateTime`, …) or its CQL System
     name (`Decimal`).
-  - `external` means a declaration only, never written into generated CQL. Functions with
-    a body (real CQL) are not supported yet.
+  - `external` means a declaration only, never written into generated CQL. A function
+    with a body is bound and expanded where it is called; FHIR writes it once in the
+    Helper library when it is called from CQL.
+  - `@param.<name>: fallback=<concept> retrievals=#code …`, one per parameter: where a
+    left-out argument comes from (the fallback concept, else an earlier call's argument,
+    else the first listed retrieval). An unknown parameter or key is `E_PARAM_TAG_UNKNOWN`.
   - Only `@retrieve: false` marks a value that depends only on its arguments, so it can
     be folded as a constant. Without the tag (or with `@retrieve: true`) the function is
     assumed to read recorded data and is never folded.

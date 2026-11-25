@@ -25,8 +25,10 @@ the same lookup as the positional form, with `null` meaning "no value".
   their aliases (`DrugDosage`). The CQL grammar already parses `Tuple{ name: expr }`; the visitor
   must keep it as a named-argument map.
 - Binding: positional arguments bind inputs in order; tuple keys bind by input name; unbound
-  inputs take their column concept. Errors: unknown key, input bound twice (same codes as the
-  frontend: `E_DMN_ARG_UNKNOWN`, `E_DMN_ARG_TWICE`).
+  inputs take their column concept (since RFC #101, `feature/20261125-calculate-functions.md`
+  §2.3: the concept, an earlier call's argument or a listed retrieval, bound at instantiation).
+  Errors: unknown key, input bound twice (`E_CALL_ARG_UNKNOWN`, `E_CALL_ARG_TWICE`; were
+  `E_DMN_ARG_UNKNOWN`, `E_DMN_ARG_TWICE` before RFC #101).
 - `null` (positional or in the tuple) is no value: conditions on that input do not match, `-`
   cells do; every output strategy must render it (see the YamlStrategy parity bug, point 6:
   `get_tricc_operation_operand` has no case for `None`).
@@ -42,7 +44,7 @@ None.
 
 - `cqlToXlsFormVisitor.visitTupleSelector` parses `Tuple{ k: v }` to `TriccOperator.TUPLE`
   (`[TriccStatic(k), v, …]`); the expansion (`tricc_oo/converters/decision_table.py`) reads it
-  as the last argument only (elsewhere: `E_DMN_ARG_UNKNOWN`).
+  as the last argument only (elsewhere: `E_CALL_ARG_UNKNOWN`, was `E_DMN_ARG_UNKNOWN`).
 - `null` is bound as "no value" and folded at expansion with every other literal, so no
   operand is serialised for it and point 6 of the YamlStrategy parity bug does not arise for
   table calls.
