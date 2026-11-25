@@ -1,6 +1,7 @@
-"""WHO anthropometric LMS tables for CDSS zscore / izscore secondary instances."""
+"""WHO anthropometric LMS tables, read by zscore / izscore as built-in decision tables."""
 
 from tricc_oo.data.anthro.registry import (
+    builtin_decision_table,
     get_choice_rows,
     get_supported_tables,
     is_supported_table,
@@ -8,6 +9,7 @@ from tricc_oo.data.anthro.registry import (
 )
 
 __all__ = [
+    "builtin_decision_table",
     "get_choice_rows",
     "get_supported_tables",
     "is_supported_table",

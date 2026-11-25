@@ -566,6 +566,9 @@ class OpenMRSStrategy(BaseOutPutStrategy):
     def tricc_operation_floor(self, ref_expressions, original_references=None):
         return f"Math.floor({ref_expressions[0]})"
 
+    def tricc_operation_power(self, ref_expressions, original_references=None):
+        return f"Math.pow({ref_expressions[0]}, {ref_expressions[1]})"
+
     def tricc_operation_if(self, ref_expressions, original_references=None):
         return f"if({ref_expressions[0]}, {ref_expressions[1]}, {ref_expressions[2]})"
 

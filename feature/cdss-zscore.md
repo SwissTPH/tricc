@@ -2,9 +2,9 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Implemented |
+| **Status** | Superseded (2026-11-23) |
 | **Branch target** | `feature/adv_merge_calc` (or follow-up) |
-| **Related** | WHO smart-ccc anthro CQL; XLSFormCDSSStrategy |
+| **Related** | WHO smart-ccc anthro CQL; XLSFormCDSSStrategy; superseded by `feature/20261123-dmn-instance-lookup.md` (zscore on decision tables) |
 | **Authoring surface** | Calculate expressions: `Zscore(...)` / `Izscore(...)` (CQL or TRICC ops) |
 
 Valid status values: `Draft` → `Approved` → `Implemented` → `Superseded`.

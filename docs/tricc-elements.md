@@ -72,11 +72,11 @@ This page documents TRICC modeling elements and their meaning based on:
 - `calculate`: computed value.
 - `add`: arithmetic compute helper.
 - `count`: option/count compute helper.
-- Anthropometric operators (CDSS / XLSForm): `Zscore(table, sex, x, y)` and
-  `Izscore(table, sex, x, z)` resolve LMS params from choice secondary instances
-  filtered by `sex` + `y_min`/`y_max`. Phase 1 table: `wfa` (weight-for-age).
-  Only tables referenced by the form are injected into the choices sheet.
-  See `feature/cdss-zscore.md`.
+- Anthropometric operators: `Zscore(table, sex, x, y)` and `Izscore(table, sex, x, z)` read
+  the LMS parameters from a decision table (see "Decision tables"): `wfa` (weight-for-age,
+  `sex` `'male'` / `'female'`, `x` the age in days) ships with TRICC, and a project table of
+  the same id replaces it. Every export computes them. See
+  `feature/20261123-dmn-instance-lookup.md`.
 - `rhombus`: decision/condition gate using `reference` and labeled out-edges. The tested value
   is a `"quoted"` reference: a bare name is text in CQL. A legacy reference that is a bare name
   alone (`weight` with the label `weight > 38?`) is read as `"weight"` with a warning; a reference
@@ -99,7 +99,7 @@ A lookup such as a dosing table ("from 6 kg, give 0.75 ml") is a **decision tabl
 `tables/<id>.yaml` file per table, listed in `tricc.yaml` (`decision_tables: [tables/*.yaml]`).
 The DrawTRICC table editor writes these files; `python -m tricc_oo.tools.drugs_js_to_tables`
 turns a CHT `drugs.js` into them. Specs: `feature/20261123-decision-tables.md`,
-`feature/20261123-dmn-named-overrides.md`.
+`feature/20261123-dmn-named-overrides.md`, `feature/20261123-dmn-instance-lookup.md`.
 
 ```yaml
 id: diazepam
@@ -151,6 +151,14 @@ does not wait for that question.
 input is wrapped in a floor (XPath `int()`, which truncates: the same for non-negative values).
 In XPath a list output value cannot contain a space.
 
+**Large tables in ODK** (`XLSFormStrategy`, `XLSFormCDSSStrategy`). A table with more rows than
+`decision_table_max_inline_rows` (`tricc.yaml`, default 10) is not inlined: its rows go to the
+choices sheet as the list `dmn_<table>` (with a hidden `select_one dmn_<table>`, so the form
+carries the instance), and the call reads it:
+`instance('dmn_diazepam')/root/item[<the cell tests on the arguments>][1]/o0`, or
+`join(' ', …/o0)` for a list. Each argument then appears once per test kind instead of once per
+row. Calls inside a repeat should stay inline.
+
 **CHT** (`XLSFormCHTStrategy`, `XLSFormCHTHFStrategy`) does not inline the tables: a call becomes
 `cht:extension-lib('dmn-<project>.js', 'diazepam', 'first', 'dose', ${weight}, ${age_in_months})`,
 each field read once, and the build writes `extension-libs/dmn-<project>.js` (every table of
@@ -158,7 +166,8 @@ the project, the project being the `tricc.yaml` title) next to the forms. Upload
 `cht-conf upload-extension-libs`. It replaces `drugs.js`.
 
 **Errors** (shared with the editor): `E_DMN_CELL`, `E_DMN_TYPE`, `E_DMN_SHAPE`,
-`E_DMN_OVERLAP` (`unique` rows that can both match), `E_DMN_LIST_VALUE`,
+`E_DMN_OVERLAP` (`unique` rows that can both match), `E_DMN_LIST_VALUE`, `E_DMN_LIST_OVERLAP`
+(ODK list mode: two values of one list cell that can both match, under `rule_order`),
 `E_DMN_TABLE_UNKNOWN`, `E_DMN_TABLE_NOT_STATIC`, `E_DMN_ARITY`, `E_DMN_ARG_UNKNOWN`,
 `E_DMN_ARG_TWICE`, `E_ALIAS_UNKNOWN_INPUT`. A table no expression calls is a warning.
 

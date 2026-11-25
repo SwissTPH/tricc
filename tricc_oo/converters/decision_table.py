@@ -14,6 +14,11 @@ Arguments bind table inputs (feature/20261123-dmn-named-overrides.md):
 
 ``null`` (and any literal) is evaluated at expansion: a row whose test fails on it is dropped,
 a test that holds is removed, so no reference is created for it.
+
+``Zscore(table, sex, x, y)`` / ``Izscore(table, sex, x, z)`` are expanded here too: three
+lookups of the LMS table (``'t.l'``, ``'t.m'``, ``'t.s'``) in the WHO formula, written with the
+arithmetic operators (``POWER`` for the exponent). A table id the project does not define is
+looked up among the WHO tables that ship with TRICC (feature/20261123-dmn-instance-lookup.md).
 """
 
 from __future__ import annotations
@@ -49,6 +54,23 @@ EXPRESSION_ATTRIBUTES = (
 
 _NULL = object()  # an argument bound to null
 
+#: a table this large written inline (strategies that do not keep the calls, e.g. FHIR) is logged
+INLINE_WARNING_ROWS = 50
+
+_ZSCORE_OPERATORS = (TriccOperator.ZSCORE, TriccOperator.IZSCORE)
+
+
+def resolve_table(table_id: str, tables: Dict[str, DecisionTable]) -> Optional[DecisionTable]:
+    """The project's table ``table_id``, else the built-in LMS table of that id (added to ``tables``)."""
+    table = tables.get(table_id)
+    if table is None:
+        from tricc_oo.data.anthro import builtin_decision_table
+
+        table = builtin_decision_table(table_id)
+        if table is not None:
+            tables[table_id] = table
+    return table
+
 
 def _call_name(op: TriccOperation, aliases: Dict[str, FunctionAlias]) -> Optional[str]:
     """The table function or alias name of a call, ``None`` when ``op`` is not one."""
@@ -75,7 +97,7 @@ def contains_table_call(expr: Any, aliases: Optional[Dict[str, FunctionAlias]] =
         if isinstance(item, list):
             stack.extend(item)
         elif isinstance(item, TriccOperation):
-            if item.operator == TriccOperator.DMN or _call_name(item, known):
+            if item.operator in (TriccOperator.DMN, *_ZSCORE_OPERATORS) or _call_name(item, known):
                 return True
             stack.extend(item.reference or [])
     return False
@@ -114,6 +136,8 @@ def _expand(expr: Any, tables, aliases, used, keep_calls=False) -> Any:
     if not isinstance(expr, TriccOperation):
         return expr
     reference = [_expand(r, tables, aliases, used, keep_calls) for r in expr.reference or []]
+    if expr.operator in _ZSCORE_OPERATORS:
+        return _expand_zscore(expr.operator, reference, tables, aliases, used, keep_calls)
     name = _call_name(expr, aliases)
     if name is None:
         if expr.operator != TriccOperator.TUPLE and any(
@@ -127,6 +151,35 @@ def _expand(expr: Any, tables, aliases, used, keep_calls=False) -> Any:
             return copy
         return expr
     return expand_call(name, reference[1:], tables, aliases, used, keep_calls)
+
+
+def _expand_zscore(operator, args, tables, aliases, used, keep_calls) -> TriccOperation:
+    """The WHO LMS formula, each of l, m, s a table lookup.
+
+    ``Zscore``: ``((y / m)^l - 1) / (s * l)``; ``Izscore``: ``m * (z * s * l + 1)^(1 / l)``.
+    """
+    name = "Zscore" if operator == TriccOperator.ZSCORE else "Izscore"
+    if len(args) != 4:
+        raise DecisionTableError("E_DMN_ARITY", f"{name}(table, sex, x, value) takes 4 arguments; got {len(args)}.")
+    table_arg, sex, x, value = args
+    if not (isinstance(table_arg, TriccStatic) and isinstance(table_arg.value, str)):
+        raise DecisionTableError(
+            "E_DMN_TABLE_NOT_STATIC", f"{name}: the table must be a text literal such as 'wfa', not {table_arg}."
+        )
+    table_id = table_arg.value.strip().strip("'\"")
+    lms = [
+        expand_call("DMNFirst", [TriccStatic(value=f"{table_id}.{out}"), sex, x], tables, aliases, used, keep_calls)
+        for out in ("l", "m", "s")
+    ]
+    ll, m, s = lms
+    one = TriccStatic(value=1)
+    if operator == TriccOperator.ZSCORE:
+        ratio = TriccOperation(TriccOperator.DIVIDED, [value, m])
+        top = TriccOperation(TriccOperator.MINUS, [TriccOperation(TriccOperator.POWER, [ratio, ll]), one])
+        return TriccOperation(TriccOperator.DIVIDED, [top, TriccOperation(TriccOperator.MULTIPLIED, [s, ll])])
+    base = TriccOperation(TriccOperator.PLUS, [TriccOperation(TriccOperator.MULTIPLIED, [value, s, ll]), one])
+    exponent = TriccOperation(TriccOperator.DIVIDED, [one, ll])
+    return TriccOperation(TriccOperator.MULTIPLIED, [m, TriccOperation(TriccOperator.POWER, [base, exponent])])
 
 
 def _split_named(args: List[Any]) -> Tuple[List[Any], List[Tuple[str, Any]]]:
@@ -173,7 +226,7 @@ def expand_call(
             "E_DMN_TABLE_NOT_STATIC", f"{name}: the table must be a text literal such as 'diazepam', not {table_arg}."
         )
     table_id, _, output = table_arg.value.partition(".")
-    table = tables.get(table_id)
+    table = resolve_table(table_id, tables)
     if table is None:
         known = ", ".join(sorted(tables)) or "none"
         raise DecisionTableError(
@@ -223,6 +276,11 @@ def expand_call(
     elif function == "DMNList":
         policy = "rule_order"
     expansion = _expansion(table, values, out_at, policy)
+    if not keep_calls and len(table.rules) > INLINE_WARNING_ROWS:
+        logger.warning(
+            f"decision table {table_id!r} ({len(table.rules)} rows) is written inline: the expression is "
+            "long (feature/20261123-dmn-instance-lookup.md)"
+        )
     if not keep_calls or isinstance(expansion, TriccStatic):
         return expansion
     call_args = [TriccStatic(value="") if v is _NULL else v for v in values]
@@ -383,14 +441,17 @@ def expand_project_tables(project: Any) -> Set[str]:
     Returns:
         The ids of the tables called. A table nobody calls is logged as a warning.
     """
-    tables = getattr(project, "decision_tables", None) or {}
+    if not getattr(project, "decision_tables", None):
+        project.decision_tables = {}  # a dict of its own: built-in tables are added when called
+    tables = project.decision_tables
+    declared = list(tables)
     aliases = getattr(project, "aliases", None) or {}
     keep_calls = bool(getattr(project, "decision_table_calls", False))
     used: Set[str] = set()
     nodes = list(iter_activity_nodes(list(project.pages.values()) + list(project.library_calculates or [])))
     for node in nodes:
         expand_node_tables(node, tables, aliases, used, keep_calls)
-    for table_id in tables:
+    for table_id in declared:
         if table_id not in used:
             logger.warning(f"decision table {table_id!r} is not called by any expression")
     return used

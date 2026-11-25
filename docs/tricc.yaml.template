@@ -66,6 +66,10 @@ parameters:
 # decision_tables:
 #   - tables/*.yaml
 
+# ODK / CDSS: a table with more rows than this is read from a secondary instance instead of
+# being written inline (0: always the instance). See feature/20261123-dmn-instance-lookup.md.
+# decision_table_max_inline_rows: 10
+
 # Other names for the table functions: the call's arguments go to table inputs by name,
 # `table` marks the table name. DrugDosage(table, age, weight) is built in.
 # aliases:
