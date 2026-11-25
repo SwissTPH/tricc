@@ -34,6 +34,8 @@ dependencies = [
     "pyxform",
     "Sympy",
     "PyYAML",
+    # capability statements are checked against their JSON Schema (feature/20261125-output-capabilities.md)
+    "jsonschema",
     "Pillow",
 ]
 keywords = ["xlsform", "drawio", "authoring"]
@@ -49,6 +51,7 @@ exclude = ["locales"]
 "tricc_oo.data.anthro" = ["*.json"]
 "tricc_oo.converters.cql" = ["*.json"]
 "tricc_oo.lang" = ["**/*"]
+"tricc_oo.data.capabilities" = ["*.json"]
 
 [project.scripts]
 tricc = "tricc_oo.cli:main"

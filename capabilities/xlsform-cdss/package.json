@@ -1,0 +1,24 @@
+{
+  "name": "@tricc/capabilities-xlsform-cdss",
+  "version": "1.0.0",
+  "description": "TRICC capability statement: XLSForm CDSS forms (ages, diagnoses).",
+  "license": "MPL-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SwissTPH/tricc.git",
+    "directory": "capabilities/xlsform-cdss"
+  },
+  "main": "statement.json",
+  "files": [
+    "statement.json",
+    "CHANGELOG.md"
+  ],
+  "keywords": [
+    "tricc",
+    "capability-statement",
+    "XLSFormCDSSStrategy"
+  ],
+  "dependencies": {
+    "@tricc/capabilities-xlsform": "^1.0.0"
+  }
+}

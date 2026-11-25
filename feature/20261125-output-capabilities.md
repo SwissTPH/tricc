@@ -71,7 +71,9 @@ know what each output can do.
   - `retrieval_contexts` / `populate_contexts`: values from `RETRIEVAL_CONTEXTS`;
   - `data_types`, `features` (`decision_table_calls`, `function_bodies`, `repeat`, …), and
     `limits` (e.g. inline decision-table rows).
-  A JSON Schema (`capabilities/statement.schema.json`) checks it, on both sides.
+  A JSON Schema (`capabilities/statement.schema.json`) checks it, on both sides (tricc_oo ships
+  a copy in `tricc_oo/data/capabilities/`, kept equal by a test). A root statement also lists its
+  `contexts` (`form`; FHIR `inline` / `library`), the values its operators' contexts take.
 - **Kept true by tests.** `tests/test_output_capabilities.py` feeds every `TriccOperator` and
   catalogue function to each strategy's expression writer. A construct the writer handles must
   be in the strategy's resolved statement (after `extends`) and one it rejects must not, so the

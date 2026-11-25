@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tricc.org/schemas/capability-statement.schema.json",
+  "title": "TRICC output capability statement",
+  "description": "What one output strategy can write (feature/20261125-output-capabilities.md). A root statement lists everything; a child (extends) lists only what it adds and removes.",
+  "type": "object",
+  "required": ["id", "version", "strategy", "lang"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "id": { "type": "string", "pattern": "^(@[a-z0-9-]+/)?[a-z0-9][a-z0-9._-]*$", "description": "The npm package name, e.g. @tricc/capabilities-fhir." },
+    "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?$" },
+    "strategy": { "type": "string", "minLength": 1, "description": "The output strategy class it describes, e.g. FHIRStrategy." },
+    "description": { "type": "string" },
+    "extends": {
+      "type": "object",
+      "required": ["package", "version"],
+      "additionalProperties": false,
+      "properties": {
+        "package": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1, "description": "A semver range, e.g. ^1.0.0." }
+      }
+    },
+    "lang": { "type": "string", "minLength": 1, "description": "The @tricc/lang (tricc_oo/lang/VERSION) range whose operator and function names it uses." },
+    "contexts": { "$ref": "#/$defs/names", "description": "The expression contexts of this output (form; or inline (FHIRPath) and library (CQL))." },
+    "operators": { "$ref": "#/$defs/operators" },
+    "functions": { "$ref": "#/$defs/names" },
+    "retrieval_contexts": { "$ref": "#/$defs/contexts" },
+    "populate_contexts": { "$ref": "#/$defs/contexts" },
+    "data_types": { "$ref": "#/$defs/names" },
+    "features": { "$ref": "#/$defs/features" },
+    "limits": { "$ref": "#/$defs/limits" },
+    "add": { "$ref": "#/$defs/part" },
+    "remove": { "$ref": "#/$defs/part" }
+  },
+  "allOf": [
+    {
+      "if": { "required": ["extends"] },
+      "then": { "not": { "anyOf": [
+        { "required": ["operators"] }, { "required": ["functions"] }, { "required": ["retrieval_contexts"] },
+        { "required": ["populate_contexts"] }, { "required": ["data_types"] }, { "required": ["features"] }
+      ] } },
+      "else": { "required": ["contexts", "operators", "functions"], "not": { "anyOf": [{ "required": ["add"] }, { "required": ["remove"] }] } }
+    }
+  ],
+  "$defs": {
+    "names": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "contexts": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "enum": ["patient", "facility", "practitioner", "location", "encounter", "history", "custom"] }
+    },
+    "features": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "enum": ["decision_table_calls", "function_bodies", "repeat"] }
+    },
+    "operators": {
+      "type": "object",
+      "description": "TriccOperator name -> the contexts where the output can write it.",
+      "propertyNames": { "pattern": "^[A-Z][A-Z0-9_]*$" },
+      "additionalProperties": { "$ref": "#/$defs/names" }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "inline_decision_table_rows": { "type": "integer", "minimum": 0, "description": "A called table with more rows is written inline anyway, with W_OUTPUT_LIMIT." }
+      }
+    },
+    "part": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "contexts": { "$ref": "#/$defs/names" },
+        "operators": { "$ref": "#/$defs/operators" },
+        "functions": { "$ref": "#/$defs/names" },
+        "retrieval_contexts": { "$ref": "#/$defs/contexts" },
+        "populate_contexts": { "$ref": "#/$defs/contexts" },
+        "data_types": { "$ref": "#/$defs/names" },
+        "features": { "$ref": "#/$defs/features" }
+      }
+    }
+  }
+}
