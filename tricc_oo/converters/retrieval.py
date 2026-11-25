@@ -284,13 +284,13 @@ def read_project_retrievals(project) -> Dict[str, Retrieval]:
     return retrievals
 
 
-def retrieval_refs(value: Any, found: Optional[Set[str]] = None, _seen: Optional[Set[int]] = None) -> Set[str]:
-    """The ``#name`` references (unresolved ``TriccReference``) in an expression."""
+def reference_values(value: Any, found: Optional[Set[str]] = None, _seen: Optional[Set[int]] = None) -> Set[str]:
+    """The names of the unresolved ``TriccReference``s in an expression."""
     from tricc_oo.models.base import TriccOperation, TriccReference
 
     found = set() if found is None else found
     if isinstance(value, TriccReference):
-        if isinstance(value.value, str) and value.value.startswith("#"):
+        if isinstance(value.value, str):
             found.add(value.value)
     elif isinstance(value, TriccOperation):
         seen = set() if _seen is None else _seen
@@ -298,24 +298,39 @@ def retrieval_refs(value: Any, found: Optional[Set[str]] = None, _seen: Optional
             return found
         seen.add(id(value))
         for ref in value.reference:
-            retrieval_refs(ref, found, seen)
+            reference_values(ref, found, seen)
     elif isinstance(value, (list, tuple, set)) or type(value).__name__ == "OrderedSet":
         for ref in value:
-            retrieval_refs(ref, found, _seen)
+            reference_values(ref, found, _seen)
     return found
+
+
+def retrieval_refs(value: Any, found: Optional[Set[str]] = None, _seen: Optional[Set[int]] = None) -> Set[str]:
+    """The ``#name`` references (unresolved ``TriccReference``) in an expression."""
+    found = set() if found is None else found
+    found.update(name for name in reference_values(value) if name.startswith("#"))
+    return found
+
+
+def expression_nodes(project) -> List[Any]:
+    """The expressions of the loaded pages (activities and block instances) and the library
+    calculates: each page's applicability and each node's expression fields."""
+    values: List[Any] = []
+    nodes: List[Any] = list(getattr(project, "library_calculates", None) or [])
+    for page in (getattr(project, "pages", None) or {}).values():
+        values.append(getattr(page, "applicability", None))
+        nodes.extend((getattr(page, "nodes", None) or {}).values())
+    for node in nodes:
+        values.extend(getattr(node, field, None) for field in _EXPRESSION_FIELDS)
+    return values
 
 
 def used_retrieval_codes(project) -> List[str]:
     """Codes of the retrievals the loaded pages (activities and block instances) and the
     library calculates use, sorted."""
     found: Set[str] = set()
-    nodes: List[Any] = list(getattr(project, "library_calculates", None) or [])
-    for page in (getattr(project, "pages", None) or {}).values():
-        retrieval_refs(getattr(page, "applicability", None), found)
-        nodes.extend((getattr(page, "nodes", None) or {}).values())
-    for node in nodes:
-        for field in _EXPRESSION_FIELDS:
-            retrieval_refs(getattr(node, field, None), found)
+    for value in expression_nodes(project):
+        retrieval_refs(value, found)
     return sorted(found)
 
 

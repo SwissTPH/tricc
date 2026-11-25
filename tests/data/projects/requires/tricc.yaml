@@ -1,0 +1,20 @@
+# Prerequisites within an encounter (feature/20261125-requires-and-implied-retrievals.md §1, §2):
+# `consult` requires `triage`, so the triage concepts it references are read from the encounter.
+title: Requires
+input_strategy: YamlStrategy
+output_strategies:
+  - XLSFormCHTStrategy
+terminology:
+  - terminology/*.codesystem.json
+interventions:
+  - id: triage
+    name: triage
+    title: Triage
+    activity:
+      - activities/triage.activity.yaml
+  - id: consult
+    name: consult
+    title: Consultation
+    requires: [triage]
+    activity:
+      - activities/consult.activity.yaml

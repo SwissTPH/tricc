@@ -121,8 +121,9 @@ class TriccInterventionConfig(BaseModel):
     # Parameter values seeding every activity this intervention lists: literals,
     # {system, code} or "{{ref}}" (feature/20261111-block-params-and-start-node.md §3.4).
     args: Dict[str, Any] = Field(default_factory=dict)
-    # Interventions whose products are in scope for dead-concept detection (§8.1);
-    # read, not used yet.
+    # Interventions earlier in the same encounter: the concepts their activities record are
+    # read from the encounter as first versions
+    # (feature/20261125-requires-and-implied-retrievals.md §1, §2).
     requires: List[Any] = Field(default_factory=list)
 
     @model_validator(mode="before")
@@ -278,6 +279,9 @@ class TriccProjectConfig(BaseModel):
                     raise ValueError(
                         f"start.intervention {parent!r} on {item.id!r} is not an intervention id"
                     )
+        from tricc_oo.converters.requires import check_intervention_requires
+
+        check_intervention_requires(self.interventions)
         return self
 
     def image_max_width(self) -> Optional[int]:

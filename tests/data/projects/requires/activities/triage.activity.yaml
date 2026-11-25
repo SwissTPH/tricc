@@ -1,0 +1,14 @@
+id: triage
+title: Triage
+process: main
+nodes:
+  - {id: start, type: start, name: start_triage, label: Triage}
+  - {id: weight, type: decimal, name: weight, label: Weight (kg)}
+  - {id: temp, type: decimal, name: temp, label: Temperature}
+  - {id: cough, type: integer, name: resp_rate, label: Respiratory rate}
+  - {id: end, type: end, name: end_triage, label: End}
+edges:
+  - {id: e1, source: start, target: weight}
+  - {id: e2, source: weight, target: temp}
+  - {id: e3, source: temp, target: cough}
+  - {id: e4, source: cough, target: end}

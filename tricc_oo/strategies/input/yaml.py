@@ -263,7 +263,8 @@ class YamlActivity(YamlModel):
     params: List[Dict[str, Any]] = Field(default_factory=list)
     # a block's outputs (template names of inner inputs / calculates); None: all, []: none
     outputs: Optional[List[str]] = None
-    # prerequisite concepts (§8.4) and extension contract (§9): read, not used yet
+    # prerequisite concepts, read from the encounter
+    # (feature/20261125-requires-and-implied-retrievals.md §1); extension contract (§9): read, not used yet
     requires: List[Any] = Field(default_factory=list)
     extension: Optional[Dict[str, Any]] = None
 
@@ -734,6 +735,13 @@ class YamlStrategy(BaseInputStrategy):
         nodes: Dict[str, Any] = {}
         edges: List[TriccEdge] = []
         pending_ends: List[YamlNode] = []
+        if yaml_act.requires:
+            from tricc_oo.converters.requires import activity_required_concept
+
+            project.activity_requires = set(project.activity_requires) | {
+                activity_required_concept(entry, project.code_systems, f"activity {yaml_act.id!r}")
+                for entry in yaml_act.requires
+            }
 
         # 1. Create every node except activity_end. That model names itself from
         # activity.id, so it is created once the container exists.

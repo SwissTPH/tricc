@@ -249,13 +249,17 @@ class BaseInputStrategy:
         references are ready -- exactly like a free-floating calculate drawn on the page.
 
         The retrievals the loaded pages use (``"#name"``) are hung the same way
-        (feature/20261109-project-retrievals.md).
+        (feature/20261109-project-retrievals.md), and so are the encounter reads of the
+        required concepts they reference, first, so each is the first version of its concept
+        (feature/20261125-requires-and-implied-retrievals.md §2).
         """
+        from tricc_oo.converters.requires import build_required_reads
         from tricc_oo.converters.retrieval import build_used_retrievals
 
         if page is None:
             return
-        calculates = list(getattr(project, "library_calculates", None) or [])
+        calculates = list(build_required_reads(project))
+        calculates += list(getattr(project, "library_calculates", None) or [])
         calculates += build_used_retrievals(project)
         if not calculates:
             return
