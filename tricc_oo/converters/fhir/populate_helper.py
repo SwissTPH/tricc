@@ -488,6 +488,36 @@ define function GetEncounterMedicationRequestDate(code String):
       )
     )
 
+// MedicationDispense: a completed dispense of the drug (context = the encounter); the
+// history window and the date are whenHandedOver.
+define function MedicationDispenseHasCode(D MedicationDispense, conceptCode String):
+  exists(((D.medication as FHIR.CodeableConcept).coding) C where C.code = conceptCode)
+    or exists(
+      [Medication] Med
+        where (D.medication as FHIR.Reference).reference = 'Medication/' + Med.id
+          and exists(Med.code.coding C where C.code = conceptCode)
+    )
+
+define function GetEncounterMedicationDispenses(code String):
+  if encounterid is null then {} as List<MedicationDispense>
+  else
+    [MedicationDispense] D
+      where D.status = 'completed'
+        and MedicationDispenseHasCode(D, code)
+        and D.context.reference = 'Encounter/' + encounterid
+
+define function GetMedicationDispenses(code String, since DateTime):
+  [MedicationDispense] D
+    where D.status = 'completed'
+      and MedicationDispenseHasCode(D, code)
+      and (since is null or D.whenHandedOver.value >= since)
+
+define function GetEncounterMedicationDispenseDate(code String):
+  Max((GetEncounterMedicationDispenses(code)) D return D.whenHandedOver.value)
+
+define function GetLastMedicationDispenseDate(code String, since DateTime):
+  Max((GetMedicationDispenses(code, since)) D return D.whenHandedOver.value)
+
 define function GetMedicationRequestDate(code String, since DateTime):
   Max(
     (
@@ -597,21 +627,43 @@ _TIMED_CQL = {
     },
     # open prescriptions (feature/20261125-populate-medication.md); Latest is "on treatment"
     ("MedicationRequest", ENCOUNTER_CONTEXT): {
-        "Latest": "GetEncounterMedicationRequestValue('{code}')",
-        "Exists": "GetEncounterMedicationRequestValue('{code}')",
+        "Latest": "{on_treatment_encounter}",
+        "Exists": "{on_treatment_encounter}",
         "Count": "Count(GetEncounterMedicationRequests('{code}'))",
         "ActiveDrugs": "GetEncounterMedicationCodes()",
         "OpenDosage": "GetEncounterMedicationDosage('{code}')",
         "LatestDate": "GetEncounterMedicationRequestDate('{code}')",
     },
     ("MedicationRequest", HISTORY_CONTEXT): {
-        "Latest": "exists(GetActiveMedicationRequests('{code}', {since}))",
-        "Exists": "exists(GetActiveMedicationRequests('{code}', {since}))",
+        "Latest": "{on_treatment_history}",
+        "Exists": "{on_treatment_history}",
         "Count": "Count(GetActiveMedicationRequests('{code}', {since}))",
         "ActiveDrugs": "GetActiveMedicationCodesSince({since})",
         "OpenDosage": "GetMedicationDosageSince('{code}', {since})",
         "LatestDate": "GetMedicationRequestDate('{code}', {since})",
     },
+    # completed dispenses (feature/20261125-populate-medication.md phase 3)
+    ("MedicationDispense", ENCOUNTER_CONTEXT): {
+        "Latest": "exists(GetEncounterMedicationDispenses('{code}'))",
+        "Exists": "exists(GetEncounterMedicationDispenses('{code}'))",
+        "Count": "Count(GetEncounterMedicationDispenses('{code}'))",
+        "LatestDate": "GetEncounterMedicationDispenseDate('{code}')",
+    },
+    ("MedicationDispense", HISTORY_CONTEXT): {
+        "Latest": "exists(GetMedicationDispenses('{code}', {since}))",
+        "Exists": "exists(GetMedicationDispenses('{code}', {since}))",
+        "Count": "Count(GetMedicationDispenses('{code}', {since}))",
+        "LatestDate": "GetLastMedicationDispenseDate('{code}', {since})",
+    },
+}
+#: "on treatment": an open prescription, or else a completed dispense (decision 2026-11-25)
+_ON_TREATMENT = {
+    "on_treatment_encounter": (
+        "GetEncounterMedicationRequestValue('{code}') or exists(GetEncounterMedicationDispenses('{code}'))"
+    ),
+    "on_treatment_history": (
+        "exists(GetActiveMedicationRequests('{code}', {since})) or exists(GetMedicationDispenses('{code}', {since}))"
+    ),
 }
 
 
@@ -678,7 +730,10 @@ def retrieval_cql_expression(retrieval, strategy: str = "FHIRStrategy") -> str:
                 f"retrieval {retrieval.code}: period '{retrieval.period}' is not a date-only ISO duration; "
                 "reading without a window"
             )
-    expression = templates[function].format(code=code, since=since or "null")
+    template = templates[function]
+    for name, value in _ON_TREATMENT.items():
+        template = template.replace("{" + name + "}", value)
+    expression = template.format(code=code, since=since or "null")
     if resource == "Observation" and function == "Latest":
         return _retrieval_observation_value(retrieval, expression)
     return expression

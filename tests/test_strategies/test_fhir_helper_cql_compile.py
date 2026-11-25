@@ -163,6 +163,11 @@ class TestHelperCqlIsTranslatable(unittest.TestCase):
             "GetMedicationDosageSince",
             "GetEncounterMedicationRequestDate",
             "GetMedicationRequestDate",
+            "MedicationDispenseHasCode",
+            "GetEncounterMedicationDispenses",
+            "GetMedicationDispenses",
+            "GetEncounterMedicationDispenseDate",
+            "GetLastMedicationDispenseDate",
         ):
             self.assertIn(f"define function {fn}(", self.helper, f"missing {fn}")
 
@@ -185,6 +190,38 @@ class TestHelperCqlIsTranslatable(unittest.TestCase):
     def test_procedure_repeat_slot_uses_the_observation_extension(self):
         self.assertIn("define function ProcedureRepeatIndex(P Procedure):", self.helper)
         self.assertIn("Coalesce(ProcedureRepeatIndex(P), 1) = Coalesce(repeatIndex, 1)", self.helper)
+
+
+class TestMedicationReads(unittest.TestCase):
+    """feature/20261125-populate-medication.md data cases, pinned on the Helper text (no CQL engine here)."""
+
+    def setUp(self):
+        self.helper = _helper_cql()
+
+    def _define(self, name):
+        match = re.search(rf"define function {name}\(.*?(?=\n\n|\Z)", self.helper, re.S)
+        self.assertIsNotNone(match, name)
+        return match.group(0)
+
+    def test_open_request_is_active_and_still_valid(self):
+        # active request -> read; stopped / completed / cancelled -> ignored
+        body = self._define("IsOpenMedicationRequest")
+        self.assertIn("M.status = 'active'", body)
+        self.assertIn("M.dispenseRequest.validityPeriod.end.value >= Now()", body)
+
+    def test_request_outside_the_period_is_ignored(self):
+        body = self._define("GetOpenMedicationRequestsSince")
+        self.assertIn("IsOpenMedicationRequest(M)", body)
+        self.assertIn("since is null or M.authoredOn.value >= since", body)
+
+    def test_drug_matched_by_code_on_concept_or_referenced_medication(self):
+        body = self._define("MedicationRequestHasCode")
+        self.assertIn("((M.medication as FHIR.CodeableConcept).coding) C where C.code = conceptCode", body)
+        self.assertIn("'Medication/' + Med.id", body)
+        self.assertNotIn("system", body)
+
+    def test_dispense_counts_completed_only(self):
+        self.assertIn("D.status = 'completed'", self._define("GetMedicationDispenses"))
 
 
 class TestLibraryCanonicalUrl(unittest.TestCase):

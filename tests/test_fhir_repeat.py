@@ -105,7 +105,8 @@ class TestFHIRStrategyRepeatCQL(unittest.TestCase):
         self.assertIn("define function GetHistoryObservationValue", helper)
         self.assertIn("define function GetPatientValue", helper)
         self.assertIn("parameter encounterid String default null", helper)
-        self.assertNotIn("define function GetLast", helper)
+        # the dropped GetLast* Observation family; GetLastMedicationDispenseDate is #75's
+        self.assertNotRegex(helper, r"define function GetLast(?!MedicationDispenseDate\()")
         self.assertIn("define function GetObservations", helper)
         self.assertEqual(helper.count("define function GetObservation(code String)"), 1)
 

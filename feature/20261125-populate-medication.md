@@ -69,11 +69,15 @@ reads observations and conditions only, so a medication retrieval reads nothing.
 
 | Function | `encounter` | `history` (`since`) |
 |---|---|---|
-| `Latest` / `Exists` | `GetEncounterMedicationRequestValue(code)` | `exists GetActiveMedicationRequest(code, since)` |
+| `Latest` / `Exists` | `GetEncounterMedicationRequestValue(code)`, or a completed dispense in the encounter | `exists(GetActiveMedicationRequests(code, since))`, or `exists(GetMedicationDispenses(code, since))` |
 | `Count` | `Count(GetEncounterMedicationRequests(code))` | `Count(GetActiveMedicationRequests(code, since))` |
-| `ActiveDrugs` | codes of this encounter's requests | `GetActiveMedicationCodesSince(since)` |
-| `OpenDosage` | dosage of this encounter's request | `GetMedicationDosageSince(code, since)` |
-| `LatestDate` (#76) | `authoredOn` / `whenHandedOver` in the encounter | `GetMedicationRequestDate` / `GetLastMedicationDispenseDate(code, since)` |
+| `ActiveDrugs` | `GetEncounterMedicationCodes()`: codes of this encounter's open requests | `GetActiveMedicationCodesSince(since)` |
+| `OpenDosage` | `GetEncounterMedicationDosage(code)` | `GetMedicationDosageSince(code, since)` |
+| `LatestDate` (#76) | `GetEncounterMedicationRequestDate(code)` (`authoredOn`) / `GetEncounterMedicationDispenseDate(code)` (`whenHandedOver`) | `GetMedicationRequestDate(code, since)` / `GetLastMedicationDispenseDate(code, since)` |
+
+MedicationDispense (`dispense` concept type): `Latest` / `Exists` / `Count` read completed
+dispenses (`GetEncounterMedicationDispenses(code)`, `GetMedicationDispenses(code, since)`);
+`ActiveDrugs` / `OpenDosage` read prescriptions only.
 
 - "Open" request = `status = 'active'` (not `completed`, `stopped`, `cancelled`,
   `entered-in-error`), optionally bounded by `dispenseRequest.validityPeriod`.
