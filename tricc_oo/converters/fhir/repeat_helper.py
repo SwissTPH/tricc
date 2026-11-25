@@ -371,4 +371,22 @@ define function GetHistoryProcedureDate(code String):
     (GetHistoryProcedure(code).performed as FHIR.dateTime).value,
     (GetHistoryProcedure(code).performed as FHIR.Period).start.value
   )
+
+// Time a Procedure was performed (dateTime, else the start of its Period), and the latest
+// one in the encounter or since a date (null: ever). LatestDate / Latest / Exists of a
+// Procedure retrieval, feature/20261125-populate-read-date.md.
+define function ProcedureTime(P Procedure):
+  Coalesce((P.performed as FHIR.dateTime).value, (P.performed as FHIR.Period).start.value)
+
+define function GetEncounterProcedureDate(code String):
+  Max((GetProcedures(code)) P return ProcedureTime(P))
+
+define function GetHistoryProcedures(code String, since DateTime):
+  [Procedure] P
+    where ProcedureHasCode(P, code)
+      and IsDoneProcedure(P)
+      and (since is null or ProcedureTime(P) >= since)
+
+define function GetHistoryProcedureDate(code String, since DateTime):
+  Max((GetHistoryProcedures(code, since)) P return ProcedureTime(P))
 """

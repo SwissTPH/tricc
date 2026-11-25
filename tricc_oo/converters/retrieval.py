@@ -72,7 +72,7 @@ DEFAULT_FUNCTION = {
 }
 
 #: resources whose ``Latest`` reads whether a record exists (done / on treatment), not a value
-_DONE_RESOURCES = ()
+_DONE_RESOURCES = ("Procedure",)
 
 _CODE_RE = re.compile(r"^#[A-Za-z][A-Za-z0-9_]*$")
 _PLACEHOLDER_RE = re.compile(r"\{\{\s*(code|period)\s*\}\}")

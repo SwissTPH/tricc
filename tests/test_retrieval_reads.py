@@ -66,3 +66,29 @@ def test_latest_date_retrieval_node_is_a_datetime_item():
 
     assert build_retrieval_node(_retrieval("LatestDate")).data_type == "datetime"
 
+
+# --- #76 phase 2: Procedure ---------------------------------------------------------------
+
+PROCEDURE = "procedure"
+
+
+@pytest.mark.parametrize(
+    "function, context, period, expected",
+    [
+        ("Latest", "encounter", None, "GetEncounterProcedureValue('weight', null)"),
+        ("Exists", "encounter", None, "GetEncounterProcedureValue('weight', null)"),
+        ("Count", "encounter", None, "Count(GetProcedures('weight'))"),
+        ("LatestDate", "encounter", None, "GetEncounterProcedureDate('weight')"),
+        ("Latest", "history", "P6M", "GetHistoryProcedureDate('weight', Now() - 6 months) is not null"),
+        ("Exists", "history", None, "GetHistoryProcedureDate('weight', null) is not null"),
+        ("Count", "history", "P1Y", "Count(GetHistoryProcedures('weight', Now() - 1 year))"),
+        ("LatestDate", "history", "P1Y", "GetHistoryProcedureDate('weight', Now() - 1 year)"),
+    ],
+)
+def test_procedure_reads(function, context, period, expected):
+    assert retrieval_cql_expression(_retrieval(function, context, PROCEDURE, period)) == expected
+
+
+def test_procedure_latest_is_done_yes_no():
+    assert _retrieval("Latest", concept_type=PROCEDURE).value_type == "boolean"
+    assert _retrieval("Latest").value_type == "decimal"  # an Observation keeps the concept's type

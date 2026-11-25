@@ -479,6 +479,19 @@ _TIMED_CQL = {
         ),
         "LatestDate": "GetHistoryConditionDate('{code}', {since})",
     },
+    # done: completed and not Unsuccessful (#74); Latest is "done", like Exists
+    ("Procedure", ENCOUNTER_CONTEXT): {
+        "Latest": "GetEncounterProcedureValue('{code}', null)",
+        "Exists": "GetEncounterProcedureValue('{code}', null)",
+        "Count": "Count(GetProcedures('{code}'))",
+        "LatestDate": "GetEncounterProcedureDate('{code}')",
+    },
+    ("Procedure", HISTORY_CONTEXT): {
+        "Latest": "GetHistoryProcedureDate('{code}', {since}) is not null",
+        "Exists": "GetHistoryProcedureDate('{code}', {since}) is not null",
+        "Count": "Count(GetHistoryProcedures('{code}', {since}))",
+        "LatestDate": "GetHistoryProcedureDate('{code}', {since})",
+    },
     # read as Observations until feature/20261125-populate-medication.md; no date mapping
     ("MedicationRequest", ENCOUNTER_CONTEXT): {},
     ("MedicationRequest", HISTORY_CONTEXT): {},

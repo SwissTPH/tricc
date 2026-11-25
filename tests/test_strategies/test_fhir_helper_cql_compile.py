@@ -146,6 +146,9 @@ class TestHelperCqlIsTranslatable(unittest.TestCase):
             "ConditionDate",
             "GetEncounterConditionDate",
             "GetHistoryConditionDate",
+            "ProcedureTime",
+            "GetEncounterProcedureDate",
+            "GetHistoryProcedures",
         ):
             self.assertIn(f"define function {fn}(", self.helper, f"missing {fn}")
 
@@ -163,7 +166,7 @@ class TestHelperCqlIsTranslatable(unittest.TestCase):
             r"define function IsDoneProcedure\(P Procedure\):\s+P\.status = 'completed'\s+"
             r"and not exists\(P\.outcome\.coding O where O\.code = '385671000'\)",
         )
-        self.assertEqual(self.helper.count("IsDoneProcedure(P)"), 2)
+        self.assertEqual(self.helper.count("IsDoneProcedure(P)"), 3)
 
     def test_procedure_repeat_slot_uses_the_observation_extension(self):
         self.assertIn("define function ProcedureRepeatIndex(P Procedure):", self.helper)
