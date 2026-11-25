@@ -12,6 +12,14 @@ ships with tricc_oo in `tricc_oo/data/capabilities/`).
 | `@tricc/capabilities-xlsform-cht-hf` | `XLSFormCHTHFStrategy` | `-xlsform-cht`              |
 | `@tricc/capabilities-fhir`         | `FHIRStrategy`         |                               |
 | `@tricc/capabilities-opensrp`      | `OpenSRPStrategy`      | `-fhir`                       |
+| `@tricc/capabilities-html`         | `HTMLStrategy`         |                               |
+| `@tricc/capabilities-openmrs`      | `OpenMRSStrategy`      |                               |
+| `@tricc/capabilities-dhis2`        | `DHIS2Strategy`        |                               |
+| `@tricc/capabilities-spice`        | `SpiceStrategy`        |                               |
+
+`data_types` are declared, not probed. `DHIS2Strategy` and `SpiceStrategy` are not registered
+output strategies today (no `@register_output_strategy`), and `HTMLStrategy` cannot be
+instantiated (abstract `validate`); their statements describe their writers all the same.
 
 A statement names `TriccOperator` operators with the contexts where the output writes them
 (`form`; FHIR: `inline` = FHIRPath, `library` = CQL), catalogue functions

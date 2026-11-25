@@ -1,0 +1,21 @@
+{
+  "name": "@tricc/capabilities-spice",
+  "version": "1.0.0",
+  "description": "TRICC capability statement: Spice forms.",
+  "license": "MPL-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SwissTPH/tricc.git",
+    "directory": "capabilities/spice"
+  },
+  "main": "statement.json",
+  "files": [
+    "statement.json",
+    "CHANGELOG.md"
+  ],
+  "keywords": [
+    "tricc",
+    "capability-statement",
+    "SpiceStrategy"
+  ]
+}
