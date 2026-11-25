@@ -36,6 +36,7 @@ from tricc_oo.strategies.registry import (
     get_output_strategy,
     get_test_strategy,
 )
+from tricc_oo.visitors.expression_checks import check_unknown_functions
 
 logger = logging.getLogger("default")
 
@@ -239,6 +240,8 @@ def load_input_project(
     for strategy, contents in strategies:
         logger.info("build the graph from strategy %s", type(strategy).__name__)
         strategy.load(list(contents), media_path, project)
+    # every expression is checked before the walk (and the decision-table expansion)
+    check_unknown_functions(project)
     if len(strategies) == 1:
         return strategies[0][0].finalize(project, media_path)
     from tricc_oo.strategies.input.drawio import DrawioStrategy
