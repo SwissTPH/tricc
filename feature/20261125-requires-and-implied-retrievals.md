@@ -2,7 +2,7 @@
 
 | Field             | Value |
 | ----------------- | ----- |
-| **Status**        | Approved (2026-11-25, RFC #104) |
+| **Status**        | Implemented (2026-11-25, RFC #104, phases 1–3; phase 4 is the tricc-frontend mirror) |
 | **Branch target** | `feature/retrievals` → `develop` |
 | **Scope**         | `models/project_config` (`TriccInterventionConfig.requires`), `YamlStrategy` (`YamlActivity.requires`), `strategies/input/base_input_strategy` (`link_project`, `attach_library_calculates`), `converters/retrieval`, `converters/fhir/populate_helper`, `converters/fhir/repeat_helper`, `visitors/tricc` (versions), `FHIRStrategy` → `OpenSRPStrategy`, `XLSFormStrategy` → `XLSFormCDSSStrategy` → `XLSFormCHTStrategy` → `XLSFormCHTHFStrategy` |
 | **Related** | #101 (calculate functions: a required concept is a version, so a parameter's fallback concept finds it). `feature/20261109-project-retrievals.md` (retrieval nodes, contexts, periods; implied retrievals are generated entries). `feature/20260929-cql-populate-wiring.md` (encounter populate reads). `feature/20261111-block-params-and-start-node.md` §8.1, §8.4 (`requires` declared, "read, not used yet"). #76 (`LatestDate`: the `.date` field) and #75 (medication reads: `.drugs`, `.dosage`). #103 (`sys.code` references: a qualified retrieval waits for it). #98 (`Retrieve` in the function catalogue; no new grammar). tricc-frontend `feature/20261014-answer-options-in-cql.md` (the `Answer('code')` pattern this follows). Frontend mirror (requires pickers; `#name` / `#concept@period.field` shown for `Retrieve(…)` as a readable chip, with suggestions; rewrite on save; validation): SwissTPH/tricc-frontend, to open. |

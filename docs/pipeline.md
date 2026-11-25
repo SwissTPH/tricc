@@ -57,7 +57,17 @@ a `CONCATENATE` for dynamic text. The schema, the canonical form and the shared 
 (`tricc_oo/converters/retrieval.py`), collects the `"#name"` references of the loaded pages and
 library calculates, and hangs one `TriccNodeRetrieval` (a populate node named `#name`, exported
 as `r_<name>`) per used retrieval on the main page, like a library calculate. An unknown code is
-an error.
+an error. `Retrieve('name')` parses to the same reference; `Retrieve('weight', 'P3M'[, field])`
+parses to an implied retrieval `#weight@P3M[.field]`, synthesised from the concept
+(`implied_retrieval`, `feature/20261125-requires-and-implied-retrievals.md` §3).
+
+**Prerequisites** (`requires`, same spec §1–§2): the runner loads the activities of the
+interventions an intervention `requires` and collects the concepts they record (inputs,
+persisted calculates); with an activity's own `requires` concepts, each one the intervention
+references becomes a `context=encounter` populate node named by the concept
+(`tricc_oo/converters/requires.py`), hung first on the start page, so it is the first version of
+the concept and a redefinition in the form is a later version (`E_REQUIRES_UNKNOWN` for an
+unknown intervention or concept).
 
 ## 6) Calculate load, versioning, and inheritance
 
@@ -113,7 +123,7 @@ Each strategy turns a used retrieval into its own input through `retrieval_expre
 | Strategy | Retrieval export |
 |----------|------------------|
 | `FHIRStrategy`, `OpenSRPStrategy` | `define "#name"` in the Helper library (catalogue in `populate_helper.py`; `custom`: its `text/cql` expression); references read `Helper."#name"` |
-| `XLSFormCHTStrategy`, `XLSFormCHTHFStrategy` | hidden calculate `r_<name>` reading `instance('contact-summary')/context/<name>` (`custom`: its `text/x-xlsform` expression); references become `${r_<name>}` |
+| `XLSFormCHTStrategy`, `XLSFormCHTHFStrategy` | hidden calculate `r_<name>` reading `instance('contact-summary')/context/<name>` (`custom`: its `text/x-xlsform` expression); references become `${r_<name>}`; `<form>.contact-summary.json` lists the keys grouped by concept and window |
 | `XLSFormStrategy`, `XLSFormCDSSStrategy` | `custom` only (`text/x-xlsform`); a function fails with the retrieval code and strategy name |
 | others | fail with the retrieval code and strategy name |
 

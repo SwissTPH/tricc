@@ -2,7 +2,7 @@
 
 | Field             | Value |
 | ----------------- | ----- |
-| **Status**        | Approved (2026-11-25, RFC #75) |
+| **Status**        | Implemented (2026-11-25, RFC #75; approved 2026-11-25) |
 | **Branch target** | `feature/retrievals` → `develop` |
 | **Scope**         | `converters/retrieval.py`, `FHIRStrategy` (`converters/fhir/populate_helper.py`, `repeat_helper.py`), `converters/fhir/concept_mapper.py`, `XLSFormCHTStrategy` |
 | **Related**       | `feature/20261109-project-retrievals.md` (#78, the retrieval dictionary this extends), SwissTPH/tricc-frontend#31 (mirror the catalogue entries into `@tricc/core` `terminology/retrieval.ts`), #76 (`LatestDate`, reused for request / dispense dates), #104 (implied reads: `#antidiabetic@.drugs`, `#metformin@P6M.dosage`, `#metformin@.date`, `#metformin@encounter.date` call these functions without a dictionary entry), `feature/20260812-medication-request-dispense-node.md` (parked: *writing* MedicationRequest / Dispense; this RFC *reads* them) |
