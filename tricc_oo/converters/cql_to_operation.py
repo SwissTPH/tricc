@@ -7,7 +7,8 @@ from antlr4.error.ErrorListener import ErrorListener
 from antlr4 import CommonTokenStream, InputStream
 from tricc_oo.converters.cql.cqlLexer import cqlLexer
 from tricc_oo.converters.cql.cqlParser import cqlParser
-from tricc_oo.converters.cql.cqlVisitor import cqlVisitor
+from tricc_oo.converters.cql.tricc_cqlVisitor import tricc_cqlVisitor
+from tricc_oo.converters.lang import parse_cql_expression
 from tricc_oo.converters.utils import clean_name, unquote_literal
 from tricc_oo.models.base import (
     TriccOperator,
@@ -132,7 +133,14 @@ def as_code_literal(value):
     return value
 
 
-class cqlToXlsFormVisitor(cqlVisitor):
+class cqlToXlsFormVisitor(tricc_cqlVisitor):
+    """CQL parse tree -> TriccOperation.
+
+    Visits a ``tricc_cqlParser.triccExpression`` tree (expressions) or a ``cqlParser.library``
+    tree (project libraries, ``transform_cql_lib_to_operations``): the profile keeps the
+    upstream labels, so both trees have the same visitor methods.
+    """
+
     def __init__(self):
         self.xlsform_rows = []
         self.errors = []
@@ -157,6 +165,14 @@ class cqlToXlsFormVisitor(cqlVisitor):
 
     def translate(self, arg, type=ANY):
         return self.resolve_scv(arg) or str(arg)
+
+    def visitTriccExpression(self, ctx):
+        return self.visit(ctx.expression())
+
+    def visitPlaceholderTerm(self, ctx):
+        # parameters are rendered before parsing (models/params.py); one left here is a bug
+        self.errors.append(f"unrendered parameter {ctx.getText()}")
+        return None
 
     def visitExpressionDefinition(self, ctx):
         identifier = ctx.identifier().getText()
@@ -261,14 +277,6 @@ class cqlToXlsFormVisitor(cqlVisitor):
         function_name = ctx.getChild(2).getText()
         return not_clean(self._get_membership_expression(ctx, function_name))
 
-    def visitInvocationExpressionTerm(self, ctx):
-        result = super().visitInvocationExpressionTerm(ctx)
-        if isinstance(result, list) and all(isinstance(x, (TriccStatic, TriccReference)) for x in result):
-            value = ".".join([x.value for x in result])
-            logger.warning(f"guessed reference for '{value}'")
-            return TriccReference(value)
-        return result
-
     def visitBetweenExpression(self, ctx):
         ref = self.visit(ctx.expression(0))
         lower = self.visit(ctx.expression(1))
@@ -363,12 +371,6 @@ class cqlToXlsFormVisitor(cqlVisitor):
         op.reference = [left, right]
         return op
 
-    def visitInvocationExpression(self, ctx):
-        raise NotImplementedError("Invocation not supported")
-
-    def visitIndexerExpression(self, ctx):
-        raise NotImplementedError("Indexer not supported")
-
     def visitCastExpression(self, ctx):
         return self.visitTypeExpression(ctx)
 
@@ -408,23 +410,13 @@ class cqlToXlsFormVisitor(cqlVisitor):
         else:
             raise NotImplementedError(f"cast {to_type} not supported")
 
-    def visitUnionExpression(self, ctx):
-        raise NotImplementedError("union not supported")
-
     def visitQuantity(self, ctx):
-        # TODO
-        raise NotImplementedError("Indexer not supported")
+        # still reachable in `within 3 days of` (timing phrases)
+        raise NotImplementedError("quantity not supported")
 
     def visitUnit(self, ctx):
-        raise NotImplementedError("Indexer not supported")
-
-    def visistDateTimePrecision(self, ctx):
-        # TODO
-        raise NotImplementedError("Indexer not supported")
-
-    def visitPluralDateTimePrecision(self, ctx):
-        # TODO
-        raise NotImplementedError("Indexer not supported")
+        # still reachable in `convert x to 'mg'`
+        raise NotImplementedError("unit not supported")
 
     # def visitQualifiedIdentifier(self, ctx):
     #    raise NotImplementedError('qualifiedIdentifier not supported')
@@ -491,7 +483,9 @@ class CQLErrorListener(ErrorListener):
 def transform_cql_to_operation(cql_input, context=None, quiet=False):
     """Parse a CQL expression into a TriccOperation / TriccReference / TriccStatic.
 
-    A bare identifier is text (``TriccStatic``); a reference is a ``"quoted"`` identifier.
+    The text is parsed with the TRICC profile (``tricc_oo/lang/cql/tricc_cql.g4``, entry
+    ``triccExpression``). A bare identifier is text (``TriccStatic``); a reference is a
+    ``"quoted"`` identifier.
 
     Args:
         cql_input: The expression.
@@ -499,43 +493,25 @@ def transform_cql_to_operation(cql_input, context=None, quiet=False):
         quiet: Do not report grammar errors (the caller treats unparsable input as text).
 
     Returns:
-        The parsed expression, or None when it does not parse.
+        The parsed expression, or None when it does not parse (a construct outside the
+        profile is reported with its message from ``tricc_oo/lang/errors.json``).
     """
-    lib_input = f"""
-    library runner
+    tree, errors = parse_cql_expression(cql_input)
+    if errors:
+        if not quiet:
+            where = f"{context} \n" if context else ""
+            for error in errors:
+                logger.error(f"CQL Grammar Error: {where}{error} \n in:\n {cql_input}")
+        return None
 
-    define "calc":
-        {cql_input.replace('−', '-')}
-    """
-    input_stream = InputStream(chr(10).join(lib_input.split("\n")))
-    lexer = cqlLexer(input_stream)
-    stream = CommonTokenStream(lexer)
-    parser = cqlParser(stream)
-
-    # Remove default error listeners and add cus    tom listener
-    parser.removeErrorListeners()
-    lexer.removeErrorListeners()
-    error_listener = CQLErrorListener(context)
-    parser.addErrorListener(error_listener)
-    lexer.addErrorListener(error_listener)
-    tree = parser.library()
-
-    # Check for errors
-    if error_listener.errors:
-        for error in [] if quiet else error_listener.errors:
-            print(f"CQL Grammar Error: {error} \n in:\n {cql_input}")
-        return None  # Or handle errors as appropriate for your use case
-
-    # If no errors, proceed with visitor
     visitor = cqlToXlsFormVisitor()
-
-    visitor.visit(tree)
+    result = visitor.visit(tree)
     if visitor.errors:
         logger.warning(f"while visiting cql: \n{cql_input}")
         for e in visitor.errors:
             logger.warning(e)
 
-    return visitor.xlsform_rows[0]["calculation"]
+    return result
 
 
 def transform_cql_lib_to_operations(cql_input):
