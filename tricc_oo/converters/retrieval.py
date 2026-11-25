@@ -58,6 +58,8 @@ RETRIEVAL_FUNCTIONS: Dict[str, tuple] = {
     "Latest": (_TIMED, True, "source"),
     "Exists": (_TIMED, True, "boolean"),
     "Count": (_TIMED, True, "integer"),
+    # date of the latest record (feature/20261125-populate-read-date.md)
+    "LatestDate": (_TIMED, True, "dateTime"),
 }
 
 DEFAULT_FUNCTION = {
@@ -68,6 +70,9 @@ DEFAULT_FUNCTION = {
     "encounter": "Latest",
     "history": "Latest",
 }
+
+#: resources whose ``Latest`` reads whether a record exists (done / on treatment), not a value
+_DONE_RESOURCES = ()
 
 _CODE_RE = re.compile(r"^#[A-Za-z][A-Za-z0-9_]*$")
 _PLACEHOLDER_RE = re.compile(r"\{\{\s*(code|period)\s*\}\}")
@@ -137,7 +142,17 @@ class Retrieval(BaseModel):
         function = self.effective_function
         entry = RETRIEVAL_FUNCTIONS.get(function) if function else None
         value_type = entry[2] if entry else "source"
+        if value_type == "source" and function == "Latest" and self.resource in _DONE_RESOURCES:
+            # a procedure done / a medication taken: yes or no (#76, #75)
+            return "boolean"
         return self.reads_data_type if value_type == "source" else value_type
+
+    @property
+    def resource(self) -> str:
+        """FHIR resource the concept read is recorded as (``Observation`` by default)."""
+        from tricc_oo.converters.fhir.concept_mapper import get_fhir_resource
+
+        return get_fhir_resource(self.reads_concept_type, None)[0]
 
 
 def _property(concept, code: str):

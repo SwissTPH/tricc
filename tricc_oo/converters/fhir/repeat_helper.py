@@ -241,6 +241,11 @@ define function GetHistoryObservationValueSince(
 define function LatestObservationTime(code String, since DateTime):
   (GetHistoryObservationSince(code, since, 1, null).effective as FHIR.dateTime).value
 
+// Time of the latest Observation of `code` in the current encounter (LatestDate
+// retrieval, feature/20261125-populate-read-date.md).
+define function GetEncounterObservationTime(code String):
+  Max((GetObservations(code)) O return (O.effective as FHIR.dateTime).value)
+
 define function GetHistoryObservationCodesSince(code String, since DateTime):
   Combine(
     distinct(
@@ -299,6 +304,26 @@ define function GetHistoryCondition(code String):
 
 define function GetHistoryConditionValue(code String):
   GetHistoryCondition(code) is not null
+
+// Date of a Condition: its onset, falling back to recordedDate (LatestDate retrieval,
+// feature/20261125-populate-read-date.md). The latest date is the Max, nulls ignored.
+define function ConditionDate(C Condition):
+  Coalesce((C.onset as FHIR.dateTime).value, C.recordedDate.value)
+
+define function GetEncounterConditionDate(code String):
+  Max((GetActiveConditions(code)) C return ConditionDate(C))
+
+define function GetHistoryConditionDate(code String, since DateTime):
+  Max(
+    (
+      [Condition] C
+        where ConditionHasCode(C, code)
+          and ConditionVerificationCode(C) != 'refuted'
+          and ConditionVerificationCode(C) != 'entered-in-error'
+        return ConditionDate(C)
+    ) D
+      where since is null or D >= since
+  )
 
 // ── Procedure family (#74; an activity done, feature/20261117-activity-procedure-dedup.md).
 // A Procedure counts only when completed and its outcome is not Unsuccessful

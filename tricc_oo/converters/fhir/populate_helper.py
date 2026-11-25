@@ -441,6 +441,50 @@ _RETRIEVAL_VALUE_TYPES = {
 }
 
 
+#: (FHIR resource, context, catalogue function) -> Helper CQL, ``{code}`` the concept code and
+#: ``{since}`` the start of the history window (``null``: no window). A resource missing here is
+#: read as an Observation (the historical fallback); a function missing for a known resource is
+#: unsupported. ``Latest`` of an Observation is converted to the value type
+#: (``_retrieval_observation_value``).
+_TIMED_CQL = {
+    ("Observation", ENCOUNTER_CONTEXT): {
+        "Latest": "GetEncounterObservationValue('{code}', null, null)",
+        "Exists": "exists(GetObservations('{code}'))",
+        "Count": "Count(GetObservations('{code}'))",
+        "LatestDate": "GetEncounterObservationTime('{code}')",
+    },
+    ("Observation", HISTORY_CONTEXT): {
+        "Latest": "GetHistoryObservationValueSince('{code}', {since}, 1, null)",
+        "Exists": "GetHistoryObservationSince('{code}', {since}, 1, null) is not null",
+        "Count": (
+            "Count([Observation] O where ObservationHasCode(O, '{code}')"
+            " and O.status in {{'final', 'amended', 'corrected'}}"
+            " and ({since} is null or (O.effective as FHIR.dateTime).value >= {since}))"
+        ),
+        "LatestDate": "LatestObservationTime('{code}', {since})",
+    },
+    ("Condition", ENCOUNTER_CONTEXT): {
+        "Latest": "GetEncounterConditionValue('{code}')",
+        "Exists": "GetConditionValue('{code}')",
+        "Count": "Count(GetActiveConditions('{code}'))",
+        "LatestDate": "GetEncounterConditionDate('{code}')",
+    },
+    ("Condition", HISTORY_CONTEXT): {
+        "Latest": "GetHistoryConditionValue('{code}')",
+        "Exists": "GetHistoryConditionValue('{code}')",
+        "Count": (
+            "Count([Condition] C where ConditionHasCode(C, '{code}')"
+            " and ConditionVerificationCode(C) != 'refuted'"
+            " and ConditionVerificationCode(C) != 'entered-in-error')"
+        ),
+        "LatestDate": "GetHistoryConditionDate('{code}', {since})",
+    },
+    # read as Observations until feature/20261125-populate-medication.md; no date mapping
+    ("MedicationRequest", ENCOUNTER_CONTEXT): {},
+    ("MedicationRequest", HISTORY_CONTEXT): {},
+}
+
+
 def retrieval_cql_type(retrieval) -> Optional[str]:
     """CQL result type of a retrieval's define, or None when unknown (custom, dateTime)."""
     if retrieval.effective_function is None:
@@ -491,46 +535,25 @@ def retrieval_cql_expression(retrieval, strategy: str = "FHIRStrategy") -> str:
     if function in RETRIEVAL_VALUE_CQL:
         return f"{RETRIEVAL_VALUE_CQL[function]}('{code}')"
     resource, _, _ = get_fhir_resource(retrieval.reads_concept_type, None)
-    condition = resource == "Condition"
-    if retrieval.context == ENCOUNTER_CONTEXT:
-        if function == "Latest":
-            if condition:
-                return f"GetEncounterConditionValue('{code}')"
-            return _retrieval_observation_value(retrieval, f"GetEncounterObservationValue('{code}', null, null)")
-        if function == "Exists":
-            return f"GetConditionValue('{code}')" if condition else f"exists(GetObservations('{code}'))"
-        if function == "Count":
-            return f"Count(GetActiveConditions('{code}'))" if condition else f"Count(GetObservations('{code}'))"
-    if retrieval.context == HISTORY_CONTEXT:
-        since = cql_lookback_start(retrieval.period) if retrieval.period else None
-        if retrieval.period and since is None:
+    if (resource, retrieval.context) not in _TIMED_CQL:
+        resource = "Observation"
+    templates = _TIMED_CQL.get((resource, retrieval.context), {})
+    if resource.startswith("Medication") and not templates and function != "LatestDate":
+        templates = _TIMED_CQL[("Observation", retrieval.context)]
+    if function not in templates:
+        raise unsupported(retrieval, strategy)
+    since = None
+    if retrieval.context == HISTORY_CONTEXT and retrieval.period:
+        since = cql_lookback_start(retrieval.period)
+        if since is None:
             logger.warning(
                 f"retrieval {retrieval.code}: period '{retrieval.period}' is not a date-only ISO duration; "
                 "reading without a window"
             )
-        since = since or "null"
-        if condition:
-            if function in ("Latest", "Exists"):
-                return f"GetHistoryConditionValue('{code}')"
-            if function == "Count":
-                return (
-                    f"Count([Condition] C where ConditionHasCode(C, '{code}')"
-                    " and ConditionVerificationCode(C) != 'refuted'"
-                    " and ConditionVerificationCode(C) != 'entered-in-error')"
-                )
-        if function == "Latest":
-            return _retrieval_observation_value(
-                retrieval, f"GetHistoryObservationValueSince('{code}', {since}, 1, null)"
-            )
-        if function == "Exists":
-            return f"GetHistoryObservationSince('{code}', {since}, 1, null) is not null"
-        if function == "Count":
-            return (
-                f"Count([Observation] O where ObservationHasCode(O, '{code}')"
-                " and O.status in {'final', 'amended', 'corrected'}"
-                f" and ({since} is null or (O.effective as FHIR.dateTime).value >= {since}))"
-            )
-    raise unsupported(retrieval, strategy)
+    expression = templates[function].format(code=code, since=since or "null")
+    if resource == "Observation" and function == "Latest":
+        return _retrieval_observation_value(retrieval, expression)
+    return expression
 
 
 def retrieval_cql_defines(retrievals, strategy: str = "FHIRStrategy") -> str:

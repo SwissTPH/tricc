@@ -140,6 +140,12 @@ class TestHelperCqlIsTranslatable(unittest.TestCase):
             "GetEncounterProcedureValue",
             "GetHistoryProcedure",
             "GetHistoryProcedureDate",
+            # LatestDate (feature/20261125-populate-read-date.md)
+            "LatestObservationTime",
+            "GetEncounterObservationTime",
+            "ConditionDate",
+            "GetEncounterConditionDate",
+            "GetHistoryConditionDate",
         ):
             self.assertIn(f"define function {fn}(", self.helper, f"missing {fn}")
 

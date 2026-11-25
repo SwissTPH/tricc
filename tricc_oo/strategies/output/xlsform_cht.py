@@ -82,6 +82,14 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
         """
         if retrieval.effective_function is None:
             return super().retrieval_expression(retrieval)
+        if retrieval.effective_function == "LatestDate":
+            warned = self.__dict__.setdefault("_retrieval_date_warned", set())
+            if retrieval.code not in warned:
+                warned.add(retrieval.code)
+                logger.warning(
+                    f"retrieval {retrieval.code}: the CHT contact summary must expose the date of the latest "
+                    f"'{retrieval.reads_code}' record as '{retrieval.name}' (feature/20261125-populate-read-date.md)"
+                )
         return f"coalesce(instance('contact-summary')/context/{retrieval.name},'')"
 
     def get_cht_input(self, start_pages, **kwargs):
