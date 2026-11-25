@@ -19,6 +19,7 @@
     {"name": "GetHistoryObservationCodesSince", "reads": "history"},
     {"name": "GetHistoryCondition", "reads": "history"},
     {"name": "GetHistoryConditionValue", "reads": "history"},
+    {"name": "Retrieve", "reads": "history"},
     {"name": "GetPractitionerValue", "reads": "context"},
     {"name": "GetLocationValue", "reads": "context"},
     {"name": "GetFacilityValue", "reads": "context"}

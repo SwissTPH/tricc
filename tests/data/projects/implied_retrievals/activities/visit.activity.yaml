@@ -1,0 +1,37 @@
+id: visit
+title: Visit
+process: main
+nodes:
+  - {id: start, type: start, name: start_visit, label: Visit}
+  # a dictionary retrieval, saved as Retrieve('code') and in the legacy "#name" form: one node
+  - {id: young, type: note, name: young_note, label: Young infant, relevance: "Retrieve('age_months') < 6"}
+  - {id: young2, type: note, name: young_note2, label: Young infant (legacy), relevance: '"#age_months" < 6'}
+  # implied reads: the latest weight in the past 3 months, used twice, and with `value` spelled out
+  - {id: no_weight, type: note, name: no_weight_note, label: No recent weight, relevance: "Retrieve('weight', 'P3M') is null"}
+  - {id: weight, type: decimal, name: weight, label: Weight (kg), relevance: "Retrieve('weight', 'P3M', 'value') is null"}
+  - {id: gain, type: calculate, name: weight_gain, label: Weight gain, calculate: "\"weight\" - Retrieve('weight', 'P3M')"}
+  - {id: since, type: calculate, name: weight_date, label: Last weighed, calculate: "Retrieve('weight', 'P3M', 'date')"}
+  - {id: known, type: calculate, name: weight_known, label: Weighed, calculate: "Retrieve('weight', 'P3M', 'exists')"}
+  - {id: count, type: calculate, name: weight_count, label: Weighings, calculate: "Retrieve('weight', 'P3M', 'count')"}
+  - {id: ever, type: calculate, name: weight_ever, label: Last weight ever, calculate: "Retrieve('weight', null)"}
+  - {id: here, type: calculate, name: weight_here, label: Weight this visit, calculate: "Retrieve('weight', 'encounter')"}
+  # medication reads (#75)
+  - {id: drugs, type: calculate, name: drugs, label: Drugs, calculate: "Retrieve('metformin', null, 'drugs')"}
+  - {id: dose, type: calculate, name: metformin_dose, label: Dose, calculate: "Retrieve('metformin', 'P6M', 'dosage')"}
+  - {id: rx, type: calculate, name: metformin_rx_date, label: Prescribed, calculate: "Retrieve('metformin', 'encounter', 'date')"}
+  - {id: end, type: end, name: end_visit, label: End}
+edges:
+  - {id: e1, source: start, target: young}
+  - {id: e2, source: young, target: young2}
+  - {id: e3, source: young2, target: no_weight}
+  - {id: e4, source: no_weight, target: weight}
+  - {id: e5, source: weight, target: gain}
+  - {id: e6, source: gain, target: since}
+  - {id: e7, source: since, target: known}
+  - {id: e8, source: known, target: count}
+  - {id: e9, source: count, target: ever}
+  - {id: e10, source: ever, target: here}
+  - {id: e11, source: here, target: drugs}
+  - {id: e12, source: drugs, target: dose}
+  - {id: e13, source: dose, target: rx}
+  - {id: e14, source: rx, target: end}

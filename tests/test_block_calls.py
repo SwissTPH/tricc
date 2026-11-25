@@ -66,6 +66,8 @@ class TestStoredDataFunctions:
 
         source = inspect.getsource(repeat_helper) + inspect.getsource(populate_helper)
         defined = set(re.findall(r"define function \"?(\w+)", source)) | set(FUNCTION_MAP)
+        # Retrieve(...) is resolved at build time into a retrieval (requires-and-implied-retrievals §3)
+        defined.add("Retrieve")
         assert set(stored_data_functions()) <= defined
 
     @pytest.mark.parametrize("name", sorted(stored_data_functions()))

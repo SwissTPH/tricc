@@ -138,7 +138,8 @@ change.
     `.value` suffix for the default field), with `reads_data_type` / `reads_concept_type` from the concept, so
     the Helper picks the resource as for a dictionary entry.
   The call then resolves to the `TriccNodeRetrieval`; exports are unchanged. The generated code
-  (`#weight@P3M`, `#weight@P3M.date`) and export name (`r_weight_P3M`, `r_weight_P3M_date`) are
+  (`#weight@P3M`, `#weight@P3M.date`) and export name (`r_weight_P3M`, `r_weight_P3M_date`;
+  no window `#weight@` → `r_weight_any`, `#weight@encounter` → `r_weight_encounter`) are
   internal: authors never write them. Equal reads share one node.
 - **Editor.** The chip label is built from the catalogue labels: `#weight@P3M.date` →
   "Date of the latest weight, past 3 months"; hovering shows the saved call. Typing `#` suggests

@@ -9,6 +9,7 @@ from tricc_oo.converters.cql.cqlLexer import cqlLexer
 from tricc_oo.converters.cql.cqlParser import cqlParser
 from tricc_oo.converters.cql.cqlVisitor import cqlVisitor
 from tricc_oo.converters.utils import clean_name, unquote_literal
+from tricc_oo.converters.retrieval import RETRIEVE_FUNCTION, retrieve_reference
 from tricc_oo.models.base import (
     TriccOperator,
     TriccOperation,
@@ -218,6 +219,10 @@ class cqlToXlsFormVisitor(cqlVisitor):
         args = ctx.paramList()
         if args:
             op.reference += [self.visit(arg) for arg in args.expression() if arg]
+        if function_name == RETRIEVE_FUNCTION and operator == TriccOperator.NATIVE:
+            # a retrieval: every argument is a code, never a form node
+            # (feature/20261125-requires-and-implied-retrievals.md §3)
+            return retrieve_reference(op.reference[1:])
         if operator in CONCEPT_REF_FIRST_ARG and op.reference:
             op.reference[0] = as_concept_reference(op.reference[0], function_name)
         if function_name in stored_data_functions():
