@@ -196,6 +196,35 @@ def test_retrieve_arguments_are_literals(expression, error):
         transform_cql_to_operation(expression)
 
 
+@pytest.mark.parametrize(
+    "expression, suggestion",
+    [
+        ('"#weight@P3M" > 2', "Retrieve('weight', 'P3M')"),
+        ('"#weight@P3M.date"', "Retrieve('weight', 'P3M', 'date')"),
+        ('"#weight@"', "Retrieve('weight', null)"),
+        ('"#metformin@encounter.dosage"', "Retrieve('metformin', 'encounter', 'dosage')"),
+    ],
+)
+def test_a_quoted_implied_read_is_refused(expression, suggestion):
+    """A hand-typed "#concept@window" is not a retrieval: the message gives the call to write."""
+    from tricc_oo.converters.cql_to_operation import transform_cql_to_operation
+    from tricc_oo.converters.retrieval import TriccRetrievalError
+
+    with pytest.raises(TriccRetrievalError, match="E_RETRIEVAL_QUOTED_IMPLIED") as error:
+        transform_cql_to_operation(expression)
+    assert f"write {suggestion}" in str(error.value)
+    assert "in the editor" in str(error.value)
+
+
+@pytest.mark.parametrize("expression", ['"#age_months"', '"weight@home"', '"a#b@c"'])
+def test_legacy_quoted_retrieval_and_other_names_are_kept(expression):
+    from tricc_oo.converters.cql_to_operation import transform_cql_to_operation
+    from tricc_oo.models.base import TriccReference
+
+    parsed = transform_cql_to_operation(expression)
+    assert isinstance(parsed, TriccReference) and parsed.value == expression.strip('"')
+
+
 def test_implied_reads_are_generated_retrievals(implied_project):
     retrievals = implied_project.retrievals
     # used twice, and once with `value` spelled out: one node
@@ -248,6 +277,7 @@ def test_implied_reads_in_the_fhir_helper(tmp_path):
         ("Retrieve('weight', null)", "E_RETRIEVAL_IMPLIED_CONCEPT"),
         ("Retrieve('weight', 'P3M', 'date')", "E_RETRIEVAL_READ_UNSUPPORTED"),
         ("Retrieve('age_months')", "E_RETRIEVAL_UNKNOWN"),
+        ("Retrieve('weight', 'P3M', 'count')", "E_RETRIEVAL_QUOTED_IMPLIED"),
     ],
 )
 def test_implied_read_errors(tmp_path, replace, error):
@@ -257,6 +287,7 @@ def test_implied_read_errors(tmp_path, replace, error):
         "E_RETRIEVAL_IMPLIED_CONCEPT": "Retrieve('height', null)",  # not a project concept
         "E_RETRIEVAL_READ_UNSUPPORTED": "Retrieve('weight', 'P3M', 'quantity')",  # quantity of an Observation
         "E_RETRIEVAL_UNKNOWN": "Retrieve('age_weeks')",  # not in the dictionary
+        "E_RETRIEVAL_QUOTED_IMPLIED": '\\"#weight@P3M.count\\"',  # hand-typed, in a YAML "…" string
     }[error]
     fixture = tmp_path / "project"
     shutil.copytree(IMPLIED, fixture)

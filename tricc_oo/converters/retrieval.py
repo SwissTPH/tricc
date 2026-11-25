@@ -129,6 +129,7 @@ E_RETRIEVAL_STATIC = "E_RETRIEVAL_STATIC"
 E_RETRIEVAL_IMPLIED_CONCEPT = "E_RETRIEVAL_IMPLIED_CONCEPT"
 E_RETRIEVAL_IMPLIED_PERIOD = "E_RETRIEVAL_IMPLIED_PERIOD"
 E_RETRIEVAL_READ_UNSUPPORTED = "E_RETRIEVAL_READ_UNSUPPORTED"
+E_RETRIEVAL_QUOTED_IMPLIED = "E_RETRIEVAL_QUOTED_IMPLIED"
 #: the build-time function saving a retrieval (``Retrieve('code')``, ``Retrieve('concept', 'P3M', 'date')``)
 RETRIEVE_FUNCTION = "Retrieve"
 #: the window of an implied read of the current encounter (else an ISO-8601 duration, or null)
@@ -378,6 +379,30 @@ def retrieval_field(retrieval: Retrieval) -> str:
     if field == DEFAULT_FIELD and retrieval.resource == MEDICATION_REQUEST:
         return MEDICATION_DEFAULT_FIELD
     return field
+
+
+def reject_quoted_implied(name: str) -> None:
+    """Reject a quoted identifier written like an implied retrieval (``"#weight@P3M"``).
+
+    An implied read is saved ``Retrieve('weight', 'P3M')``; the quoted form is not one (the
+    legacy ``"#name"`` of a dictionary retrieval, without ``@``, still is).
+    feature/20261125-requires-and-implied-retrievals.md §3.
+
+    Args:
+        name: The identifier, without its quotes.
+
+    Raises:
+        TriccRetrievalError: ``E_RETRIEVAL_QUOTED_IMPLIED`` for ``#…@…``.
+    """
+    if not (name.startswith("#") and "@" in name):
+        return
+    concept, window, field = split_implied_code(name)
+    args = [repr(concept), repr(window) if window else "null"] + ([repr(field)] if field != DEFAULT_FIELD else [])
+    raise TriccRetrievalError(
+        f'"{name}" is not a retrieval: write {RETRIEVE_FUNCTION}({", ".join(args)}) '
+        f"(or {name} in the editor)",
+        E_RETRIEVAL_QUOTED_IMPLIED,
+    )
 
 
 def retrieve_reference(args: List[Any]):

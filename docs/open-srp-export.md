@@ -625,7 +625,8 @@ and for a drug `active` (its default), `dosage`, `drug`, `duration`, `quantity`,
 `E_RETRIEVAL_STATIC`, `E_RETRIEVAL_IMPLIED_PERIOD`, `E_RETRIEVAL_IMPLIED_CONCEPT`,
 `E_RETRIEVAL_READ_UNSUPPORTED` (a field the concept's resource does not offer: `date` for
 Observation / Condition / Procedure / medication, the drug fields for MedicationRequest),
-`E_RETRIEVAL_UNKNOWN`.
+`E_RETRIEVAL_UNKNOWN`. A quoted `"#weight@P3M"` is not a read: `E_RETRIEVAL_QUOTED_IMPLIED`
+(write `Retrieve('weight', 'P3M')`); the legacy `"#name"` still is.
 
 **One read per record** (§4). The Helper retrieves each resource once per scope, in a define
 every function reads: `"HistoryObservations"` / `"EncounterObservations"` (final, amended,

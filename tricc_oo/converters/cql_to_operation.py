@@ -9,7 +9,7 @@ from tricc_oo.converters.cql.cqlLexer import cqlLexer
 from tricc_oo.converters.cql.cqlParser import cqlParser
 from tricc_oo.converters.cql.cqlVisitor import cqlVisitor
 from tricc_oo.converters.utils import clean_name, unquote_literal
-from tricc_oo.converters.retrieval import RETRIEVE_FUNCTION, retrieve_reference
+from tricc_oo.converters.retrieval import RETRIEVE_FUNCTION, reject_quoted_implied, retrieve_reference
 from tricc_oo.models.base import (
     TriccOperator,
     TriccOperation,
@@ -145,6 +145,8 @@ class cqlToXlsFormVisitor(cqlVisitor):
         # look for the code in the system
         # if no code or not found return None
         if arg.startswith('"') and arg.endswith('"'):
+            # "#weight@P3M" is not an implied read: that is Retrieve('weight', 'P3M')
+            reject_quoted_implied(arg[1:-1])
             return TriccReference(arg[1:-1])
         elif arg.lower() in ["true", "false"]:
             return TriccStatic(arg.lower() == "true")

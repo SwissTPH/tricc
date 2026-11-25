@@ -160,6 +160,11 @@ change.
   retrieval needs that key, listed by the CHT export like a dictionary retrieval's.
 - **Legacy `"#name"`** keeps being read as a dictionary retrieval. The editor rewrites it to
   `Retrieve('name')` when it saves; docs show only `Retrieve`.
+- **A quoted `"#…@…"` is refused.** A hand-typed quoted identifier that looks like an implied
+  read (`"#weight@P3M"`, `"#weight@P3M.date"`, `"#weight@"`) is an error when the expression is
+  parsed (`E_RETRIEVAL_QUOTED_IMPLIED`), whose message gives the call to write:
+  `Retrieve('weight', 'P3M')` (or `#weight@P3M` in the editor). Only a name starting with `#`
+  and holding `@` is refused; `"#name"` without `@` is the legacy form above.
 - **Qualified concepts** (`Retrieve('sys.code', 'P3M')`) follow #103: `sys.code` as in the SCV
   serialisation, falling back to the default CodeSystem when `sys` is not one (`resolve_scv`).
   Until #103 lands, the concept is looked up in the default CodeSystem only.
@@ -208,7 +213,8 @@ engine; the output capability statements (#102) can record it.
   resource).
 - `E_RETRIEVAL_UNKNOWN` (one argument, not in the dictionary; today's `TriccRetrievalError`),
   `E_RETRIEVAL_IMPLIED_CONCEPT` (not a project concept), `E_RETRIEVAL_IMPLIED_PERIOD` (not an
-  ISO-8601 duration), `E_RETRIEVAL_STATIC` (an argument that is not a literal).
+  ISO-8601 duration), `E_RETRIEVAL_STATIC` (an argument that is not a literal),
+  `E_RETRIEVAL_QUOTED_IMPLIED` (a quoted `"#concept@window[.field]"` instead of `Retrieve(…)`).
 
 ### 6. Tests
 
@@ -229,7 +235,8 @@ YAML fixtures in `tests/data/yaml/` and `tests/test_requires.py`:
   `'date'`, `'exists'`, `'count'` give their own nodes and functions;
   `Retrieve('weight', 'encounter')` builds an `encounter` context retrieval with no period; `'quantity'` on an
   Observation concept fails; `'date'` fails until #76 lands;
-- unknown code, unknown concept, bad period and a non-literal argument fail;
+- unknown code, unknown concept, bad period and a non-literal argument fail; a quoted
+  `"#weight@P3M"` fails with the `Retrieve(…)` to write, `"#age_months"` still reads;
 - aggregation: the Helper library has one retrieve per resource / scope used; `value`, `date`
   and `count` of the same concept and window share one `:records` define; no item
   `initialExpression` calls a Helper function with arguments; the Helper still compiles
@@ -270,6 +277,8 @@ None. Deferred: qualified concepts in `Retrieve` wait for #103.
   and window with the fields derived from it, items referencing defines rather than Helper
   function calls; CHT keys grouped per concept. (@delcroip)
 - 2026-11-25: Approved for implementation with #75, #76 and #104 on one branch (@delcroip)
+- 2026-11-25: A hand-typed quoted `"#…@…"` is an error at parse time pointing to
+  `Retrieve(…)`; legacy `"#name"` (no `@`) keeps its behaviour. (@delcroip)
 - 2026-11-25: Medication fields reworked with #75: one drug per read, `active` (default),
   `dosage`, `drug`, `duration`, `quantity`, `dispensed`; `drugs` (every open prescription) is
   removed. (@delcroip)

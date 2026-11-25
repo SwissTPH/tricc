@@ -59,7 +59,8 @@ library calculates, and hangs one `TriccNodeRetrieval` (a populate node named `#
 as `r_<name>`) per used retrieval on the main page, like a library calculate. An unknown code is
 an error. `Retrieve('name')` parses to the same reference; `Retrieve('weight', 'P3M'[, field])`
 parses to an implied retrieval `#weight@P3M[.field]`, synthesised from the concept
-(`implied_retrieval`, `feature/20261125-requires-and-implied-retrievals.md` §3).
+(`implied_retrieval`, `feature/20261125-requires-and-implied-retrievals.md` §3); a quoted
+`"#weight@P3M"` is refused when parsed (`E_RETRIEVAL_QUOTED_IMPLIED`).
 
 **Prerequisites** (`requires`, same spec §1–§2): the runner loads the activities of the
 interventions an intervention `requires` and collects the concepts they record (inputs,
