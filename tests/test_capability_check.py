@@ -78,8 +78,8 @@ def test_fhir_errors_and_limit_warning_per_active_statement(tmp_path, caplog):
                       outputs=("FHIRStrategy",))
     assert _build(folder, tmp_path, caplog) == 1
     errors = _codes(caplog, "E_OUTPUT_UNSUPPORTED:")
-    assert len(errors) == 2  # Max inline, once per active statement
-    assert all("'heavy' (check) uses Max" in e and "cannot write inline" in e for e in errors)
+    assert len(errors) == 2  # Max in a condition (FHIRPath), once per active statement
+    assert all("'young_note' (check) uses Max" in e and "cannot write inline" in e for e in errors)
     assert {e.rsplit("(", 1)[1] for e in errors} == {"@tricc/capabilities-fhir@1.0.0)",
                                                      "@acme/capabilities-fhir-strict@1.0.0)"}
     limits = _codes(caplog, "W_OUTPUT_LIMIT:")

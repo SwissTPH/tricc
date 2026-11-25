@@ -5,10 +5,12 @@ nodes:
   - {id: start, type: start, name: start_check, label: Check}
   - {id: weight, type: decimal, name: weight, label: Weight (kg)}
   - {id: age, type: integer, name: age_in_months, label: Age (months)}
-  # FHIR writes Max in CQL (library) only, not in FHIRPath (inline)
+  # a calculation: FHIR writes Max in CQL (library), so it is fine
   - {id: heavy, type: calculate, name: heavy, label: Heavy, calculate: 'Max("weight", 20)'}
-  # a retrieval from the patient context (plain XLSForm reads only custom ones)
-  - {id: young, type: note, name: young_note, label: Young infant, relevance: '"#age_months" < 6'}
+  # a condition is FHIRPath (inline), where FHIR cannot write Max; and a retrieval from the
+  # patient context (plain XLSForm reads only custom ones)
+  - {id: young, type: note, name: young_note, label: Young infant,
+     relevance: 'Max("weight", 20) > 30 and "#age_months" < 6'}
   # a decision table of 9 rows (the strict statement allows 5 inline)
   - {id: dose, type: calculate, name: dose, label: Dose, calculate: "DMN('diazepam', \"weight\", \"age_in_months\")"}
   - {id: end, type: end, name: end_check, label: End}

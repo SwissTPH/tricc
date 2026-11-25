@@ -116,7 +116,10 @@ know what each output can do.
 - `runner` reads the active entries of `capabilities`, loads their files (checking `sha256` and
   the schema), resolves `extends`, and, after the project is loaded and before `process_pages`,
   checks every expression, decision-table call, function body (#101), retrieval and prefill
-  node against each one.
+  node against each one. Contexts (FHIR): a condition (`relevance`, `applicability`,
+  `trigger`) is written inline (FHIRPath `enableWhenExpression`; without the operator the
+  export only warns and drops the condition); a calculation is written in FHIRPath or CQL as the
+  writer chooses, so the operator is needed in either context; library defines are `library`.
 - Error `E_OUTPUT_UNSUPPORTED` per construct and statement, naming the node (activity, name), the
   construct and the strategy. `W_OUTPUT_LIMIT` when a limit is exceeded but the output has a
   fallback (e.g. a long inline table).

@@ -60,5 +60,9 @@ decision-table call, retrieval and prefill node is checked against each **active
 | `E_CAPABILITY_EXTENDS`  | the parent statement is not loaded or its version is out of range         |
 | `W_CAPABILITY_LANG`     | the statement names a `@tricc/lang` range that excludes this TRICC        |
 
+For FHIR, a condition is checked in the `inline` context (FHIRPath; without the operator the export
+only warns and drops the condition), a calculation in either context (the writer picks FHIRPath
+or CQL). The check does not know which calculations the export later prunes as unused.
+
 A loaded but inactive statement is not checked; with no active statement nothing is checked.
 Export keeps its own errors for anything the check misses.

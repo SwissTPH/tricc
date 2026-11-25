@@ -35,9 +35,11 @@ SET_FIELDS = ("contexts", "functions", "retrieval_contexts", "populate_contexts"
 #: operators a call to a decision table becomes (checked as ``decision_table_calls``)
 TABLE_OPERATORS = ("DMN", "TUPLE", "ZSCORE", "IZSCORE", "DMN_CALL")
 
-#: node attributes written in the ``inline`` context by outputs that have one (FHIR: FHIRPath);
-#: the project libraries' calculates and remote references are written in ``library`` (CQL)
-INLINE_ATTRIBUTES = ("relevance", "applicability", "trigger", "expression", "expression_reference", "default")
+#: node attributes always written in the ``inline`` context by outputs that have one (FHIR:
+#: FHIRPath ``enableWhenExpression``); a calculation is written in FHIRPath or CQL as the writer
+#: chooses, so it needs the operator in either context; the project libraries' calculates and
+#: remote references are written in ``library`` (CQL)
+INLINE_ATTRIBUTES = ("relevance", "applicability", "trigger")
 
 
 class TriccCapabilityError(ValueError):
@@ -184,13 +186,14 @@ class ResolvedStatement:
         contexts = self.operators.get(operator)
         return bool(contexts) and (context is None or context in contexts)
 
-    def context_of(self, attribute: str, in_library: bool = False) -> str:
-        """The context an expression of a node attribute is written in by this output."""
-        if self.contexts == {"form"} or len(self.contexts) == 1:
+    def context_of(self, attribute: str, in_library: bool = False) -> Optional[str]:
+        """The context an expression of a node attribute is written in by this output; None when
+        the writer chooses (any context of the operator will do)."""
+        if len(self.contexts) == 1:
             return next(iter(self.contexts))
-        if in_library or attribute not in INLINE_ATTRIBUTES:
+        if in_library or attribute == "remote_reference":
             return "library"
-        return "inline"
+        return "inline" if attribute in INLINE_ATTRIBUTES else None
 
     def as_dict(self) -> Dict[str, Any]:
         """The resolved statement as plain JSON data (sorted), for comparisons and summaries."""
@@ -395,7 +398,7 @@ def _check_expression(statement: ResolvedStatement, project: Any, node_label: st
                 issues.append(_unsupported(statement, node_label, function, f"{function}()"))
             continue
         if not statement.writes(name, context):
-            where = f" {context}" if len(statement.contexts) > 1 else ""
+            where = f" {context}" if context and len(statement.contexts) > 1 else ""
             label = name.replace("_", " ").title().replace(" ", "")
             issues.append(CapabilityIssue(
                 "E_OUTPUT_UNSUPPORTED", statement.label, statement.strategy, node_label, name,
