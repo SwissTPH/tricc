@@ -151,18 +151,16 @@ class TestHelperCqlIsTranslatable(unittest.TestCase):
             "GetHistoryProcedures",
             # medication reads (feature/20261125-populate-medication.md)
             "MedicationRequestHasCode",
-            "IsOpenMedicationRequest",
-            "GetEncounterMedicationRequests",
-            "GetEncounterMedicationRequestValue",
-            "GetActiveMedicationRequests",
-            "GetActiveMedicationRequest",
-            "GetEncounterMedicationCodes",
-            "GetActiveMedicationCodesSince",
+            "MedicationRequestCode",
+            "MedicationRequestDosePeriod",
+            "MedicationRequestPeriod",
+            "PeriodOverlaps",
+            "IsValidMedicationRequest",
             "MedicationRequestDosage",
-            "GetEncounterMedicationDosage",
-            "GetMedicationDosageSince",
-            "GetEncounterMedicationRequestDate",
-            "GetMedicationRequestDate",
+            "PeriodDays",
+            "MedicationRequestDuration",
+            "MedicationRequestQuantity",
+            "MedicationRequestDispensed",
             "MedicationDispenseHasCode",
             "GetEncounterMedicationDispenses",
             "GetMedicationDispenses",
@@ -206,16 +204,34 @@ class TestMedicationReads(unittest.TestCase):
         self.assertIsNotNone(match, name)
         return match.group(0)
 
-    def test_open_request_is_active_and_still_valid(self):
-        # active request -> read; stopped / completed / cancelled -> ignored
-        body = self._define("IsOpenMedicationRequest")
+    def test_valid_request_is_active_and_overlaps_the_window(self):
+        # active request -> read; stopped / completed / cancelled -> ignored; a period that
+        # ends before the window (or starts after it) -> ignored
+        body = self._define("IsValidMedicationRequest")
         self.assertIn("M.status = 'active'", body)
-        self.assertIn("M.dispenseRequest.validityPeriod.end.value >= Now()", body)
+        self.assertIn("PeriodOverlaps(MedicationRequestPeriod(M), startTime, endTime)", body)
+        overlaps = self._define("PeriodOverlaps")
+        self.assertIn("P.start.value is null or P.start.value same day or before endTime", overlaps)
+        self.assertIn("P.end.value is null or P.end.value same day or after startTime", overlaps)
 
-    def test_request_outside_the_period_is_ignored(self):
-        body = self._define("GetOpenMedicationRequestsSince")
-        self.assertIn("IsOpenMedicationRequest(M)", body)
-        self.assertIn("since is null or M.authoredOn.value >= since", body)
+    def test_dose_period_first_then_validity_period(self):
+        # R4: effectiveDosePeriod (R5) is dosageInstruction.timing.repeat.boundsPeriod
+        self.assertIn("I.timing.repeat.bounds as FHIR.Period", self._define("MedicationRequestDosePeriod"))
+        self.assertIn(
+            "Coalesce(MedicationRequestDosePeriod(M), M.dispenseRequest.validityPeriod)",
+            self._define("MedicationRequestPeriod"),
+        )
+
+    def test_no_dispense_fallback_and_no_wildcard_read(self):
+        for gone in ("IsOpenMedicationRequest", "GetActiveMedicationCodesSince", "GetEncounterMedicationCodes",
+                     "GetMedicationDosageSince"):
+            self.assertNotIn(gone, self.helper)
+
+    def test_dispensed_sums_the_completed_dispenses_of_the_request(self):
+        body = self._define("MedicationRequestDispensed")
+        self.assertIn('("HistoryMedicationDispenses") D', body)
+        self.assertIn("D.authorizingPrescription A where A.reference = 'MedicationRequest/' + M.id", body)
+        self.assertIn("return D.quantity.value.value", body)
 
     def test_drug_matched_by_code_on_concept_or_referenced_medication(self):
         body = self._define("MedicationRequestHasCode")

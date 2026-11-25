@@ -620,11 +620,11 @@ Expressions save a retrieval as a call (`feature/20261125-requires-and-implied-r
 still reads it), and `Retrieve('weight', 'P3M' | null | 'encounter'[, field])` is an **implied**
 read with no dictionary entry: the latest `weight` in the past 3 months (`null`: ever;
 `'encounter'`: this encounter), `field` one of `value` (default), `date`, `exists`, `count`,
-`drugs`, `dosage`. It becomes the retrieval `#weight@P3M[.field]`, exported as `r_weight_P3M[_field]`
+and for a drug `active` (its default), `dosage`, `drug`, `duration`, `quantity`, `dispensed`. It becomes the retrieval `#weight@P3M[.field]`, exported as `r_weight_P3M[_field]`
 (`#weight@` → `r_weight_any`). Every argument must be a literal; errors:
 `E_RETRIEVAL_STATIC`, `E_RETRIEVAL_IMPLIED_PERIOD`, `E_RETRIEVAL_IMPLIED_CONCEPT`,
 `E_RETRIEVAL_READ_UNSUPPORTED` (a field the concept's resource does not offer: `date` for
-Observation / Condition / Procedure / medication, `drugs` / `dosage` for MedicationRequest),
+Observation / Condition / Procedure / medication, the drug fields for MedicationRequest),
 `E_RETRIEVAL_UNKNOWN`.
 
 **One read per record** (§4). The Helper retrieves each resource once per scope, in a define
@@ -646,20 +646,22 @@ define cache applies.
 | `DeceasedDateTime`, names, `Telecom`, `Photo` | read from `PatientRecord` (`deceased`, `name`, `telecom`, `photo.url`) |
 | `PatientValue` | the `PatientGender` / `PatientBirthDate` / `AgeInYears` define for those concepts, else `GetPatientValue('<code>')` |
 | `FacilityValue` / `PractitionerValue` / `LocationValue` | `GetFacilityValue('<code>')` / … |
-| `Latest` (encounter / history) | Observation: `ValueAs<type>(First("<records>").value)`; Condition / Procedure: `exists("<records>")`; medication: on treatment, an open prescription or else a completed dispense |
-| `Exists`, `Count` | `exists("<records>")`, `Count("<records>")` (medication: open prescriptions) |
+| `Latest` (encounter / history) | Observation: `ValueAs<type>(First("<records>").value)`; Condition / Procedure / MedicationDispense: `exists("<records>")`; a drug (MedicationRequest): `active`, a valid prescription exists, `exists("<records>")` |
+| `Exists`, `Count` | `exists("<records>")`, `Count("<records>")` (a drug: valid prescriptions) |
 | `LatestDate` | Observation `effective`, Condition `onset` else `recordedDate`, Procedure `performed`, MedicationRequest `authoredOn`, MedicationDispense `whenHandedOver`: the latest of `"<records>"` |
-| `ActiveDrugs` | MedicationRequest: drug codes of the open prescriptions, space-separated (`GetEncounterMedicationCodes()` / `GetActiveMedicationCodesSince(<since>)`) |
-| `OpenDosage` | MedicationRequest: coded `doseAndRate.type`, else the dosage text, of the latest open prescription |
+| `Dosage`, `Drug`, `Duration`, `Quantity`, `Dispensed` | a drug: `MedicationRequestDosage` / `MedicationRequestCode` / `MedicationRequestDuration` (days) / `MedicationRequestQuantity` / `MedicationRequestDispensed` of `First("<records>")`, the latest valid prescription; `Dispensed` sums the completed MedicationDispense `quantity` whose `authorizingPrescription` is that request |
 | `custom` | its `text/cql` expression; `{{code}}` → `"<code>"`, `{{period}}` → `30 days` |
 
 `<records>` is `#<concept>@<period>:records` (history; no period: `#<concept>@:records`) or
 `#<concept>@encounter:records`; the resource follows the concept's `conceptType` (`diagnosis` →
 Condition, `procedure` → Procedure, `drug` / `medication` / `treatment` → MedicationRequest,
 `dispense` → MedicationDispense, else Observation). Medication codes match
-`medicationCodeableConcept` or the referenced `Medication.code`, across any system; an open
-prescription is `active` with a dispense validity period not ended
-(`feature/20261125-populate-read-date.md`, `feature/20261125-populate-medication.md`).
+`medicationCodeableConcept` or the referenced `Medication.code`, across any system. A drug's
+records are its **valid** prescriptions (`IsValidMedicationRequest(M, start, end)`): status
+`active`, and the dose period (R4 `dosageInstruction.timing.repeat.boundsPeriod`; R5
+`effectiveDosePeriod`), else `dispenseRequest.validityPeriod`, contains now (no window,
+encounter) or overlaps `[Now() - <period>, Now()]` (a window), to the day; an open start / end is
+unbounded (`feature/20261125-populate-read-date.md`, `feature/20261125-populate-medication.md`).
 `<type>` follows the `dataType` of the concept read (`coded` / text: string). A period with
 several units (`P1Y6M`) cannot fill `{{period}}` in CQL.
 

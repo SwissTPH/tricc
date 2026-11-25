@@ -415,10 +415,9 @@ define function GetEncounterValue(code String, repeatIndex Integer, period Strin
   GetEncounterObservationValue(code, repeatIndex, period)
 
 // ── Medication reads (feature/20261125-populate-medication.md) ────────────────
-// A drug is matched by code across any system, on medicationCodeableConcept or on the
-// code of the Medication a medicationReference points to. An open prescription is an
-// active MedicationRequest whose dispense validity period has not ended; the history
-// window applies to authoredOn.
+// One drug per read. A drug is matched by code across any system, on
+// medicationCodeableConcept or on the code of the Medication a medicationReference points
+// to. Every field reads the latest valid MedicationRequest of the drug (IsValidMedicationRequest).
 
 define "Medications":
   [Medication]
@@ -449,6 +448,7 @@ define function MedicationRequestHasCode(M MedicationRequest, conceptCode String
           and exists(Med.code.coding C where C.code = conceptCode)
     )
 
+// drug: the code actually prescribed (differs from the concept read when it groups drugs)
 define function MedicationRequestCode(M MedicationRequest):
   Coalesce(
     First((M.medication as FHIR.CodeableConcept).coding).code.value,
@@ -457,70 +457,65 @@ define function MedicationRequestCode(M MedicationRequest):
     ).code.value
   )
 
-define function IsOpenMedicationRequest(M MedicationRequest):
+// The period the drug is taken over. R5 names it MedicationRequest.effectiveDosePeriod; this
+// Helper is R4, where the equivalent is dosageInstruction.timing.repeat.boundsPeriod.
+define function MedicationRequestDosePeriod(M MedicationRequest):
+  First(
+    (M.dosageInstruction) I
+      where I.timing.repeat.bounds is FHIR.Period
+      return I.timing.repeat.bounds as FHIR.Period
+  )
+
+// The period a request is valid over: its dose period, else dispenseRequest.validityPeriod.
+define function MedicationRequestPeriod(M MedicationRequest):
+  Coalesce(MedicationRequestDosePeriod(M), M.dispenseRequest.validityPeriod)
+
+// A period (null, or an open start / end, is unbounded) overlapping [startTime, endTime], to the day.
+define function PeriodOverlaps(P FHIR.Period, startTime DateTime, endTime DateTime):
+  (P.start.value is null or P.start.value same day or before endTime)
+    and (P.end.value is null or P.end.value same day or after startTime)
+
+// Validity rule: an active request whose period overlaps [startTime, endTime]: now for a
+// read with no window or of the encounter (startTime = endTime = Now()), the window else.
+define function IsValidMedicationRequest(M MedicationRequest, startTime DateTime, endTime DateTime):
   M.status = 'active'
-    and (
-      M.dispenseRequest.validityPeriod.end is null
-        or M.dispenseRequest.validityPeriod.end.value >= Now()
-    )
+    and PeriodOverlaps(MedicationRequestPeriod(M), startTime, endTime)
 
-define function GetEncounterOpenMedicationRequests():
-  ("EncounterMedicationRequests") M where IsOpenMedicationRequest(M)
-
-define function GetEncounterMedicationRequests(code String):
-  (GetEncounterOpenMedicationRequests()) M where MedicationRequestHasCode(M, code)
-
-define function GetEncounterMedicationRequestValue(code String):
-  exists(GetEncounterMedicationRequests(code))
-
-define function GetOpenMedicationRequestsSince(since DateTime):
-  ("HistoryMedicationRequests") M
-    where IsOpenMedicationRequest(M)
-      and (since is null or M.authoredOn.value >= since)
-
-define function GetActiveMedicationRequests(code String, since DateTime):
-  (GetOpenMedicationRequestsSince(since)) M where MedicationRequestHasCode(M, code)
-
-define function GetActiveMedicationRequest(code String, since DateTime):
-  First((GetActiveMedicationRequests(code, since)) M sort by authoredOn.value desc)
-
-// ActiveDrugs: the drug codes of the open prescriptions, space-separated like an XLSForm
-// select_multiple answer; null when there is none.
-define function GetEncounterMedicationCodes():
-  Combine(distinct((GetEncounterOpenMedicationRequests()) M return MedicationRequestCode(M)), ' ')
-
-define function GetActiveMedicationCodesSince(since DateTime):
-  Combine(distinct((GetOpenMedicationRequestsSince(since)) M return MedicationRequestCode(M)), ' ')
-
-// OpenDosage: the code of a coded dosageInstruction.doseAndRate type, else the dosage text.
+// dosage: the code of a coded dosageInstruction.doseAndRate type, else the dosage text.
 define function MedicationRequestDosage(M MedicationRequest):
   Coalesce(
     First(First(M.dosageInstruction).doseAndRate.type.coding).code.value,
     First(M.dosageInstruction).text.value
   )
 
-define function GetEncounterMedicationDosage(code String):
-  MedicationRequestDosage(First((GetEncounterMedicationRequests(code)) M sort by authoredOn.value desc))
+define function PeriodDays(P FHIR.Period):
+  days between P.start.value and P.end.value
 
-define function GetMedicationDosageSince(code String, since DateTime):
-  MedicationRequestDosage(GetActiveMedicationRequest(code, since))
-
-// LatestDate: when the drug was last prescribed (authoredOn), open or not; a cancelled,
-// entered-in-error or draft request was never prescribed.
-define function IsPrescribedMedicationRequest(M MedicationRequest):
-  not (M.status in {'cancelled', 'entered-in-error', 'draft'})
-
-define function GetEncounterMedicationRequestDate(code String):
-  Max(
-    (
-      ("EncounterMedicationRequests") M
-        where IsPrescribedMedicationRequest(M)
-          and MedicationRequestHasCode(M, code)
-        return M.authoredOn.value
-    )
+// duration: the days the dose period lasts, else the validity period.
+define function MedicationRequestDuration(M MedicationRequest):
+  Coalesce(
+    PeriodDays(MedicationRequestDosePeriod(M)),
+    PeriodDays(M.dispenseRequest.validityPeriod)
   )
 
-// MedicationDispense: a completed dispense of the drug (context = the encounter); the
+// quantity: dispenseRequest.quantity.
+define function MedicationRequestQuantity(M MedicationRequest):
+  M.dispenseRequest.quantity.value.value
+
+// dispensed: the quantity of the completed dispenses of the request (authorizingPrescription);
+// 0 when none, null without a request.
+define function MedicationRequestDispensed(M MedicationRequest):
+  if M is null then null
+  else Coalesce(
+    Sum(
+      ("HistoryMedicationDispenses") D
+        where exists(D.authorizingPrescription A where A.reference = 'MedicationRequest/' + M.id)
+        return D.quantity.value.value
+    ),
+    0.0
+  )
+
+// MedicationDispense concepts: a completed dispense of the drug (context = the encounter); the
 // history window and the date are whenHandedOver.
 define function MedicationDispenseHasCode(D MedicationDispense, conceptCode String):
   exists(((D.medication as FHIR.CodeableConcept).coding) C where C.code = conceptCode)
@@ -543,17 +538,6 @@ define function GetEncounterMedicationDispenseDate(code String):
 
 define function GetLastMedicationDispenseDate(code String, since DateTime):
   Max((GetMedicationDispenses(code, since)) D return D.whenHandedOver.value)
-
-define function GetMedicationRequestDate(code String, since DateTime):
-  Max(
-    (
-      ("HistoryMedicationRequests") M
-        where IsPrescribedMedicationRequest(M)
-          and MedicationRequestHasCode(M, code)
-        return M.authoredOn.value
-    ) D
-      where since is null or D >= since
-  )
 """
 
 
@@ -624,11 +608,12 @@ _RECORDS = {
         "ProcedureHasCode(P, '{code}')",
         "ProcedureTime(P)",
     ),
+    # the window is the validity rule's (IsValidMedicationRequest), not a time filter
     "MedicationRequest": (
         "M",
         {ENCOUNTER_CONTEXT: "EncounterMedicationRequests", HISTORY_CONTEXT: "HistoryMedicationRequests"},
-        "MedicationRequestHasCode(M, '{code}') and IsPrescribedMedicationRequest(M)",
-        "M.authoredOn.value",
+        "MedicationRequestHasCode(M, '{code}') and IsValidMedicationRequest(M, {start}, Now())",
+        None,
     ),
     "MedicationDispense": (
         "D",
@@ -645,10 +630,8 @@ _RECORDS_SORT = {
     "MedicationRequest": "authoredOn.value",
     "MedicationDispense": "whenHandedOver.value",
 }
-_OPEN = "(({records}) M where IsOpenMedicationRequest(M))"
 #: (resource, catalogue function) -> CQL of the read from ``{records}`` (the quoted records
-#: define), ``{dispenses}`` (the concept's dispenses, same window), ``{code}`` and ``{since}``.
-#: A function missing for a resource is unsupported. ``Latest`` of an Observation is converted
+#: define). A function missing for a resource is unsupported. ``Latest`` of an Observation is converted
 #: to the value type (``_retrieval_observation_value``).
 _RECORD_READS = {
     ("Observation", "Latest"): "First({records}).value",
@@ -664,21 +647,20 @@ _RECORD_READS = {
     ("Procedure", "Exists"): "exists({records})",
     ("Procedure", "Count"): "Count({records})",
     ("Procedure", "LatestDate"): "Max(({records}) P return ProcedureTime(P))",
-    # on treatment: an open prescription, or else a completed dispense (decision 2026-11-25)
-    ("MedicationRequest", "Latest"): f"exists{_OPEN} or exists({{dispenses}})",
-    ("MedicationRequest", "Exists"): f"exists{_OPEN} or exists({{dispenses}})",
-    ("MedicationRequest", "Count"): f"Count{_OPEN}",
-    ("MedicationRequest", "OpenDosage"): f"MedicationRequestDosage(First{_OPEN})",
-    ("MedicationRequest", "LatestDate"): "Max(({records}) M return M.authoredOn.value)",
+    # a drug: the records are its valid requests, latest first; Latest is "active"
+    ("MedicationRequest", "Latest"): "exists({records})",
+    ("MedicationRequest", "Exists"): "exists({records})",
+    ("MedicationRequest", "Count"): "Count({records})",
+    ("MedicationRequest", "LatestDate"): "First({records}).authoredOn.value",
+    ("MedicationRequest", "Dosage"): "MedicationRequestDosage(First({records}))",
+    ("MedicationRequest", "Drug"): "MedicationRequestCode(First({records}))",
+    ("MedicationRequest", "Duration"): "MedicationRequestDuration(First({records}))",
+    ("MedicationRequest", "Quantity"): "MedicationRequestQuantity(First({records}))",
+    ("MedicationRequest", "Dispensed"): "MedicationRequestDispensed(First({records}))",
     ("MedicationDispense", "Latest"): "exists({records})",
     ("MedicationDispense", "Exists"): "exists({records})",
     ("MedicationDispense", "Count"): "Count({records})",
     ("MedicationDispense", "LatestDate"): "Max(({records}) D return D.whenHandedOver.value)",
-}
-#: reads that are not of one concept: the drug codes of every open prescription
-_RESOURCE_READS = {
-    ("MedicationRequest", ENCOUNTER_CONTEXT, "ActiveDrugs"): "GetEncounterMedicationCodes()",
-    ("MedicationRequest", HISTORY_CONTEXT, "ActiveDrugs"): "GetActiveMedicationCodesSince({since})",
 }
 
 
@@ -703,28 +685,26 @@ def _retrieval_since(retrieval) -> Optional[str]:
     return since
 
 
-def records_define_name(retrieval, resource: Optional[str] = None) -> str:
+def records_define_name(retrieval) -> str:
     """Name of the records define of a retrieval's concept, scope and window.
 
     ``#weight@P3M:records`` (history, 3 months), ``#weight@:records`` (no window),
-    ``#weight@encounter:records``; a MedicationDispense list read for a prescription
-    concept ends in ``:dispenses``.
+    ``#weight@encounter:records``.
     """
     from tricc_oo.converters.retrieval import ENCOUNTER_WINDOW, implied_code
 
     window = ENCOUNTER_WINDOW if retrieval.context == ENCOUNTER_CONTEXT else retrieval.period
-    own = resource is None or _retrieval_resource(retrieval) == resource
-    suffix = "records" if own else "dispenses"
-    return f"{implied_code(retrieval.reads_code or '', window)}:{suffix}"
+    return f"{implied_code(retrieval.reads_code or '', window)}:records"
 
 
 def records_define_body(retrieval, resource: str) -> str:
     """CQL of the records define: the concept's ``resource`` records, latest first."""
     alias, sources, match, time = _RECORDS[resource]
     code = (retrieval.reads_code or "").replace("'", "\\'")
-    where = match.format(code=code)
     since = _retrieval_since(retrieval)
-    if since:
+    # a drug's validity rule: valid now (no window, encounter), else over [since, now]
+    where = match.format(code=code, start=since or "Now()")
+    if since and time:
         where += f" and {time} >= {since}"
     return (
         f'("{sources[retrieval.context]}") {alias}\n    where {where}\n    sort by {_RECORDS_SORT[resource]} desc'
@@ -733,17 +713,9 @@ def records_define_body(retrieval, resource: str) -> str:
 
 def retrieval_records(retrieval) -> list:
     """``[(define name, CQL)]`` of the records lists a retrieval reads (empty: none)."""
-    function = retrieval.effective_function
-    if retrieval.context not in (ENCOUNTER_CONTEXT, HISTORY_CONTEXT) or function in (None, "ActiveDrugs"):
+    if retrieval.context not in (ENCOUNTER_CONTEXT, HISTORY_CONTEXT) or retrieval.effective_function is None:
         return []
-    resource = _retrieval_resource(retrieval)
-    lists = [(records_define_name(retrieval), records_define_body(retrieval, resource))]
-    if "{dispenses}" in _RECORD_READS.get((resource, function), ""):
-        lists.append(
-            (records_define_name(retrieval, "MedicationDispense"),
-             records_define_body(retrieval, "MedicationDispense"))
-        )
-    return lists
+    return [(records_define_name(retrieval), records_define_body(retrieval, _retrieval_resource(retrieval)))]
 
 
 def retrieval_cql_type(retrieval) -> Optional[str]:
@@ -796,10 +768,6 @@ def retrieval_cql_expression(retrieval, strategy: str = "FHIRStrategy") -> str:
     if function in RETRIEVAL_VALUE_CQL:
         return f"{RETRIEVAL_VALUE_CQL[function]}('{code}')"
     resource = _retrieval_resource(retrieval)
-    since = _retrieval_since(retrieval)
-    read = _RESOURCE_READS.get((resource, retrieval.context, function))
-    if read is not None:
-        return read.format(since=since or "null")
     read = _RECORD_READS.get((resource, function))
     if read is None or retrieval.context not in (ENCOUNTER_CONTEXT, HISTORY_CONTEXT):
         raise unsupported(retrieval, strategy)
@@ -807,9 +775,7 @@ def retrieval_cql_expression(retrieval, strategy: str = "FHIRStrategy") -> str:
     if resource == "Observation" and retrieval.context == ENCOUNTER_CONTEXT and function == "Latest":
         # the default repeat slot, as GetObservationValue
         records = f"(({records}) O where ObservationRepeatIndex(O) is null or ObservationRepeatIndex(O) = 1)"
-    expression = read.format(
-        records=records, dispenses=f'"{records_define_name(retrieval, "MedicationDispense")}"'
-    )
+    expression = read.format(records=records)
     if resource == "Observation" and function == "Latest":
         return _retrieval_observation_value(retrieval, expression)
     return expression

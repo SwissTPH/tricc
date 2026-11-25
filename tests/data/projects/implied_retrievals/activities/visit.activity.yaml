@@ -15,8 +15,10 @@ nodes:
   - {id: count, type: calculate, name: weight_count, label: Weighings, calculate: "Retrieve('weight', 'P3M', 'count')"}
   - {id: ever, type: calculate, name: weight_ever, label: Last weight ever, calculate: "Retrieve('weight', null)"}
   - {id: here, type: calculate, name: weight_here, label: Weight this visit, calculate: "Retrieve('weight', 'encounter')"}
-  # medication reads (#75)
-  - {id: drugs, type: calculate, name: drugs, label: Drugs, calculate: "Retrieve('metformin', null, 'drugs')"}
+  # medication reads (#75): one drug per read; the default field is `active` (a valid prescription now)
+  - {id: drugs, type: calculate, name: on_metformin, label: On metformin, calculate: "Retrieve('metformin', null)"}
+  # prescribed but not dispensed is a calculate, not a read
+  - {id: owed, type: calculate, name: metformin_owed, label: Metformin not all dispensed, calculate: "Retrieve('metformin', 'P6M', 'quantity') > Retrieve('metformin', 'P6M', 'dispensed')"}
   - {id: dose, type: calculate, name: metformin_dose, label: Dose, calculate: "Retrieve('metformin', 'P6M', 'dosage')"}
   - {id: rx, type: calculate, name: metformin_rx_date, label: Prescribed, calculate: "Retrieve('metformin', 'encounter', 'date')"}
   - {id: end, type: end, name: end_visit, label: End}
@@ -32,6 +34,7 @@ edges:
   - {id: e9, source: count, target: ever}
   - {id: e10, source: ever, target: here}
   - {id: e11, source: here, target: drugs}
-  - {id: e12, source: drugs, target: dose}
+  - {id: e12, source: drugs, target: owed}
+  - {id: e15, source: owed, target: dose}
   - {id: e13, source: dose, target: rx}
   - {id: e14, source: rx, target: end}

@@ -82,13 +82,19 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
         """
         if retrieval.effective_function is None:
             return super().retrieval_expression(retrieval)
-        if retrieval.effective_function == "LatestDate":
+        what = {
+            "LatestDate": ("the date of the latest", "record", "feature/20261125-populate-read-date.md"),
+            # CHT reports hold no MedicationDispense.authorizingPrescription link
+            "Dispensed": ("the quantity dispensed against the latest valid prescription of", "",
+                          "feature/20261125-populate-medication.md"),
+        }.get(retrieval.effective_function)
+        if what:
             warned = self.__dict__.setdefault("_retrieval_date_warned", set())
             if retrieval.code not in warned:
                 warned.add(retrieval.code)
                 logger.warning(
-                    f"retrieval {retrieval.code}: the CHT contact summary must expose the date of the latest "
-                    f"'{retrieval.reads_code}' record as '{retrieval.name}' (feature/20261125-populate-read-date.md)"
+                    f"retrieval {retrieval.code}: the CHT contact summary must expose {what[0]} "
+                    f"'{retrieval.reads_code}'{(' ' + what[1]) if what[1] else ''} as '{retrieval.name}' ({what[2]})"
                 )
         return f"coalesce(instance('contact-summary')/context/{retrieval.name},'')"
 

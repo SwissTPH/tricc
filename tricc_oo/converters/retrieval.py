@@ -60,14 +60,19 @@ RETRIEVAL_FUNCTIONS: Dict[str, tuple] = {
     "Count": (_TIMED, True, "integer"),
     # date of the latest record (feature/20261125-populate-read-date.md)
     "LatestDate": (_TIMED, True, "dateTime"),
-    # medication reads (feature/20261125-populate-medication.md): the drug codes of the open
-    # prescriptions (multi-select) and the dosage of the open prescription of a drug
-    "ActiveDrugs": (_TIMED, True, "coded"),
-    "OpenDosage": (_TIMED, True, "string"),
+    # medication reads (feature/20261125-populate-medication.md): one drug per read, from the
+    # latest valid MedicationRequest of the drug (``Latest`` of a drug is "active")
+    "Dosage": (_TIMED, True, "string"),
+    "Drug": (_TIMED, True, "coded"),
+    "Duration": (_TIMED, True, "integer"),
+    "Quantity": (_TIMED, True, "decimal"),
+    "Dispensed": (_TIMED, True, "decimal"),
 }
 
-#: catalogue functions that read medication records only
-MEDICATION_FUNCTIONS = ("ActiveDrugs", "OpenDosage")
+#: catalogue functions that read a prescription (a MedicationRequest concept) only
+MEDICATION_FUNCTIONS = ("Dosage", "Drug", "Duration", "Quantity", "Dispensed")
+#: the FHIR resource of a prescription
+MEDICATION_REQUEST = "MedicationRequest"
 #: FHIR resources holding medication records
 MEDICATION_RESOURCES = ("MedicationRequest", "MedicationDispense")
 
@@ -134,15 +139,21 @@ RETRIEVE_FIELDS = {
     "date": "LatestDate",
     "exists": "Exists",
     "count": "Count",
-    "drugs": "ActiveDrugs",
-    "dosage": "OpenDosage",
+    # a drug (MedicationRequest concept): ``active`` is its default field (``Latest``)
+    "active": "Latest",
+    "dosage": "Dosage",
+    "drug": "Drug",
+    "duration": "Duration",
+    "quantity": "Quantity",
+    "dispensed": "Dispensed",
 }
 DEFAULT_FIELD = "value"
+#: the default field of a drug: whether a valid prescription exists
+MEDICATION_DEFAULT_FIELD = "active"
 #: field -> the FHIR resources it is offered for (a field missing here applies to all)
 FIELD_RESOURCES = {
     "date": ("Observation", "Condition", "Procedure", "MedicationRequest", "MedicationDispense"),
-    "drugs": ("MedicationRequest",),
-    "dosage": ("MedicationRequest",),
+    **{field: (MEDICATION_REQUEST,) for field in ("active", "dosage", "drug", "duration", "quantity", "dispensed")},
 }
 #: catalogue function -> how an implied read is named (the editor builds its chip the same way)
 _FUNCTION_LABELS = {
@@ -150,8 +161,11 @@ _FUNCTION_LABELS = {
     "LatestDate": "Date of the latest {concept}",
     "Exists": "{concept} recorded",
     "Count": "Number of {concept} records",
-    "ActiveDrugs": "Active drugs ({concept})",
-    "OpenDosage": "Open dosage of {concept}",
+    "Dosage": "Dosage of {concept}",
+    "Drug": "Drug prescribed for {concept}",
+    "Duration": "Days {concept} is prescribed for",
+    "Quantity": "Quantity of {concept} prescribed",
+    "Dispensed": "Quantity of {concept} dispensed",
 }
 
 
@@ -291,19 +305,19 @@ def read_retrieval(concept) -> Retrieval:
 
 
 def check_reads_resource(retrieval: Retrieval) -> None:
-    """Reject a medication function reading a concept that is not a medication.
+    """Reject a prescription function reading a concept that is not a drug.
 
     Args:
         retrieval: A retrieval whose concept read (``reads_concept_type``) is resolved.
 
     Raises:
-        TriccRetrievalError: ``ActiveDrugs`` / ``OpenDosage`` on a concept recorded as another
-            resource than MedicationRequest / MedicationDispense.
+        TriccRetrievalError: ``Dosage`` / ``Drug`` / ``Duration`` / ``Quantity`` / ``Dispensed``
+            on a concept recorded as another resource than MedicationRequest.
     """
     function = retrieval.effective_function
-    if function in MEDICATION_FUNCTIONS and retrieval.resource not in MEDICATION_RESOURCES:
+    if function in MEDICATION_FUNCTIONS and retrieval.resource != MEDICATION_REQUEST:
         raise TriccRetrievalError(
-            f"retrieval {retrieval.code}: {function} reads medication records, but "
+            f"retrieval {retrieval.code}: {function} reads prescriptions, but "
             f"{retrieval.reads_code!r} is recorded as {retrieval.resource} (conceptType "
             f"{retrieval.reads_concept_type!r})"
         )
@@ -351,6 +365,19 @@ def split_implied_code(code: str) -> tuple:
     concept, _, rest = code.lstrip("#").rpartition("@")
     window, _, field = rest.partition(".")
     return concept, window or None, field or DEFAULT_FIELD
+
+
+def retrieval_field(retrieval: Retrieval) -> str:
+    """The field a timed retrieval reads (``value``, ``date``…): its own for an implied read,
+    else the one of its function; ``Latest`` of a drug is ``active``."""
+    if retrieval.implied:
+        field = split_implied_code(retrieval.code)[2]
+    else:
+        function = retrieval.effective_function
+        field = next((f for f, fn in RETRIEVE_FIELDS.items() if fn == function), DEFAULT_FIELD)
+    if field == DEFAULT_FIELD and retrieval.resource == MEDICATION_REQUEST:
+        return MEDICATION_DEFAULT_FIELD
+    return field
 
 
 def retrieve_reference(args: List[Any]):
@@ -550,15 +577,15 @@ def _select_multiple_concepts(project) -> Set[str]:
 
 
 def _warn_dosage_of_multiple(project, retrievals: Iterable[Retrieval]) -> None:
-    """Warn when ``OpenDosage`` reads a select_multiple concept (one dosage per drug)."""
-    dosages = [r for r in retrievals if r.effective_function == "OpenDosage"]
+    """Warn when ``Dosage`` reads a select_multiple concept (one dosage per drug)."""
+    dosages = [r for r in retrievals if r.effective_function == "Dosage"]
     if not dosages:
         return
     multiple = _select_multiple_concepts(project)
     for retrieval in dosages:
         if retrieval.reads_code in multiple or (retrieval.reads_data_type or "").lower() == "select_multiple":
             logger.warning(
-                f"retrieval {retrieval.code}: OpenDosage reads {retrieval.reads_code!r}, a select_multiple "
+                f"retrieval {retrieval.code}: Dosage reads {retrieval.reads_code!r}, a select_multiple "
                 "concept; the dosage is the one of a single drug, read the drug concept instead"
             )
 
@@ -677,7 +704,8 @@ def contact_summary_keys(retrievals: Iterable[Retrieval], populates: Iterable[An
 
     One group per concept read (one lookup in the contact-summary script), its fields side by
     side: ``{"concept": "weight", "context": "history", "window": "P3M", "fields": {"value":
-    "weight_P3M", "date": "weight_P3M_date"}}``. Reads of no concept (patient functions,
+    "weight_P3M", "date": "weight_P3M_date"}}``; a drug's default field is ``active``
+    (feature/20261125-populate-medication.md). Reads of no concept (patient functions,
     custom) are listed under ``other``. feature/20261125-requires-and-implied-retrievals.md §4.
 
     Args:
@@ -688,7 +716,6 @@ def contact_summary_keys(retrievals: Iterable[Retrieval], populates: Iterable[An
     Returns:
         ``{"concepts": [group, …], "other": [{"key", "retrieval", "function"}, …]}``.
     """
-    fields_by_function = {function: field for field, function in RETRIEVE_FIELDS.items()}
     groups: Dict[tuple, Dict[str, Any]] = {}
     other = []
 
@@ -701,9 +728,9 @@ def contact_summary_keys(retrievals: Iterable[Retrieval], populates: Iterable[An
 
     for retrieval in retrievals:
         function = retrieval.effective_function
-        if retrieval.context in _TIMED and retrieval.reads_code and function in fields_by_function:
+        if retrieval.context in _TIMED and retrieval.reads_code and function in RETRIEVE_FIELDS.values():
             window = None if retrieval.context == "encounter" else retrieval.period
-            add(retrieval.reads_code, retrieval.context, window, fields_by_function[function], retrieval.name)
+            add(retrieval.reads_code, retrieval.context, window, retrieval_field(retrieval), retrieval.name)
         else:
             other.append({"key": retrieval.name, "retrieval": retrieval.code, "function": function or CUSTOM_CONTEXT})
     for key, concept, context, period in populates:

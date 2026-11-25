@@ -127,7 +127,8 @@ interventions:
   wins over it; without either, one named `<default>-retrieve` is used. Only the
   retrievals an intervention uses are exported; an unknown `"#code"` stops the build.
   See `feature/20261109-project-retrievals.md`. Expressions save them as `Retrieve('code')`;
-  `Retrieve('weight', 'P3M'[, 'date' | 'exists' | 'count' | 'drugs' | 'dosage'])` reads a concept
+  `Retrieve('weight', 'P3M'[, 'date' | 'exists' | 'count'])` reads a concept, and
+  `Retrieve('metformin', 'P6M'[, 'active' | 'dosage' | 'drug' | 'duration' | 'quantity' | 'dispensed'])` a drug,
   without a dictionary entry (`feature/20261125-requires-and-implied-retrievals.md`).
 - **`interventions[].requires`** lists interventions earlier in the same encounter: the concepts
   their activities record are read from the encounter at the start of this intervention (first

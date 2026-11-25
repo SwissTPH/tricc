@@ -211,7 +211,14 @@ def test_implied_reads_are_generated_retrievals(implied_project):
     ]
     here = retrievals["#weight@encounter"]
     assert (here.context, here.period, here.effective_function) == ("encounter", None, "Latest")
-    assert retrievals["#metformin@.drugs"].effective_function == "ActiveDrugs"
+    # a drug: its default field is `active` (yes / no); the prescription fields read its latest
+    # valid MedicationRequest (feature/20261125-populate-medication.md)
+    active = retrievals["#metformin@"]
+    assert (active.effective_function, active.value_type, active.resource) == ("Latest", "boolean", "MedicationRequest")
+    assert [(retrievals[f"#metformin@P6M.{field}"].effective_function, retrievals[f"#metformin@P6M.{field}"].value_type)
+            for field in ("quantity", "dispensed", "dosage")] == [
+        ("Quantity", "decimal"), ("Dispensed", "decimal"), ("Dosage", "string"),
+    ]
     assert retrievals["#metformin@encounter.date"].label == "Date of the latest Metformin, this encounter"
     # the dictionary retrieval, written both ways: one node
     assert [code for code in retrievals if not retrievals[code].implied] == ["#age_months"]
@@ -248,7 +255,7 @@ def test_implied_read_errors(tmp_path, replace, error):
 
     by = {
         "E_RETRIEVAL_IMPLIED_CONCEPT": "Retrieve('height', null)",  # not a project concept
-        "E_RETRIEVAL_READ_UNSUPPORTED": "Retrieve('weight', 'P3M', 'drugs')",  # drugs of an Observation
+        "E_RETRIEVAL_READ_UNSUPPORTED": "Retrieve('weight', 'P3M', 'quantity')",  # quantity of an Observation
         "E_RETRIEVAL_UNKNOWN": "Retrieve('age_weeks')",  # not in the dictionary
     }[error]
     fixture = tmp_path / "project"
@@ -261,6 +268,25 @@ def test_implied_read_errors(tmp_path, replace, error):
             run_project_build(str(fixture), str(tmp_path / "out"), cli_output_strategy="XLSFormCHTStrategy")
     finally:
         logging.disable(logging.NOTSET)
+
+
+def test_prescribed_but_not_dispensed_is_a_calculate(tmp_path):
+    """`#metformin@P6M.quantity > #metformin@P6M.dispensed`: two reads of one prescription
+    (feature/20261125-populate-medication.md)."""
+    survey = _survey(_build(tmp_path / "cht", "XLSFormCHTStrategy", IMPLIED), "visit")
+    assert survey.loc["metformin_owed", "calculation"] == (
+        "number(${r_metformin_P6M_quantity}>${r_metformin_P6M_dispensed})"
+    )
+    assert survey.loc["r_metformin_P6M_dispensed", "calculation"] == (
+        "coalesce(instance('contact-summary')/context/metformin_P6M_dispensed,'')"
+    )
+    libraries = _fhir_libraries(_build(tmp_path / "fhir", "FHIRStrategy", IMPLIED))
+    (helper,) = [cql for name, cql in libraries.items() if name.endswith("-Helper.cql")]
+    assert helper.count('define "#metformin@P6M:records":') == 1
+    assert 'define "#metformin@P6M.quantity":\n  MedicationRequestQuantity(First("#metformin@P6M:records"))' in helper
+    assert 'define "#metformin@P6M.dispensed":\n  MedicationRequestDispensed(First("#metformin@P6M:records"))' in helper
+    assert "IsValidMedicationRequest(M, Now() - 6 months, Now())" in helper
+    assert 'define "#metformin@":\n  exists("#metformin@:records")' in helper
 
 
 # --- §4 export: one read per record ------------------------------------------------------------
@@ -284,7 +310,7 @@ def test_fields_of_one_concept_and_window_share_one_records_list(tmp_path):
         body = helper.split(f"define {field_define}:\n", 1)[1].split("\n\n", 1)[0]
         assert '"#weight@P3M:records"' in body and "(" + "'weight'" not in body
     # the records lists read the shared retrieves, never a bare one
-    for records in re.findall(r'define "[^"]+:(?:records|dispenses)":\n  (.*)', helper):
+    for records in re.findall(r'define "[^"]+:records":\n  (.*)', helper):
         assert records.startswith('("History') or records.startswith('("Encounter')
     for resource in ("Observation", "Condition", "Procedure", "MedicationRequest", "MedicationDispense"):
         assert helper.count(f"[{resource}]") == 1
@@ -323,5 +349,11 @@ def test_cht_contact_summary_keys_grouped_by_concept_and_window(tmp_path):
     }
     assert {(g["concept"], g["context"], g["window"]) for g in keys["concepts"]} >= {
         ("weight", "history", None), ("weight", "encounter", None), ("metformin", "history", "P6M"),
+    }
+    # a drug's default field is `active`, its prescription fields sit next to it
+    metformin = {(g["concept"], g["context"], g["window"]): g["fields"] for g in keys["concepts"]}
+    assert metformin[("metformin", "history", None)] == {"active": "metformin_any"}
+    assert metformin[("metformin", "history", "P6M")] == {
+        "dosage": "metformin_P6M_dosage", "quantity": "metformin_P6M_quantity", "dispensed": "metformin_P6M_dispensed",
     }
     assert keys["other"] == [{"key": "age_months", "retrieval": "#age_months", "function": "AgeInMonths"}]

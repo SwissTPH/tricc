@@ -5,7 +5,7 @@
 | **Status**        | Implemented (2026-11-25, RFC #104, phases 1–3; phase 4 is the tricc-frontend mirror) |
 | **Branch target** | `feature/retrievals` → `develop` |
 | **Scope**         | `models/project_config` (`TriccInterventionConfig.requires`), `YamlStrategy` (`YamlActivity.requires`), `strategies/input/base_input_strategy` (`link_project`, `attach_library_calculates`), `converters/retrieval`, `converters/fhir/populate_helper`, `converters/fhir/repeat_helper`, `visitors/tricc` (versions), `FHIRStrategy` → `OpenSRPStrategy`, `XLSFormStrategy` → `XLSFormCDSSStrategy` → `XLSFormCHTStrategy` → `XLSFormCHTHFStrategy` |
-| **Related** | #101 (calculate functions: a required concept is a version, so a parameter's fallback concept finds it). `feature/20261109-project-retrievals.md` (retrieval nodes, contexts, periods; implied retrievals are generated entries). `feature/20260929-cql-populate-wiring.md` (encounter populate reads). `feature/20261111-block-params-and-start-node.md` §8.1, §8.4 (`requires` declared, "read, not used yet"). #76 (`LatestDate`: the `.date` field) and #75 (medication reads: `.drugs`, `.dosage`). #103 (`sys.code` references: a qualified retrieval waits for it). #98 (`Retrieve` in the function catalogue; no new grammar). tricc-frontend `feature/20261014-answer-options-in-cql.md` (the `Answer('code')` pattern this follows). Frontend mirror (requires pickers; `#name` / `#concept@period.field` shown for `Retrieve(…)` as a readable chip, with suggestions; rewrite on save; validation): SwissTPH/tricc-frontend, to open. |
+| **Related** | #101 (calculate functions: a required concept is a version, so a parameter's fallback concept finds it). `feature/20261109-project-retrievals.md` (retrieval nodes, contexts, periods; implied retrievals are generated entries). `feature/20260929-cql-populate-wiring.md` (encounter populate reads). `feature/20261111-block-params-and-start-node.md` §8.1, §8.4 (`requires` declared, "read, not used yet"). #76 (`LatestDate`: the `.date` field) and #75 (medication reads: `.active`, `.dosage`, `.drug`, `.duration`, `.quantity`, `.dispensed`). #103 (`sys.code` references: a qualified retrieval waits for it). #98 (`Retrieve` in the function catalogue; no new grammar). tricc-frontend `feature/20261014-answer-options-in-cql.md` (the `Answer('code')` pattern this follows). Frontend mirror (requires pickers; `#name` / `#concept@period.field` shown for `Retrieve(…)` as a readable chip, with suggestions; rewrite on save; validation): SwissTPH/tricc-frontend, to open. |
 | **RFC**           | SwissTPH/tricc#104 |
 
 Valid status values: `Draft` → `Approved` → `Implemented` → `Superseded`.
@@ -37,12 +37,12 @@ concept and per period, even though it is always the same kind of read.
   value, earlier visits, period of three months). Without a period, `#weight@` reads the last
   value ever recorded.
 - A field after a dot reads something else about that record: `#weight@P3M.date` (when it was
-  last recorded), `.exists`, `.count`, and for medicines `.drugs` and `.dosage`. `.value` is the
-  default and may be left out. The editor only offers the fields that make sense for the
+  last recorded), `.exists`, `.count`, and for a drug `.active` (its default), `.dosage`, `.drug`, `.duration`,
+  `.quantity`, `.dispensed`. `.value` is the default and may be left out. The editor only offers the fields that make sense for the
   concept, and shows the read as a sentence ("Date of the latest weight, past 3 months").
 - Within the visit, the concept itself is usually used (through `requires`). `@encounter`
   reads the current visit's record instead of a period, for what the concept alone does not give:
-  `#metformin@encounter.date` (when it was prescribed in this visit), `.drugs`, `.dosage`,
+  `#metformin@encounter.date` (when it was prescribed in this visit), `.dosage`, `.quantity`,
   `.count`.
 - Dictionary retrievals keep showing as `#age_months`. Both are saved as a plain function call
   (`Retrieve(…)`), as answers are saved as `Answer('code')`, so the saved text is standard CQL.
@@ -112,8 +112,17 @@ from the concept's `conceptType`, `get_fhir_resource`):
 | `date` | `LatestDate` | Observation, Condition, Procedure, MedicationRequest / Dispense | `dateTime` | #76 |
 | `exists` | `Exists` | all | `boolean` | today |
 | `count` | `Count` | all | `integer` | today |
-| `drugs` | `ActiveDrugs` | MedicationRequest | `coded` (multi) | #75 |
-| `dosage` | `OpenDosage` | MedicationRequest | `string` | #75 |
+| `active` (a drug's default) | `Latest` | MedicationRequest | `boolean` | #75 |
+| `dosage` | `Dosage` | MedicationRequest | `string` | #75 |
+| `drug` | `Drug` | MedicationRequest | `coded` | #75 |
+| `duration` | `Duration` | MedicationRequest | `integer` (days) | #75 |
+| `quantity` | `Quantity` | MedicationRequest | `decimal` | #75 |
+| `dispensed` | `Dispensed` | MedicationRequest | `decimal` | #75 |
+
+A drug (a MedicationRequest concept) reads one drug: every field reads the latest valid
+prescription of it in the window (#75's validity rule), and `value` / `active` (its default) is
+whether one exists. `Retrieve('metformin', 'P6M')` and `Retrieve('metformin', 'P6M', 'active')`
+read the same; the editor saves the former. A list of active drugs is not a field.
 
 A field whose function is not implemented yet (before #76 / #75) or not valid for the resource:
 `E_RETRIEVAL_READ_UNSUPPORTED`. New catalogue functions add a field name; the syntax does not
@@ -218,7 +227,7 @@ YAML fixtures in `tests/data/yaml/` and `tests/test_requires.py`:
   read by it;
 - `Retrieve('weight', 'P3M', 'value')` gives the same node as `Retrieve('weight', 'P3M')`;
   `'date'`, `'exists'`, `'count'` give their own nodes and functions;
-  `Retrieve('weight', 'encounter')` builds an `encounter` context retrieval with no period; `'drugs'` on an
+  `Retrieve('weight', 'encounter')` builds an `encounter` context retrieval with no period; `'quantity'` on an
   Observation concept fails; `'date'` fails until #76 lands;
 - unknown code, unknown concept, bad period and a non-literal argument fail;
 - aggregation: the Helper library has one retrieve per resource / scope used; `value`, `date`
@@ -231,7 +240,8 @@ YAML fixtures in `tests/data/yaml/` and `tests/test_requires.py`:
 
 1. `requires` validation and encounter reads as first versions.
 2. `Retrieve` (dictionary and implied, fields `value` / `exists` / `count`), legacy `"#name"`
-   kept; `date` with #76, `drugs` / `dosage` with #75.
+   kept; `date` with #76, the drug fields (`active`, `dosage`, `drug`, `duration`, `quantity`,
+   `dispensed`) with #75.
 3. Export aggregation (shared retrieves, `:records` lists, items on defines), existing
    populate reads included.
 4. Frontend mirror (display, typing, rewrite on save).
@@ -254,9 +264,12 @@ None. Deferred: qualified concepts in `Retrieve` wait for #103.
   not one). (@delcroip)
 - 2026-11-25: An implied read takes an optional field, `#concept@period.field` →
   `Retrieve('concept', 'P3M', 'field')`, default `value` (`.value` accepted). Fields map to
-  catalogue functions (`date` #76, `drugs` / `dosage` #75), offered per resource. The window may be `@encounter` (the
+  catalogue functions (`date` #76, the drug fields #75), offered per resource. The window may be `@encounter` (the
   current visit's record), for reads the concept alone does not give. (@delcroip)
 - 2026-11-25: Exports aggregate reads: one retrieve per resource and scope, one list per concept
   and window with the fields derived from it, items referencing defines rather than Helper
   function calls; CHT keys grouped per concept. (@delcroip)
 - 2026-11-25: Approved for implementation with #75, #76 and #104 on one branch (@delcroip)
+- 2026-11-25: Medication fields reworked with #75: one drug per read, `active` (default),
+  `dosage`, `drug`, `duration`, `quantity`, `dispensed`; `drugs` (every open prescription) is
+  removed. (@delcroip)
