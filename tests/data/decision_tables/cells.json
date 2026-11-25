@@ -20,6 +20,8 @@
     { "cell": "'yes'", "type": "string", "pass": ["yes"], "fail": ["no", null] },
     { "cell": "'a', 'b'", "type": "string", "pass": ["a", "b"], "fail": ["c"] },
     { "cell": "'a, b'", "type": "string", "pass": ["a, b"], "fail": ["a"] },
+    { "cell": "'it\\'s'", "type": "string", "pass": ["it's"], "fail": ["its", "it", null] },
+    { "cell": "'it\\'s \"x\"'", "type": "string", "pass": ["it's \"x\""], "fail": ["it's", "x", null] },
     { "cell": "true", "type": "boolean", "pass": [true], "fail": [false, null] },
     { "cell": "", "type": "decimal", "error": "E_DMN_CELL" },
     { "cell": ">=", "type": "decimal", "error": "E_DMN_CELL" },

@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Approved (2026-11-25, in conversation) |
+| **Status** | Implemented (approved 2026-11-25, in conversation) |
 | **Branch target** | `fix/xpath-text-literals` → `develop` |
 | **Scope** | `XLSFormStrategy` → `XLSFormCDSSStrategy` → `XLSFormCHTStrategy` → `XLSFormCHTHFStrategy` (calculations, `relevant`, `constraint`, `choice_filter`; CHT `cht:extension-lib(...)` arguments) |
 | **Related** | `fix/20261012-yaml-edge-labels.md` (introduced `xpath_literal` for static operands), `feature/20261123-decision-tables.md`, `feature/20261123-dmn-instance-lookup.md`, `feature/lang-and-capabilities` branch (FEEL `'it''s'` cells, kept out of the shared vectors until this lands) |
@@ -59,6 +59,8 @@ Authors of XLSForm, CDSS, CHT and CHT HF forms whose content holds an apostrophe
 - The FEEL / CQL doubled-quote form `'it''s'` is not read by the cell and CQL parsers on
   `develop`; that is the `lang-and-capabilities` work. The tests here use `'it\'s'`, which
   `develop` reads.
+- DrawTRICC refuses an option name holding a quote, so the fixture project keeps plain option
+  names; the option case is tested on a node built in the test.
 - Option names of a `select_multiple` become calculate names (`quote's` is an invalid
   XLSForm name). That is a naming problem, not an XPath literal; left for another issue.
 
@@ -97,12 +99,12 @@ constants). Fixed identifiers produced by tricc may stay as they are (listed abo
 
 ### 3. Code checklist
 
-- [ ] `XLSFormStrategy.tricc_operation_diagnosis_list`: display through `xpath_literal`.
-- [ ] `XLSFormCHTStrategy.table_call_expression`: table id, policy, output through `xpath_literal`.
-- [ ] `XLSFormStrategy.tricc_operation_selected`: option and non-text values through `xpath_literal`.
-- [ ] `XLSFormStrategy.tricc_operation_native` (`GetChoiceName`): field argument through `xpath_literal`.
-- [ ] `tests/test_dmn_instance.py` `_literal` through `xpath_literal`.
-- [ ] Docstrings on the touched public functions.
+- [x] `XLSFormStrategy.tricc_operation_diagnosis_list`: display through `xpath_literal`.
+- [x] `XLSFormCHTStrategy.table_call_expression`: table id, policy, output through `xpath_literal`.
+- [x] `XLSFormStrategy.tricc_operation_selected`: option and non-text values through `xpath_literal`.
+- [x] `XLSFormStrategy.tricc_operation_native` (`GetChoiceName`): field argument through `xpath_literal`.
+- [x] `tests/test_dmn_instance.py` `_literal` through `xpath_literal`.
+- [x] Docstrings on the touched public functions.
 
 ### 4. Tests
 
@@ -110,7 +112,7 @@ Each fails on `develop` 61905ed unless noted.
 
 - `tests/data/decision_tables/cells.json`: string cells `'it\'s'` and `'it\'s "x"'` (the
   `concat` branch). On `develop`, `test_every_cell_form_reads_like_the_evaluator` fails on them
-  with `lxml.etree.XPathEvalError` (the `_literal` helper).
+  with `lxml.etree.XPathSyntaxError: Invalid expression` (the `_literal` helper).
 - `tests/test_xpath_text_literals.py`:
   - every string cell vector through the real writer (`get_tricc_operation_expression` /
     `table_call_expression` of a kept `DMN_CALL`), XLSForm and CDSS, inline and from the
