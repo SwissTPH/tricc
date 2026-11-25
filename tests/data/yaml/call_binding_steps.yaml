@@ -1,0 +1,35 @@
+# Binding a call's left-out parameters (feature/20261125-calculate-functions.md §2.3), with the
+# decision tables of tests/data/projects/calculate_functions/tables. Each calculate is drawn in
+# the flow, so the walk instantiates them in this order.
+id: binding
+title: Binding steps
+process: main
+nodes:
+  - {id: start, type: start, name: start_binding, label: Binding}
+  - {id: wm, type: decimal, name: w_measured, label: Measured weight}
+  # passed
+  - {id: a, type: calculate, name: a_passed, label: A, calculate: "DMN('t_free', \"w_measured\")"}
+  # left out, no fallback concept: what the earlier call of t_free passed
+  - {id: b, type: calculate, name: b_earlier, label: B, calculate: "DMN('t_free')"}
+  # null: no value, even with an earlier call
+  - {id: c, type: calculate, name: c_null, label: C, calculate: "DMN('t_free', null)"}
+  # left out, its concept (weight) not collected yet, no earlier call: the listed retrieval
+  - {id: e, type: calculate, name: e_retrieval, label: E, calculate: "DMN('t_weight')"}
+  # left out, concept not collected, no earlier call, no retrieval: no value
+  - {id: f, type: calculate, name: f_none, label: F, calculate: "DMN('t_age')"}
+  - {id: weight, type: decimal, name: weight, label: Weight}
+  - {id: g, type: calculate, name: g_passed, label: G, calculate: "DMN('t_weight', \"w_measured\")"}
+  # left out: the collected concept wins over the earlier call (g)
+  - {id: h, type: calculate, name: h_form, label: H, calculate: "DMN('t_weight')"}
+  - {id: end, type: end, name: end_binding, label: End}
+edges:
+  - {id: e1, source: start, target: wm}
+  - {id: e2, source: wm, target: a}
+  - {id: e3, source: a, target: b}
+  - {id: e4, source: b, target: c}
+  - {id: e5, source: c, target: e}
+  - {id: e6, source: e, target: f}
+  - {id: e7, source: f, target: weight}
+  - {id: e8, source: weight, target: g}
+  - {id: e9, source: g, target: h}
+  - {id: e10, source: h, target: end}

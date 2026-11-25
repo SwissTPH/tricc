@@ -1,0 +1,48 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "demo",
+  "name": "demo",
+  "url": "http://example.org/fhir/CodeSystem/demo",
+  "status": "draft",
+  "content": "complete",
+  "concept": [
+    {
+      "code": "weight",
+      "display": "Weight (kg)",
+      "property": [
+        {
+          "code": "dataType",
+          "valueCode": "decimal"
+        },
+        {
+          "code": "conceptType",
+          "valueCode": "Symptom-Finding"
+        }
+      ]
+    },
+    {
+      "code": "fs_saved",
+      "display": "Saved free-standing calculate",
+      "property": [
+        {
+          "code": "dataType",
+          "valueCode": "string"
+        },
+        {
+          "code": "conceptType",
+          "valueString": "Symptom-Finding"
+        }
+      ]
+    },
+    {
+      "code": "age_months",
+      "display": "Age (months)",
+      "property": [
+        {
+          "code": "dataType",
+          "valueCode": "integer"
+        }
+      ]
+    }
+  ]
+}

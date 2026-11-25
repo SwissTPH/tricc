@@ -165,7 +165,7 @@ them. Every other previous version is merged as today.
 
 ### 4. Data needs report
 
-Each build writes `<form>.data-needs.json` next to the output: per call, the function or table
+Each build that binds at least one call writes `<form>.data-needs.json` next to the output: per call, the function or table
 (and whether it comes from the dictionary, a library or both), the calculate it belongs to, the
 node where it was instantiated, and per parameter the step that bound it (`passed`, `null`,
 `form`, `earlier_call`, `retrieval`, `none`) with the concept or `#code`. The frontend data needs
@@ -183,7 +183,8 @@ Tests, `docs/tricc-elements.md` and the two DMN specs move to the `E_CALL_*` cod
 
 ### 6. Tests
 
-YAML fixtures in `tests/data/yaml/` and `tests/test_calculate_functions.py`:
+YAML fixtures in `tests/data/yaml/` (activities) with the tables, libraries and dictionaries of
+`tests/data/projects/calculate_functions/`, and `tests/test_calculate_functions.py`:
 
 - binding: passed; `null` with an earlier call; left out with the fallback collected, from an
   earlier call, from a listed retrieval, nothing; the fallback wins over an earlier call;

@@ -57,7 +57,7 @@ from tricc_oo.models.tricc import (
     TRICC_TRUE_VALUE,
 )
 from tricc_oo.visitors.utils import PROCESSES
-from tricc_oo.converters.decision_table import expand_node_tables
+from tricc_oo.visitors.calls import CallState, instantiate_if_pending
 from tricc_oo.converters.cql_to_operation import transform_cql_to_operation
 from tricc_oo.converters.datadictionnary import lookup_codesystems_code
 from tricc_oo.converters.tricc_to_xls_form import get_list_names, get_export_name
@@ -467,13 +467,17 @@ def load_calculate(
     if isinstance(node, TriccGroup):
                 return True
     if node not in processed_nodes:
-        # a node the project pass did not reach (feature/20261123-decision-tables.md)
-        expand_node_tables(
-            node,
-            kwargs["decision_tables"] if kwargs.get("decision_tables") is not None else {},
-            kwargs.get("aliases"),
-            keep_calls=bool(kwargs.get("decision_table_calls")),
-        )
+        # calls stay calls during the walk; a node the project check did not reach is checked
+        # here (feature/20261125-calculate-functions.md §2.2)
+        call_state = kwargs.get("call_state")
+        if call_state is None:
+            call_state = CallState(
+                tables=kwargs["decision_tables"] if kwargs.get("decision_tables") is not None else {},
+                aliases=kwargs.get("aliases"),
+                keep_calls=bool(kwargs.get("decision_table_calls")),
+            )
+            kwargs["call_state"] = call_state
+        call_state.check_node(node)
         # generate condition
         if is_ready_to_process(node, processed_nodes, True) and process_reference(
             node,
@@ -550,15 +554,25 @@ def load_calculate(
                 node.is_sequence_defined = True
             # if hasattr(node, 'next_nodes'):
             # node.next_nodes=reorder_node_list(node.next_nodes, node.group)
-            process_reference(
-                node,
-                processed_nodes=processed_nodes,
-                calculates=calculates,
-                used_calculates=used_calculates,
-                replace_reference=True,
-                warn=warn,
-                codesystems=kwargs.get("codesystems", None),
-            )
+
+            def instantiate():
+                # bind and expand the calls, then replace the references (§2.2)
+                call_state.instantiate_calls(node, processed_nodes)
+                process_reference(
+                    node,
+                    processed_nodes=processed_nodes,
+                    calculates=calculates,
+                    used_calculates=used_calculates,
+                    replace_reference=True,
+                    warn=warn,
+                    codesystems=kwargs.get("codesystems", None),
+                )
+
+            if call_state.is_free_standing(node):
+                # instantiated by its first reader, or at the end of the walk (§2.5)
+                call_state.defer(node, instantiate)
+                return True
+            instantiate()
             if isinstance(node, (TriccNodeMainStart, TriccNodeActivityStart)):
                 process_reference(
                     node.activity,
@@ -1498,6 +1512,7 @@ def process_operation_reference(
 
         # Replace node reference in expression if requested
         if replace_reference:
+            instantiate_if_pending(target_node)  # a free-standing calculate, read here first
             replacement = target_node
             # Expression / expression_reference only: multi-version display fields
             # need GET_INHERITED_VALUE so ODK coalesce picks whichever instance was
@@ -1573,6 +1588,8 @@ def process_operation_reference(
     for ref_node in real_node_refs:
         if not is_prev_processed(ref_node, node, processed_nodes=processed_nodes, local=False):
             return False
+        if replace_reference:
+            instantiate_if_pending(ref_node)
 
     # ───────────────────────────────────────────────
     # 3. Try to resolve remaining unfound names → maybe they are options

@@ -1,0 +1,13 @@
+id: t_age
+title: Age class
+hit_policy: first
+inputs:
+  - name: age
+    concept: age_months
+    type: integer
+outputs:
+  - name: band
+    type: string
+rules:
+  - [">= 60", "child"]
+  - ["< 60",  "infant"]

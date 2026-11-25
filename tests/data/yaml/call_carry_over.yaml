@@ -1,0 +1,26 @@
+# Carry-over (feature/20261125-calculate-functions.md §2.3 step 2): the earlier call's argument
+# as written, resolved again where the later call is instantiated.
+id: carry
+title: Carry-over
+process: main
+nodes:
+  - {id: start, type: start, name: start_carry, label: Carry}
+  - {id: v1, type: decimal, name: v, label: V (first)}
+  - {id: a, type: calculate, name: a_bare, label: A, calculate: "DMN('t_free', \"v\")"}
+  - {id: v2, type: decimal, name: v, label: V (again)}
+  # the bare concept "v" resolves to its newer version
+  - {id: b, type: calculate, name: b_bare, label: B, calculate: "DMN('t_free')"}
+  - {id: q, type: decimal, name: q, label: Q}
+  # an expression carries over (t_age, keyed apart from t_free)
+  - {id: c, type: calculate, name: c_expr, label: C, calculate: "DMN('t_age', \"q\" * 12)"}
+  - {id: d, type: calculate, name: d_expr, label: D, calculate: "DMN('t_age')"}
+  - {id: end, type: end, name: end_carry, label: End}
+edges:
+  - {id: e1, source: start, target: v1}
+  - {id: e2, source: v1, target: a}
+  - {id: e3, source: a, target: v2}
+  - {id: e4, source: v2, target: b}
+  - {id: e5, source: b, target: q}
+  - {id: e6, source: q, target: c}
+  - {id: e7, source: c, target: d}
+  - {id: e8, source: d, target: end}

@@ -1,0 +1,12 @@
+id: t_free
+title: No fallback concept
+hit_policy: first
+inputs:
+  - name: x
+    type: decimal
+outputs:
+  - name: size
+    type: string
+rules:
+  - [">= 10", "big"]
+  - ["< 10",  "small"]

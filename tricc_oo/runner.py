@@ -30,6 +30,7 @@ from tricc_oo.converters.project_config import (
 )
 from tricc_oo.models.project_config import TriccInterventionConfig, TriccProjectConfig
 from tricc_oo.strategies.input.base_input_strategy import BaseInputStrategy
+from tricc_oo.visitors.calls import write_data_needs
 from tricc_oo.strategies.registry import (
     all_input_extensions,
     get_input_strategy,
@@ -302,6 +303,8 @@ def run_grouped_export(
     logger.info("Using strategy %s", OutputStrategyCls.__name__)
     output_strategy.check_retrievals()
     output_strategy.execute()
+    # every call and where each argument came from (feature/20261125-calculate-functions.md §4)
+    write_data_needs(project, out_dir)
     if test_strategy_name:
         TestStrategyCls = get_test_strategy(test_strategy_name)
         logger.info("Running test strategy %s", TestStrategyCls.__name__)

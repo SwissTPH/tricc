@@ -1,0 +1,30 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "demo-retrieve",
+  "name": "demo-retrieve",
+  "title": "Retrievals",
+  "url": "http://example.org/fhir/CodeSystem/demo-retrieve",
+  "meta": {"tag": [{"system": "http://tricc.org/fhir/CodeSystem/codesystem-role", "code": "retrieve"}]},
+  "status": "draft",
+  "content": "complete",
+  "concept": [
+    {
+      "code": "#prev_weight",
+      "display": "Weight in the last 30 days",
+      "property": [
+        {"code": "context", "valueCode": "history"},
+        {"code": "function", "valueCode": "Latest"},
+        {"code": "reads", "valueCoding": {"system": "http://example.org/fhir/CodeSystem/demo", "code": "weight"}},
+        {"code": "period", "valueString": "P30D"}
+      ]
+    },
+    {
+      "code": "#age_years",
+      "display": "Age in years",
+      "property": [
+        {"code": "context", "valueCode": "patient"},
+        {"code": "function", "valueCode": "AgeInYears"}
+      ]
+    }
+  ]
+}

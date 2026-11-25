@@ -599,6 +599,10 @@ class TriccIntervention(BaseModel):
     # type, arguments, CQL documentation tags such as @retrieve); see
     # tricc_oo.converters.cql_library.function_signature
     function_signatures: Dict[str, Any] = {}
+    # the calls' shared state across the walks (tricc_oo.visitors.calls.CallState) and the data
+    # needs report it fills (feature/20261125-calculate-functions.md §2.6, §4)
+    call_state: Optional[Any] = None
+    data_needs: List[Dict[str, Any]] = []
     # block pages (rooted by block_start), by id: templates, never start pages
     blocks: Dict[str, Any] = {}
 

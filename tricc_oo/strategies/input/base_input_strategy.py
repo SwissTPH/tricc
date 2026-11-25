@@ -268,7 +268,14 @@ class BaseInputStrategy:
             page.calculates.append(calc)
 
     def link_project(self, project):
-        """Build the main flow from the loaded pages, then link and process them."""
+        """Build the main flow from the loaded pages, then link and process them.
+
+        One ``CallState`` per project is shared by every ``process_pages``: a call in an earlier
+        walk counts as an earlier call (feature/20261125-calculate-functions.md §2.6).
+        """
+        from tricc_oo.visitors.calls import CallState
+
+        project.call_state = CallState(project)
         app = self.execute_linked_process(project)
         if app:
             project.start_pages["main"] = app

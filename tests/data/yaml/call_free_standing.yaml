@@ -1,0 +1,21 @@
+# Free-standing calculates holding a call (feature/20261125-calculate-functions.md §2.5): drawn
+# without an arrow into them, bound where they are first read.
+id: free
+title: Free-standing
+process: main
+nodes:
+  - {id: start, type: start, name: start_free, label: Free}
+  - {id: weight, type: decimal, name: weight, label: Weight}
+  # read by the note after weight: bound there, from the collected weight
+  - {id: read, type: calculate, name: fs_read, label: Read, calculate: "DMN('t_weight')"}
+  # read by nobody, saved to the record (its concept is a Symptom-Finding in the dictionary):
+  # bound at the end of the walk
+  - {id: saved, type: calculate, name: fs_saved, label: Saved, calculate: "DMN('t_age')"}
+  # read by nobody, not saved: dropped
+  - {id: dropped, type: calculate, name: fs_dropped, label: Dropped, calculate: "DMN('t_free', \"weight\")"}
+  - {id: note, type: note, name: fs_note, label: "Class ${fs_read}"}
+  - {id: end, type: end, name: end_free, label: End}
+edges:
+  - {id: e1, source: start, target: weight}
+  - {id: e2, source: weight, target: note}
+  - {id: e3, source: note, target: end}
