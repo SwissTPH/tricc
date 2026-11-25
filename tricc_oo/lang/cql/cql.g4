@@ -325,7 +325,6 @@ expression
     | expression intervalOperatorPhrase expression                                                  #timingExpression
     | expression ('=' | '!=' | '~' | '!~') expression                                               #equalityExpression
     | expression ('in' | 'contains') dateTimePrecisionSpecifier? expression                         #membershipExpression
-    | expression 'not' ('in' | 'contains') dateTimePrecisionSpecifier? expression                   #negateMembershipExpression
     | expression 'and' expression                                                                   #andExpression
     | expression ('or' | 'xor') expression                                                          #orExpression
     | expression 'implies' expression                                                               #impliesExpression
@@ -467,6 +466,10 @@ literal
     | quantity                                              #quantityLiteral
     | ratio                                                 #ratioLiteral
     ;
+
+externalConstant
+        : '%' ( keywordIdentifier | identifier | STRING )
+        ;
 
 intervalSelector
     : // TODO: Consider this as an alternative syntax for intervals... (would need to be moved up to expression to make it work)

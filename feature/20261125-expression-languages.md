@@ -219,7 +219,9 @@ against the folder.
   expression itself (no offset from the wrapper library).
 - A construct removed by `tricc_cql.g4` gets a named message instead of ANTLR's "no viable
   alternative": the error listener maps the offending token (`[`, `from`, `where`, `union`,
-  `.member`, a unit) to a message from `errors.json`, shared with the frontend.
+  `.member`, a unit) to a message from `errors.json`, shared with the frontend. Codes:
+  `E_CQL_PROFILE` for a named construct, `E_CQL_SYNTAX` otherwise (`errors.json` `codes`).
+  FHIRPath's `|` is no longer a token, so it stays a plain lexer error.
 - An unknown function name: `W_CQL_UNKNOWN_FUNCTION` (passed through as `native` today).
 - **Tightening.** Before switching, phase 1 runs the new parser over the fixtures and the known
   projects (e.g. `combacal-plus/visual-authoring/dm_int.tricc`). A construct now outside the
