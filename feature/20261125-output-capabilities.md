@@ -2,7 +2,7 @@
 
 | Field             | Value |
 | ----------------- | ----- |
-| **Status**        | Approved (2026-11-25, RFC #102) |
+| **Status**        | Implemented (2026-11-25; RFC #102, approved 2026-11-25) |
 | **Branch target** | `feature/lang-and-capabilities` → `develop` |
 | **Scope**         | new `capabilities/` folder (one package per output strategy), `strategies/output` (every strategy: `base_output_strategy`, `xls_form`, `xlsform_cdss`, `xlsform_cht`, `xlsform_cht_hf`, `fhir_form`, `opensrp`, `html_form`, `openmrs_form`, `dhis2_form`, `spice`), `models/project_config` (`capabilities`, `output_strategies`), `runner`, `converters/retrieval`, `converters/decision_table`; frontend: `@tricc/core` (project format, validation), `@tricc/editor` (project capabilities screen) |
 | **Related** | #98 (shared expression languages and function catalogue: statements name its operators and functions and declare the `@tricc/lang` version they were written for). #101 (calculate functions: `E_FUNCTION_NOT_EXPORTABLE` moves here). `feature/20261123-decision-tables.md` (`decision_table_calls`, CHT extension library). `feature/20261109-project-retrievals.md` (retrieval contexts per strategy). Frontend mirror (project format, capabilities screen, loading from npm / GitHub Packages / file, editor checks): SwissTPH/tricc-frontend, mirror into `tricc-frontend/feature/` on approval. |
