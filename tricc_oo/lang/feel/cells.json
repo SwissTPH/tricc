@@ -1,5 +1,5 @@
 {
-  "description": "Decision table cell tests (FEEL unary-test subset). Shared with tricc_oo: keep both copies identical. Each case: a cell, its column type, then either the error code or values that pass and values that fail (null = not entered).",
+  "description": "Decision table cell tests (FEEL unary-test subset, feel/TriccFeelParser.g4): the shared test vector of tricc_oo and tricc-frontend (one copy, in tricc_oo/lang/feel/). Each case: a cell, its column type, then either the error code or values that pass and values that fail (null = not entered).",
   "cases": [
     { "cell": "-", "type": "decimal", "pass": [0, 3.5, null], "fail": [] },
     { "cell": "null", "type": "decimal", "pass": [null], "fail": [0, 7] },
@@ -21,6 +21,9 @@
     { "cell": "'a', 'b'", "type": "string", "pass": ["a", "b"], "fail": ["c"] },
     { "cell": "'a, b'", "type": "string", "pass": ["a, b"], "fail": ["a"] },
     { "cell": "true", "type": "boolean", "pass": [true], "fail": [false, null] },
+    { "cell": "not ( null )", "type": "decimal", "pass": [0], "fail": [null] },
+    { "cell": ">= -2.5", "type": "decimal", "pass": [-2.5, 0], "fail": [-3, null] },
+    { "cell": "\"yes\"", "type": "string", "pass": ["yes"], "fail": ["no"] },
     { "cell": "", "type": "decimal", "error": "E_DMN_CELL" },
     { "cell": ">=", "type": "decimal", "error": "E_DMN_CELL" },
     { "cell": "[6..3)", "type": "decimal", "error": "E_DMN_CELL" },
@@ -33,6 +36,8 @@
     { "cell": "> 'x'", "type": "string", "error": "E_DMN_TYPE" },
     { "cell": "[1..2)", "type": "string", "error": "E_DMN_TYPE" },
     { "cell": "3", "type": "string", "error": "E_DMN_TYPE" },
-    { "cell": "1", "type": "boolean", "error": "E_DMN_TYPE" }
+    { "cell": "1", "type": "boolean", "error": "E_DMN_TYPE" },
+    { "cell": "foo bar", "type": "string", "error": "E_DMN_CELL" },
+    { "cell": "'open", "type": "string", "error": "E_DMN_CELL" }
   ]
 }
