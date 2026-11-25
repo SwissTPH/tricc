@@ -204,7 +204,9 @@ parser and its tests read `lang/feel/cells.json`.
 
 **1.8 Project CQL libraries.** A library (`tricc.yaml` `libraries`, `cql_library.py`) may declare
 its dialect and version, e.g. `libraries[].dialect: tricc-cql@<VERSION>` in `tricc.yaml` or a
-`/* @dialect: tricc-cql@<VERSION> */` tag at the top of the file (phase 4 picks one). A library
+`/* @dialect: tricc-cql@<VERSION> */` tag at the top of the file (phase 4 picks one;
+implemented: the tag in the opening comment, so `tricc.yaml` `libraries` stays a list of files;
+an unknown dialect or another major version is `E_CQL_DIALECT`). A library
 that declares nothing is **standard CQL**: parsed with the unmodified upstream `cqlParser.library`
 (no `not in`, no placeholders), TRICC's limits checked by a visitor. As today, only `define`s are
 used, function bodies are rejected and `external` functions are signatures.
