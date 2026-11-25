@@ -1,0 +1,66 @@
+name: lang-upstream
+
+# Watch the upstream grammars (feature/20261125-expression-languages.md §1.6): a new HL7 CQL tag
+# that changes grammar/*.g4, or a new KIE release that changes FEEL_1_1.g4, opens a PR that
+# replaces the files and bumps tricc_oo/lang/VERSION. The PR runs the tests (meaning.json,
+# overrides); a person reviews the README sha256 and the profile.
+on:
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  upstream:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: develop
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Fetch the latest upstream grammars
+        id: fetch
+        run: |
+          set -euo pipefail
+          cql_tag=$(gh api repos/cqframework/clinical_quality_language/tags --jq '[.[] | select(.name | test("^v[0-9]+\\.[0-9]+\\.[0-9]+$"))][0].name')
+          kie_tag=$(gh api repos/apache/incubator-kie-drools/releases/latest --jq .tag_name)
+          base=https://raw.githubusercontent.com
+          curl -sSfL "$base/cqframework/clinical_quality_language/$cql_tag/grammar/cql.g4" -o tricc_oo/lang/cql/cql.g4
+          curl -sSfL "$base/cqframework/clinical_quality_language/$cql_tag/grammar/fhirpath.g4" -o tricc_oo/lang/cql/fhirpath.g4
+          curl -sSfL "$base/apache/incubator-kie-drools/$kie_tag/kie-dmn/kie-dmn-feel/src/main/antlr4/org/kie/dmn/feel/parser/feel11/FEEL_1_1.g4" -o tricc_oo/lang/feel/FEEL_1_1.g4
+          if git diff --quiet -- tricc_oo/lang; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "cql_tag=$cql_tag" >> "$GITHUB_OUTPUT"
+          echo "kie_tag=$kie_tag" >> "$GITHUB_OUTPUT"
+      - name: Bump the version, regenerate, open a PR
+        if: steps.fetch.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          IFS=. read -r major minor patch < tricc_oo/lang/VERSION
+          echo "$major.$((minor + 1)).0" > tricc_oo/lang/VERSION
+          pip install antlr4-tools==0.2.1
+          ANTLR=antlr4 scripts/generate-lang-parsers.sh
+          branch="lang/upstream-${{ steps.fetch.outputs.cql_tag }}-${{ steps.fetch.outputs.kie_tag }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add tricc_oo/lang tricc_oo/converters/cql tricc_oo/converters/feel
+          git commit -m "Build: :arrow_up: upstream grammars CQL ${{ steps.fetch.outputs.cql_tag }}, FEEL ${{ steps.fetch.outputs.kie_tag }}"
+          git push -u origin "$branch"
+          gh pr create --base develop --head "$branch" \
+            --title "Build: upstream grammars CQL ${{ steps.fetch.outputs.cql_tag }}, FEEL ${{ steps.fetch.outputs.kie_tag }}" \
+            --body "Upstream grammar files changed. Update the tags and sha256 in tricc_oo/lang/cql/README.md, feel/README.md and tests/test_lang_package.py, add a CHANGELOG entry, and check the profile overrides still apply."
