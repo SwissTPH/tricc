@@ -1,0 +1,21 @@
+id: check
+title: Check
+process: main
+nodes:
+  - {id: start, type: start, name: start_check, label: Check}
+  - {id: weight, type: decimal, name: weight, label: Weight (kg)}
+  - {id: age, type: integer, name: age_in_months, label: Age (months)}
+  # FHIR writes Max in CQL (library) only, not in FHIRPath (inline)
+  - {id: heavy, type: calculate, name: heavy, label: Heavy, calculate: 'Max("weight", 20)'}
+  # a retrieval from the patient context (plain XLSForm reads only custom ones)
+  - {id: young, type: note, name: young_note, label: Young infant, relevance: '"#age_months" < 6'}
+  # a decision table of 9 rows (the strict statement allows 5 inline)
+  - {id: dose, type: calculate, name: dose, label: Dose, calculate: "DMN('diazepam', \"weight\", \"age_in_months\")"}
+  - {id: end, type: end, name: end_check, label: End}
+edges:
+  - {id: e1, source: start, target: weight}
+  - {id: e2, source: weight, target: age}
+  - {id: e3, source: age, target: heavy}
+  - {id: e4, source: heavy, target: young}
+  - {id: e5, source: young, target: dose}
+  - {id: e6, source: dose, target: end}

@@ -18,6 +18,14 @@ import os
 from typing import List, Optional, Sequence, Tuple
 
 import tricc_oo.strategies  # noqa: F401  — register built-in strategies
+from tricc_oo.converters.capabilities import (
+    ResolvedStatement,
+    TriccCapabilityError,
+    check_output_statements,
+    check_project,
+    load_project_statements,
+    report_issues,
+)
 from tricc_oo.converters.project_config import (
     enforce_tricc_version,
     find_project_root,
@@ -213,6 +221,21 @@ def resolve_decision_table_sources(in_filepath: str, project_config: TriccProjec
     return list(zip(files, read_input_file_contents(files)))
 
 
+def resolve_capability_statements(in_filepath: str, project_config: TriccProjectConfig) -> List[ResolvedStatement]:
+    """The active capability statements of ``tricc.yaml`` ``capabilities``, resolved (read from the
+    project's copies, never from the network).
+
+    Raises:
+        TriccCapabilityError: ``E_CAPABILITY_FILE`` / ``E_CAPABILITY_EXTENDS``.
+    """
+    if not project_config.capabilities:
+        return []
+    project_root = find_project_root(in_filepath)
+    if not project_root:
+        raise TriccCapabilityError("E_CAPABILITY_FILE", "tricc.yaml capabilities require a local project folder")
+    return load_project_statements(project_root, project_config.capabilities)
+
+
 def load_input_project(
     groups: Sequence[Tuple[str, Sequence[str], Sequence[str]]],
     media_path: str,
@@ -222,6 +245,7 @@ def load_input_project(
     libraries: Sources = (),
     decision_tables: Sources = (),
     decision_table_calls: bool = False,
+    capability_statements: Sequence[ResolvedStatement] = (),
 ):
     """Build the TriccIntervention from ``(strategy name, files, contents)`` groups.
 
@@ -242,6 +266,8 @@ def load_input_project(
         strategy.load(list(contents), media_path, project)
     # every expression is checked before the walk (and the decision-table expansion)
     check_unknown_functions(project)
+    # against the project's active output capability statements (raises on E_OUTPUT_UNSUPPORTED)
+    report_issues(check_project(project, capability_statements))
     if len(strategies) == 1:
         return strategies[0][0].finalize(project, media_path)
     from tricc_oo.strategies.input.drawio import DrawioStrategy
@@ -263,6 +289,7 @@ def run_one_export(
     terminology: Sources = (),
     libraries: Sources = (),
     decision_tables: Sources = (),
+    capability_statements: Sequence[ResolvedStatement] = (),
 ) -> None:
     return run_grouped_export(
         [(input_strategy_name, files, file_content)],
@@ -274,6 +301,7 @@ def run_one_export(
         terminology=terminology,
         libraries=libraries,
         decision_tables=decision_tables,
+        capability_statements=capability_statements,
     )
 
 
@@ -287,6 +315,7 @@ def run_grouped_export(
     terminology: Sources = (),
     libraries: Sources = (),
     decision_tables: Sources = (),
+    capability_statements: Sequence[ResolvedStatement] = (),
 ):
     os.makedirs(out_dir, exist_ok=True)
     media_path = os.path.join(out_dir, "media-tmp")
@@ -300,6 +329,7 @@ def run_grouped_export(
         libraries=libraries,
         decision_tables=decision_tables,
         decision_table_calls=bool(getattr(OutputStrategyCls, "decision_table_calls", False)),
+        capability_statements=capability_statements,
     )
     output_strategy = OutputStrategyCls(project, out_dir)
     logger.info("Using strategy %s", OutputStrategyCls.__name__)
@@ -343,9 +373,11 @@ def run_project_build(
         )
         terminology, libraries = resolve_project_sources(in_filepath, project_config)
         decision_tables = resolve_decision_table_sources(in_filepath, project_config)
-    except ValueError as exc:
+        statements = resolve_capability_statements(in_filepath, project_config)
+    except ValueError as exc:  # TriccCapabilityError included
         logger.critical("%s", exc)
         return 1
+    check_output_statements(output_strategies, statements)
 
     n_strategies = len(output_strategies)
     has_interventions = bool(project_config.interventions)
@@ -366,17 +398,23 @@ def run_project_build(
                 has_interventions=has_interventions,
                 n_strategies=n_strategies,
             )
-            output_strategy = run_grouped_export(
-                groups,
-                out_dir,
-                strategy_name,
-                project_config,
-                intervention,
-                test_strategy_name=test_strategy_name,
-                terminology=terminology,
-                libraries=libraries,
-                decision_tables=decision_tables,
-            )
+            try:
+                output_strategy = run_grouped_export(
+                    groups,
+                    out_dir,
+                    strategy_name,
+                    project_config,
+                    intervention,
+                    test_strategy_name=test_strategy_name,
+                    terminology=terminology,
+                    libraries=libraries,
+                    decision_tables=decision_tables,
+                    # the project is the same for every output: check it once per intervention
+                    capability_statements=statements if strategy_name == output_strategies[0] else (),
+                )
+            except TriccCapabilityError as exc:
+                logger.critical("%s", exc)
+                return 1
             if intervention is not None:
                 built[intervention.id] = output_strategy
         try:

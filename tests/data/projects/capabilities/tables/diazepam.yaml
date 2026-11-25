@@ -1,0 +1,23 @@
+id: diazepam
+title: Diazepam, rectal (ml)
+hit_policy: first
+inputs:
+  - name: weight
+    concept: weight
+    type: decimal
+  - name: age
+    concept: age_in_months
+    type: integer
+outputs:
+  - name: dose
+    type: string
+rules:
+  - [">= 20",    "-",        "2.5"]
+  - ["[15..20)", "-",        "1.7"]
+  - ["[10..15)", "-",        "1.2"]
+  - ["[6..10)",  "-",        "0.75"]
+  - ["[3..6)",   "-",        "0.4"]
+  - ["-",        ">= 36",    "1.7"]
+  - ["-",        "[12..36)", "1.2"]
+  - ["-",        "[5..12)",  "0.75"]
+  - ["-",        "[2..5)",   "0.4"]
