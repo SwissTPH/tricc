@@ -1,5 +1,4 @@
 import functools
-import json
 import os
 from typing import Dict
 
@@ -8,7 +7,7 @@ from antlr4 import CommonTokenStream, InputStream
 from tricc_oo.converters.cql.cqlLexer import cqlLexer
 from tricc_oo.converters.cql.cqlParser import cqlParser
 from tricc_oo.converters.cql.tricc_cqlVisitor import tricc_cqlVisitor
-from tricc_oo.converters.lang import parse_cql_expression
+from tricc_oo.converters.lang import LANG_DIR, load_lang_json, parse_cql_expression
 from tricc_oo.converters.utils import clean_name, unquote_literal
 from tricc_oo.models.base import (
     TriccOperator,
@@ -29,68 +28,42 @@ STRING = 1
 NUMBER = 2
 ANY = 3
 
-FUNCTION_MAP = {
-    "AgeInYears": TriccOperator.AGE_YEAR,
-    "AgeInMonths": TriccOperator.AGE_MONTH,
-    "AgeInDays": TriccOperator.AGE_DAY,
-    "Coalesce": TriccOperator.COALESCE,
-    "Concatenate": TriccOperator.CONCATENATE,
-    "iZScore": TriccOperator.IZSCORE,
-    "ZScore": TriccOperator.ZSCORE,
-    # the spelling of feature/cdss-zscore.md (and of xpath_to_cql)
-    "Izscore": TriccOperator.IZSCORE,
-    "Zscore": TriccOperator.ZSCORE,
-    "Round": TriccOperator.ROUND,
-    "Integer": TriccOperator.CAST_INTEGER,
-    # decision tables (feature/20261123-decision-tables.md): the name is kept as the first
-    # operand, so the expansion knows the policy (DMNFirst / DMNList) or the alias (DrugDosage);
-    # an alias declared in tricc.yaml parses as NATIVE and is recognised by the expansion
-    "DMN": TriccOperator.DMN,
-    "DMNFirst": TriccOperator.DMN,
-    "DMNList": TriccOperator.DMN,
-    "DrugDosage": TriccOperator.DMN,
-    "HasQualifier": TriccOperator.HAS_QUALIFIER,
-    "DateTimeToDecimal": TriccOperator.DATETIME_TO_DECIMAL,
-    "ToDate": TriccOperator.CAST_DATE,
-    "ToDecimal": TriccOperator.CAST_NUMBER,
-    "ToInteger": TriccOperator.CAST_INTEGER,
-    "ToString": TriccOperator.CAST_STRING,
-    "ToBoolean": TriccOperator.CAST_BOOLEAN,
-    "Count": TriccOperator.COUNT,
-    "DiagnosisList": TriccOperator.DIAGNOSIS_LIST,
-    "Today": TriccOperator.TODAY,
-    "Now": TriccOperator.NOW,
-    "GetContentVersion": TriccOperator.CONTENT_VERSION,
-    "Abs": TriccOperator.ABS,
-    "Min": TriccOperator.MIN,
-    "Max": TriccOperator.MAX,
-    "Sum": TriccOperator.SUM,
-    "FormatDate": TriccOperator.FORMAT_DATE,
-    "Length": TriccOperator.LENGTH,
-    "NormalizeSpace": TriccOperator.NORMALIZE_SPACE,
-    "Matches": TriccOperator.MATCHES,
-    "CountSelected": TriccOperator.COUNT_SELECTED,
-    "GetRepeatedValue": TriccOperator.GET_REPEATED_VALUE,
-}
 
-#: the shared list of CQL functions that retrieve stored data (tricc_oo is its authority; the
-#: frontend's closed-block check tests against a copy of it)
-STORED_DATA_FUNCTIONS_FILE = os.path.join(os.path.dirname(__file__), "cql", "stored_data_functions.json")
+def _catalogue_function_map() -> Dict[str, TriccOperator]:
+    """``{function name: TriccOperator}`` for the catalogue functions that parse to an operator."""
+    return {
+        entry["name"]: TriccOperator[entry["operator"]]
+        for entry in load_lang_json("functions.json")["functions"]
+        if entry.get("operator")
+    }
+
+
+#: CQL function name -> operator, from the catalogue ``tricc_oo/lang/functions.json``.
+#: Decision tables (feature/20261123-decision-tables.md): ``DMN``, ``DMNFirst``, ``DMNList`` keep
+#: their name as the first operand, so the expansion knows the policy or the alias; an alias
+#: declared in tricc.yaml parses as NATIVE and is recognised by the expansion.
+FUNCTION_MAP: Dict[str, TriccOperator] = _catalogue_function_map()
+
+#: the catalogue, the shared list of CQL functions (tricc_oo is its authority; the frontend
+#: pins a copy of ``tricc_oo/lang/``)
+STORED_DATA_FUNCTIONS_FILE = os.path.join(LANG_DIR, "functions.json")
 
 
 @functools.lru_cache(maxsize=1)
 def stored_data_functions() -> Dict[str, str]:
-    """The CQL functions that retrieve stored data, from ``stored_data_functions.json``.
+    """The CQL functions that retrieve stored data, from the catalogue ``functions.json``.
 
     feature/20261111-block-params-and-start-node.md §18.5, §18.8 point 4.
 
     Returns:
         ``{function name: reads}``, ``reads`` being ``patient``, ``encounter``, ``history`` or
-        ``context``.
+        ``context`` (catalogue entries with ``reads: none`` are left out).
     """
-    with open(STORED_DATA_FUNCTIONS_FILE, encoding="utf-8") as file:
-        data = json.load(file)
-    return {entry["name"]: entry["reads"] for entry in data["functions"]}
+    return {
+        entry["name"]: entry["reads"]
+        for entry in load_lang_json("functions.json")["functions"]
+        if entry.get("reads", "none") != "none"
+    }
 
 
 # Operators whose first argument is a concept code rather than a value expression.

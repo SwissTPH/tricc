@@ -649,7 +649,7 @@ def check_block_scope(page, where: str) -> None:
     """Refuse stored data inside a block instance (§18.1, §18.8 decisions).
 
     A block reads no stored data: a ``populate`` node, or an expression calling a function of
-    ``converters/cql/stored_data_functions.json`` (``AgeInDays()``, the encounter, history
+    ``tricc_oo/lang/functions.json`` (``reads``) (``AgeInDays()``, the encounter, history
     and context readers), is an error. ``Today()`` / ``Now()`` are allowed. The value comes
     in as an expression argument, evaluated at the use.
 
