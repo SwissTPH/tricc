@@ -158,6 +158,11 @@ class TestHelperCqlIsTranslatable(unittest.TestCase):
             "GetActiveMedicationRequest",
             "GetEncounterMedicationCodes",
             "GetActiveMedicationCodesSince",
+            "MedicationRequestDosage",
+            "GetEncounterMedicationDosage",
+            "GetMedicationDosageSince",
+            "GetEncounterMedicationRequestDate",
+            "GetMedicationRequestDate",
         ):
             self.assertIn(f"define function {fn}(", self.helper, f"missing {fn}")
 

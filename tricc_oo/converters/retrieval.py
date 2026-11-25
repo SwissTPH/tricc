@@ -63,6 +63,7 @@ RETRIEVAL_FUNCTIONS: Dict[str, tuple] = {
     # medication reads (feature/20261125-populate-medication.md): the drug codes of the open
     # prescriptions (multi-select) and the dosage of the open prescription of a drug
     "ActiveDrugs": (_TIMED, True, "coded"),
+    "OpenDosage": (_TIMED, True, "string"),
 }
 
 #: catalogue functions that read medication records only
@@ -353,6 +354,30 @@ def build_retrieval_node(retrieval: Retrieval):
     )
 
 
+def _select_multiple_concepts(project) -> Set[str]:
+    """Names of the select_multiple questions of the loaded pages."""
+    names = set()
+    for page in (getattr(project, "pages", None) or {}).values():
+        for node in (getattr(page, "nodes", None) or {}).values():
+            if str(getattr(node, "tricc_type", "")) == "select_multiple" and getattr(node, "name", None):
+                names.add(node.name)
+    return names
+
+
+def _warn_dosage_of_multiple(project, retrievals: Iterable[Retrieval]) -> None:
+    """Warn when ``OpenDosage`` reads a select_multiple concept (one dosage per drug)."""
+    dosages = [r for r in retrievals if r.effective_function == "OpenDosage"]
+    if not dosages:
+        return
+    multiple = _select_multiple_concepts(project)
+    for retrieval in dosages:
+        if retrieval.reads_code in multiple or (retrieval.reads_data_type or "").lower() == "select_multiple":
+            logger.warning(
+                f"retrieval {retrieval.code}: OpenDosage reads {retrieval.reads_code!r}, a select_multiple "
+                "concept; the dosage is the one of a single drug, read the drug concept instead"
+            )
+
+
 def build_used_retrievals(project) -> List[Any]:
     """Read the dictionary and build one node per used retrieval (once per project).
 
@@ -374,6 +399,7 @@ def build_used_retrievals(project) -> List[Any]:
             f" ({retrieve_code_system_key(project) or 'none found'})"
         )
     project.retrievals = {code: available[code] for code in used}
+    _warn_dosage_of_multiple(project, project.retrievals.values())
     project.retrieval_nodes = [build_retrieval_node(r) for r in project.retrievals.values()]
     logger.info(f"retrievals used: {', '.join(used)}")
     return project.retrieval_nodes

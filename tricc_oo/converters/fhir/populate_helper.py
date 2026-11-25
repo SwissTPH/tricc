@@ -456,6 +456,48 @@ define function GetEncounterMedicationCodes():
 
 define function GetActiveMedicationCodesSince(since DateTime):
   Combine(distinct((GetOpenMedicationRequestsSince(since)) M return MedicationRequestCode(M)), ' ')
+
+// OpenDosage: the code of a coded dosageInstruction.doseAndRate type, else the dosage text.
+define function MedicationRequestDosage(M MedicationRequest):
+  Coalesce(
+    First(First(M.dosageInstruction).doseAndRate.type.coding).code.value,
+    First(M.dosageInstruction).text.value
+  )
+
+define function GetEncounterMedicationDosage(code String):
+  MedicationRequestDosage(First((GetEncounterMedicationRequests(code)) M sort by authoredOn.value desc))
+
+define function GetMedicationDosageSince(code String, since DateTime):
+  MedicationRequestDosage(GetActiveMedicationRequest(code, since))
+
+// LatestDate: when the drug was last prescribed (authoredOn), open or not; a cancelled,
+// entered-in-error or draft request was never prescribed.
+define function IsPrescribedMedicationRequest(M MedicationRequest):
+  not (M.status in {'cancelled', 'entered-in-error', 'draft'})
+
+define function GetEncounterMedicationRequestDate(code String):
+  if encounterid is null then null as DateTime
+  else
+    Max(
+      (
+        [MedicationRequest] M
+          where IsPrescribedMedicationRequest(M)
+            and MedicationRequestHasCode(M, code)
+            and M.encounter.reference = 'Encounter/' + encounterid
+          return M.authoredOn.value
+      )
+    )
+
+define function GetMedicationRequestDate(code String, since DateTime):
+  Max(
+    (
+      [MedicationRequest] M
+        where IsPrescribedMedicationRequest(M)
+          and MedicationRequestHasCode(M, code)
+        return M.authoredOn.value
+    ) D
+      where since is null or D >= since
+  )
 """
 
 
@@ -559,12 +601,16 @@ _TIMED_CQL = {
         "Exists": "GetEncounterMedicationRequestValue('{code}')",
         "Count": "Count(GetEncounterMedicationRequests('{code}'))",
         "ActiveDrugs": "GetEncounterMedicationCodes()",
+        "OpenDosage": "GetEncounterMedicationDosage('{code}')",
+        "LatestDate": "GetEncounterMedicationRequestDate('{code}')",
     },
     ("MedicationRequest", HISTORY_CONTEXT): {
         "Latest": "exists(GetActiveMedicationRequests('{code}', {since}))",
         "Exists": "exists(GetActiveMedicationRequests('{code}', {since}))",
         "Count": "Count(GetActiveMedicationRequests('{code}', {since}))",
         "ActiveDrugs": "GetActiveMedicationCodesSince({since})",
+        "OpenDosage": "GetMedicationDosageSince('{code}', {since})",
+        "LatestDate": "GetMedicationRequestDate('{code}', {since})",
     },
 }
 

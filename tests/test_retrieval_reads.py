@@ -130,3 +130,38 @@ def test_medication_function_on_another_resource_fails(function):
     with pytest.raises(TriccRetrievalError, match="has no mapping"):
         retrieval_cql_expression(_retrieval(function, concept_type=CONDITION))
     check_reads_resource(_retrieval(function, concept_type=MEDICATION))
+
+
+# --- #75 phase 2: OpenDosage and LatestDate -------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "function, context, period, expected",
+    [
+        ("OpenDosage", "encounter", None, "GetEncounterMedicationDosage('weight')"),
+        ("OpenDosage", "history", "P6M", "GetMedicationDosageSince('weight', Now() - 6 months)"),
+        ("LatestDate", "encounter", None, "GetEncounterMedicationRequestDate('weight')"),
+        ("LatestDate", "history", None, "GetMedicationRequestDate('weight', null)"),
+    ],
+)
+def test_medication_dosage_and_date(function, context, period, expected):
+    assert retrieval_cql_expression(_retrieval(function, context, MEDICATION, period)) == expected
+
+
+def test_open_dosage_is_text_and_rejected_on_other_resources():
+    from tricc_oo.converters.retrieval import check_reads_resource
+
+    assert _retrieval("OpenDosage", concept_type=MEDICATION).value_type == "string"
+    with pytest.raises(TriccRetrievalError, match="OpenDosage reads medication records"):
+        check_reads_resource(_retrieval("OpenDosage", concept_type=PROCEDURE))
+
+
+def test_open_dosage_of_a_select_multiple_warns(caplog):
+    from types import SimpleNamespace
+
+    from tricc_oo.converters.retrieval import _warn_dosage_of_multiple
+
+    page = SimpleNamespace(nodes={"n": SimpleNamespace(tricc_type="select_multiple", name="weight")})
+    with caplog.at_level("WARNING", logger="default"):
+        _warn_dosage_of_multiple(SimpleNamespace(pages={"p": page}), [_retrieval("OpenDosage", concept_type=MEDICATION)])
+    assert "select_multiple" in caplog.text
