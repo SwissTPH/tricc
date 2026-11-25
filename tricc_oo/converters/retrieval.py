@@ -60,7 +60,15 @@ RETRIEVAL_FUNCTIONS: Dict[str, tuple] = {
     "Count": (_TIMED, True, "integer"),
     # date of the latest record (feature/20261125-populate-read-date.md)
     "LatestDate": (_TIMED, True, "dateTime"),
+    # medication reads (feature/20261125-populate-medication.md): the drug codes of the open
+    # prescriptions (multi-select) and the dosage of the open prescription of a drug
+    "ActiveDrugs": (_TIMED, True, "coded"),
 }
+
+#: catalogue functions that read medication records only
+MEDICATION_FUNCTIONS = ("ActiveDrugs", "OpenDosage")
+#: FHIR resources holding medication records
+MEDICATION_RESOURCES = ("MedicationRequest", "MedicationDispense")
 
 DEFAULT_FUNCTION = {
     "patient": "PatientValue",
@@ -72,7 +80,7 @@ DEFAULT_FUNCTION = {
 }
 
 #: resources whose ``Latest`` reads whether a record exists (done / on treatment), not a value
-_DONE_RESOURCES = ("Procedure",)
+_DONE_RESOURCES = ("Procedure",) + MEDICATION_RESOURCES
 
 _CODE_RE = re.compile(r"^#[A-Za-z][A-Za-z0-9_]*$")
 _PLACEHOLDER_RE = re.compile(r"\{\{\s*(code|period)\s*\}\}")
@@ -225,6 +233,25 @@ def read_retrieval(concept) -> Retrieval:
     return retrieval
 
 
+def check_reads_resource(retrieval: Retrieval) -> None:
+    """Reject a medication function reading a concept that is not a medication.
+
+    Args:
+        retrieval: A retrieval whose concept read (``reads_concept_type``) is resolved.
+
+    Raises:
+        TriccRetrievalError: ``ActiveDrugs`` / ``OpenDosage`` on a concept recorded as another
+            resource than MedicationRequest / MedicationDispense.
+    """
+    function = retrieval.effective_function
+    if function in MEDICATION_FUNCTIONS and retrieval.resource not in MEDICATION_RESOURCES:
+        raise TriccRetrievalError(
+            f"retrieval {retrieval.code}: {function} reads medication records, but "
+            f"{retrieval.reads_code!r} is recorded as {retrieval.resource} (conceptType "
+            f"{retrieval.reads_concept_type!r})"
+        )
+
+
 def retrieve_code_system_key(project) -> Optional[str]:
     """Key of the retrieval dictionary in ``project.code_systems``, or None."""
     from tricc_oo.strategies.input.param_build import role_code_system_key
@@ -251,6 +278,7 @@ def read_project_retrievals(project) -> Dict[str, Retrieval]:
             else:
                 retrieval.reads_data_type = _property_text(read, "dataType")
                 retrieval.reads_concept_type = _property_text(read, "conceptType")
+        check_reads_resource(retrieval)
         retrievals[retrieval.code] = retrieval
     return retrievals
 

@@ -395,6 +395,67 @@ define function GetEncounterConditionValue(code String):
 // Deprecated alias: resource-agnostic name kept for previously generated libraries.
 define function GetEncounterValue(code String, repeatIndex Integer, period String):
   GetEncounterObservationValue(code, repeatIndex, period)
+
+// ── Medication reads (feature/20261125-populate-medication.md) ────────────────
+// A drug is matched by code across any system, on medicationCodeableConcept or on the
+// code of the Medication a medicationReference points to. An open prescription is an
+// active MedicationRequest whose dispense validity period has not ended; the history
+// window applies to authoredOn.
+
+define function MedicationRequestHasCode(M MedicationRequest, conceptCode String):
+  exists(((M.medication as FHIR.CodeableConcept).coding) C where C.code = conceptCode)
+    or exists(
+      [Medication] Med
+        where (M.medication as FHIR.Reference).reference = 'Medication/' + Med.id
+          and exists(Med.code.coding C where C.code = conceptCode)
+    )
+
+define function MedicationRequestCode(M MedicationRequest):
+  Coalesce(
+    First((M.medication as FHIR.CodeableConcept).coding).code.value,
+    First(
+      First([Medication] Med where (M.medication as FHIR.Reference).reference = 'Medication/' + Med.id).code.coding
+    ).code.value
+  )
+
+define function IsOpenMedicationRequest(M MedicationRequest):
+  M.status = 'active'
+    and (
+      M.dispenseRequest.validityPeriod.end is null
+        or M.dispenseRequest.validityPeriod.end.value >= Now()
+    )
+
+define function GetEncounterOpenMedicationRequests():
+  if encounterid is null then {} as List<MedicationRequest>
+  else
+    [MedicationRequest] M
+      where IsOpenMedicationRequest(M)
+        and M.encounter.reference = 'Encounter/' + encounterid
+
+define function GetEncounterMedicationRequests(code String):
+  (GetEncounterOpenMedicationRequests()) M where MedicationRequestHasCode(M, code)
+
+define function GetEncounterMedicationRequestValue(code String):
+  exists(GetEncounterMedicationRequests(code))
+
+define function GetOpenMedicationRequestsSince(since DateTime):
+  [MedicationRequest] M
+    where IsOpenMedicationRequest(M)
+      and (since is null or M.authoredOn.value >= since)
+
+define function GetActiveMedicationRequests(code String, since DateTime):
+  (GetOpenMedicationRequestsSince(since)) M where MedicationRequestHasCode(M, code)
+
+define function GetActiveMedicationRequest(code String, since DateTime):
+  First((GetActiveMedicationRequests(code, since)) M sort by authoredOn.value desc)
+
+// ActiveDrugs: the drug codes of the open prescriptions, space-separated like an XLSForm
+// select_multiple answer; null when there is none.
+define function GetEncounterMedicationCodes():
+  Combine(distinct((GetEncounterOpenMedicationRequests()) M return MedicationRequestCode(M)), ' ')
+
+define function GetActiveMedicationCodesSince(since DateTime):
+  Combine(distinct((GetOpenMedicationRequestsSince(since)) M return MedicationRequestCode(M)), ' ')
 """
 
 
@@ -492,9 +553,19 @@ _TIMED_CQL = {
         "Count": "Count(GetHistoryProcedures('{code}', {since}))",
         "LatestDate": "GetHistoryProcedureDate('{code}', {since})",
     },
-    # read as Observations until feature/20261125-populate-medication.md; no date mapping
-    ("MedicationRequest", ENCOUNTER_CONTEXT): {},
-    ("MedicationRequest", HISTORY_CONTEXT): {},
+    # open prescriptions (feature/20261125-populate-medication.md); Latest is "on treatment"
+    ("MedicationRequest", ENCOUNTER_CONTEXT): {
+        "Latest": "GetEncounterMedicationRequestValue('{code}')",
+        "Exists": "GetEncounterMedicationRequestValue('{code}')",
+        "Count": "Count(GetEncounterMedicationRequests('{code}'))",
+        "ActiveDrugs": "GetEncounterMedicationCodes()",
+    },
+    ("MedicationRequest", HISTORY_CONTEXT): {
+        "Latest": "exists(GetActiveMedicationRequests('{code}', {since}))",
+        "Exists": "exists(GetActiveMedicationRequests('{code}', {since}))",
+        "Count": "Count(GetActiveMedicationRequests('{code}', {since}))",
+        "ActiveDrugs": "GetActiveMedicationCodesSince({since})",
+    },
 }
 
 
@@ -551,8 +622,6 @@ def retrieval_cql_expression(retrieval, strategy: str = "FHIRStrategy") -> str:
     if (resource, retrieval.context) not in _TIMED_CQL:
         resource = "Observation"
     templates = _TIMED_CQL.get((resource, retrieval.context), {})
-    if resource.startswith("Medication") and not templates and function != "LatestDate":
-        templates = _TIMED_CQL[("Observation", retrieval.context)]
     if function not in templates:
         raise unsupported(retrieval, strategy)
     since = None

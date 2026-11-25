@@ -92,3 +92,41 @@ def test_procedure_reads(function, context, period, expected):
 def test_procedure_latest_is_done_yes_no():
     assert _retrieval("Latest", concept_type=PROCEDURE).value_type == "boolean"
     assert _retrieval("Latest").value_type == "decimal"  # an Observation keeps the concept's type
+
+
+# --- #75 medication: MedicationRequest ----------------------------------------------------
+
+MEDICATION = "medication"
+
+
+@pytest.mark.parametrize(
+    "function, context, period, expected",
+    [
+        ("Latest", "encounter", None, "GetEncounterMedicationRequestValue('weight')"),
+        ("Exists", "encounter", None, "GetEncounterMedicationRequestValue('weight')"),
+        ("Count", "encounter", None, "Count(GetEncounterMedicationRequests('weight'))"),
+        ("ActiveDrugs", "encounter", None, "GetEncounterMedicationCodes()"),
+        ("Latest", "history", "P6M", "exists(GetActiveMedicationRequests('weight', Now() - 6 months))"),
+        ("Exists", "history", None, "exists(GetActiveMedicationRequests('weight', null))"),
+        ("Count", "history", "P1Y", "Count(GetActiveMedicationRequests('weight', Now() - 1 year))"),
+        ("ActiveDrugs", "history", "P6M", "GetActiveMedicationCodesSince(Now() - 6 months)"),
+    ],
+)
+def test_medication_request_reads(function, context, period, expected):
+    assert retrieval_cql_expression(_retrieval(function, context, MEDICATION, period)) == expected
+
+
+def test_on_treatment_is_yes_no_and_active_drugs_coded():
+    assert _retrieval("Latest", concept_type=MEDICATION).value_type == "boolean"
+    assert _retrieval("ActiveDrugs", concept_type=MEDICATION).value_type == "coded"
+
+
+@pytest.mark.parametrize("function", ["ActiveDrugs"])
+def test_medication_function_on_another_resource_fails(function):
+    from tricc_oo.converters.retrieval import check_reads_resource
+
+    with pytest.raises(TriccRetrievalError, match=f"{function} reads medication records"):
+        check_reads_resource(_retrieval(function, concept_type=OBSERVATION))
+    with pytest.raises(TriccRetrievalError, match="has no mapping"):
+        retrieval_cql_expression(_retrieval(function, concept_type=CONDITION))
+    check_reads_resource(_retrieval(function, concept_type=MEDICATION))
