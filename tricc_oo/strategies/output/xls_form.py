@@ -11,7 +11,7 @@ import pandas as pd
 from pyxform import create_survey_from_xls
 
 from tricc_oo.visitors.calls import inline_function_call
-from tricc_oo.converters.utils import clean_name
+from tricc_oo.converters.utils import clean_name, xpath_literal
 from tricc_oo.models.base import (
     TriccOperator,
     TriccOperation, TriccStatic, TriccReference,
@@ -617,16 +617,17 @@ class XLSFormStrategy(BaseOutPutStrategy):
             return "1"
 
     def tricc_operation_native(self, ref_expressions, original_references=None):
+        """A native function call; ``GetChoiceName(value, field)`` becomes ``jr:choice-name``.
 
+        The field argument of ``jr:choice-name`` is the field reference written as a string
+        (``'${field}'``), through ``xpath_literal`` (fix/20261125-xpath-text-literals.md).
+        """
         if len(ref_expressions) > 0:
             if ref_expressions[0].startswith(("'", "`",)):
                 ref_expressions[0] = ref_expressions[0][1:-1]
             if ref_expressions[0] == "GetChoiceName":
-                return f"""jr:choice-name({
-                    self.clean_coalesce(ref_expressions[1])
-                    }, '{
-                    self.clean_coalesce(ref_expressions[2])
-                    }')"""
+                field = xpath_literal(self.clean_coalesce(ref_expressions[2]))
+                return f"jr:choice-name({self.clean_coalesce(ref_expressions[1])}, {field})"
             elif ref_expressions[0] == "GetFacilityParam":
                 return "0"
                 # return f"jr:choice-name({','.join(ref_expressions[1:])})"
@@ -649,15 +650,19 @@ class XLSFormStrategy(BaseOutPutStrategy):
         return f"({ref_expressions[0]})"
 
     def tricc_operation_selected(self, ref_expressions, original_references=None):
+        """``selected(field, value)`` per value, joined with ``or``.
+
+        A string is an operand already written as XPath; an option or another value (a number)
+        is written with ``xpath_literal`` (fix/20261125-xpath-text-literals.md).
+        """
         parts = []
         for s in ref_expressions[1:]:
-            # for option with numeric value
             if isinstance(s, str):
                 cleaned_s = s
             elif isinstance(s, TriccNodeSelectOption):
-                cleaned_s = s.name
+                cleaned_s = xpath_literal(s.name)
             else:
-                cleaned_s = "'" + str(s) + "'"
+                cleaned_s = xpath_literal(s)
             parts.append(f"selected({self.clean_coalesce(ref_expressions[0])}, {cleaned_s})")
         if len(parts) == 1:
             return parts[0]
@@ -948,8 +953,13 @@ class XLSFormStrategy(BaseOutPutStrategy):
         return f"concat({','.join(map(str, ref_expressions))})"
 
     def tricc_operation_diagnosis_list(self, ref_expressions, original_references=None):
+        """The display texts of the diagnoses that hold, each followed by a comma.
+
+        ``concat(if(<dx> = 1, '<display>,', ''), …)``; the display text is written with
+        ``xpath_literal`` (fix/20261125-xpath-text-literals.md).
+        """
         from tricc_oo.converters.datadictionnary import lookup_codesystems_code
-       
+
         parts = []
         for i, orig_ref in enumerate(original_references):
             expr = ref_expressions[i] if ref_expressions and i < len(ref_expressions) else None
@@ -972,7 +982,7 @@ class XLSFormStrategy(BaseOutPutStrategy):
                 display = code
 
             # Always include comma after diagnosis name
-            parts.append(f"if({expr} = 1, '{display},', '')")
+            parts.append(f"if({expr} = 1, {xpath_literal(f'{display},')}, '')")
 
         if parts:
             return f"concat({','.join(parts)})"

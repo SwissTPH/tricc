@@ -1,0 +1,12 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "literals",
+  "name": "literals",
+  "title": "Literals",
+  "url": "http://example.org/fhir/CodeSystem/literals",
+  "status": "draft",
+  "content": "complete",
+  "concept": [
+    {"code": "dx_cough", "display": "Child's \"dry\" cough"}
+  ]
+}

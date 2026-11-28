@@ -1,0 +1,16 @@
+# Text holding an apostrophe and a double quote, written into XPath by the XLSForm family
+# (fix/20261125-xpath-text-literals.md).
+title: XPath text literals
+input_strategy: YamlStrategy
+output_strategies:
+  - XLSFormStrategy
+decision_tables:
+  - tables/*.yaml
+terminology:
+  - terminology/*.codesystem.json
+interventions:
+  - id: literals
+    name: literals
+    title: Literals
+    activity:
+      - activities/literals.activity.yaml

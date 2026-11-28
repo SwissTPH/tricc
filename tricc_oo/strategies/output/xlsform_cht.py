@@ -28,7 +28,7 @@ from tricc_oo.strategies.output.xls_form import XLSFormStrategy
 from tricc_oo.converters.cql_to_operation import transform_cql_to_operation
 from tricc_oo.converters.duration import to_days
 from tricc_oo.converters.tricc_to_xls_form import get_export_name
-from tricc_oo.converters.utils import clean_name, remove_html
+from tricc_oo.converters.utils import clean_name, remove_html, xpath_literal
 from tricc_oo.serializers.js_expression import render_cht_js_expression
 from tricc_oo.visitors.text_injection import serialize_injection_for_js_text
 from tricc_oo.visitors.xform_pd import make_breakpoints, get_task_js
@@ -871,12 +871,14 @@ class XLSFormCHTStrategy(XLSFormCDSSStrategy):
         """``cht:extension-lib('dmn-<project>.js', 'table', 'policy', 'output', input1, …)``.
 
         Each input is read once; the library evaluates the table (tricc_oo.serializers.dmn_js).
+        The table, policy and output are written with ``xpath_literal``; the library name is a
+        slug made by tricc (fix/20261125-xpath-text-literals.md).
         """
         table_id, policy, output = (r.value for r in operation.reference[1:4])
         self.check_list_values((getattr(self.project, "decision_tables", None) or {}).get(table_id), policy, output)
         args = [self.table_call_operand(arg) for arg in operation.reference[4:]]
         self._decision_table_calls = True
-        head = ", ".join(f"'{v}'" for v in (table_id, policy, output))
+        head = ", ".join(xpath_literal(v) for v in (table_id, policy, output))
         return f"cht:extension-lib('{self.decision_table_library()}', {head}, {', '.join(args)})"
 
     def write_decision_table_library(self) -> Optional[str]:

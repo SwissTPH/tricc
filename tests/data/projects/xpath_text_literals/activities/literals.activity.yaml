@@ -1,0 +1,42 @@
+id: literals
+title: Literals
+process: main
+nodes:
+  - {id: start, type: start, name: start_literals, label: Literals}
+  - {id: remark, type: text, name: remark, label: Remark}
+  - id: answer
+    type: select_one
+    name: answer
+    label: Answer
+    options:
+      - {id: opt_its, name: its, label: It's}
+      - {id: opt_other, name: other, label: Other}
+  - id: signs
+    type: select_multiple
+    name: signs
+    label: Signs
+    options:
+      - {id: opt_rash, name: rash, label: Rash}
+      - {id: opt_none, name: none, label: None}
+  # a text constant compared with a field, and in a concatenation (concat branch)
+  - {id: same, type: calculate, name: same_remark, label: Same remark, calculate: "\"remark\" = 'it\\'s \"x\"'"}
+  - {id: joined, type: calculate, name: joined, label: Joined, calculate: "Concatenate('it\\'s \"x\"', \"remark\")"}
+  # selected() with a text argument (an option name cannot hold a quote in the editor;
+  # tests/test_xpath_text_literals.py builds one directly)
+  - {id: on_selected, type: integer, name: on_selected, label: Shown when selected,
+     relevance: "selected(\"signs\", 'it\\'s \"x\"')"}
+  # a decision table call with a text argument, and a text cell / output
+  - {id: reply, type: calculate, name: reply, label: Reply, calculate: "DMN('replies', \"remark\")"}
+  - {id: fixed, type: calculate, name: fixed_reply, label: Fixed reply, calculate: "DMN('replies', 'it\\'s \"x\"')"}
+  # a diagnosis whose display text holds both quotes
+  - {id: dx, type: calculate, name: dx_cough, label: Cough, calculate: "\"remark\" != ''"}
+  - {id: dxlist, type: calculate, name: dx_list, label: Diagnoses, calculate: "DiagnosisList(\"dx_cough\")"}
+  - {id: note, type: note, name: literals_note, label: "${same_remark} ${joined} ${reply} ${fixed_reply} ${dx_list}"}
+  - {id: end, type: end, name: end_literals, label: End}
+edges:
+  - {id: e1, source: start, target: remark}
+  - {id: e2, source: remark, target: answer}
+  - {id: e3, source: answer, target: signs}
+  - {id: e4, source: signs, target: on_selected}
+  - {id: e6, source: on_selected, target: note}
+  - {id: e7, source: note, target: end}

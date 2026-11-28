@@ -33,6 +33,7 @@ from tests.test_decision_tables import (
 from tests.test_decision_tables import yaml_project  # noqa: F401 (a fixture)
 from tricc_oo.converters.cql_to_operation import transform_cql_to_operation
 from tricc_oo.converters.decision_table import expand_decision_tables
+from tricc_oo.converters.utils import xpath_literal
 from tricc_oo.data.anthro import builtin_decision_table, get_choice_rows
 from tricc_oo.models.base import TriccOperation, TriccOperator, TriccReference
 from tricc_oo.models.decision_table import (
@@ -92,11 +93,12 @@ def _instance(table, policy="first"):
 
 
 def _literal(value, column):
+    """An input value as an XPath literal (the form's value: booleans 1 / 0, not entered: empty)."""
     if value is None:
         return "''"
     if isinstance(value, bool):
         return "'1'" if value else "'0'"
-    return f"'{value}'"
+    return xpath_literal(value)
 
 
 def lookup(table, inputs, policy="first", output=None):
