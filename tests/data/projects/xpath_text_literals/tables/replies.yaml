@@ -1,0 +1,13 @@
+id: replies
+title: Replies to a remark
+hit_policy: first
+inputs:
+  - name: remark
+    concept: remark
+    type: string
+outputs:
+  - name: reply
+    type: string
+rules:
+  - ["'it\\'s \"x\"'", "it's"]
+  - ["-", "other"]
