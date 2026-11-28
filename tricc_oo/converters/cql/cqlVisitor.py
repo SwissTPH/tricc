@@ -1,4 +1,5 @@
 # flake8: noqa
+# tricc-lang 1.0.0 (tricc_oo/lang/VERSION)
 # Generated from cql.g4 by ANTLR 4.13.2
 from antlr4 import *
 if "." in __name__:
@@ -425,11 +426,6 @@ class cqlVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by cqlParser#negateMembershipExpression.
-    def visitNegateMembershipExpression(self, ctx:cqlParser.NegateMembershipExpressionContext):
-        return self.visitChildren(ctx)
-
-
     # Visit a parse tree produced by cqlParser#termExpression.
     def visitTermExpression(self, ctx:cqlParser.TermExpressionContext):
         return self.visitChildren(ctx)
@@ -795,6 +791,11 @@ class cqlVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by cqlParser#externalConstant.
+    def visitExternalConstant(self, ctx:cqlParser.ExternalConstantContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by cqlParser#intervalSelector.
     def visitIntervalSelector(self, ctx:cqlParser.IntervalSelectorContext):
         return self.visitChildren(ctx)
@@ -887,11 +888,6 @@ class cqlVisitor(ParseTreeVisitor):
 
     # Visit a parse tree produced by cqlParser#identifier.
     def visitIdentifier(self, ctx:cqlParser.IdentifierContext):
-        return self.visitChildren(ctx)
-
-
-    # Visit a parse tree produced by cqlParser#externalConstant.
-    def visitExternalConstant(self, ctx:cqlParser.ExternalConstantContext):
         return self.visitChildren(ctx)
 
 

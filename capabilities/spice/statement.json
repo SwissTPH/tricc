@@ -1,0 +1,17 @@
+{
+  "$schema": "../statement.schema.json",
+  "id": "@tricc/capabilities-spice",
+  "version": "1.0.0",
+  "strategy": "SpiceStrategy",
+  "description": "Spice forms.",
+  "lang": "^1.0.0",
+  "contexts": ["form"],
+  "operators": {
+    "EQUAL": ["form"]
+  },
+  "functions": [],
+  "retrieval_contexts": [],
+  "populate_contexts": [],
+  "data_types": ["note", "select_one", "select_multiple", "select_yesno", "integer", "decimal", "text", "date"],
+  "features": []
+}

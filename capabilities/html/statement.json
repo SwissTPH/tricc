@@ -1,0 +1,27 @@
+{
+  "$schema": "../statement.schema.json",
+  "id": "@tricc/capabilities-html",
+  "version": "1.0.0",
+  "strategy": "HTMLStrategy",
+  "description": "Static HTML form preview.",
+  "lang": "^1.0.0",
+  "contexts": ["form"],
+  "operators": {
+    "AND": ["form"],
+    "EQUAL": ["form"],
+    "LESS": ["form"],
+    "LESS_OR_EQUAL": ["form"],
+    "MINUS": ["form"],
+    "MORE": ["form"],
+    "MORE_OR_EQUAL": ["form"],
+    "NOT": ["form"],
+    "NOTEQUAL": ["form"],
+    "OR": ["form"],
+    "PLUS": ["form"]
+  },
+  "functions": [],
+  "retrieval_contexts": [],
+  "populate_contexts": [],
+  "data_types": ["note", "select_one", "select_multiple", "select_yesno", "integer", "decimal", "text", "date"],
+  "features": []
+}

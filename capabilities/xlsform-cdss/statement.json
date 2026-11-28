@@ -1,0 +1,21 @@
+{
+  "$schema": "../statement.schema.json",
+  "id": "@tricc/capabilities-xlsform-cdss",
+  "version": "1.0.0",
+  "strategy": "XLSFormCDSSStrategy",
+  "description": "XLSForm CDSS forms (ages, diagnoses).",
+  "lang": "^1.0.0",
+  "extends": {
+    "package": "@tricc/capabilities-xlsform",
+    "version": "^1.0.0"
+  },
+  "add": {
+    "operators": {
+      "AGE_DAY": ["form"],
+      "AGE_MONTH": ["form"],
+      "AGE_YEAR": ["form"]
+    },
+    "functions": ["AgeInDays", "AgeInMonths", "AgeInYears"]
+  },
+  "remove": {}
+}
