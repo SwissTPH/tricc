@@ -1,0 +1,60 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "demo-calculate",
+  "name": "demo-calculate",
+  "title": "Calculates",
+  "url": "http://example.org/fhir/CodeSystem/demo-calculate",
+  "meta": {"tag": [{"system": "http://tricc.org/fhir/CodeSystem/codesystem-role", "code": "calculate"}]},
+  "status": "draft",
+  "content": "complete",
+  "concept": [
+    {
+      "code": "IsAdult",
+      "display": "Is an adult",
+      "property": [{"code": "dataType", "valueCode": "boolean"}],
+      "extension": [
+        {
+          "url": "http://tricc.org/fhir/StructureDefinition/function-parameter",
+          "extension": [
+            {"url": "name", "valueString": "age"},
+            {"url": "type", "valueCode": "integer"}
+          ]
+        },
+        {
+          "url": "http://tricc.org/fhir/StructureDefinition/function-parameter",
+          "extension": [
+            {"url": "name", "valueString": "declared"},
+            {"url": "type", "valueCode": "boolean"}
+          ]
+        }
+      ]
+    },
+    {
+      "code": "BMI",
+      "display": "Body mass index",
+      "property": [{"code": "dataType", "valueCode": "decimal"}],
+      "extension": [
+        {
+          "url": "http://tricc.org/fhir/StructureDefinition/function-parameter",
+          "extension": [
+            {"url": "name", "valueString": "weight"},
+            {"url": "type", "valueCode": "decimal"},
+            {"url": "fallback", "valueCoding": {"system": "http://example.org/fhir/CodeSystem/demo", "code": "weight"}},
+            {"url": "retrieval", "valueCode": "#last_weight"}
+          ]
+        },
+        {
+          "url": "http://tricc.org/fhir/StructureDefinition/function-parameter",
+          "extension": [
+            {"url": "name", "valueString": "height"},
+            {"url": "type", "valueCode": "decimal"}
+          ]
+        },
+        {
+          "url": "http://tricc.org/fhir/StructureDefinition/function-body",
+          "valueExpression": {"language": "text/cql", "expression": "weight / (height * height)"}
+        }
+      ]
+    }
+  ]
+}

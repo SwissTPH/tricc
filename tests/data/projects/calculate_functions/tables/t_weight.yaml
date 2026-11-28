@@ -1,0 +1,15 @@
+id: t_weight
+title: Weight class
+hit_policy: first
+inputs:
+  - name: w
+    concept: weight
+    type: decimal
+    retrievals:
+      - "#prev_weight"
+outputs:
+  - name: class
+    type: string
+rules:
+  - [">= 50", "heavy"]
+  - ["< 50",  "light"]

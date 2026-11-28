@@ -61,11 +61,17 @@ class DecisionTableError(ValueError):
 
 @dataclass
 class TableColumn:
-    """An input or output column. An input's ``concept`` is read when a call leaves it out."""
+    """An input or output column.
+
+    A call that leaves an input out binds it from its fallbacks
+    (feature/20261125-calculate-functions.md §2.3): the latest value of ``concept``, an earlier
+    call's argument, then the first of ``retrievals`` (``#code``).
+    """
 
     name: str
     type: ColumnType = "string"
     concept: Optional[str] = None
+    retrievals: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -164,7 +170,14 @@ def _decode_columns(value: Any, path: str, key: str) -> List[TableColumn]:
                 f"{path}: column {name!r} has type {column_type!r}; use one of {', '.join(TABLE_COLUMN_TYPES)}.",
             )
         concept = rec.get("concept") if isinstance(rec.get("concept"), str) and rec.get("concept") else None
-        columns.append(TableColumn(name=name, type=column_type, concept=concept))
+        retrievals = rec.get("retrievals") or []
+        if isinstance(retrievals, str):
+            retrievals = retrievals.split()
+        if not isinstance(retrievals, list) or not all(isinstance(r, str) and r.startswith("#") for r in retrievals):
+            raise DecisionTableError(
+                "E_DMN_SHAPE", f"{path}: column {name!r} retrievals must be a list of '#code'."
+            )
+        columns.append(TableColumn(name=name, type=column_type, concept=concept, retrievals=list(retrievals)))
     return columns
 
 
@@ -237,6 +250,8 @@ def encode_table(table: DecisionTable) -> str:
         if c.concept:
             out["concept"] = c.concept
         out["type"] = c.type
+        if c.retrievals:
+            out["retrievals"] = list(c.retrievals)
         return out
 
     head: Dict[str, Any] = {"id": table.id}

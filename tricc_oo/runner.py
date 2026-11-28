@@ -38,6 +38,7 @@ from tricc_oo.converters.project_config import (
 )
 from tricc_oo.models.project_config import TriccInterventionConfig, TriccProjectConfig
 from tricc_oo.strategies.input.base_input_strategy import BaseInputStrategy
+from tricc_oo.visitors.calls import write_data_needs
 from tricc_oo.strategies.registry import (
     all_input_extensions,
     get_input_strategy,
@@ -245,6 +246,7 @@ def load_input_project(
     libraries: Sources = (),
     decision_tables: Sources = (),
     decision_table_calls: bool = False,
+    function_calls: bool = False,
     capability_statements: Sequence[ResolvedStatement] = (),
 ):
     """Build the TriccIntervention from ``(strategy name, files, contents)`` groups.
@@ -258,6 +260,8 @@ def load_input_project(
     project = strategies[0][0].new_project(project_config, intervention)
     # the output strategy evaluates the decision tables itself (CHT dmn-<project>.js)
     project.decision_table_calls = decision_table_calls
+    # the output strategy writes each calculate function once (FHIR Helper library)
+    project.function_calls = function_calls
     BaseInputStrategy.load_terminology(project, terminology)
     BaseInputStrategy.load_libraries(project, libraries)
     BaseInputStrategy.load_decision_tables(project, decision_tables)
@@ -329,12 +333,15 @@ def run_grouped_export(
         libraries=libraries,
         decision_tables=decision_tables,
         decision_table_calls=bool(getattr(OutputStrategyCls, "decision_table_calls", False)),
+        function_calls=bool(getattr(OutputStrategyCls, "function_calls", False)),
         capability_statements=capability_statements,
     )
     output_strategy = OutputStrategyCls(project, out_dir)
     logger.info("Using strategy %s", OutputStrategyCls.__name__)
     output_strategy.check_retrievals()
     output_strategy.execute()
+    # every call and where each argument came from (feature/20261125-calculate-functions.md §4)
+    write_data_needs(project, out_dir)
     if test_strategy_name:
         TestStrategyCls = get_test_strategy(test_strategy_name)
         logger.info("Running test strategy %s", TestStrategyCls.__name__)

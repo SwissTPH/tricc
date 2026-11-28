@@ -153,7 +153,8 @@ writes one YAML table per drug: weight rows, then age rows with weight `-`; non-
 
 ### 2. Validation and errors
 
-`E_DMN_TABLE_UNKNOWN`, `E_DMN_TABLE_NOT_STATIC`, `E_DMN_ARITY` (argument count ≠ inputs),
+`E_DMN_TABLE_UNKNOWN`, `E_DMN_TABLE_NOT_STATIC`, `E_CALL_ARITY` (argument count ≠ inputs; was
+`E_DMN_ARITY` before RFC #101),
 `E_DMN_CELL` (cell syntax, with table / row / column), `E_DMN_TYPE` (cell value vs column
 type, or a list result used as one value), `E_DMN_OVERLAP` (`unique`), `E_DMN_LIST_VALUE` (a list output value with a space, XPath),
 `E_ALIAS_UNKNOWN_INPUT`. A table no call uses is a warning.
@@ -213,7 +214,8 @@ Where the code differs from, or adds to, Part II:
   tables into the Global repo is left to that repo.
 - **Errors.** `DecisionTableError(code, message)` (a `ValueError`); table files fail at load,
   calls at expansion with the node named. `E_DMN_SHAPE` (row width, bad file) and the
-  #96 codes `E_DMN_ARG_UNKNOWN` / `E_DMN_ARG_TWICE` are added. "A list result used as one
+  #96 codes `E_DMN_ARG_UNKNOWN` / `E_DMN_ARG_TWICE` are added (renamed `E_CALL_ARG_UNKNOWN` /
+  `E_CALL_ARG_TWICE` by RFC #101). "A list result used as one
   value" (`E_DMN_TYPE`) is not checked.
 - **CHT extension library** (added 2026-11-23). The runner tells the input stage whether the
   output strategy evaluates tables itself (`decision_table_calls = True` on

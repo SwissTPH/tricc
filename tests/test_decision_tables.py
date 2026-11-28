@@ -257,11 +257,11 @@ def test_calls_inside_expressions_and_used_tables():
         ("DMN('nope', 1)", "E_DMN_TABLE_UNKNOWN"),
         ("DMN('diazepam.nope', 1)", "E_DMN_TABLE_UNKNOWN"),
         ("DMN(\"t\", 1)", "E_DMN_TABLE_NOT_STATIC"),
-        ("DMN('diazepam', 1, 2, 3)", "E_DMN_ARITY"),
-        ("DrugDosage('diazepam', 1, 2, 3)", "E_DMN_ARITY"),
-        ("DMN('diazepam', Tuple{ height: 1 })", "E_DMN_ARG_UNKNOWN"),
-        ("DMN('diazepam', 1, Tuple{ weight: 2 })", "E_DMN_ARG_TWICE"),
-        ("Coalesce(DMN('diazepam', 1), Tuple{ weight: 2 })", "E_DMN_ARG_UNKNOWN"),
+        ("DMN('diazepam', 1, 2, 3)", "E_CALL_ARITY"),
+        ("DrugDosage('diazepam', 1, 2, 3)", "E_CALL_ARITY"),
+        ("DMN('diazepam', Tuple{ height: 1 })", "E_CALL_ARG_UNKNOWN"),
+        ("DMN('diazepam', 1, Tuple{ weight: 2 })", "E_CALL_ARG_TWICE"),
+        ("Coalesce(DMN('diazepam', 1), Tuple{ weight: 2 })", "E_CALL_ARG_UNKNOWN"),
     ],
 )
 def test_call_errors(cql, code):
@@ -270,16 +270,19 @@ def test_call_errors(cql, code):
     assert exc.value.code == code
 
 
-def test_alias_unknown_input_and_unbound_input_without_concept():
+def test_alias_unknown_input_and_unbound_input_without_concept(caplog):
     aliases = {"Bad": FunctionAlias(function="DMN", args=["table", "height"])}
     with pytest.raises(DecisionTableError) as exc:
         expand("Bad('diazepam', 1)", aliases=aliases)
     assert exc.value.code == "E_ALIAS_UNKNOWN_INPUT"
+    # an input left out with no fallback has no value (feature/20261125-calculate-functions.md §2.3)
     bare = DecisionTable(**{**DIAZEPAM.__dict__})
     bare.inputs = [c.__class__(name=c.name, type=c.type) for c in DIAZEPAM.inputs]
-    with pytest.raises(DecisionTableError) as exc:
-        expand("DMN('diazepam', 1)", {"diazepam": bare})
-    assert exc.value.code == "E_DMN_ARITY"
+    with caplog.at_level(logging.WARNING, logger="default"):
+        expr = expand("DMN('diazepam', 25)", {"diazepam": bare})
+    assert "W_PARAM_NO_VALUE" in caplog.text
+    assert not expr.get_references() if hasattr(expr, "get_references") else True
+    assert run(expr, {}) == "2.5"
 
 
 # ---------------------------------------------------------------- table files

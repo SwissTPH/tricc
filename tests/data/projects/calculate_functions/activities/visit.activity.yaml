@@ -1,0 +1,13 @@
+# One visit: triage, then registration. Both compute is_adult (the #54 case).
+id: visit
+title: Visit
+process: main
+nodes:
+  - {id: v_start, type: start, name: start_visit, label: Visit}
+  - {id: v_goto_triage, type: goto, name: goto_triage, label: Triage, link: triage, instance: 1}
+  - {id: v_goto_registration, type: goto, name: goto_registration, label: Registration, link: registration, instance: 1}
+  - {id: v_end, type: end, name: end_visit, label: End}
+edges:
+  - {source: v_start, target: v_goto_triage}
+  - {source: v_goto_triage, target: v_goto_registration}
+  - {source: v_goto_registration, target: v_end}

@@ -1,7 +1,7 @@
 import logging
 import os
 
-from tricc_oo.converters.decision_table import expand_project_tables
+from tricc_oo.visitors.calls import CallState, check_project_calls
 from tricc_oo.converters.xml_to_tricc import (
     apply_goto_page_to_activity,
     apply_goto_repeat_to_activity,
@@ -59,9 +59,13 @@ class DrawioStrategy(BaseInputStrategy):
     file_extensions = (".drawio",)
 
     def process_pages(self, start_page, project):
-        # decision table calls become IFS / LIST_IF before anything reads the expressions
-        # (feature/20261123-decision-tables.md)
-        expand_project_tables(project)
+        # calls (decision tables, functions) are checked here and stay calls during the walk: bound
+        # and expanded when their node is instantiated (feature/20261125-calculate-functions.md)
+        call_state = project.call_state or CallState(project)
+        project.call_state = call_state
+        check_project_calls(project)
+        call_state.start_page = start_page
+        processed_nodes = OrderedSet()
         # create the graph
         self.linking_nodes(start_page.root, start_page, project.pages)
         # Save the calculate list [node]
@@ -82,8 +86,13 @@ class DrawioStrategy(BaseInputStrategy):
             decision_tables=project.decision_tables,
             aliases=project.aliases,
             decision_table_calls=project.decision_table_calls,
+            call_state=call_state,
+            processed_nodes=processed_nodes,
             process=[start_page.root.process],
         )
+        # unread free-standing calculates holding a call: bound now when saved, else dropped
+        call_state.finish_walk(processed_nodes)
+        project.data_needs = call_state.records
 
         logger.info("# check if all edges (arrow) where used")
         for key, page in project.pages.items():

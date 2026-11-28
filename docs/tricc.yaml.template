@@ -49,8 +49,10 @@ parameters:
 
 # CQL libraries: every `define name: <expression>` becomes a calculate that any
 # activity (draw.io or YAML) can reference by name, as if it were drawn free-floating
-# on the main page. library / using / include / context lines are ignored; functions
-# with a body are not supported yet; names must be plain identifiers. An `external`
+# on the main page. library / using / include / context lines are ignored; names must be
+# plain identifiers. A function with a body is a calculate function, called F(…) with
+# named parameters (@param.<name>: fallback=<concept> retrievals=#code; see
+# docs/tricc-elements.md "Calculate functions"). An `external`
 # function declares the FHIR type of a function called as written; CQL documentation
 # tags before it add data (only @retrieve: false = depends on its arguments alone, foldable
 # as a constant; without it the function is assumed to read recorded data), e.g.

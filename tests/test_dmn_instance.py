@@ -243,7 +243,7 @@ def test_a_project_table_replaces_the_built_in_one():
     [
         ("Zscore(\"t\", \"sex\", \"age\", \"w\")", "E_DMN_TABLE_NOT_STATIC"),
         ("Zscore('nope', \"sex\", \"age\", \"w\")", "E_DMN_TABLE_UNKNOWN"),
-        ("Zscore('wfa', \"sex\", \"age\")", "E_DMN_ARITY"),
+        ("Zscore('wfa', \"sex\", \"age\")", "E_CALL_ARITY"),
     ],
 )
 def test_zscore_errors(cql, code):

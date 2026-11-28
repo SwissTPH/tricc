@@ -336,6 +336,32 @@ def build_used_retrievals(project) -> List[Any]:
     return project.retrieval_nodes
 
 
+def add_retrieval(project, code: str):
+    """The node of retrieval ``code``, built when no expression used it yet.
+
+    A call binds a left-out parameter to a retrieval listed on it
+    (feature/20261125-calculate-functions.md §2.3 step 3): ``project.retrievals`` and
+    ``project.retrieval_nodes`` are extended, the caller hangs the node on its start page.
+
+    Raises:
+        TriccRetrievalError: ``E_PARAM_RETRIEVAL_UNKNOWN``, no such code in the dictionary.
+    """
+    for node in getattr(project, "retrieval_nodes", None) or []:
+        if node.name == code:
+            return node
+    retrieval = read_project_retrievals(project).get(code)
+    if retrieval is None:
+        raise TriccRetrievalError(
+            f"E_PARAM_RETRIEVAL_UNKNOWN: retrieval {code}: no concept with this code in the retrieval dictionary"
+            f" ({retrieve_code_system_key(project) or 'none found'})"
+        )
+    node = build_retrieval_node(retrieval)
+    project.retrievals = {**(project.retrievals or {}), code: retrieval}
+    project.retrieval_nodes = [*(project.retrieval_nodes or []), node]
+    logger.info(f"retrieval {code} built for a call parameter")
+    return node
+
+
 # --- expressions ------------------------------------------------------------------
 
 
