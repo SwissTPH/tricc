@@ -140,6 +140,32 @@ class TestHelperCqlIsTranslatable(unittest.TestCase):
             "GetEncounterProcedureValue",
             "GetHistoryProcedure",
             "GetHistoryProcedureDate",
+            # LatestDate (feature/20261125-populate-read-date.md)
+            "LatestObservationTime",
+            "GetEncounterObservationTime",
+            "ConditionDate",
+            "GetEncounterConditionDate",
+            "GetHistoryConditionDate",
+            "ProcedureTime",
+            "GetEncounterProcedureDate",
+            "GetHistoryProcedures",
+            # medication reads (feature/20261125-populate-medication.md)
+            "MedicationRequestHasCode",
+            "MedicationRequestCode",
+            "MedicationRequestDosePeriod",
+            "MedicationRequestPeriod",
+            "PeriodOverlaps",
+            "IsValidMedicationRequest",
+            "MedicationRequestDosage",
+            "PeriodDays",
+            "MedicationRequestDuration",
+            "MedicationRequestQuantity",
+            "MedicationRequestDispensed",
+            "MedicationDispenseHasCode",
+            "GetEncounterMedicationDispenses",
+            "GetMedicationDispenses",
+            "GetEncounterMedicationDispenseDate",
+            "GetLastMedicationDispenseDate",
         ):
             self.assertIn(f"define function {fn}(", self.helper, f"missing {fn}")
 
@@ -157,11 +183,87 @@ class TestHelperCqlIsTranslatable(unittest.TestCase):
             r"define function IsDoneProcedure\(P Procedure\):\s+P\.status = 'completed'\s+"
             r"and not exists\(P\.outcome\.coding O where O\.code = '385671000'\)",
         )
-        self.assertEqual(self.helper.count("IsDoneProcedure(P)"), 2)
+        # every Procedure read goes through the shared "HistoryProcedures" retrieve
+        self.assertEqual(self.helper.count("IsDoneProcedure(P)"), 1)
+        self.assertIn('define "HistoryProcedures":\n  [Procedure] P where IsDoneProcedure(P)', self.helper)
+        self.assertEqual(self.helper.count("[Procedure]"), 1)
 
     def test_procedure_repeat_slot_uses_the_observation_extension(self):
         self.assertIn("define function ProcedureRepeatIndex(P Procedure):", self.helper)
         self.assertIn("Coalesce(ProcedureRepeatIndex(P), 1) = Coalesce(repeatIndex, 1)", self.helper)
+
+
+class TestMedicationReads(unittest.TestCase):
+    """feature/20261125-populate-medication.md data cases, pinned on the Helper text (no CQL engine here)."""
+
+    def setUp(self):
+        self.helper = _helper_cql()
+
+    def _define(self, name):
+        match = re.search(rf"define function {name}\(.*?(?=\n\n|\Z)", self.helper, re.S)
+        self.assertIsNotNone(match, name)
+        return match.group(0)
+
+    def test_valid_request_is_active_and_overlaps_the_window(self):
+        # active request -> read; stopped / completed / cancelled -> ignored; a period that
+        # ends before the window (or starts after it) -> ignored
+        body = self._define("IsValidMedicationRequest")
+        self.assertIn("M.status = 'active'", body)
+        self.assertIn("PeriodOverlaps(MedicationRequestPeriod(M), startTime, endTime)", body)
+        overlaps = self._define("PeriodOverlaps")
+        self.assertIn("P.start.value is null or P.start.value same day or before endTime", overlaps)
+        self.assertIn("P.end.value is null or P.end.value same day or after startTime", overlaps)
+
+    def test_dose_period_first_then_validity_period(self):
+        # R4: effectiveDosePeriod (R5) is dosageInstruction.timing.repeat.boundsPeriod
+        self.assertIn("I.timing.repeat.bounds as FHIR.Period", self._define("MedicationRequestDosePeriod"))
+        self.assertIn(
+            "Coalesce(MedicationRequestDosePeriod(M), M.dispenseRequest.validityPeriod)",
+            self._define("MedicationRequestPeriod"),
+        )
+
+    def test_no_dispense_fallback_and_no_wildcard_read(self):
+        for gone in ("IsOpenMedicationRequest", "GetActiveMedicationCodesSince", "GetEncounterMedicationCodes",
+                     "GetMedicationDosageSince"):
+            self.assertNotIn(gone, self.helper)
+
+    def test_dispensed_sums_the_completed_dispenses_of_the_request(self):
+        body = self._define("MedicationRequestDispensed")
+        self.assertIn('("HistoryMedicationDispenses") D', body)
+        self.assertIn("D.authorizingPrescription A where A.reference = 'MedicationRequest/' + M.id", body)
+        self.assertIn("return D.quantity.value.value", body)
+
+    def test_drug_matched_by_code_on_concept_or_referenced_medication(self):
+        body = self._define("MedicationRequestHasCode")
+        self.assertIn("((M.medication as FHIR.CodeableConcept).coding) C where C.code = conceptCode", body)
+        self.assertIn("'Medication/' + Med.id", body)
+        self.assertNotIn("system", body)
+
+    def test_dispense_counts_completed_only(self):
+        self.assertIn('define "HistoryMedicationDispenses":\n  [MedicationDispense] D where D.status = \'completed\'',
+                      self.helper)
+        self.assertIn('("HistoryMedicationDispenses") D', self._define("GetMedicationDispenses"))
+
+
+class TestOneRetrievePerResourceAndScope(unittest.TestCase):
+    """feature/20261125-requires-and-implied-retrievals.md §4: the Helper retrieves each resource
+    once per scope, in a define every function reads (a define is cached, a function call is not)."""
+
+    def setUp(self):
+        self.helper = _helper_cql()
+
+    def test_each_resource_is_retrieved_once(self):
+        for resource in ("Observation", "Condition", "Procedure", "MedicationRequest", "MedicationDispense",
+                         "Medication"):
+            with self.subTest(resource=resource):
+                self.assertEqual(self.helper.count(f"[{resource}]"), 1)
+
+    def test_encounter_scope_reads_the_history_define(self):
+        for resource in ("Observations", "Conditions", "Procedures", "MedicationRequests", "MedicationDispenses"):
+            with self.subTest(resource=resource):
+                body = self.helper.split(f'define "Encounter{resource}":', 1)[1].split("\n\n", 1)[0]
+                self.assertIn(f'("History{resource}")', body)
+                self.assertIn("encounterid", body)
 
 
 class TestLibraryCanonicalUrl(unittest.TestCase):

@@ -55,7 +55,7 @@ FUNCTION_MAP_BEFORE = {
     "GetRepeatedValue": TriccOperator.GET_REPEATED_VALUE,
 }
 
-# stored_data_functions.json as it was before the catalogue
+# stored_data_functions.json as it was before the catalogue (+ Retrieve, feature/retrievals)
 STORED_BEFORE = {
     "AgeInDays": "patient", "AgeInMonths": "patient", "AgeInYears": "patient", "GetPatientValue": "patient",
     "GetEncounterValue": "encounter", "GetEncounterObservationValue": "encounter",
@@ -64,7 +64,7 @@ STORED_BEFORE = {
     "GetHistoryObservation": "history", "GetHistoryObservationValue": "history",
     "GetHistoryObservationSince": "history", "GetHistoryObservationValueSince": "history",
     "GetHistoryObservationCodesSince": "history", "GetHistoryCondition": "history",
-    "GetHistoryConditionValue": "history", "GetPractitionerValue": "context", "GetLocationValue": "context",
+    "GetHistoryConditionValue": "history", "Retrieve": "history", "GetPractitionerValue": "context", "GetLocationValue": "context",
     "GetFacilityValue": "context",
 }
 

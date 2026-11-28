@@ -49,7 +49,7 @@ from tricc_oo.converters.fhir.cql_value import (
     cql_helper_value_block,
     wrap_cql_for_item_type,
 )
-from tricc_oo.converters.retrieval import iter_retrievals
+from tricc_oo.converters.retrieval import is_retrieval_node, iter_retrievals
 from tricc_oo.converters.cql_library import native_function_type
 from tricc_oo.converters.fhir.populate_helper import (
     ENCOUNTER_CONTEXT,
@@ -58,6 +58,7 @@ from tricc_oo.converters.fhir.populate_helper import (
     populate_reads_multiple,
     populate_source_concept,
     populate_value_type,
+    populate_define_name,
     populate_fhir_item_type,
     populate_unit,
     resolve_populate_reference,
@@ -288,7 +289,7 @@ context Patient
 // library. See fix/20260914-cql-retrieve-codesystem.md.
 define function HasCondition(code String):
   exists(
-    [Condition] C
+    ("HistoryConditions") C
       where ConditionHasCode(C, code)
         and exists(C.clinicalStatus.coding CS where CS.code = 'active')
   )
@@ -323,6 +324,25 @@ include "{helper_library_id}" version '1.0.0' called Helper
 context Patient
 
 """
+
+
+_HELPER_CALL_WITH_ARGUMENTS = re.compile(r"\bHelper\.\w+\(\s*[^)\s]")
+_CQL_KEYWORDS = frozenset({"null", "true", "false", "and", "or", "not", "is", "as", "xor", "implies", "FHIR"})
+
+
+def _only_helper_reads(expression: str) -> bool:
+    """True when ``expression`` reads nothing but Helper definitions (``Helper.X``), literals
+    and system functions, so it can move into the Helper library."""
+    text = re.sub(r"'(?:[^'\\]|\\.)*'", "''", expression)
+    text = re.sub(r'\bHelper\.(?:"[^"]*"|\w+)', "", text)
+    if '"' in text:
+        return False
+    for match in re.finditer(r"\b[A-Za-z_]\w*\b", text):
+        call = text[match.end():].lstrip().startswith("(")
+        member = text[:match.start()].endswith(".")
+        if match.group(0) not in _CQL_KEYWORDS and not call and not member:
+            return False
+    return True
 
 
 @register_output_strategy("FHIRStrategy")
@@ -379,6 +399,9 @@ class FHIRStrategy(BaseOutPutStrategy):
         self.cql_defines: Dict[str, List[str]] = {}
         # populate concept read -> linkIds reading it (unpersisted-concept warning)
         self._populate_reads: Dict[str, set] = {}
+        # generated Helper defines replacing Helper function calls in item defines, by name
+        # (feature/20261125-requires-and-implied-retrievals.md §4)
+        self._helper_defines: Dict[str, str] = {}
         # select_multiple concept names (populate list carry, feature/20260929-cql-populate-wiring.md §10)
         self._select_multiple_concepts: set = set()
         self.structuremaps: Dict[str, dict] = {}
@@ -2085,17 +2108,23 @@ class FHIRStrategy(BaseOutPutStrategy):
                 return True
 
             if isinstance(node, TriccNodePopulate):
-                cql_expr = self._populate_reference(node)
+                multiple = self._populate_is_multiple(node)
+                source_type = "string" if multiple else populate_value_type(node)
                 if node.context in (ENCOUNTER_CONTEXT, HISTORY_CONTEXT):
                     self._populate_reads.setdefault(populate_source_concept(node), set()).add(link_id)
                 item = self._find_item_by_link_id(q.get("item", []), link_id)
-                self._attach_cql_initial_expression(
-                    segment,
-                    item,
-                    calc_name,
-                    cql_expr,
-                    source_type="string" if self._populate_is_multiple(node) else populate_value_type(node),
-                )
+                cql_expr = resolve_populate_reference(node, qualified=False, multiple=multiple)
+                if not is_retrieval_node(node) and "(" in cql_expr:
+                    # the item names a Helper define, never a Helper function call
+                    if item is not None and item_allows_initial(item) and not item.get("answerOption"):
+                        cql_expr = wrap_cql_for_item_type(
+                            cql_expr, item.get("type"), qualified=False, source_type=source_type
+                        )
+                    name = self._helper_define(populate_define_name(node, multiple), cql_expr)
+                    cql_expr, source_type = f'Helper."{name}"', None
+                else:
+                    cql_expr = "Helper." + cql_expr
+                self._attach_cql_initial_expression(segment, item, calc_name, cql_expr, source_type=source_type)
                 return True
 
             expression = getattr(node, "expression_reference", None) or getattr(node, "reference", None)
@@ -2214,11 +2243,23 @@ class FHIRStrategy(BaseOutPutStrategy):
                 )
             self._record_cql_define(segment, name, cql_expr)
             return False
-        self._record_cql_define(
-            segment, name, wrap_cql_for_item_type(cql_expr, item.get("type"), source_type=source_type)
-        )
+        expression = wrap_cql_for_item_type(cql_expr, item.get("type"), source_type=source_type)
+        self._record_cql_define(segment, name, self._helper_read(expression))
         set_item_extension(item, build_initial_expression(name))
         return True
+
+    def _helper_read(self, expression: str) -> str:
+        """An item define calling Helper functions with arguments reads a generated Helper define
+        instead (``Helper."@weight"``): the engine caches a define, not a function call
+        (feature/20261125-requires-and-implied-retrievals.md §4). An expression that also reads
+        this library's own defines stays as it is.
+        """
+        if not _HELPER_CALL_WITH_ARGUMENTS.search(expression) or not _only_helper_reads(expression):
+            return expression
+        body = re.sub(r"\bHelper\.", "", expression)
+        literal = re.search(r"'((?:[^'\\]|\\.)*)'", body)
+        name = self._helper_define("@" + (literal.group(1) if literal else "read"), body)
+        return f'Helper."{name}"'
 
     def _cql_expression_type(self, expression) -> Optional[str]:
         """``boolean`` / ``integer`` / ``decimal`` / ``date`` when a TRICC expression's
@@ -2853,8 +2894,26 @@ class FHIRStrategy(BaseOutPutStrategy):
         return populate_reads_multiple(node, self._select_multiple_concepts)
 
     def _populate_reference(self, node) -> str:
-        """Qualified CQL accessor for a populate node (whole option list for a multi-select)."""
-        return resolve_populate_reference(node, qualified=True, multiple=self._populate_is_multiple(node))
+        """Qualified CQL accessor for a populate node (whole option list for a multi-select).
+
+        A Helper function call becomes a generated Helper define (``Helper."@weight"``),
+        evaluated once (feature/20261125-requires-and-implied-retrievals.md §4).
+        """
+        multiple = self._populate_is_multiple(node)
+        expression = resolve_populate_reference(node, qualified=False, multiple=multiple)
+        if is_retrieval_node(node) or "(" not in expression:
+            return "Helper." + expression
+        return f'Helper."{self._helper_define(populate_define_name(node, multiple), expression)}"'
+
+    def _helper_define(self, base: str, body: str) -> str:
+        """Name of the generated Helper define holding ``body`` (``base``, ``base:2``… when
+        ``base`` already holds another body)."""
+        name, index = base, 1
+        while name in self._helper_defines and self._helper_defines[name] != body:
+            index += 1
+            name = f"{base}:{index}"
+        self._helper_defines[name] = body
+        return name
 
     def _cql_node_reference(self, node) -> str:
         """CQL for a reference to another node's value — never its bare item name.
@@ -2941,6 +3000,9 @@ class FHIRStrategy(BaseOutPutStrategy):
         retrievals = retrieval_cql_defines(iter_retrievals(self.project), type(self).__name__)
         if retrievals:
             helper_cql += "\n" + retrievals
+        if self._helper_defines:
+            helper_cql += "\n// ── Populate reads (feature/20261125-requires-and-implied-retrievals.md §4) ─────\n\n"
+            helper_cql += "\n\n".join(f'define "{n}":\n  {b}' for n, b in sorted(self._helper_defines.items())) + "\n"
         self.cql_libraries[helper_key] = helper_cql
 
         # Create FHIR Library resource for helper

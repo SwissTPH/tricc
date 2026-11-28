@@ -770,10 +770,13 @@ class TriccOperation(BaseModel):
 
         ``retrieves_stored_data`` is set by the CQL parser on a call to a function of
         ``tricc_oo/lang/functions.json`` (``reads``) (patient, encounter, history or
-        context readers; feature/20261111-block-params-and-start-node.md §18.5).
+        context readers; feature/20261111-block-params-and-start-node.md §18.5). A retrieval
+        (``Retrieve(...)`` or ``"#name"``, a reference to ``#…``) reads stored data too
+        (feature/20261125-requires-and-implied-retrievals.md §3).
 
         Returns:
-            True when this operation's own flag is set or a child operation's is.
+            True when this operation's own flag is set or a child operation's is, or it
+            references a retrieval.
         """
         if self.retrieves_stored_data:
             return True
@@ -783,6 +786,8 @@ class TriccOperation(BaseModel):
             if isinstance(item, list):
                 pending.extend(item)
             elif isinstance(item, TriccOperation) and item.get_stored_data():
+                return True
+            elif isinstance(item, TriccReference) and isinstance(item.value, str) and item.value.startswith("#"):
                 return True
         return False
 

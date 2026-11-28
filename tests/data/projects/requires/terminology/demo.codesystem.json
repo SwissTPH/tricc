@@ -1,0 +1,14 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "demo",
+  "name": "demo",
+  "url": "http://example.org/fhir/CodeSystem/demo",
+  "status": "draft",
+  "content": "complete",
+  "concept": [
+    {"code": "weight", "display": "Weight (kg)", "property": [{"code": "dataType", "valueCode": "decimal"}, {"code": "conceptType", "valueCode": "Symptom-Finding"}]},
+    {"code": "temp", "display": "Temperature", "property": [{"code": "dataType", "valueCode": "decimal"}, {"code": "conceptType", "valueCode": "Symptom-Finding"}]},
+    {"code": "resp_rate", "display": "Respiratory rate", "property": [{"code": "dataType", "valueCode": "integer"}, {"code": "conceptType", "valueCode": "Symptom-Finding"}]},
+    {"code": "muac", "display": "MUAC (mm)", "property": [{"code": "dataType", "valueCode": "decimal"}, {"code": "conceptType", "valueCode": "Symptom-Finding"}]}
+  ]
+}

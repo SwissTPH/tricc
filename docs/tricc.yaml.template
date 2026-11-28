@@ -133,6 +133,9 @@ interventions:
     activity:
       - common/*
       - followup/*
+    # interventions earlier in the same encounter: the concepts their activities record are
+    # read from the encounter as first versions (feature/20261125-requires-and-implied-retrievals.md)
+    # requires: [pediatrics]
     start:
       on: follow_up
       intervention: pediatrics        # parent id; clock starts on its submission

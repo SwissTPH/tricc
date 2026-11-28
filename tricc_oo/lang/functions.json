@@ -52,6 +52,7 @@
     {"name": "GetHistoryObservationCodesSince", "params": [{"name": "code", "type": "String"}, {"name": "since", "type": "DateTime"}], "returns": "List<String>", "operator": null, "reads": "history", "foldable": false},
     {"name": "GetHistoryCondition", "params": [{"name": "code", "type": "String"}], "returns": "Any", "operator": null, "reads": "history", "foldable": false},
     {"name": "GetHistoryConditionValue", "params": [{"name": "code", "type": "String"}], "returns": "Any", "operator": null, "reads": "history", "foldable": false},
+    {"name": "Retrieve", "params": [{"name": "code", "type": "String"}, {"name": "window", "type": "String", "optional": true}, {"name": "field", "type": "String", "optional": true}], "returns": "Any", "operator": null, "reads": "history", "foldable": false},
     {"name": "GetPractitionerValue", "params": [{"name": "code", "type": "String"}], "returns": "Any", "operator": null, "reads": "context", "foldable": false},
     {"name": "GetLocationValue", "params": [{"name": "code", "type": "String"}], "returns": "Any", "operator": null, "reads": "context", "foldable": false},
     {"name": "GetFacilityValue", "params": [{"name": "code", "type": "String"}], "returns": "Any", "operator": null, "reads": "context", "foldable": false}

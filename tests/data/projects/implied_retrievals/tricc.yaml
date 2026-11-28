@@ -1,0 +1,13 @@
+# Implied retrievals (feature/20261125-requires-and-implied-retrievals.md §3): `Retrieve(...)`.
+title: Implied retrievals
+input_strategy: YamlStrategy
+output_strategies:
+  - XLSFormCHTStrategy
+terminology:
+  - terminology/*.codesystem.json
+interventions:
+  - id: visit
+    name: visit
+    title: Visit
+    activity:
+      - activities/visit.activity.yaml

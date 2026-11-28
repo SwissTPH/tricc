@@ -58,7 +58,23 @@ RETRIEVAL_FUNCTIONS: Dict[str, tuple] = {
     "Latest": (_TIMED, True, "source"),
     "Exists": (_TIMED, True, "boolean"),
     "Count": (_TIMED, True, "integer"),
+    # date of the latest record (feature/20261125-populate-read-date.md)
+    "LatestDate": (_TIMED, True, "dateTime"),
+    # medication reads (feature/20261125-populate-medication.md): one drug per read, from the
+    # latest valid MedicationRequest of the drug (``Latest`` of a drug is "active")
+    "Dosage": (_TIMED, True, "string"),
+    "Drug": (_TIMED, True, "coded"),
+    "Duration": (_TIMED, True, "integer"),
+    "Quantity": (_TIMED, True, "decimal"),
+    "Dispensed": (_TIMED, True, "decimal"),
 }
+
+#: catalogue functions that read a prescription (a MedicationRequest concept) only
+MEDICATION_FUNCTIONS = ("Dosage", "Drug", "Duration", "Quantity", "Dispensed")
+#: the FHIR resource of a prescription
+MEDICATION_REQUEST = "MedicationRequest"
+#: FHIR resources holding medication records
+MEDICATION_RESOURCES = ("MedicationRequest", "MedicationDispense")
 
 DEFAULT_FUNCTION = {
     "patient": "PatientValue",
@@ -68,6 +84,9 @@ DEFAULT_FUNCTION = {
     "encounter": "Latest",
     "history": "Latest",
 }
+
+#: resources whose ``Latest`` reads whether a record exists (done / on treatment), not a value
+_DONE_RESOURCES = ("Procedure",) + MEDICATION_RESOURCES
 
 _CODE_RE = re.compile(r"^#[A-Za-z][A-Za-z0-9_]*$")
 _PLACEHOLDER_RE = re.compile(r"\{\{\s*(code|period)\s*\}\}")
@@ -92,7 +111,63 @@ _EXPRESSION_FIELDS = (
 
 
 class TriccRetrievalError(ValueError):
-    """A retrieval that is unknown, malformed, or that a strategy cannot export."""
+    """A retrieval that is unknown, malformed, or that a strategy cannot export.
+
+    Attributes:
+        code: The error code (``E_RETRIEVAL_UNKNOWN``, ``E_RETRIEVAL_STATIC``…), or None.
+    """
+
+    def __init__(self, message: str, code: Optional[str] = None):
+        super().__init__(f"{code}: {message}" if code else message)
+        self.code = code
+
+
+# --- implied retrievals: ``Retrieve(...)`` (feature/20261125-requires-and-implied-retrievals.md §3)
+
+E_RETRIEVAL_UNKNOWN = "E_RETRIEVAL_UNKNOWN"
+E_RETRIEVAL_STATIC = "E_RETRIEVAL_STATIC"
+E_RETRIEVAL_IMPLIED_CONCEPT = "E_RETRIEVAL_IMPLIED_CONCEPT"
+E_RETRIEVAL_IMPLIED_PERIOD = "E_RETRIEVAL_IMPLIED_PERIOD"
+E_RETRIEVAL_READ_UNSUPPORTED = "E_RETRIEVAL_READ_UNSUPPORTED"
+E_RETRIEVAL_QUOTED_IMPLIED = "E_RETRIEVAL_QUOTED_IMPLIED"
+#: the build-time function saving a retrieval (``Retrieve('code')``, ``Retrieve('concept', 'P3M', 'date')``)
+RETRIEVE_FUNCTION = "Retrieve"
+#: the window of an implied read of the current encounter (else an ISO-8601 duration, or null)
+ENCOUNTER_WINDOW = "encounter"
+#: field of an implied read -> catalogue function; ``value`` is the default
+RETRIEVE_FIELDS = {
+    "value": "Latest",
+    "date": "LatestDate",
+    "exists": "Exists",
+    "count": "Count",
+    # a drug (MedicationRequest concept): ``active`` is its default field (``Latest``)
+    "active": "Latest",
+    "dosage": "Dosage",
+    "drug": "Drug",
+    "duration": "Duration",
+    "quantity": "Quantity",
+    "dispensed": "Dispensed",
+}
+DEFAULT_FIELD = "value"
+#: the default field of a drug: whether a valid prescription exists
+MEDICATION_DEFAULT_FIELD = "active"
+#: field -> the FHIR resources it is offered for (a field missing here applies to all)
+FIELD_RESOURCES = {
+    "date": ("Observation", "Condition", "Procedure", "MedicationRequest", "MedicationDispense"),
+    **{field: (MEDICATION_REQUEST,) for field in ("active", "dosage", "drug", "duration", "quantity", "dispensed")},
+}
+#: catalogue function -> how an implied read is named (the editor builds its chip the same way)
+_FUNCTION_LABELS = {
+    "Latest": "{concept}",
+    "LatestDate": "Date of the latest {concept}",
+    "Exists": "{concept} recorded",
+    "Count": "Number of {concept} records",
+    "Dosage": "Dosage of {concept}",
+    "Drug": "Drug prescribed for {concept}",
+    "Duration": "Days {concept} is prescribed for",
+    "Quantity": "Quantity of {concept} prescribed",
+    "Dispensed": "Quantity of {concept} dispensed",
+}
 
 
 class Retrieval(BaseModel):
@@ -115,9 +190,19 @@ class Retrieval(BaseModel):
     reads_concept_type: Optional[str] = None
 
     @property
+    def implied(self) -> bool:
+        """True for a read written ``Retrieve('concept', window[, field])`` (code ``#concept@window``)."""
+        return "@" in self.code
+
+    @property
     def name(self) -> str:
-        """The code without ``#`` (``age_months``)."""
-        return self.code.lstrip("#")
+        """The code without ``#`` (``age_months``); for an implied read a field-safe name:
+        ``#weight@P3M.date`` -> ``weight_P3M_date``, ``#weight@`` -> ``weight_any``."""
+        if not self.implied:
+            return self.code.lstrip("#")
+        concept, window, field = split_implied_code(self.code)
+        parts = [concept, window or "any"] + ([field] if field != DEFAULT_FIELD else [])
+        return re.sub(r"[^A-Za-z0-9_]", "_", "_".join(parts))
 
     @property
     def export_name(self) -> str:
@@ -137,7 +222,17 @@ class Retrieval(BaseModel):
         function = self.effective_function
         entry = RETRIEVAL_FUNCTIONS.get(function) if function else None
         value_type = entry[2] if entry else "source"
+        if value_type == "source" and function == "Latest" and self.resource in _DONE_RESOURCES:
+            # a procedure done / a medication taken: yes or no (#76, #75)
+            return "boolean"
         return self.reads_data_type if value_type == "source" else value_type
+
+    @property
+    def resource(self) -> str:
+        """FHIR resource the concept read is recorded as (``Observation`` by default)."""
+        from tricc_oo.converters.fhir.concept_mapper import get_fhir_resource
+
+        return get_fhir_resource(self.reads_concept_type, None)[0]
 
 
 def _property(concept, code: str):
@@ -210,6 +305,25 @@ def read_retrieval(concept) -> Retrieval:
     return retrieval
 
 
+def check_reads_resource(retrieval: Retrieval) -> None:
+    """Reject a prescription function reading a concept that is not a drug.
+
+    Args:
+        retrieval: A retrieval whose concept read (``reads_concept_type``) is resolved.
+
+    Raises:
+        TriccRetrievalError: ``Dosage`` / ``Drug`` / ``Duration`` / ``Quantity`` / ``Dispensed``
+            on a concept recorded as another resource than MedicationRequest.
+    """
+    function = retrieval.effective_function
+    if function in MEDICATION_FUNCTIONS and retrieval.resource != MEDICATION_REQUEST:
+        raise TriccRetrievalError(
+            f"retrieval {retrieval.code}: {function} reads prescriptions, but "
+            f"{retrieval.reads_code!r} is recorded as {retrieval.resource} (conceptType "
+            f"{retrieval.reads_concept_type!r})"
+        )
+
+
 def retrieve_code_system_key(project) -> Optional[str]:
     """Key of the retrieval dictionary in ``project.code_systems``, or None."""
     from tricc_oo.strategies.input.param_build import role_code_system_key
@@ -236,17 +350,169 @@ def read_project_retrievals(project) -> Dict[str, Retrieval]:
             else:
                 retrieval.reads_data_type = _property_text(read, "dataType")
                 retrieval.reads_concept_type = _property_text(read, "conceptType")
+        check_reads_resource(retrieval)
         retrievals[retrieval.code] = retrieval
     return retrievals
 
 
-def retrieval_refs(value: Any, found: Optional[Set[str]] = None, _seen: Optional[Set[int]] = None) -> Set[str]:
-    """The ``#name`` references (unresolved ``TriccReference``) in an expression."""
+def implied_code(concept: str, window: Optional[str], field: str = DEFAULT_FIELD) -> str:
+    """The internal code of an implied read: ``#weight@P3M``, ``#weight@`` (no window),
+    ``#weight@P3M.date``; the default field ``value`` is left out."""
+    return f"#{concept}@{window or ''}" + ("" if field == DEFAULT_FIELD else f".{field}")
+
+
+def split_implied_code(code: str) -> tuple:
+    """``(concept, window or None, field)`` of an implied code (``implied_code`` reversed)."""
+    concept, _, rest = code.lstrip("#").rpartition("@")
+    window, _, field = rest.partition(".")
+    return concept, window or None, field or DEFAULT_FIELD
+
+
+def retrieval_field(retrieval: Retrieval) -> str:
+    """The field a timed retrieval reads (``value``, ``date``…): its own for an implied read,
+    else the one of its function; ``Latest`` of a drug is ``active``."""
+    if retrieval.implied:
+        field = split_implied_code(retrieval.code)[2]
+    else:
+        function = retrieval.effective_function
+        field = next((f for f, fn in RETRIEVE_FIELDS.items() if fn == function), DEFAULT_FIELD)
+    if field == DEFAULT_FIELD and retrieval.resource == MEDICATION_REQUEST:
+        return MEDICATION_DEFAULT_FIELD
+    return field
+
+
+def reject_quoted_implied(name: str) -> None:
+    """Reject a quoted identifier written like an implied retrieval (``"#weight@P3M"``).
+
+    An implied read is saved ``Retrieve('weight', 'P3M')``; the quoted form is not one (the
+    legacy ``"#name"`` of a dictionary retrieval, without ``@``, still is).
+    feature/20261125-requires-and-implied-retrievals.md §3.
+
+    Args:
+        name: The identifier, without its quotes.
+
+    Raises:
+        TriccRetrievalError: ``E_RETRIEVAL_QUOTED_IMPLIED`` for ``#…@…``.
+    """
+    if not (name.startswith("#") and "@" in name):
+        return
+    concept, window, field = split_implied_code(name)
+    args = [repr(concept), repr(window) if window else "null"] + ([repr(field)] if field != DEFAULT_FIELD else [])
+    raise TriccRetrievalError(
+        f'"{name}" is not a retrieval: write {RETRIEVE_FUNCTION}({", ".join(args)}) '
+        f"(or {name} in the editor)",
+        E_RETRIEVAL_QUOTED_IMPLIED,
+    )
+
+
+def retrieve_reference(args: List[Any]):
+    """The reference a ``Retrieve(...)`` call stands for (parsed arguments, in order).
+
+    ``Retrieve('code')`` is the dictionary retrieval ``#code``; ``Retrieve('concept', window[,
+    field])`` an implied read, ``window`` an ISO-8601 duration, ``null`` (no window) or
+    ``'encounter'``. Every argument is a literal. The concept and field are checked against
+    the project when the retrievals are built (``implied_retrieval``).
+
+    Args:
+        args: The parsed arguments (``TriccStatic``; ``None`` for ``null``).
+
+    Returns:
+        A ``TriccReference`` to ``#code`` / ``#concept@window[.field]``.
+
+    Raises:
+        TriccRetrievalError: ``E_RETRIEVAL_STATIC`` (an argument is not a literal),
+            ``E_RETRIEVAL_IMPLIED_PERIOD`` (a window that is not a duration),
+            ``E_RETRIEVAL_READ_UNSUPPORTED`` (an unknown field).
+    """
+    from tricc_oo.models.base import TriccReference, TriccStatic
+
+    if not 1 <= len(args) <= 3:
+        raise TriccRetrievalError(f"{RETRIEVE_FUNCTION} takes 1 to 3 arguments, got {len(args)}", E_RETRIEVAL_STATIC)
+    values = []
+    for position, arg in enumerate(args):
+        if arg is None and position == 1:
+            values.append(None)
+        elif isinstance(arg, TriccStatic) and isinstance(arg.value, str) and arg.value.strip():
+            values.append(arg.value.strip())
+        else:
+            raise TriccRetrievalError(
+                f"{RETRIEVE_FUNCTION} argument {position + 1} must be a text literal such as 'weight', not {arg}",
+                E_RETRIEVAL_STATIC,
+            )
+    if len(values) == 1:
+        return TriccReference("#" + values[0].lstrip("#"))
+    concept, window = values[0], values[1]
+    field = values[2] if len(values) == 3 else DEFAULT_FIELD
+    if window is not None and window != ENCOUNTER_WINDOW and not _DURATION_RE.match(window):
+        raise TriccRetrievalError(
+            f"{RETRIEVE_FUNCTION}({concept!r}, {window!r}): the window must be an ISO-8601 duration (e.g. 'P3M'), "
+            f"null or '{ENCOUNTER_WINDOW}'",
+            E_RETRIEVAL_IMPLIED_PERIOD,
+        )
+    if field not in RETRIEVE_FIELDS:
+        raise TriccRetrievalError(
+            f"{RETRIEVE_FUNCTION}({concept!r}, …, {field!r}): unknown field, use one of {', '.join(RETRIEVE_FIELDS)}",
+            E_RETRIEVAL_READ_UNSUPPORTED,
+        )
+    return TriccReference(implied_code(concept, window, field))
+
+
+def implied_retrieval(code: str, project) -> Retrieval:
+    """The retrieval an implied code stands for, with the concept read resolved.
+
+    ``#weight@P3M.date`` -> ``Retrieval(context="history", function="LatestDate",
+    reads_code="weight", period="P3M")``; ``#weight@`` has no period, ``#weight@encounter``
+    the ``encounter`` context.
+
+    Raises:
+        TriccRetrievalError: ``E_RETRIEVAL_IMPLIED_CONCEPT`` (not a project concept),
+            ``E_RETRIEVAL_IMPLIED_PERIOD``, ``E_RETRIEVAL_READ_UNSUPPORTED`` (a field not valid
+            for the concept's resource).
+    """
+    from tricc_oo.converters.datadictionnary import find_concept
+
+    concept, window, field = split_implied_code(code)
+    function = RETRIEVE_FIELDS.get(field)
+    if function is None:
+        raise TriccRetrievalError(f"retrieval {code}: unknown field {field!r}", E_RETRIEVAL_READ_UNSUPPORTED)
+    encounter = window == ENCOUNTER_WINDOW
+    if window and not encounter and not _DURATION_RE.match(window):
+        raise TriccRetrievalError(
+            f"retrieval {code}: {window!r} is not an ISO-8601 duration", E_RETRIEVAL_IMPLIED_PERIOD
+        )
+    code_systems = getattr(project, "code_systems", None) or {}
+    read = find_concept(code_systems, concept, None) if code_systems else None
+    if read is None:
+        raise TriccRetrievalError(
+            f"retrieval {code}: {concept!r} is not a project concept", E_RETRIEVAL_IMPLIED_CONCEPT
+        )
+    retrieval = Retrieval(
+        code=code,
+        context="encounter" if encounter else "history",
+        function=function,
+        reads_code=concept,
+        period=None if encounter else window,
+        reads_data_type=_property_text(read, "dataType"),
+        reads_concept_type=_property_text(read, "conceptType"),
+    )
+    allowed = FIELD_RESOURCES.get(field)
+    if allowed is not None and retrieval.resource not in allowed:
+        raise TriccRetrievalError(
+            f"retrieval {code}: the field {field!r} is not offered for {concept!r} ({retrieval.resource})",
+            E_RETRIEVAL_READ_UNSUPPORTED,
+        )
+    window_text = "this encounter" if encounter else (window or "any time")
+    retrieval.label = _FUNCTION_LABELS[function].format(concept=read.display or concept) + f", {window_text}"
+    return retrieval
+
+
+def reference_values(value: Any, found: Optional[Set[str]] = None, _seen: Optional[Set[int]] = None) -> Set[str]:
+    """The names of the unresolved ``TriccReference``s in an expression."""
     from tricc_oo.models.base import TriccOperation, TriccReference
 
     found = set() if found is None else found
     if isinstance(value, TriccReference):
-        if isinstance(value.value, str) and value.value.startswith("#"):
+        if isinstance(value.value, str):
             found.add(value.value)
     elif isinstance(value, TriccOperation):
         seen = set() if _seen is None else _seen
@@ -254,24 +520,39 @@ def retrieval_refs(value: Any, found: Optional[Set[str]] = None, _seen: Optional
             return found
         seen.add(id(value))
         for ref in value.reference:
-            retrieval_refs(ref, found, seen)
+            reference_values(ref, found, seen)
     elif isinstance(value, (list, tuple, set)) or type(value).__name__ == "OrderedSet":
         for ref in value:
-            retrieval_refs(ref, found, _seen)
+            reference_values(ref, found, _seen)
     return found
+
+
+def retrieval_refs(value: Any, found: Optional[Set[str]] = None, _seen: Optional[Set[int]] = None) -> Set[str]:
+    """The ``#name`` references (unresolved ``TriccReference``) in an expression."""
+    found = set() if found is None else found
+    found.update(name for name in reference_values(value) if name.startswith("#"))
+    return found
+
+
+def expression_nodes(project) -> List[Any]:
+    """The expressions of the loaded pages (activities and block instances) and the library
+    calculates: each page's applicability and each node's expression fields."""
+    values: List[Any] = []
+    nodes: List[Any] = list(getattr(project, "library_calculates", None) or [])
+    for page in (getattr(project, "pages", None) or {}).values():
+        values.append(getattr(page, "applicability", None))
+        nodes.extend((getattr(page, "nodes", None) or {}).values())
+    for node in nodes:
+        values.extend(getattr(node, field, None) for field in _EXPRESSION_FIELDS)
+    return values
 
 
 def used_retrieval_codes(project) -> List[str]:
     """Codes of the retrievals the loaded pages (activities and block instances) and the
     library calculates use, sorted."""
     found: Set[str] = set()
-    nodes: List[Any] = list(getattr(project, "library_calculates", None) or [])
-    for page in (getattr(project, "pages", None) or {}).values():
-        retrieval_refs(getattr(page, "applicability", None), found)
-        nodes.extend((getattr(page, "nodes", None) or {}).values())
-    for node in nodes:
-        for field in _EXPRESSION_FIELDS:
-            retrieval_refs(getattr(node, field, None), found)
+    for value in expression_nodes(project):
+        retrieval_refs(value, found)
     return sorted(found)
 
 
@@ -310,6 +591,30 @@ def build_retrieval_node(retrieval: Retrieval):
     )
 
 
+def _select_multiple_concepts(project) -> Set[str]:
+    """Names of the select_multiple questions of the loaded pages."""
+    names = set()
+    for page in (getattr(project, "pages", None) or {}).values():
+        for node in (getattr(page, "nodes", None) or {}).values():
+            if str(getattr(node, "tricc_type", "")) == "select_multiple" and getattr(node, "name", None):
+                names.add(node.name)
+    return names
+
+
+def _warn_dosage_of_multiple(project, retrievals: Iterable[Retrieval]) -> None:
+    """Warn when ``Dosage`` reads a select_multiple concept (one dosage per drug)."""
+    dosages = [r for r in retrievals if r.effective_function == "Dosage"]
+    if not dosages:
+        return
+    multiple = _select_multiple_concepts(project)
+    for retrieval in dosages:
+        if retrieval.reads_code in multiple or (retrieval.reads_data_type or "").lower() == "select_multiple":
+            logger.warning(
+                f"retrieval {retrieval.code}: Dosage reads {retrieval.reads_code!r}, a select_multiple "
+                "concept; the dosage is the one of a single drug, read the drug concept instead"
+            )
+
+
 def build_used_retrievals(project) -> List[Any]:
     """Read the dictionary and build one node per used retrieval (once per project).
 
@@ -323,14 +628,18 @@ def build_used_retrievals(project) -> List[Any]:
     used = used_retrieval_codes(project)
     if not used:
         return []
-    available = read_project_retrievals(project)
+    implied = [code for code in used if "@" in code]
+    available = read_project_retrievals(project) if len(implied) < len(used) else {}
+    available.update((code, implied_retrieval(code, project)) for code in implied)
     unknown = [code for code in used if code not in available]
     if unknown:
         raise TriccRetrievalError(
             f"unknown retrieval {', '.join(unknown)}: no concept with this code in the retrieval dictionary"
-            f" ({retrieve_code_system_key(project) or 'none found'})"
+            f" ({retrieve_code_system_key(project) or 'none found'})",
+            E_RETRIEVAL_UNKNOWN,
         )
     project.retrievals = {code: available[code] for code in used}
+    _warn_dosage_of_multiple(project, project.retrievals.values())
     project.retrieval_nodes = [build_retrieval_node(r) for r in project.retrievals.values()]
     logger.info(f"retrievals used: {', '.join(used)}")
     return project.retrieval_nodes
@@ -413,6 +722,48 @@ def unsupported(retrieval: Retrieval, strategy: str) -> TriccRetrievalError:
         f"retrieval {retrieval.code}: {strategy} has no mapping for function "
         f"{retrieval.effective_function} (context {retrieval.context})"
     )
+
+
+def contact_summary_keys(retrievals: Iterable[Retrieval], populates: Iterable[Any] = ()) -> Dict[str, Any]:
+    """The contact-summary keys a CHT form reads, grouped by concept, scope and window.
+
+    One group per concept read (one lookup in the contact-summary script), its fields side by
+    side: ``{"concept": "weight", "context": "history", "window": "P3M", "fields": {"value":
+    "weight_P3M", "date": "weight_P3M_date"}}``; a drug's default field is ``active``
+    (feature/20261125-populate-medication.md). Reads of no concept (patient functions,
+    custom) are listed under ``other``. feature/20261125-requires-and-implied-retrievals.md §4.
+
+    Args:
+        retrievals: The used retrievals.
+        populates: Populate nodes read from the contact summary (``(key, concept, context,
+            period)`` tuples).
+
+    Returns:
+        ``{"concepts": [group, …], "other": [{"key", "retrieval", "function"}, …]}``.
+    """
+    groups: Dict[tuple, Dict[str, Any]] = {}
+    other = []
+
+    def add(concept, context, window, field, key):
+        group = groups.setdefault(
+            (concept, context, window or ""),
+            {"concept": concept, "context": context, "window": window, "fields": {}},
+        )
+        group["fields"].setdefault(field, key)
+
+    for retrieval in retrievals:
+        function = retrieval.effective_function
+        if retrieval.context in _TIMED and retrieval.reads_code and function in RETRIEVE_FIELDS.values():
+            window = None if retrieval.context == "encounter" else retrieval.period
+            add(retrieval.reads_code, retrieval.context, window, retrieval_field(retrieval), retrieval.name)
+        else:
+            other.append({"key": retrieval.name, "retrieval": retrieval.code, "function": function or CUSTOM_CONTEXT})
+    for key, concept, context, period in populates:
+        add(concept, context, period, DEFAULT_FIELD, key)
+    return {
+        "concepts": [groups[k] for k in sorted(groups)],
+        "other": sorted(other, key=lambda item: item["key"]),
+    }
 
 
 def is_retrieval_node(node) -> bool:

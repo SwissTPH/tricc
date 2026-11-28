@@ -581,6 +581,12 @@ class TriccIntervention(BaseModel):
     # pages are loaded (tricc_oo.converters.retrieval.attach_used_retrievals)
     retrievals: Dict[str, Any] = {}
     retrieval_nodes: List[Any] = []
+    # concepts the interventions this one ``requires`` record (set by the runner), the
+    # concepts its activities ``requires``, and the encounter reads built for the referenced
+    # ones (tricc_oo.converters.requires, feature/20261125-requires-and-implied-retrievals.md)
+    required_concepts: Set[str] = set()
+    activity_requires: Set[str] = set()
+    required_read_nodes: List[Any] = []
     # legacy form_id values already reported by intervention_name()
     ignored_form_ids: Set[str] = set()
     # Calculates from the tricc.yaml ``libraries`` (CQL defines); attached to the main

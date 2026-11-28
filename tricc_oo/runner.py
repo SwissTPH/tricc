@@ -15,7 +15,8 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import List, Optional, Sequence, Tuple
+import tempfile
+from typing import Dict, List, Optional, Sequence, Set, Tuple
 
 import tricc_oo.strategies  # noqa: F401  — register built-in strategies
 from tricc_oo.converters.capabilities import (
@@ -245,6 +246,7 @@ def load_input_project(
     libraries: Sources = (),
     decision_tables: Sources = (),
     decision_table_calls: bool = False,
+    required_concepts: Sequence[str] = (),
     capability_statements: Sequence[ResolvedStatement] = (),
 ):
     """Build the TriccIntervention from ``(strategy name, files, contents)`` groups.
@@ -258,6 +260,8 @@ def load_input_project(
     project = strategies[0][0].new_project(project_config, intervention)
     # the output strategy evaluates the decision tables itself (CHT dmn-<project>.js)
     project.decision_table_calls = decision_table_calls
+    # concepts the required interventions record (feature/20261125-requires-and-implied-retrievals.md §1)
+    project.required_concepts = set(required_concepts)
     BaseInputStrategy.load_terminology(project, terminology)
     BaseInputStrategy.load_libraries(project, libraries)
     BaseInputStrategy.load_decision_tables(project, decision_tables)
@@ -275,6 +279,52 @@ def load_input_project(
     linker = DrawioStrategy([f for _, files, _ in groups for f in files])
     linker.write_terminology(project, media_path)
     return linker.link_project(project)
+
+
+def required_intervention_concepts(
+    project_config: TriccProjectConfig,
+    jobs: Sequence[GroupedJob],
+    intervention: Optional[TriccInterventionConfig],
+    terminology: Sources = (),
+    libraries: Sources = (),
+    cache: Optional[Dict[str, Set[str]]] = None,
+) -> Set[str]:
+    """Concepts recorded by the interventions ``intervention`` requires.
+
+    Each required intervention's activities are loaded (not linked) and their inputs and
+    persisted calculates collected (``requires.provided_concepts``).
+    feature/20261125-requires-and-implied-retrievals.md §1.
+
+    Args:
+        project_config: The tricc.yaml configuration.
+        jobs: The build jobs, ``[(intervention, [(strategy name, files)])]``.
+        intervention: The intervention being built (None: no requires).
+        terminology: Project CodeSystems, ``[(path, json text)]``.
+        libraries: Project CQL libraries, ``[(path, cql text)]``.
+        cache: Concepts already collected, by intervention id (filled).
+
+    Returns:
+        The union of the concepts the required interventions record.
+    """
+    from tricc_oo.converters.requires import provided_concepts
+
+    if intervention is None or not intervention.requires:
+        return set()
+    cache = {} if cache is None else cache
+    by_id = {item.id: (item, groups) for item, groups in jobs if item is not None}
+    found: Set[str] = set()
+    for required in intervention.requires:
+        if required not in cache:
+            config, groups = by_id[required]
+            project = BaseInputStrategy.new_project(project_config, config)
+            BaseInputStrategy.load_terminology(project, terminology)
+            BaseInputStrategy.load_libraries(project, libraries)
+            with tempfile.TemporaryDirectory() as media_path:
+                for name, files in groups:
+                    get_input_strategy(name)(list(files)).load(read_input_file_contents(files), media_path, project)
+            cache[required] = provided_concepts(project)
+        found |= cache[required]
+    return found
 
 
 def run_one_export(
@@ -315,6 +365,7 @@ def run_grouped_export(
     terminology: Sources = (),
     libraries: Sources = (),
     decision_tables: Sources = (),
+    required_concepts: Sequence[str] = (),
     capability_statements: Sequence[ResolvedStatement] = (),
 ):
     os.makedirs(out_dir, exist_ok=True)
@@ -329,6 +380,7 @@ def run_grouped_export(
         libraries=libraries,
         decision_tables=decision_tables,
         decision_table_calls=bool(getattr(OutputStrategyCls, "decision_table_calls", False)),
+        required_concepts=required_concepts,
         capability_statements=capability_statements,
     )
     output_strategy = OutputStrategyCls(project, out_dir)
@@ -382,6 +434,7 @@ def run_project_build(
     n_strategies = len(output_strategies)
     has_interventions = bool(project_config.interventions)
     any_loaded = False
+    provided: Dict[str, Set[str]] = {}
     for strategy_name in output_strategies:
         built = {}
         for intervention, job_groups in jobs:
@@ -409,6 +462,9 @@ def run_project_build(
                     terminology=terminology,
                     libraries=libraries,
                     decision_tables=decision_tables,
+                    required_concepts=required_intervention_concepts(
+                        project_config, jobs, intervention, terminology, libraries, provided
+                    ),
                     # the project is the same for every output: check it once per intervention
                     capability_statements=statements if strategy_name == output_strategies[0] else (),
                 )

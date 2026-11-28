@@ -125,13 +125,29 @@ define function ObservationHasCode(O Observation, conceptCode String):
 define function ConditionHasCode(C Condition, conceptCode String):
   exists(C.code.coding CC where CC.code = conceptCode)
 
-define function GetObservations(code String):
+// One retrieve per resource and scope: every function below reads these defines, which
+// the engine evaluates once (a define is cached, a function call with arguments is not).
+// See feature/20261125-requires-and-implied-retrievals.md §4.
+define "HistoryObservations":
+  [Observation] O where O.status in {{'final', 'amended', 'corrected'}}
+
+define "EncounterObservations":
   if encounterid is null then {{}} as List<Observation>
   else
-    [Observation] O
-      where ObservationHasCode(O, code)
-        and O.status in {{'final', 'amended', 'corrected'}}
-        and O.encounter.reference = 'Encounter/' + encounterid
+    ("HistoryObservations") O
+      where O.encounter.reference = 'Encounter/' + encounterid
+
+define "HistoryConditions":
+  [Condition]
+
+define "EncounterConditions":
+  if encounterid is null then {{}} as List<Condition>
+  else
+    ("HistoryConditions") C
+      where C.encounter.reference = 'Encounter/' + encounterid
+
+define function GetObservations(code String):
+  ("EncounterObservations") O where ObservationHasCode(O, code)
 
 define function ObservationRepeatIndex(O Observation):
   singleton from (
@@ -177,9 +193,8 @@ define function GetHistoryObservation(
   First(
     Skip(
       (
-        [Observation] O
+        ("HistoryObservations") O
           where ObservationHasCode(O, code)
-          and O.status in {{'final', 'amended', 'corrected'}}
           and (
             repeatIndex is null
             or ObservationRepeatIndex(O) = repeatIndex
@@ -211,9 +226,8 @@ define function GetHistoryObservationSince(
   First(
     Skip(
       (
-        [Observation] O
+        ("HistoryObservations") O
           where ObservationHasCode(O, code)
-          and O.status in {{'final', 'amended', 'corrected'}}
           and (since is null or (O.effective as FHIR.dateTime).value >= since)
           and (
             repeatIndex is null
@@ -241,13 +255,17 @@ define function GetHistoryObservationValueSince(
 define function LatestObservationTime(code String, since DateTime):
   (GetHistoryObservationSince(code, since, 1, null).effective as FHIR.dateTime).value
 
+// Time of the latest Observation of `code` in the current encounter (LatestDate
+// retrieval, feature/20261125-populate-read-date.md).
+define function GetEncounterObservationTime(code String):
+  Max((GetObservations(code)) O return (O.effective as FHIR.dateTime).value)
+
 define function GetHistoryObservationCodesSince(code String, since DateTime):
   Combine(
     distinct(
       (
-        [Observation] O
+        ("HistoryObservations") O
           where ObservationHasCode(O, code)
-            and O.status in {{'final', 'amended', 'corrected'}}
             and (O.effective as FHIR.dateTime).value = LatestObservationTime(code, since)
           return First((O.value as FHIR.CodeableConcept).coding.code).value
       )
@@ -259,11 +277,7 @@ define function GetHistoryObservationCodesSince(code String, since DateTime):
 // Condition entries aren't repeated within one encounter the way vitals are) ──
 
 define function GetConditions(code String):
-  if encounterid is null then {{}} as List<Condition>
-  else
-    [Condition] C
-      where ConditionHasCode(C, code)
-        and C.encounter.reference = 'Encounter/' + encounterid
+  ("EncounterConditions") C where ConditionHasCode(C, code)
 
 define function ConditionVerificationCode(C Condition):
   First(C.verificationStatus.coding.code)
@@ -290,7 +304,7 @@ define function HasRefutedCondition(code String):
 
 define function GetHistoryCondition(code String):
   First(
-    [Condition] C
+    ("HistoryConditions") C
       where ConditionHasCode(C, code)
         and First(C.verificationStatus.coding.code) != 'refuted'
         and First(C.verificationStatus.coding.code) != 'entered-in-error'
@@ -299,6 +313,26 @@ define function GetHistoryCondition(code String):
 
 define function GetHistoryConditionValue(code String):
   GetHistoryCondition(code) is not null
+
+// Date of a Condition: its onset, falling back to recordedDate (LatestDate retrieval,
+// feature/20261125-populate-read-date.md). The latest date is the Max, nulls ignored.
+define function ConditionDate(C Condition):
+  Coalesce((C.onset as FHIR.dateTime).value, C.recordedDate.value)
+
+define function GetEncounterConditionDate(code String):
+  Max((GetActiveConditions(code)) C return ConditionDate(C))
+
+define function GetHistoryConditionDate(code String, since DateTime):
+  Max(
+    (
+      ("HistoryConditions") C
+        where ConditionHasCode(C, code)
+          and ConditionVerificationCode(C) != 'refuted'
+          and ConditionVerificationCode(C) != 'entered-in-error'
+        return ConditionDate(C)
+    ) D
+      where since is null or D >= since
+  )
 
 // ── Procedure family (#74; an activity done, feature/20261117-activity-procedure-dedup.md).
 // A Procedure counts only when completed and its outcome is not Unsuccessful
@@ -319,13 +353,17 @@ define function ProcedureRepeatIndex(P Procedure):
       return FHIRHelpers.ToInteger(E.value as FHIR.integer)
   )
 
-define function GetProcedures(code String):
+define "HistoryProcedures":
+  [Procedure] P where IsDoneProcedure(P)
+
+define "EncounterProcedures":
   if encounterid is null then {{}} as List<Procedure>
   else
-    [Procedure] P
-      where ProcedureHasCode(P, code)
-        and IsDoneProcedure(P)
-        and P.encounter.reference = 'Encounter/' + encounterid
+    ("HistoryProcedures") P
+      where P.encounter.reference = 'Encounter/' + encounterid
+
+define function GetProcedures(code String):
+  ("EncounterProcedures") P where ProcedureHasCode(P, code)
 
 define function GetEncounterProcedureValue(code String, repeatIndex Integer):
   exists(
@@ -335,9 +373,8 @@ define function GetEncounterProcedureValue(code String, repeatIndex Integer):
 
 define function GetHistoryProcedure(code String):
   First(
-    [Procedure] P
+    ("HistoryProcedures") P
       where ProcedureHasCode(P, code)
-        and IsDoneProcedure(P)
       sort by (performed as FHIR.dateTime).value desc
   )
 
@@ -346,4 +383,21 @@ define function GetHistoryProcedureDate(code String):
     (GetHistoryProcedure(code).performed as FHIR.dateTime).value,
     (GetHistoryProcedure(code).performed as FHIR.Period).start.value
   )
+
+// Time a Procedure was performed (dateTime, else the start of its Period), and the latest
+// one in the encounter or since a date (null: ever). LatestDate / Latest / Exists of a
+// Procedure retrieval, feature/20261125-populate-read-date.md.
+define function ProcedureTime(P Procedure):
+  Coalesce((P.performed as FHIR.dateTime).value, (P.performed as FHIR.Period).start.value)
+
+define function GetEncounterProcedureDate(code String):
+  Max((GetProcedures(code)) P return ProcedureTime(P))
+
+define function GetHistoryProcedures(code String, since DateTime):
+  ("HistoryProcedures") P
+    where ProcedureHasCode(P, code)
+      and (since is null or ProcedureTime(P) >= since)
+
+define function GetHistoryProcedureDate(code String, since DateTime):
+  Max((GetHistoryProcedures(code, since)) P return ProcedureTime(P))
 """

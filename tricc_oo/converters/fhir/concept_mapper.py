@@ -35,6 +35,10 @@ CONCEPT_TYPE_TO_FHIR: Dict[str, Tuple[str, str, str]] = {
     "drug":                 ("MedicationRequest", "http://hl7.org/fhir/StructureDefinition/MedicationRequest", "medication"),
     "medication":           ("MedicationRequest", "http://hl7.org/fhir/StructureDefinition/MedicationRequest", "medication"),
     "treatment":            ("MedicationRequest", "http://hl7.org/fhir/StructureDefinition/MedicationRequest", "medication"),
+    # a dispensed drug (feature/20261125-populate-medication.md)
+    "dispense":             (
+        "MedicationDispense", "http://hl7.org/fhir/StructureDefinition/MedicationDispense", "medication"
+    ),
     # Procedure
     "procedure":            ("Procedure",       "http://hl7.org/fhir/StructureDefinition/Procedure",       "code"),
     "intervention":         ("Procedure",       "http://hl7.org/fhir/StructureDefinition/Procedure",       "code"),

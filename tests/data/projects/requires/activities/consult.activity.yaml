@@ -1,0 +1,21 @@
+id: consult
+title: Consultation
+process: main
+# an activity prerequisite: a concept no required intervention records
+requires:
+  - {system: 'http://example.org/fhir/CodeSystem/demo', code: muac}
+nodes:
+  - {id: start, type: start, name: start_consult, label: Consultation}
+  # reads the triage weight (the encounter read is the first version of `weight`)
+  - {id: low, type: note, name: low_weight_note, label: Low weight, relevance: '"weight" < 5'}
+  - {id: muac_note, type: note, name: muac_note, label: Low MUAC, relevance: '"muac" < 115'}
+  # the weight measured again: a later version of `weight`
+  - {id: weight, type: decimal, name: weight, label: Weight again (kg)}
+  - {id: heavy, type: calculate, name: heavy, label: Heavy, calculate: '"weight" > 20'}
+  - {id: end, type: end, name: end_consult, label: End}
+edges:
+  - {id: e1, source: start, target: low}
+  - {id: e2, source: low, target: muac_note}
+  - {id: e3, source: muac_note, target: weight}
+  - {id: e4, source: weight, target: heavy}
+  - {id: e5, source: heavy, target: end}

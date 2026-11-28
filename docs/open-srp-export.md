@@ -608,12 +608,37 @@ A populate node reads its `source` concept (a code, or `{system, code}` in YAML;
 `source` attribute), else the concept named like the node: `t_weight` with `source: weight` reads
 `weight` and keeps its own name.
 
-### Project retrievals (`"#name"`)
+### Project retrievals (`Retrieve('name')`, legacy `"#name"`)
 
 `feature/20261109-project-retrievals.md`: a retrieval of the project dictionary that an
 intervention uses becomes one `define "#name"` in the **Helper** library and a hidden item
 `r_<name>` whose `initialExpression` is `Calc_r_<name>: Helper."#name"`. CQL references use
 `Helper."#name"`; FHIRPath references read the `r_<name>` item.
+
+Expressions save a retrieval as a call (`feature/20261125-requires-and-implied-retrievals.md`
+§3): `Retrieve('age_months')` is the dictionary entry `#age_months` (the legacy `"#age_months"`
+still reads it), and `Retrieve('weight', 'P3M' | null | 'encounter'[, field])` is an **implied**
+read with no dictionary entry: the latest `weight` in the past 3 months (`null`: ever;
+`'encounter'`: this encounter), `field` one of `value` (default), `date`, `exists`, `count`,
+and for a drug `active` (its default), `dosage`, `drug`, `duration`, `quantity`, `dispensed`. It becomes the retrieval `#weight@P3M[.field]`, exported as `r_weight_P3M[_field]`
+(`#weight@` → `r_weight_any`). Every argument must be a literal; errors:
+`E_RETRIEVAL_STATIC`, `E_RETRIEVAL_IMPLIED_PERIOD`, `E_RETRIEVAL_IMPLIED_CONCEPT`,
+`E_RETRIEVAL_READ_UNSUPPORTED` (a field the concept's resource does not offer: `date` for
+Observation / Condition / Procedure / medication, the drug fields for MedicationRequest),
+`E_RETRIEVAL_UNKNOWN`. A quoted `"#weight@P3M"` is not a read: `E_RETRIEVAL_QUOTED_IMPLIED`
+(write `Retrieve('weight', 'P3M')`); the legacy `"#name"` still is.
+
+**One read per record** (§4). The Helper retrieves each resource once per scope, in a define
+every function reads: `"HistoryObservations"` / `"EncounterObservations"` (final, amended,
+corrected), `"HistoryConditions"` / `"EncounterConditions"`, `"HistoryProcedures"` /
+`"EncounterProcedures"` (done), `"HistoryMedicationRequests"` / `"EncounterMedicationRequests"`,
+`"HistoryMedicationDispenses"` / `"EncounterMedicationDispenses"` (completed), `"Medications"`.
+The timed retrievals of one concept, scope and window share one list,
+`define "#weight@P3M:records"` (the concept's resources, latest first), and each retrieval's
+define is a one-line read of it. A populate node, a required concept's encounter read and any
+other item define made only of Helper calls name a generated Helper define (`Helper."@weight"`,
+`"@weight@P1Y"` for a history populate) rather than calling a Helper function, so the engine's
+define cache applies.
 
 | function | CQL of `define "#name"` |
 |---|---|
@@ -622,10 +647,22 @@ intervention uses becomes one `define "#name"` in the **Helper** library and a h
 | `DeceasedDateTime`, names, `Telecom`, `Photo` | read from `PatientRecord` (`deceased`, `name`, `telecom`, `photo.url`) |
 | `PatientValue` | the `PatientGender` / `PatientBirthDate` / `AgeInYears` define for those concepts, else `GetPatientValue('<code>')` |
 | `FacilityValue` / `PractitionerValue` / `LocationValue` | `GetFacilityValue('<code>')` / … |
-| `Latest` (encounter / history) | `ValueAs<type>(GetEncounterObservationValue(…))` / `ValueAs<type>(GetHistoryObservationValueSince('<code>', Now() - <period>, 1, null))`; Condition concepts: `Get…ConditionValue('<code>')` |
-| `Exists`, `Count` | `exists(GetObservations(…))` / `GetHistoryObservationSince(…) is not null`; `Count(…)` over the same Observations (or Conditions) |
+| `Latest` (encounter / history) | Observation: `ValueAs<type>(First("<records>").value)`; Condition / Procedure / MedicationDispense: `exists("<records>")`; a drug (MedicationRequest): `active`, a valid prescription exists, `exists("<records>")` |
+| `Exists`, `Count` | `exists("<records>")`, `Count("<records>")` (a drug: valid prescriptions) |
+| `LatestDate` | Observation `effective`, Condition `onset` else `recordedDate`, Procedure `performed`, MedicationRequest `authoredOn`, MedicationDispense `whenHandedOver`: the latest of `"<records>"` |
+| `Dosage`, `Drug`, `Duration`, `Quantity`, `Dispensed` | a drug: `MedicationRequestDosage` / `MedicationRequestCode` / `MedicationRequestDuration` (days) / `MedicationRequestQuantity` / `MedicationRequestDispensed` of `First("<records>")`, the latest valid prescription; `Dispensed` sums the completed MedicationDispense `quantity` whose `authorizingPrescription` is that request |
 | `custom` | its `text/cql` expression; `{{code}}` → `"<code>"`, `{{period}}` → `30 days` |
 
+`<records>` is `#<concept>@<period>:records` (history; no period: `#<concept>@:records`) or
+`#<concept>@encounter:records`; the resource follows the concept's `conceptType` (`diagnosis` →
+Condition, `procedure` → Procedure, `drug` / `medication` / `treatment` → MedicationRequest,
+`dispense` → MedicationDispense, else Observation). Medication codes match
+`medicationCodeableConcept` or the referenced `Medication.code`, across any system. A drug's
+records are its **valid** prescriptions (`IsValidMedicationRequest(M, start, end)`): status
+`active`, and the dose period (R4 `dosageInstruction.timing.repeat.boundsPeriod`; R5
+`effectiveDosePeriod`), else `dispenseRequest.validityPeriod`, contains now (no window,
+encounter) or overlaps `[Now() - <period>, Now()]` (a window), to the day; an open start / end is
+unbounded (`feature/20261125-populate-read-date.md`, `feature/20261125-populate-medication.md`).
 `<type>` follows the `dataType` of the concept read (`coded` / text: string). A period with
 several units (`P1Y6M`) cannot fill `{{period}}` in CQL.
 
