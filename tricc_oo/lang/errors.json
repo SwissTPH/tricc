@@ -1,0 +1,52 @@
+{
+  "description": "Named messages for CQL constructs outside the TRICC profile (tricc_cql.g4), shared by tricc_oo and tricc-frontend (feature/20261125-expression-languages.md §2). On a syntax error, walk the default-channel tokens in order; the first token matching a construct (in list order) names the error, at that token's line and column. A token matches when its text is in `texts` or its symbolic type is in `types`, and, if `after` is set, the previous default-channel token is an operand end (`operand`: a type in `operand_types` or a text in `operand_texts`) or a number (`number`: type NUMBER). No match: the parser's own message with `codes.syntax`.",
+  "codes": {
+    "syntax": "E_CQL_SYNTAX",
+    "profile": "E_CQL_PROFILE",
+    "profile_warning": "W_CQL_PROFILE",
+    "unknown_function": "W_CQL_UNKNOWN_FUNCTION",
+    "dialect": "E_CQL_DIALECT"
+  },
+  "operand_types": ["IDENTIFIER", "QUOTEDIDENTIFIER", "DELIMITEDIDENTIFIER", "STRING", "NUMBER", "LONGNUMBER", "PLACEHOLDER"],
+  "operand_texts": [")", "]", "}"],
+  "constructs": [
+    {
+      "construct": "query",
+      "texts": ["from", "where", "return", "such that", "sort", "let", "with", "without", "aggregate"],
+      "message": "A query is not supported in a form; read that data with a prefilled value."
+    },
+    {
+      "construct": "union",
+      "texts": ["union", "intersect", "except"],
+      "message": "union, intersect and except are not supported in a form; combine the values with or, or with a list {a, b}."
+    },
+    {
+      "construct": "indexer",
+      "texts": ["["],
+      "after": "operand",
+      "message": "An indexer (x[0]) is not supported in a form; use First(), Last() or a single value."
+    },
+    {
+      "construct": "retrieve",
+      "texts": ["["],
+      "message": "A retrieve ([Observation]) is not supported in a form; read that data with a prefilled value or a stored-data function such as GetObservationValue()."
+    },
+    {
+      "construct": "unit",
+      "types": ["STRING"],
+      "texts": ["year", "month", "week", "day", "hour", "minute", "second", "millisecond", "years", "months", "weeks", "days", "hours", "minutes", "seconds", "milliseconds"],
+      "after": "number",
+      "message": "A quantity with a unit (5 'mg', 3 days) is not supported in a form; write the number and keep the unit in the question."
+    },
+    {
+      "construct": "plural_precision",
+      "texts": ["years", "months", "weeks", "days", "hours", "minutes", "seconds", "milliseconds"],
+      "message": "years between / duration in days of are not supported in a form; use AgeInDays(), AgeInMonths(), AgeInYears() or compare dates."
+    },
+    {
+      "construct": "member",
+      "texts": ["."],
+      "message": "Member access (x.member, x.f()) is not supported in a form; reference a question as \"name\" and call a function with the value as its first argument."
+    }
+  ]
+}

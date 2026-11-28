@@ -24,6 +24,7 @@ import pytest
 from tests.helpers import load_yaml_project
 from tricc_oo.converters.cql_to_operation import transform_cql_to_operation
 from tricc_oo.converters.decision_table import expand_decision_tables
+from tricc_oo.converters.lang import load_lang_json
 from tricc_oo.models.base import TriccOperator, TriccReference, TriccStatic
 from tricc_oo.models.decision_table import (
     DecisionTable,
@@ -56,7 +57,8 @@ def _load(name):
         return json.load(file)
 
 
-CELLS = _load("cells.json")["cases"]
+# the FEEL grammar's shared test vector (tricc_oo/lang/feel/, one copy for tricc_oo and the frontend)
+CELLS = load_lang_json("feel/cells.json")["cases"]
 TABLES = _load("tables.json")
 DIAZEPAM = decode_table(TABLES["tables"]["diazepam"], "diazepam")
 TABLE_MAP = {"diazepam": DIAZEPAM}

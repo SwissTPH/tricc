@@ -1,0 +1,52 @@
+# Output capability statements (feature/20261125-output-capabilities.md): loaded copies under
+# capabilities/, only the active ones are checked. Tests flip `active` in a copy.
+title: Capabilities
+input_strategy: YamlStrategy
+output_strategies:
+  - XLSFormCHTStrategy
+terminology:
+  - terminology/*.codesystem.json
+retrieve_code_system: http://example.org/fhir/CodeSystem/demo-retrieve
+decision_tables:
+  - tables/*.yaml
+capabilities:
+  - package: "@tricc/capabilities-xlsform"
+    version: 1.0.0
+    source: npm
+    registry: https://registry.npmjs.org
+    file: capabilities/@tricc/capabilities-xlsform@1.0.0.json
+    sha256: d4ac41e94c906d691b168baa366c751e3478dc510f3527b3b18cb11bc03b78b1
+    active: false
+  - package: "@tricc/capabilities-xlsform-cdss"
+    version: 1.0.0
+    source: npm
+    registry: https://registry.npmjs.org
+    file: capabilities/@tricc/capabilities-xlsform-cdss@1.0.0.json
+    sha256: 24f67cc579f4b0ad422c55b31b6504346dd81822d8b24949d1ca7bcfba3c06e1
+    active: false
+  - package: "@tricc/capabilities-xlsform-cht"
+    version: 1.0.0
+    source: npm
+    registry: https://registry.npmjs.org
+    file: capabilities/@tricc/capabilities-xlsform-cht@1.0.0.json
+    sha256: 63c23af878ce388ce9c266335c523897d744fd6df0a2554721652fe498366a6b
+    active: true
+  - package: "@tricc/capabilities-fhir"
+    version: 1.0.0
+    source: npm
+    registry: https://registry.npmjs.org
+    file: capabilities/@tricc/capabilities-fhir@1.0.0.json
+    sha256: 443adf1179394008d4d0afeea51c477147fe62068b01d8770e382cf30dd08f7e
+    active: false
+  - package: "@acme/capabilities-fhir-strict"
+    version: 1.0.0
+    source: file
+    file: capabilities/@acme/capabilities-fhir-strict@1.0.0.json
+    sha256: da3a71906b5ccafb8086eec817b4460212d70117aa74d5cb12e1398355795d6d
+    active: false
+interventions:
+  - id: check
+    name: check
+    title: Check
+    activity:
+      - activities/check.activity.yaml

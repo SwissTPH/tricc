@@ -1,0 +1,17 @@
+{
+  "$schema": "https://tricc.org/schemas/capability-statement.schema.json",
+  "id": "@tricc/capabilities-xlsform-cht",
+  "version": "1.0.0",
+  "strategy": "XLSFormCHTStrategy",
+  "description": "CHT app forms.",
+  "lang": "^1.0.0",
+  "extends": {
+    "package": "@tricc/capabilities-xlsform-cdss",
+    "version": "^1.0.0"
+  },
+  "add": {
+    "retrieval_contexts": ["patient", "facility", "practitioner", "location", "encounter", "history"],
+    "populate_contexts": ["patient", "facility", "practitioner", "location", "encounter", "history"]
+  },
+  "remove": {}
+}

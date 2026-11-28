@@ -93,8 +93,12 @@ interventions:
   - A row's concept is its node's explicit YAML `concept`, else the concept whose code
     is the node name. Designation text is used as is (`${name}` tokens are not remapped
     to export names).
-- **`libraries`** lists CQL files, parsed with the CQL grammar (a syntax error stops the
-  build with the file and line). Each `define name: <expression>` becomes a
+- **`libraries`** lists CQL files. A library is **standard CQL** (HL7 grammar v5.7.0, no
+  `not in`, no `{{placeholders}}`) unless its opening comment declares TRICC's dialect,
+  `/* @dialect: tricc-cql@1.0.0 */` (the version of `tricc_oo/lang/VERSION`; an unknown
+  dialect or major version is `E_CQL_DIALECT`). A syntax error stops the build with the file
+  and line; each define is then read as a TRICC expression, so a construct outside the
+  profile (a query, a retrieve, `union`, …) is refused there. Each `define name: <expression>` becomes a
   calculate that any activity can reference by name, processed like a free-floating
   calculate on the main page (computed once its references are available). Expression
   defines and functions are read: declarations (`library`, `using`, `include`,

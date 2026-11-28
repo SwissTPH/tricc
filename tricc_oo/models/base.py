@@ -772,7 +772,7 @@ class TriccOperation(BaseModel):
         """Whether this operation, or any operation inside it, retrieves stored data.
 
         ``retrieves_stored_data`` is set by the CQL parser on a call to a function of
-        ``converters/cql/stored_data_functions.json`` (patient, encounter, history or
+        ``tricc_oo/lang/functions.json`` (``reads``) (patient, encounter, history or
         context readers; feature/20261111-block-params-and-start-node.md §18.5).
 
         Returns:

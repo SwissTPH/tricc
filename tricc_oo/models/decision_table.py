@@ -303,58 +303,11 @@ class CellTest:
 
 
 _NUMBER = re.compile(r"^-?\d+(?:\.\d+)?$")
-_COMPARE = re.compile(r"^(<=|>=|<|>|=)\s*(.+)$")
-_RANGE = re.compile(r"^([\[(])\s*(-?\d+(?:\.\d+)?)\s*\.\.\s*(-?\d+(?:\.\d+)?)\s*([\])])$")
-_NOT_NULL = re.compile(r"^not\s*\(\s*null\s*\)$")
 
 
 def _number(text: str) -> Union[int, float]:
     value = float(text)
     return int(value) if value.is_integer() and "." not in text else value
-
-
-def parse_literal(text: str) -> Optional[CellValue]:
-    """A number, ``'text'`` or a boolean; ``None`` when it is none of them."""
-    if _NUMBER.match(text):
-        return _number(text)
-    if text == "true":
-        return True
-    if text == "false":
-        return False
-    quoted = re.match(r"^'((?:[^'\\]|\\.)*)'$", text) or re.match(r'^"((?:[^"\\]|\\.)*)"$', text)
-    if quoted:
-        return re.sub(r"\\(.)", r"\1", quoted.group(1))
-    return None
-
-
-def split_list(text: str) -> Optional[List[str]]:
-    """Split ``a, b, c`` at top-level commas, outside quotes and brackets. ``None`` when unbalanced."""
-    parts: List[str] = []
-    depth = 0
-    quote: Optional[str] = None
-    start = 0
-    i = 0
-    while i < len(text):
-        ch = text[i]
-        if quote:
-            if ch == "\\":
-                i += 1
-            elif ch == quote:
-                quote = None
-        elif ch in ("'", '"'):
-            quote = ch
-        elif ch in "[(":
-            depth += 1
-        elif ch in "])":
-            depth -= 1
-        elif ch == "," and depth == 0:
-            parts.append(text[start:i].strip())
-            start = i + 1
-        i += 1
-    if quote or depth != 0:
-        return None
-    parts.append(text[start:].strip())
-    return parts
 
 
 def _is_numeric(column_type: str) -> bool:
@@ -378,64 +331,99 @@ def _type_mismatch(value: CellValue, column_type: str) -> Optional[str]:
     return None
 
 
+_NOT_A_TEST = (
+    '"{cell}" is not a test. Use -, null, a comparison (>= 20), a range ([3..6)), a value '
+    "(a number, 'text', true or false) or a list of them."
+)
+
+
 def parse_cell(text: str, column_type: str) -> CellTest:
-    """Parse an input cell against its column type.
+    """Parse an input cell against its column type, with the FEEL cell grammar.
+
+    The grammar is ``tricc_oo/lang/feel/TriccFeelParser.g4`` over the upstream KIE FEEL lexer
+    (feature/20261125-expression-languages.md §1.5); the type checks are here.
 
     Raises:
         DecisionTableError: ``E_DMN_CELL`` (syntax) or ``E_DMN_TYPE`` (value vs column type).
     """
+    from tricc_oo.converters.feel_cell import parse_cell_tree
+
     cell = text.strip()
-    if cell == "-":
-        return CellTest("any")
     if cell == "":
         raise DecisionTableError("E_DMN_CELL", 'The cell is empty. Write - for "any value", or null for "not entered".')
-    parts = split_list(cell)
-    if parts is None:
-        raise DecisionTableError("E_DMN_CELL", f'"{cell}" has an unclosed quote or bracket.')
-    if len(parts) > 1:
-        items = []
-        for part in parts:
-            if part == "-":
-                raise DecisionTableError("E_DMN_CELL", '- cannot be one value of a list: it already means "any".')
-            items.append(_parse_single(part, column_type))
-        return CellTest("list", items=tuple(items))
-    return _parse_single(cell, column_type)
+    tree, problem = parse_cell_tree(cell)
+    if tree is None:
+        raise DecisionTableError("E_DMN_CELL", _cell_syntax_message(cell, problem))
+    return _CellBuilder(cell, column_type).visit(tree)
 
 
-def _parse_single(cell: str, column_type: str) -> CellTest:
-    if cell == "":
-        raise DecisionTableError("E_DMN_CELL", "A list has an empty value between two commas.")
-    if cell == "null":
-        return CellTest("null")
-    if _NOT_NULL.match(cell):
-        return CellTest("null", negated=True)
-    rng = _RANGE.match(cell)
-    if rng:
-        if not _is_numeric(column_type):
-            raise DecisionTableError("E_DMN_TYPE", f"A range needs a number column; this column is {column_type}.")
-        low, high = _number(rng.group(2)), _number(rng.group(3))
-        if low > high:
-            raise DecisionTableError("E_DMN_CELL", f"The range {cell} is empty: {low} is above {high}.")
-        return CellTest("range", low=low, high=high, low_in=rng.group(1) == "[", high_in=rng.group(4) == "]")
-    if cell[0] in "[(":
-        raise DecisionTableError(
-            "E_DMN_CELL", f'"{cell}" is not a range. Write it as [3..6) — a square bracket includes the bound.'
-        )
-    cmp = _COMPARE.match(cell)
-    op = cmp.group(1) if cmp else "="
-    literal = parse_literal(cmp.group(2).strip() if cmp else cell)
-    if literal is None:
-        raise DecisionTableError(
-            "E_DMN_CELL",
-            f'"{cell}" is not a test. Use -, null, a comparison (>= 20), a range ([3..6)), a value '
-            "(a number, 'text', true or false) or a list of them.",
-        )
-    mismatch = _type_mismatch(literal, column_type)
-    if mismatch:
-        raise DecisionTableError("E_DMN_TYPE", mismatch)
-    if op != "=" and not _is_numeric(column_type):
-        raise DecisionTableError("E_DMN_TYPE", f"{op} compares numbers; this column is {column_type}.")
-    return CellTest("compare", op=op, value=literal)
+def _cell_syntax_message(cell: str, problem: str) -> str:
+    """A message for a cell that does not parse; ``problem`` is what the token scan found."""
+    if problem == "unclosed":
+        return f'"{cell}" has an unclosed quote or bracket.'
+    if problem == "any_in_list":
+        return '- cannot be one value of a list: it already means "any".'
+    if problem == "empty_item":
+        return "A list has an empty value between two commas."
+    if problem == "range":
+        return f'"{cell}" is not a range. Write it as [3..6) — a square bracket includes the bound.'
+    return _NOT_A_TEST.format(cell=cell)
+
+
+class _CellBuilder:
+    """Parse tree of ``cellRoot`` -> :class:`CellTest`, with the column type checks."""
+
+    def __init__(self, cell: str, column_type: str):
+        self.cell = cell
+        self.column_type = column_type
+
+    def visit(self, root: Any) -> CellTest:
+        from tricc_oo.converters.feel.TriccFeelParser import TriccFeelParser
+
+        tests = root.cellTests()
+        if isinstance(tests, TriccFeelParser.CellAnyContext):
+            return CellTest("any")
+        if isinstance(tests, TriccFeelParser.CellNotNullContext):
+            return CellTest("null", negated=True)
+        items = [self._test(t) for t in tests.cellTest()]
+        return items[0] if len(items) == 1 else CellTest("list", items=tuple(items))
+
+    def _test(self, ctx: Any) -> CellTest:
+        from tricc_oo.converters.feel.TriccFeelParser import TriccFeelParser
+
+        if isinstance(ctx, TriccFeelParser.CellNullContext):
+            return CellTest("null")
+        if isinstance(ctx, TriccFeelParser.CellRangeContext):
+            if not _is_numeric(self.column_type):
+                raise DecisionTableError(
+                    "E_DMN_TYPE", f"A range needs a number column; this column is {self.column_type}."
+                )
+            low, high = (self._value(v) for v in ctx.cellValue())
+            for bound in (low, high):
+                mismatch = _type_mismatch(bound, self.column_type)
+                if mismatch:
+                    raise DecisionTableError("E_DMN_TYPE", mismatch)
+            if low > high:
+                raise DecisionTableError("E_DMN_CELL", f"The range {self.cell} is empty: {low} is above {high}.")
+            return CellTest(
+                "range", low=low, high=high, low_in=ctx.low.text == "[", high_in=ctx.up.text == "]"
+            )
+        op = ctx.op.text if isinstance(ctx, TriccFeelParser.CellCompareContext) else "="
+        literal = self._value(ctx.cellValue())
+        mismatch = _type_mismatch(literal, self.column_type)
+        if mismatch:
+            raise DecisionTableError("E_DMN_TYPE", mismatch)
+        if op != "=" and not _is_numeric(self.column_type):
+            raise DecisionTableError("E_DMN_TYPE", f"{op} compares numbers; this column is {self.column_type}.")
+        return CellTest("compare", op=op, value=literal)
+
+    def _value(self, ctx: Any) -> CellValue:
+        from tricc_oo.converters.feel_cell import cell_value
+
+        value = cell_value(ctx.getText())
+        if value is None:
+            raise DecisionTableError("E_DMN_CELL", _NOT_A_TEST.format(cell=self.cell))
+        return value
 
 
 def parse_output(text: str, column_type: str) -> CellValue:

@@ -1,0 +1,11 @@
+{
+  "id": "@acme/capabilities-fhir-strict",
+  "version": "1.0.0",
+  "strategy": "FHIRStrategy",
+  "description": "An in-house FHIR deployment: decision tables of 5 rows at most inline.",
+  "lang": "^1.0.0",
+  "extends": { "package": "@tricc/capabilities-fhir", "version": "^1.0.0" },
+  "add": {},
+  "remove": {},
+  "limits": { "inline_decision_table_rows": 5 }
+}

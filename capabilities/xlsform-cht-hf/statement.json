@@ -1,0 +1,21 @@
+{
+  "$schema": "../statement.schema.json",
+  "id": "@tricc/capabilities-xlsform-cht-hf",
+  "version": "1.0.0",
+  "strategy": "XLSFormCHTHFStrategy",
+  "description": "CHT health-facility forms.",
+  "lang": "^1.0.0",
+  "extends": {
+    "package": "@tricc/capabilities-xlsform-cht",
+    "version": "^1.0.0"
+  },
+  "add": {},
+  "remove": {
+    "operators": {
+      "AGE_DAY": ["form"],
+      "AGE_MONTH": ["form"],
+      "AGE_YEAR": ["form"]
+    },
+    "functions": ["AgeInDays", "AgeInMonths", "AgeInYears"]
+  }
+}
