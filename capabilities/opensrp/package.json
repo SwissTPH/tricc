@@ -1,0 +1,24 @@
+{
+  "name": "@tricc/capabilities-opensrp",
+  "version": "1.0.0",
+  "description": "TRICC capability statement: OpenSRP / FHIR-Core bundles.",
+  "license": "MPL-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SwissTPH/tricc.git",
+    "directory": "capabilities/opensrp"
+  },
+  "main": "statement.json",
+  "files": [
+    "statement.json",
+    "CHANGELOG.md"
+  ],
+  "keywords": [
+    "tricc",
+    "capability-statement",
+    "OpenSRPStrategy"
+  ],
+  "dependencies": {
+    "@tricc/capabilities-fhir": "^1.0.0"
+  }
+}

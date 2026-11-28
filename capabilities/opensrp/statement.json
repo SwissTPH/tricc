@@ -1,0 +1,14 @@
+{
+  "$schema": "../statement.schema.json",
+  "id": "@tricc/capabilities-opensrp",
+  "version": "1.0.0",
+  "strategy": "OpenSRPStrategy",
+  "description": "OpenSRP / FHIR-Core bundles.",
+  "lang": "^1.0.0",
+  "extends": {
+    "package": "@tricc/capabilities-fhir",
+    "version": "^1.0.0"
+  },
+  "add": {},
+  "remove": {}
+}

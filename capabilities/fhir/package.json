@@ -1,0 +1,21 @@
+{
+  "name": "@tricc/capabilities-fhir",
+  "version": "1.0.0",
+  "description": "TRICC capability statement: FHIR SDC Questionnaire with CQL libraries; inline = FHIRPath, library = CQL.",
+  "license": "MPL-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SwissTPH/tricc.git",
+    "directory": "capabilities/fhir"
+  },
+  "main": "statement.json",
+  "files": [
+    "statement.json",
+    "CHANGELOG.md"
+  ],
+  "keywords": [
+    "tricc",
+    "capability-statement",
+    "FHIRStrategy"
+  ]
+}

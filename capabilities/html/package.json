@@ -1,0 +1,21 @@
+{
+  "name": "@tricc/capabilities-html",
+  "version": "1.0.0",
+  "description": "TRICC capability statement: Static HTML form preview.",
+  "license": "MPL-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SwissTPH/tricc.git",
+    "directory": "capabilities/html"
+  },
+  "main": "statement.json",
+  "files": [
+    "statement.json",
+    "CHANGELOG.md"
+  ],
+  "keywords": [
+    "tricc",
+    "capability-statement",
+    "HTMLStrategy"
+  ]
+}

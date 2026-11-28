@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "description": "Meaning rules both sides must agree on (feature/20261125-expression-languages.md §1.4), run by tricc_oo's tests and tricc-frontend's. parse: what one CQL term means (reference, text, number, boolean, null, operation). expression_arg: whether a block argument, as written, is calculated (an expression) or a fixed value (is_expression_arg / isExpressionArg): a placeholder stands for a value, {{x}} as a quoted reference and {{x | raw}} as a bare word, and the text is parsed with the TRICC profile. literal_value: the value of a fixed argument ('text' unquoted, anything else as written). feel_text: TRICC's 'text' in a decision-table cell is FEEL's \"text\".",
+  "parse": [
+    { "text": "\"weight\"", "kind": "reference", "value": "weight" },
+    { "text": "'axillary'", "kind": "text", "value": "axillary" },
+    { "text": "axillary", "kind": "text", "value": "axillary" },
+    { "text": "38", "kind": "number", "value": 38 },
+    { "text": "2.5", "kind": "number", "value": 2.5 },
+    { "text": "true", "kind": "boolean", "value": true },
+    { "text": "false", "kind": "boolean", "value": false },
+    { "text": "null", "kind": "null" },
+    { "text": "AgeInDays()", "kind": "operation" },
+    { "text": "\"weight\" > 38", "kind": "operation" },
+    { "text": "-3", "kind": "operation" }
+  ],
+  "expression_arg": [
+    { "arg": "AgeInDays()", "expression": true },
+    { "arg": "Today()", "expression": true },
+    { "arg": "\"weight\"", "expression": true },
+    { "arg": "\"x\" > {{t}}", "expression": true },
+    { "arg": "{{t}} + 1", "expression": true },
+    { "arg": "not \"pregnant\"", "expression": true },
+    { "arg": "'a' & 'b'", "expression": true },
+    { "arg": "-1", "expression": true },
+    { "arg": "DMN('diazepam', \"weight\")", "expression": true },
+    { "arg": "axillary", "expression": false },
+    { "arg": "'axillary'", "expression": false },
+    { "arg": "left arm", "expression": false },
+    { "arg": "a b c", "expression": false },
+    { "arg": "38", "expression": false },
+    { "arg": "38.5", "expression": false },
+    { "arg": "true", "expression": false },
+    { "arg": "false", "expression": false },
+    { "arg": "null", "expression": false },
+    { "arg": "{{x}}", "expression": false },
+    { "arg": "{{x | raw}}", "expression": false },
+    { "arg": "{{x}} {{y}}", "expression": false },
+    { "arg": "", "expression": false }
+  ],
+  "literal_value": [
+    { "arg": "'axillary'", "value": "axillary" },
+    { "arg": "axillary", "value": "axillary" },
+    { "arg": "left arm", "value": "left arm" },
+    { "arg": "38", "value": "38" },
+    { "arg": "true", "value": "true" },
+    { "arg": "{{x}}", "value": "{{x}}" },
+    { "arg": "'it''s'", "value": "'it''s'" }
+  ],
+  "feel_text": [
+    { "tricc": "'yes'", "feel": "\"yes\"" },
+    { "tricc": "'a', 'b'", "feel": "\"a\", \"b\"" },
+    { "tricc": "'a, b'", "feel": "\"a, b\"" },
+    { "tricc": "'it\\'s'", "feel": "\"it's\"" },
+    { "tricc": "< 5", "feel": "< 5" },
+    { "tricc": "[1..5)", "feel": "[1..5)" },
+    { "tricc": "-", "feel": "-" }
+  ]
+}

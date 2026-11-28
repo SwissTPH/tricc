@@ -377,7 +377,7 @@ Where only a fixed value fits, either is `E_ARG_DYNAMIC_STATIC`, with the reason
 null keeps its hidden calculate too. The same applies to an intervention's `args`: `37 + 1` is `38`.
 
 A block reads no stored data: an expression calling a function of
-`tricc_oo/converters/cql/stored_data_functions.json` (`AgeInDays()`, the encounter, history
+`tricc_oo/lang/functions.json` (the function catalogue, `reads`) (`AgeInDays()`, the encounter, history
 and practitioner / location / facility readers), or a `populate` node, inside a block is
 `E_BLOCK_SCOPE`. Pass the value in as an expression argument. `Today()` and `Now()` are allowed.
 

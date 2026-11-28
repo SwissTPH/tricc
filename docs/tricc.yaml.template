@@ -79,6 +79,16 @@ parameters:
 # referenced in expressions as "#name" (e.g. "#age_months" < 2). A CodeSystem tagged
 # codesystem-role|retrieve wins; else <default>-retrieve. feature/20261109-project-retrievals.md
 # retrieve_code_system: http://example.org/fhir/CodeSystem/demo-retrieve
+# Output capability statements loaded in the project (copies under capabilities/); the active
+# ones are checked when the project loads (docs/expression-languages.md).
+# capabilities:
+#   - package: "@tricc/capabilities-fhir"
+#     version: 1.0.0
+#     source: npm
+#     registry: https://registry.npmjs.org
+#     file: capabilities/@tricc/capabilities-fhir@1.0.0.json
+#     sha256: <sha256 of the file>
+#     active: true
 
 # Each entry is one algorithm. Omit this list to keep today's behaviour
 # (every top-level drawing in -i is one implicit on-demand intervention).
