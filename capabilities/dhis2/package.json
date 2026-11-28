@@ -1,0 +1,21 @@
+{
+  "name": "@tricc/capabilities-dhis2",
+  "version": "1.0.0",
+  "description": "TRICC capability statement: DHIS2 programs.",
+  "license": "MPL-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SwissTPH/tricc.git",
+    "directory": "capabilities/dhis2"
+  },
+  "main": "statement.json",
+  "files": [
+    "statement.json",
+    "CHANGELOG.md"
+  ],
+  "keywords": [
+    "tricc",
+    "capability-statement",
+    "DHIS2Strategy"
+  ]
+}

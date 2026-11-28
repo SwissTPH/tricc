@@ -1,7 +1,17 @@
 """Project CQL libraries (tricc.yaml ``libraries``) -> calculate nodes.
 
-Libraries are parsed with the CQL grammar (``cqlParser.library``); a syntax error names
-the file and line.
+A library is **standard CQL** unless it declares TRICC's dialect: it is parsed with the
+untouched upstream grammar (``cqlParser.library``, no ``not in``, no ``{{placeholders}}``) and
+TRICC's limits are checked when each define is read as a TRICC expression. A library that starts
+with a comment holding ``@dialect: tricc-cql@<version>`` is parsed with the TRICC profile
+(``tricc_cqlParser.library``); feature/20261125-expression-languages.md §1.8:
+
+    /* @dialect: tricc-cql@1.0.0 */
+    library Helpers
+    define "not_sick": 'fever' not in "symptoms"
+
+An unknown dialect, or a ``tricc-cql`` major version other than the one in use, is
+``E_CQL_DIALECT``. A syntax error names the file and line.
 
 A library is a list of named expressions; in TRICC terms each ``define`` is a
 calculate. Only expression definitions are supported: ``library`` / ``using`` /
@@ -41,6 +51,9 @@ from antlr4.error.ErrorListener import ErrorListener
 
 from tricc_oo.converters.cql.cqlLexer import cqlLexer
 from tricc_oo.converters.cql.cqlParser import cqlParser
+from tricc_oo.converters.cql.tricc_cqlLexer import tricc_cqlLexer
+from tricc_oo.converters.cql.tricc_cqlParser import tricc_cqlParser
+from tricc_oo.converters.lang import error_code, lang_version
 from tricc_oo.converters.utils import generate_id
 from tricc_oo.models.base import TriccNodeType
 from tricc_oo.models.calculate import TriccNodeCalculate
@@ -50,6 +63,13 @@ logger = logging.getLogger("default")
 _NAME_OK = re.compile(r"^[A-Za-z_][A-Za-z0-9_.]*$")
 _TAG = re.compile(r"^@(?P<name>[A-Za-z_][A-Za-z0-9_.-]*)\s*:?\s*(?P<value>.*)$")
 _BOOLEAN_TAGS = ("retrieve",)
+#: the dialect tag in the comment that opens a library: ``@dialect: tricc-cql@1.0.0``
+_DIALECT = re.compile(r"^\s*/\*(?P<body>.*?)\*/", re.S)
+_DIALECT_TAG = re.compile(
+    r"@dialect\s*:?\s*(?P<name>[A-Za-z0-9_.-]+?)(?:@(?P<version>[0-9][0-9A-Za-z.+-]*))?\s*$", re.M
+)
+#: dialect name of the TRICC profile
+TRICC_DIALECT = "tricc-cql"
 
 # FHIR data type of a CQL type specifier, by its unqualified, lower-cased name
 # (``FHIR.decimal``, ``System.Decimal`` and ``Decimal`` are all ``decimal``).
@@ -112,18 +132,55 @@ class _RaiseOnSyntaxError(ErrorListener):
         raise ValueError(f"{self.source}: not valid CQL at line {line}:{column}: {msg}")
 
 
+def library_dialect(text: str, source: str = "<library>") -> Optional[Tuple[str, Optional[str]]]:
+    """The dialect a library declares in its opening comment, else None (standard CQL).
+
+    Args:
+        text: The library.
+        source: Its file, for messages.
+
+    Returns:
+        ``(name, version)``; the version may be None.
+
+    Raises:
+        ValueError: ``E_CQL_DIALECT`` for an unknown dialect or a TRICC major version other than
+            the one of ``tricc_oo/lang/VERSION``.
+    """
+    opening = _DIALECT.match(text)
+    if not opening:
+        return None
+    tag = _DIALECT_TAG.search(opening.group("body"))
+    if not tag:
+        return None
+    name, version = tag.group("name"), tag.group("version")
+    if name != TRICC_DIALECT:
+        raise ValueError(f"{error_code('dialect')}: {source}: unknown CQL dialect {name!r}; use {TRICC_DIALECT}")
+    if version and version.split(".")[0] != lang_version().split(".")[0]:
+        raise ValueError(
+            f"{error_code('dialect')}: {source}: {TRICC_DIALECT}@{version} is not supported by this TRICC "
+            f"({TRICC_DIALECT}@{lang_version()})"
+        )
+    return name, version
+
+
 class _ParsedLibrary:
-    """One library parsed with the CQL grammar: its defines and functions, in file order."""
+    """One library parsed with the CQL grammar: its defines and functions, in file order.
+
+    Standard CQL by default; the TRICC profile when the library declares ``tricc-cql``.
+    """
 
     def __init__(self, text: str, source: str):
         self.text = text
         self.source = source
+        self.dialect = library_dialect(text, source)
+        lexer_class, parser_class = (tricc_cqlLexer, tricc_cqlParser) if self.dialect else (cqlLexer, cqlParser)
+        self.lexer_class = lexer_class
         self.input = InputStream(text)
-        lexer = cqlLexer(self.input)
+        lexer = lexer_class(self.input)
         lexer.removeErrorListeners()
         lexer.addErrorListener(_RaiseOnSyntaxError(source))
         self.tokens = CommonTokenStream(lexer)
-        parser = cqlParser(self.tokens)
+        parser = parser_class(self.tokens)
         parser.removeErrorListeners()
         parser.addErrorListener(_RaiseOnSyntaxError(source))
         self.tree = parser.library()
@@ -143,14 +200,19 @@ class _ParsedLibrary:
         hidden = self.tokens.getHiddenTokensToLeft(ctx.start.tokenIndex) or []
         comment = None
         for token in reversed(hidden):
-            if token.type == cqlLexer.WS:
+            if token.type == self.lexer_class.WS:
                 continue
-            if token.type == cqlLexer.COMMENT:
+            if token.type == self.lexer_class.COMMENT:
                 comment = token.text
             break
         if comment is None:
             return {}
         return _parse_tags(comment[2:-2], name, self.source)
+
+
+def _is_function(ctx) -> bool:
+    """A function definition, from either grammar (standard CQL or the TRICC profile)."""
+    return type(ctx).__name__ == "FunctionDefinitionContext"
 
 
 def _identifier(ctx) -> str:
@@ -239,7 +301,7 @@ def parse_cql_library_functions(text: str, source: str = "<library>") -> Dict[st
     library = _ParsedLibrary(text, source)
     functions: Dict[str, FunctionSignature] = {}
     for ctx in library.statements():
-        if not isinstance(ctx, cqlParser.FunctionDefinitionContext):
+        if not _is_function(ctx):
             continue
         signature = _function_signature(library, ctx)
         if signature.name in functions:
@@ -255,7 +317,7 @@ def parse_cql_library(text: str, source: str = "<library>") -> List[Tuple[str, s
     defines: List[Tuple[str, str]] = []
     seen = set()
     for ctx in library.statements():
-        if isinstance(ctx, cqlParser.FunctionDefinitionContext):
+        if _is_function(ctx):
             _function_signature(library, ctx)  # rejects a body
             continue
         name = _identifier(ctx.identifier())

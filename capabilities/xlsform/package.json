@@ -1,0 +1,21 @@
+{
+  "name": "@tricc/capabilities-xlsform",
+  "version": "1.0.0",
+  "description": "TRICC capability statement: XLSForm (ODK) forms.",
+  "license": "MPL-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SwissTPH/tricc.git",
+    "directory": "capabilities/xlsform"
+  },
+  "main": "statement.json",
+  "files": [
+    "statement.json",
+    "CHANGELOG.md"
+  ],
+  "keywords": [
+    "tricc",
+    "capability-statement",
+    "XLSFormStrategy"
+  ]
+}

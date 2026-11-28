@@ -1,0 +1,18 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "demo",
+  "name": "demo",
+  "url": "http://example.org/fhir/CodeSystem/demo",
+  "status": "draft",
+  "content": "complete",
+  "concept": [
+    {
+      "code": "weight",
+      "display": "Weight (kg)",
+      "property": [
+        {"code": "dataType", "valueCode": "decimal"},
+        {"code": "conceptType", "valueCode": "Symptom-Finding"}
+      ]
+    }
+  ]
+}

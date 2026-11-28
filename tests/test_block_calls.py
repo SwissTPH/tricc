@@ -59,7 +59,8 @@ class TestStoredDataFunctions:
 
         data = json.load(open(STORED_DATA_FUNCTIONS_FILE, encoding="utf-8"))
         assert data["version"] == 1
-        assert {f["reads"] for f in data["functions"]} == {"patient", "encounter", "history", "context"}
+        reads = {f["reads"] for f in data["functions"]}
+        assert reads == {"none", "patient", "encounter", "history", "context"}
 
     def test_every_function_is_known(self):
         from tricc_oo.converters.fhir import populate_helper, repeat_helper

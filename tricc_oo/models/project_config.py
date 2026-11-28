@@ -212,6 +212,26 @@ class TriccBlockRef(BaseModel):
     path: str
 
 
+class TriccCapabilityEntry(BaseModel):
+    """One loaded output capability statement (feature/20261125-output-capabilities.md §2).
+
+    ``file`` is the statement copied into the project folder (relative to ``tricc.yaml``); the
+    build reads only that copy, checked by ``sha256``. Only ``active`` statements are checked; an
+    inactive one is kept for later, for comparison, or as the parent of an active one.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    package: str
+    version: str
+    source: Literal["npm", "github", "file"] = "npm"
+    # npm / github sources: the registry it was loaded from
+    registry: Optional[str] = None
+    file: str
+    sha256: Optional[str] = None
+    active: bool = True
+
+
 class TriccProjectConfig(BaseModel):
     """Root `tricc.yaml` document."""
 
@@ -244,6 +264,9 @@ class TriccProjectConfig(BaseModel):
     # The retrieval dictionary (CodeSystem url, id or name): data read before the
     # consultation, referenced as "#code" (feature/20261109-project-retrievals.md).
     retrieve_code_system: Optional[str] = None
+    # Output capability statements loaded in the project; the active ones are checked at load
+    # (feature/20261125-output-capabilities.md).
+    capabilities: List[TriccCapabilityEntry] = Field(default_factory=list)
 
     @field_validator("terminology", "libraries", "decision_tables")
     @classmethod
